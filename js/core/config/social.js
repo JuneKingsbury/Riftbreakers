@@ -1,0 +1,128 @@
+/**
+ * Social simulation data: colonist mood thoughts, relationship tiers, the
+ * weighted table of pairwise interactions, and the tuning knobs that gate how
+ * often colonists interact and how opinions decay. Consumed by the social
+ * system (js/systems/social.js) and colonist mood code. Re-exported through
+ * the config hub (index.js) so consumers import from '../core/config.js'.
+ */
+
+export const THOUGHTS = {
+    built_something:   { text: 'Built something', moodEffect: 3, duration: 100 },
+    good_work:         { text: 'Good honest work', moodEffect: 2, duration: 80 },
+    harvested:         { text: 'Harvested crops', moodEffect: 3, duration: 100 },
+    crafted:           { text: 'Crafted something', moodEffect: 4, duration: 120 },
+    cooked:            { text: 'Cooked a meal', moodEffect: 3, duration: 100 },
+    tamed_animal:      { text: 'Tamed an animal', moodEffect: 6, duration: 150 },
+    put_out_fire:      { text: 'Put out a fire', moodEffect: 5, duration: 150 },
+    repaired:          { text: 'Repaired a structure', moodEffect: 3, duration: 100 },
+    deconstructed:     { text: 'Tore something down', moodEffect: 2, duration: 80 },
+    new_colonist:      { text: 'New colonist arrived', moodEffect: 5, duration: 200 },
+    unwanted:          { text: 'Feeling unwanted', moodEffect: -10, duration: 20 },
+    freezing:          { text: 'Freezing outside', moodEffect: -8, duration: 50 },
+    overheating:       { text: 'Overheating outside', moodEffect: -6, duration: 80 },
+    fire_panic:        { text: 'Colony on fire!', moodEffect: -20, duration: 200 },
+    crops_died:        { text: 'Crops died', moodEffect: -15, duration: 250 },
+    cold_snap:         { text: 'Freezing cold snap', moodEffect: -12, duration: 300 },
+    inspired:          { text: 'Feeling inspired!', moodEffect: 25, duration: 300 },
+    food_spoiled:      { text: 'Food is rotting', moodEffect: -5, duration: 150 },
+    learned_spell:     { text: 'Learned a new spell!', moodEffect: 8, duration: 200 },
+    cast_spell:        { text: 'Cast a spell', moodEffect: 3, duration: 80 },
+    tame_failed:       { text: 'Failed taming attempt!', moodEffect: -8, duration: 150 },
+    wolf_retaliated:   { text: 'Wolf attacked during taming!', moodEffect: -12, duration: 200 },
+    fed_animal:        { text: 'Fed and bonded with an animal', moodEffect: 3, duration: 100 },
+    animal_died:       { text: 'My animal companion died', moodEffect: -8, duration: 150 },
+    pet_died:          { text: 'My beloved pet died', moodEffect: -15, duration: 300 },
+    animal_escaped:    { text: 'An animal escaped the colony', moodEffect: -5, duration: 150 },
+    // Relaxation thoughts
+    relaxed:           { text: 'Relaxed a while',          moodEffect: 4, duration: 200 },
+    hung_out:          { text: 'Hung out in the hall',     moodEffect: 8, duration: 250 },
+    stargazed:         { text: 'Watched the stars',        moodEffect: 6, duration: 220 },
+    cloud_watched:     { text: 'Watched the clouds',       moodEffect: 5, duration: 200 },
+    strolled:          { text: 'Took a nice stroll',       moodEffect: 3, duration: 150 },
+    warmed_by_fire:    { text: 'Warmed by the fire',       moodEffect: 6, duration: 200 },
+    people_watched:    { text: 'Did some people-watching', moodEffect: 5, duration: 200 },
+    skipped_stones:    { text: 'Skipped stones',           moodEffect: 5, duration: 200 },
+    smelled_flowers:   { text: 'Smelled the flowers',      moodEffect: 5, duration: 200 },
+    // Ambient mood events
+    enjoyed_weather:   { text: 'Enjoyed the weather',      moodEffect: 6, duration: 400 },
+    saw_shooting_star: { text: 'Saw a shooting star',      moodEffect: 8, duration: 400 },
+    found_trinket:     { text: 'Found a lucky trinket',    moodEffect: 5, duration: 350 },
+    // Arrival-bond thoughts (a wanderer arrives already knowing someone here)
+    reunited_friend:   { text: 'Reunited with an old friend', moodEffect: 10, duration: 300 },
+    reunited_rival:    { text: 'An old rival turned up here', moodEffect: -8, duration: 250 },
+    // Social thoughts
+    made_friend:       { text: 'Made a new friend!', moodEffect: 12, duration: 300 },
+    became_adversaries:{ text: 'Made an adversary', moodEffect: -5, duration: 150 },
+    became_rivals:     { text: 'Made an enemy', moodEffect: -10, duration: 250 },
+    good_conversation: { text: 'Had a nice chat', moodEffect: 4, duration: 120 },
+    had_argument:      { text: 'Had an argument', moodEffect: -6, duration: 120 },
+    fell_in_love:      { text: 'Found love!', moodEffect: 20, duration: 500 },
+    friendship_ended:  { text: 'Lost a friend', moodEffect: -8, duration: 200 },
+    acquaintance_died: { text: 'Someone I knew has died', moodEffect: -20, duration: 1500 },
+    friend_died:       { text: 'A friend has died', moodEffect: -60, duration: 3000 },
+    close_friend_died: { text: 'A close friend has died', moodEffect: -80, duration: 4000 },
+    rival_died:        { text: 'A rival has died', moodEffect: 5, duration: 500 },
+    lover_died:        { text: 'My love has died', moodEffect: -100, duration: 5000 },
+};
+
+export const RELATIONSHIP_TIERS = [
+    { key: 'rival',        minOpinion: -75,  name: 'Rival',        color: '#ff4444' },
+    { key: 'adversary',    minOpinion: -50,  name: 'Adversary',    color: '#ff9d34' },
+    { key: 'stranger',     minOpinion: -25,  name: 'Stranger',     color: '#888888' },
+    { key: 'acquaintance', minOpinion: 15,   name: 'Acquaintance', color: '#aaaaaa' },
+    { key: 'friend',       minOpinion: 40,   name: 'Friend',       color: '#44cc44' },
+    { key: 'close_friend', minOpinion: 65,   name: 'Close Friend', color: '#44aaff' },
+    { key: 'lovers',       minOpinion: 85,   name: 'Lovers',       color: '#ff88cc' },
+];
+
+// Two-colonist activities that run when both are hanging out together at the
+// Town Hall. Larger opinion deltas than passive interactions make the hall a
+// relationship engine, not just a mood pad. Consumed by social.js (SocialSystem).
+export const GROUP_ACTIVITIES = [
+    { key: 'played_game',   text: '{a} and {b} played a game in the hall.',        weight: 30, opinionDelta: 14, thoughtKey: 'good_conversation', type: 'success', valence: 1 },
+    { key: 'told_stories',  text: '{a} and {b} traded stories in the hall.',     weight: 28, opinionDelta: 12, thoughtKey: 'good_conversation', type: 'success', valence: 1 },
+    { key: 'shared_drink',  text: '{a} and {b} shared a drink in the hall.',       weight: 22, opinionDelta: 16, thoughtKey: 'good_conversation', type: 'success', valence: 1 },
+    { key: 'sang_together', text: '{a} and {b} sang together in the hall.',        weight: 20, opinionDelta: 13, thoughtKey: 'good_conversation', type: 'success', valence: 1 },
+];
+
+export const SOCIAL_INTERACTIONS = [
+    { key: 'pleasant_chat',   text: '{a} and {b} had a pleasant chat.',       weight: 40, opinionDelta: 5,  thoughtKey: 'good_conversation', type: 'info',    valence: 1 },
+    { key: 'shared_meal',     text: '{a} and {b} shared a meal together.',    weight: 30, opinionDelta: 8,  thoughtKey: 'good_conversation', type: 'info',    valence: 1 },
+    { key: 'helped_work',     text: '{a} helped {b} with their work.',        weight: 25, opinionDelta: 10, thoughtKey: 'good_conversation', type: 'success', valence: 1 },
+    { key: 'funny_story',     text: '{a} told {b} a funny story.',            weight: 25, opinionDelta: 4,  thoughtKey: 'good_conversation', type: 'info',    valence: 1 },
+    { key: 'encouraged',      text: '{a} and {b} encouraged each other.',     weight: 20, opinionDelta: 7,  thoughtKey: 'good_conversation', type: 'success', valence: 1 },
+    { key: 'nodded',          text: '{a} and {b} exchanged a nod.',           weight: 15, opinionDelta: 1,  thoughtKey: null,                type: 'info',    valence: 0 },
+    { key: 'disagreement',    text: '{a} and {b} had a disagreement.',        weight: 10, opinionDelta: -8, thoughtKey: 'had_argument',      type: 'warning', valence: -1 },
+    { key: 'argument',        text: '{a} and {b} argued loudly.',             weight: 6,  opinionDelta: -15,thoughtKey: 'had_argument',      type: 'warning', valence: -1 },
+    { key: 'annoyed',         text: '{a} got on {b}\'s nerves.',              weight: 8,  opinionDelta: -5, thoughtKey: null,                type: 'warning', valence: -1 },
+];
+
+export const SOCIAL_CONFIG = {
+    checkInterval: 15,
+    interactionRange: 4,
+    baseInteractionChance: 0.12,
+    socialiteChanceMult: 1.8,
+    lonerChanceMult: 0.3,
+    interactionCooldown: 200,
+    opinionDecayInterval: 500,
+    opinionDecayAmount: 1,
+    // Group activities: when both colonists of a pair are hanging out at the Town
+    // Hall, they run a GROUP_ACTIVITIES interaction at this (higher) chance instead
+    // of a normal one, building bonds faster. Shorter cooldown so the hall stays lively.
+    groupActivityChance: 0.5,
+    groupActivityCooldown: 120,
+};
+
+// A newly-arrived wanderer has a chance to already know one existing colonist,
+// arriving with a pre-set mutual opinion. Adds instant social texture at zero
+// ongoing cost. Consumed by events.js resolveWanderer. `chance` gates whether a
+// bond forms at all; when it does, one of `bonds` is picked by weight.
+export const ARRIVAL_BONDS = {
+    chance: 0.4,
+    bonds: [
+        { key: 'old_friend',      weight: 5, opinion: 55,  thoughtKey: 'reunited_friend', arrivalText: '{a} and {b} are old friends.' },
+        { key: 'close_friend',    weight: 2, opinion: 70,  thoughtKey: 'reunited_friend', arrivalText: '{a} and {b} were close friends in the past!' },
+        { key: 'estranged',       weight: 3, opinion: -55, thoughtKey: 'reunited_rival',  arrivalText: '{a} and {b} have bad blood between them.' },
+        { key: 'bitter_rival',    weight: 1, opinion: -70, thoughtKey: 'reunited_rival',  arrivalText: '{a} and {b} are bitter rivals!' },
+    ],
+};

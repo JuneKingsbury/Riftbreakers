@@ -1,0 +1,457 @@
+import { computeMoveRange, computeMovePath, computeAttackRange, computeAoeArea, resolveAbility, ABILITIES } from './abilities.js';
+import { isDead, isAlive, isConscious, isUnconscious, isStunned, faceToward } from './units.js';
+import { getTile } from './battle-map.js';
+import { moveEntity, moveEntityAlongPath } from '../systems/movement-lerp.js';
+
+export const STATES = {
+    ADVANCE_CT:            'ADVANCE_CT',
+    PLAYER_TURN:           'PLAYER_TURN',
+    SELECT_MOVE:           'SELECT_MOVE',
+    SELECT_ABILITY:        'SELECT_ABILITY',
+    SELECT_ABILITY_TARGET: 'SELECT_ABILITY_TARGET',
+    ANIMATING:             'ANIMATING',
+    ENEMY_TURN:            'ENEMY_TURN',
+    BATTLE_OVER:           'BATTLE_OVER',
+};
+
+const CT_ACT_THRESHOLD = 100;
+const CT_TICK_AMOUNT   = 1;
+
+export class TacticalBattle {
+    constructor(map, units) {
+        this.map   = map;
+        this.units = units;
+        this.state = STATES.ADVANCE_CT;
+        this.activeUnit = null;
+        this.selectedAbility = null;
+        this.moveRange = new Set();
+        this.abilityRange = new Set();
+        this.aoePreview = new Set();
+        this.hitPreview = new Set();
+        this.hitPreview = new Set();
+        this.log = [];
+        this.winner = null;
+        this._animEnd = 0;
+        this._pendingEnemy = null;
+        this.onLogMessage = null;
+        this.onStateChange = null;
+    }
+
+    get livingUnits() {
+        return this.units.filter(u => isAlive(u));
+    }
+
+    logMsg(msg) {
+        this.log.unshift(msg);
+        if (this.log.length > 40) this.log.pop();
+        if (this.onLogMessage) this.onLogMessage(msg);
+    }
+
+    setState(s) {
+        this.state = s;
+        if (this.onStateChange) this.onStateChange(s);
+    }
+
+    // Advance CT until a unit reaches the threshold. Returns the acting unit.
+    advanceCT() {
+        const living = this.livingUnits;
+        if (living.length === 0) return null;
+        for (;;) {
+            for (const u of living) {
+                u.ct += u.spd * CT_TICK_AMOUNT;
+                if (u._charging) u._charging.ct += u.spd * CT_TICK_AMOUNT;
+            }
+            const ready = living.filter(u => u.ct >= CT_ACT_THRESHOLD);
+            if (ready.length > 0) {
+                ready.sort((a, b) => b.ct - a.ct || b.spd - a.spd);
+                return ready[0];
+            }
+        }
+    }
+
+    startTurn(unit) {
+        this.activeUnit = unit;
+
+        // Remove defend status at the start of each turn
+        unit.status = unit.status.filter(s => s !== 'defend');
+
+        if (isUnconscious(unit)) {
+            unit.deathTimer = (unit.deathTimer || 0) - 1;
+            if (unit.deathTimer <= 0) {
+                unit.status = unit.status.filter(s => s !== 'unconscious');
+                if (!unit.status.includes('dead')) unit.status.push('dead');
+                this.logMsg(`${unit.name} has perished!`);
+                this._checkVictory();
+            }
+            this.endTurn(100);
+            return;
+        }
+
+        if (isStunned(unit)) {
+            unit.status = unit.status.filter(s => s !== 'stun');
+            this.logMsg(`${unit.name} is stunned and loses their turn!`);
+            this.endTurn(15);
+            return;
+        }
+
+        if (unit.team === 'enemy') {
+            this.setState(STATES.ENEMY_TURN);
+        } else {
+            this.setState(STATES.PLAYER_TURN);
+            this.moveRange = computeMoveRange(unit, this.map, this.livingUnits);
+        }
+    }
+
+    // Player selects Move action
+    enterMoveMode() {
+        if (this.state !== STATES.PLAYER_TURN) return;
+        this.moveRange = computeMoveRange(this.activeUnit, this.map, this.livingUnits);
+        this.abilityRange = new Set();
+        this.aoePreview = new Set();
+        this.hitPreview = new Set();
+        this.setState(STATES.SELECT_MOVE);
+    }
+
+    // Player selects an ability to use
+    enterAbilityMode(abilityKey) {
+        if (this.state !== STATES.PLAYER_TURN) return;
+        const ab = ABILITIES[abilityKey];
+        if (!ab) return;
+        if (ab.passive) return;
+        if (ab.mpCost > this.activeUnit.mp) return;
+        this.selectedAbility = abilityKey;
+        const fromTile = new Set([`${this.activeUnit.x},${this.activeUnit.y}`]);
+        this.abilityRange = computeAttackRange(fromTile, ab.range);
+        this.aoePreview = new Set();
+        this.hitPreview = new Set();
+        this.setState(STATES.SELECT_ABILITY_TARGET);
+    }
+
+    // Update AoE preview when hovering a target tile
+    hoverAbilityTarget(tx, ty) {
+        if (this.state !== STATES.SELECT_ABILITY_TARGET) return;
+        const ab = ABILITIES[this.selectedAbility];
+        if (ab && ab.aoe > 0) {
+            this.aoePreview = computeAoeArea(tx, ty, ab.aoe);
+        } else {
+            this.aoePreview = new Set([`${tx},${ty}`]);
+        }
+
+        // Compute which tiles in the preview contain a valid hittable target.
+        const source = this.activeUnit;
+        this.hitPreview = new Set();
+        for (const key of this.aoePreview) {
+            const hit = this.livingUnits.some(u => {
+                if (`${u.x},${u.y}` !== key) return false;
+                const sameTeam = u.team === source.team;
+                if (ab.targetType === 'ally'  && !sameTeam) return false;
+                if (ab.targetType === 'enemy' &&  sameTeam) return false;
+                return true;
+            });
+            if (hit) this.hitPreview.add(key);
+        }
+    }
+
+    // Player commits a move
+    commitMove(tx, ty) {
+        if (this.state !== STATES.SELECT_MOVE) return false;
+        const key = `${tx},${ty}`;
+        if (!this.moveRange.has(key)) return false;
+        const unit = this.activeUnit;
+        const path = computeMovePath(unit, this.map, this.livingUnits, tx, ty);
+        if (path && path.length > 0) {
+            moveEntityAlongPath(unit, path, 180);
+        } else {
+            moveEntity(unit, tx, ty, 180);
+        }
+        faceToward(unit, tx, ty);
+        this.logMsg(`${unit.name} moved to (${tx}, ${ty}).`);
+        this.setState(STATES.PLAYER_TURN);
+        this.moveRange = new Set();
+        this.abilityRange = new Set();
+        return true;
+    }
+
+    // Player commits an ability on a tile
+    commitAbility(tx, ty) {
+        if (this.state !== STATES.SELECT_ABILITY_TARGET) return false;
+        const ab = ABILITIES[this.selectedAbility];
+        if (!ab) return false;
+        if (!this.abilityRange.has(`${tx},${ty}`)) return false;
+
+        const source = this.activeUnit;
+
+        if (ab.chargeTime && ab.chargeTime > 0) {
+            source.mp = Math.max(0, source.mp - ab.mpCost);
+            source._charging = {
+                ability: this.selectedAbility,
+                targetX: tx,
+                targetY: ty,
+                ct: 0,
+                needed: ab.chargeTime * 10,
+            };
+            if (!source.status.includes('charging')) source.status.push('charging');
+            this.logMsg(`${source.name} begins channeling ${ab.name}!`);
+            this.selectedAbility = null;
+            this.abilityRange = new Set();
+            this.aoePreview = new Set();
+        this.hitPreview = new Set();
+            this.setState(STATES.PLAYER_TURN);
+            return true;
+        }
+
+        source.mp = Math.max(0, source.mp - ab.mpCost);
+
+        const affectedTiles = ab.aoe > 0 ? computeAoeArea(tx, ty, ab.aoe) : new Set([`${tx},${ty}`]);
+        const targets = this.livingUnits.filter(u => {
+            const sameTeam = u.team === source.team;
+            if (ab.targetType === 'ally' && !sameTeam) return false;
+            if (ab.targetType === 'enemy' && sameTeam) return false;
+            return affectedTiles.has(`${u.x},${u.y}`);
+        });
+
+        if (targets.length === 0 && !ab.isHeal && !ab.isCure) {
+            this.logMsg(`${source.name} used ${ab.name} but hit nothing!`);
+        }
+
+        for (const target of targets) {
+            const result = resolveAbility(source, target, this.selectedAbility, this.map);
+            if (result.missed) {
+                this.logMsg(`${source.name} missed ${target.name}!`);
+                this._spawnFloat(target, 'Miss!', '#aaa');
+                continue;
+            }
+            if (result.damage > 0) {
+                const highGround = getTile(this.map, source.x, source.y)?.elevation > getTile(this.map, target.x, target.y)?.elevation;
+                const suffix = highGround ? ' (high gnd!)' : '';
+                this.logMsg(`${source.name} hits ${target.name} for ${result.damage} dmg${suffix}.`);
+                this._spawnFloat(target, `-${result.damage}`, '#f88');
+            }
+            if (result.healing > 0) {
+                this.logMsg(`${source.name} heals ${target.name} for ${result.healing} HP.`);
+                this._spawnFloat(target, `+${result.healing}`, '#8f8');
+            }
+            if (result.revived) {
+                this.logMsg(`${target.name} is revived!`);
+            }
+            if (result.statusApplied) {
+                this.logMsg(`${target.name} is afflicted with ${result.statusApplied}!`);
+            }
+            if (result.killedInstantly) {
+                this.logMsg(`${target.name} is slain!`);
+            } else if (isUnconscious(target)) {
+                this.logMsg(`${target.name} is knocked unconscious!`);
+            }
+        }
+
+        this.selectedAbility = null;
+        this.abilityRange = new Set();
+        this.aoePreview = new Set();
+        this.hitPreview = new Set();
+        this.setState(STATES.PLAYER_TURN);
+        this._checkVictory();
+        return true;
+    }
+
+    // Check and fire any ready charges. Returns array of fired charges for animation.
+    checkAndFireCharges() {
+        const fired = [];
+        for (const unit of this.livingUnits) {
+            if (!unit._charging) continue;
+            if (unit._charging.ct < unit._charging.needed) continue;
+
+            const { ability, targetX, targetY } = unit._charging;
+            const ab = ABILITIES[ability];
+            unit.status = unit.status.filter(s => s !== 'charging');
+            unit._charging = null;
+
+            if (ab) {
+                const affectedTiles = ab.aoe > 0 ? computeAoeArea(targetX, targetY, ab.aoe) : new Set([`${targetX},${targetY}`]);
+                const targets = this.livingUnits.filter(u => {
+                    const sameTeam = u.team === unit.team;
+                    if (ab.targetType === 'ally' && !sameTeam) return false;
+                    if (ab.targetType === 'enemy' && sameTeam) return false;
+                    return affectedTiles.has(`${u.x},${u.y}`);
+                });
+
+                this.logMsg(`${unit.name}'s ${ab.name} fires!`);
+
+                for (const target of targets) {
+                    const result = resolveAbility(unit, target, ability, this.map);
+                    if (result.missed) {
+                        this.logMsg(`${unit.name} missed ${target.name}!`);
+                        this._spawnFloat(target, 'Miss!', '#aaa');
+                        continue;
+                    }
+                    if (result.damage > 0) {
+                        this.logMsg(`${unit.name} hits ${target.name} for ${result.damage} dmg.`);
+                        this._spawnFloat(target, `-${result.damage}`, '#f88');
+                    }
+                    if (result.healing > 0) {
+                        this.logMsg(`${unit.name} heals ${target.name} for ${result.healing} HP.`);
+                        this._spawnFloat(target, `+${result.healing}`, '#8f8');
+                    }
+                    if (result.revived) {
+                        this.logMsg(`${target.name} is revived!`);
+                    }
+                    if (result.killedInstantly) {
+                        this.logMsg(`${target.name} is slain!`);
+                    } else if (isUnconscious(target)) {
+                        this.logMsg(`${target.name} is knocked unconscious!`);
+                    }
+                }
+            }
+
+            fired.push({ unit, targetX, targetY, ability });
+        }
+
+        if (fired.length > 0) this._checkVictory();
+        return fired;
+    }
+
+    // Apply an ability directly for enemy AI, bypassing the player-input state guards.
+    applyEnemyAbility(unit, abilityKey, tx, ty) {
+        const ab = ABILITIES[abilityKey];
+        if (!ab || ab.passive) return;
+
+        unit.mp = Math.max(0, unit.mp - ab.mpCost);
+
+        if (ab.chargeTime && ab.chargeTime > 0) {
+            unit._charging = { ability: abilityKey, targetX: tx, targetY: ty, ct: 0, needed: ab.chargeTime * 10 };
+            if (!unit.status.includes('charging')) unit.status.push('charging');
+            this.logMsg(`${unit.name} begins channeling ${ab.name}!`);
+            return;
+        }
+
+        const affectedTiles = ab.aoe > 0 ? computeAoeArea(tx, ty, ab.aoe) : new Set([`${tx},${ty}`]);
+        const targets = this.livingUnits.filter(u => {
+            const sameTeam = u.team === unit.team;
+            if (ab.targetType === 'ally' && !sameTeam) return false;
+            if (ab.targetType === 'enemy' && sameTeam) return false;
+            return affectedTiles.has(`${u.x},${u.y}`);
+        });
+
+        for (const target of targets) {
+            const result = resolveAbility(unit, target, abilityKey, this.map);
+            if (result.missed) {
+                this.logMsg(`${unit.name} missed ${target.name}!`);
+                this._spawnFloat(target, 'Miss!', '#aaa');
+                continue;
+            }
+            if (result.damage > 0) {
+                this.logMsg(`${unit.name} hits ${target.name} for ${result.damage} dmg.`);
+                this._spawnFloat(target, `-${result.damage}`, '#f88');
+            }
+            if (result.healing > 0) {
+                this.logMsg(`${unit.name} heals ${target.name} for ${result.healing} HP.`);
+                this._spawnFloat(target, `+${result.healing}`, '#8f8');
+            }
+            if (result.revived) this.logMsg(`${target.name} is revived!`);
+            if (result.killedInstantly) {
+                this.logMsg(`${target.name} is slain!`);
+            } else if (isUnconscious(target)) {
+                this.logMsg(`${target.name} is knocked unconscious!`);
+            }
+        }
+
+        this._checkVictory();
+    }
+
+    enterDefendMode() {
+        if (this.state !== STATES.PLAYER_TURN) return false;
+        if (!this.activeUnit.status.includes('defend')) {
+            this.activeUnit.status.push('defend');
+        }
+        this.logMsg(`${this.activeUnit.name} takes a defensive stance.`);
+        return true;
+    }
+
+    pivotUnit() {
+        if (this.state !== STATES.PLAYER_TURN) return false;
+        const order = ['north', 'east', 'south', 'west'];
+        const idx = order.indexOf(this.activeUnit.facing);
+        this.activeUnit.facing = order[(idx + 1) % 4];
+        this.logMsg(`${this.activeUnit.name} pivots to face ${this.activeUnit.facing}.`);
+        return true;
+    }
+
+    endTurn(ctCost) {
+        const cost = ctCost ?? 20;
+        if (this.activeUnit) {
+            this.activeUnit.ct -= cost;
+            if (this.activeUnit.ct < 0) this.activeUnit.ct = 0;
+
+            // Passive MP drain
+            for (const key of this.activeUnit.abilities) {
+                const ab = ABILITIES[key];
+                if (ab && ab.passive && ab.passiveMpCost > 0) {
+                    this.activeUnit.mp = Math.max(0, this.activeUnit.mp - ab.passiveMpCost);
+                }
+            }
+        }
+        this.activeUnit = null;
+        this.moveRange = new Set();
+        this.abilityRange = new Set();
+        this.aoePreview = new Set();
+        this.hitPreview = new Set();
+        this.selectedAbility = null;
+        if (this.state !== STATES.BATTLE_OVER) {
+            this.setState(STATES.ADVANCE_CT);
+        }
+    }
+
+    cancelAction() {
+        if (this.state === STATES.SELECT_MOVE || this.state === STATES.SELECT_ABILITY || this.state === STATES.SELECT_ABILITY_TARGET) {
+            this.selectedAbility = null;
+            this.abilityRange = new Set();
+            this.aoePreview = new Set();
+        this.hitPreview = new Set();
+            this.moveRange = computeMoveRange(this.activeUnit, this.map, this.livingUnits);
+            this.setState(STATES.PLAYER_TURN);
+        }
+    }
+
+    _checkVictory() {
+        const playerConscious = this.livingUnits.some(u => u.team === 'player' && isConscious(u));
+        const enemyConscious  = this.livingUnits.some(u => u.team === 'enemy' && isConscious(u));
+        if (!enemyConscious) { this.winner = 'player'; this.setState(STATES.BATTLE_OVER); }
+        else if (!playerConscious) { this.winner = 'enemy'; this.setState(STATES.BATTLE_OVER); }
+    }
+
+    // Simulate N turns ahead to show initiative queue (non-destructive)
+    previewTurnOrder(n = 8) {
+        const living = this.livingUnits;
+        if (living.length === 0) return [];
+        const sim = living.map(u => ({ unit: u, ct: u.ct }));
+        const order = [];
+        let iters = 0;
+        while (order.length < n && iters < 2000) {
+            iters++;
+            for (const s of sim) s.ct += s.unit.spd;
+            const ready = sim.filter(s => s.ct >= CT_ACT_THRESHOLD);
+            if (ready.length > 0) {
+                ready.sort((a, b) => b.ct - a.ct || b.unit.spd - a.unit.spd);
+                for (const r of ready) {
+                    if (order.length >= n) break;
+                    order.push(r.unit);
+                    r.ct -= CT_ACT_THRESHOLD;
+                }
+            }
+        }
+        return order;
+    }
+
+    _spawnFloat(unit, text, color) {
+        unit._floats = unit._floats || [];
+        unit._floats.push({ text, color, age: 0, maxAge: 1200 });
+    }
+
+    getRangeHighlights() {
+        return {
+            move:    this.moveRange,
+            ability: this.abilityRange,
+            aoe:     this.aoePreview,
+            hit:     this.hitPreview,
+        };
+    }
+}

@@ -1,0 +1,210 @@
+export const BUILD_CATEGORIES = ['Walls & Floors', 'Furniture', 'Production', 'Defense', 'Arcane'];
+
+export const BUILDINGS = {
+    // === Walls & Floors ===
+    wood_wall:         { char: '█', color: '#aa7744', cost: { wood: 2 }, work: 12, hp: 50, structureType: 'wall', category: 'Walls & Floors', passable: { colonist: false, animal: false, enemy: false }, breakable: true, description: 'Blocks movement. Forms rooms when enclosing an area with doors.' },
+    stone_wall:        { char: '█', color: '#666666', cost: { stone: 2 }, work: 16, hp: 70, structureType: 'wall', category: 'Walls & Floors', passable: { colonist: false, animal: false, enemy: false }, breakable: true, description: 'Blocks movement. Forms rooms when enclosing an area with doors.' },
+    fence:             { char: '|', color: '#886644', cost: { wood: 1 }, work: 5, hp: 20, structureType: 'wall', category: 'Walls & Floors', passable: { colonist: false, animal: false, enemy: false }, breakable: true, showGround: true, description: 'Blocks movement like a wall but lighter to build.' },
+    door:              { char: '+', color: '#cc9955', cost: { wood: 3 }, work: 15, hp: 30, structureType: 'door', category: 'Walls & Floors', passable: { colonist: true, animal: false, enemy: false }, breakable: true, description: 'Allows colonist passage. Blocks enemies. Room boundary.' },
+    wood_floor:        { char: '·', color: '#aa7744', bg: '#3d2a14', cost: { wood: 1 }, work: 6, structureType: 'floor', category: 'Walls & Floors', description: 'Cosmetic flooring. Makes rooms nicer.' },
+    stone_floor:       { char: '·', color: '#666666', bg: '#2a2a2a', cost: { stone: 1 }, work: 6, structureType: 'floor', category: 'Walls & Floors', description: 'Cosmetic flooring. Makes rooms nicer.' },
+    brick_wall:        { char: '█', color: '#b2463c', cost: { bricks: 2 }, work: 20, hp: 90, structureType: 'wall', category: 'Walls & Floors', passable: { colonist: false, animal: false, enemy: false }, breakable: true, research: 'warding', description: 'Blocks movement. Forms rooms when enclosing an area with doors.' },
+    brick_floor:       { char: '·', color: '#b2463c', bg: '#3a1a18', cost: { bricks: 1 }, work: 6, structureType: 'floor', category: 'Walls & Floors', research: 'warding', description: 'Cosmetic flooring. Makes rooms nicer.' },
+    reinforced_door:   { char: '╬', color: '#aa8855', cost: { stone: 3, iron: 2, planks: 2 }, work: 22, hp: 50, structureType: 'door', category: 'Walls & Floors', passable: { colonist: true, animal: false, enemy: false }, breakable: true, research: 'fortification', description: 'Reinforced door (50 HP). Mid-tier between regular and void doors.' },
+    void_wall:         { char: '▓', color: '#6622aa', cost: { stone: 3, void_essence: 3 }, work: 15, hp: 120, structureType: 'wall', category: 'Walls & Floors', passable: { colonist: false, animal: false, enemy: false }, breakable: true, research: 'void_architecture', description: 'Reinforced wall (120 HP). Blocks enemies.' },
+    void_door:         { char: '▒', color: '#7733bb', cost: { stone: 3, planks: 2, void_essence: 4 }, work: 20, hp: 80, structureType: 'door', category: 'Walls & Floors', passable: { colonist: true, animal: false, enemy: false }, breakable: true, research: 'void_architecture', description: 'Reinforced door (80 HP). Colonists pass through, enemies must break it.' },
+
+    // === Furniture ===
+    candle:            { char: 'i', color: '#ffcc00', cost: { wood: 1 }, work: 4, structureType: 'furniture', category: 'Furniture', dragPlace: true, lightRadius: 5, candleEmitter: true, noShadow: true, description: 'Light source. Does not provide warmth.' },
+    campfire:          { char: '≈', color: '#ff8833', cost: { wood: 3 }, work: 10, structureType: 'furniture', category: 'Furniture', lightRadius: 3, warmRadius: 3, smokeEmitter: true, noShadow: true, description: 'Provides warmth (radius 3) and light. No mana required.' },
+    bed:               { char: 'B', color: '#8855aa', cost: { wood: 5 }, work: 25, structureType: 'furniture', category: 'Furniture', description: 'Colonists sleep here. Assign for a mood bonus.' },
+    food_chest:        { char: 'S', color: '#997744', cost: { planks: 4, stone: 2 }, work: 25, structureType: 'furniture', category: 'Furniture', maxCount: 4, description: 'Preserves food, reducing spoilage by 15% per chest (stacks up to 60%).' },
+    ice_box:           { char: 'I', color: '#88ccff', cost: { runite: 2, stone: 4, planks: 2, void_essence: 2 }, work: 40, structureType: 'furniture', category: 'Furniture', research: 'alchemy', power: { consumes: 1 }, maxCount: 1, description: 'Magically chills food, reducing spoilage by 40%. Consumes 1 mana.' },
+    glowstone:         { char: 'L', color: '#ffff88', cost: { planks: 2, stone: 1 }, work: 14, structureType: 'furniture', category: 'Furniture', lightRadius: 10, research: 'luminance', power: { consumes: 2, radius: 5 }, description: 'Mana-powered light, radius 5. Consumes 2 mana.' },
+    rug:               { char: '~', color: '#cc6644', bg: '#4a2211', cost: { leather: 2 }, work: 10, structureType: 'furniture', category: 'Furniture', noShadow: true, description: 'Decorative rug. Counts as fine flooring for room quality.' },
+    shelf:             { char: '=', color: '#996633', cost: { planks: 3 }, work: 12, structureType: 'furniture', category: 'Furniture', roomQuality: 5, decorRooms: ['bedroom', 'townhall'], description: 'Wall shelf. Improves bedroom and Town Hall quality.' },
+    chair:             { char: 'h', color: '#aa7744', cost: { planks: 2 }, work: 8, structureType: 'furniture', category: 'Furniture', roomQuality: 4, decorRooms: ['bedroom', 'townhall'], workshopBonus: 3, description: 'A simple chair. Improves bedroom, workshop, and Town Hall quality.' },
+    bookcase:          { char: '║', color: '#775533', cost: { planks: 4, leather: 1 }, work: 18, structureType: 'furniture', category: 'Furniture', roomQuality: 7, decorRooms: ['bedroom', 'townhall'], research: 'warding', description: 'A bookcase. Improves bedroom and Town Hall quality.' },
+    tool_rack:         { char: '╥', color: '#886644', cost: { planks: 3, iron: 1 }, work: 15, structureType: 'furniture', category: 'Furniture', workshopBonus: 10, description: 'Organized tools. Improves workshop quality.' },
+    material_shelf:    { char: '╡', color: '#997755', cost: { planks: 4 }, work: 12, structureType: 'furniture', category: 'Furniture', workshopBonus: 8, description: 'Material storage. Improves workshop quality.' },
+    town_hall_banner:  { char: 'Ξ', color: '#ddbb44', cost: { planks: 6, wood: 4 }, work: 30, structureType: 'furniture', category: 'Furniture', townHall: true, roomQuality: 6, decorRooms: ['townhall'], description: 'Designates a Town Hall. Idle colonists gather here to relax.' },
+    podium:            { char: 'Π', color: '#c9a24a', cost: { planks: 4, wood: 2 }, work: 18, structureType: 'furniture', category: 'Furniture', roomQuality: 8, decorRooms: ['townhall'], description: 'A speaker\'s podium. A fine centerpiece for a Town Hall.' },
+    table:             { char: '╤', color: '#a87840', cost: { planks: 3, wood: 3 }, work: 16, structureType: 'furniture', category: 'Furniture', roomQuality: 6, decorRooms: ['bedroom', 'townhall'], workshopBonus: 4, description: 'A large gathering table. Improves bedroom, workshop, and Town Hall quality.' },
+
+    // === Production (ordered by progression) ===
+    workbench:         { char: 'C', color: '#bb8833', cost: { wood: 5, stone: 2 }, work: 30, structureType: 'furniture', category: 'Production', description: 'Basic crafting for planks, bricks, leather, simple weapons, and tools.' },
+    cooking_pot:       { char: 'F', color: '#ff6633', name: 'Cooking Pot', cost: { stone: 3, wood: 1 }, work: 18, structureType: 'furniture', category: 'Production', smokeEmitter: true, description: 'Required for cooking meals from raw food and crops.' },
+    research_desk:     { char: 'R', color: '#44aaff', cost: { wood: 5, stone: 3, planks: 2 }, work: 40, structureType: 'furniture', category: 'Production', description: 'Colonists study here to generate research points.' },
+    anvil:             { char: '⌂', color: '#999999', cost: { stone: 6, bricks: 2, planks: 2 }, work: 30, structureType: 'furniture', category: 'Production', research: 'metalworking', smokeEmitter: true, workGlowColor: '#ff8833', description: 'Required for metalworking. Able to create iron weapons, armor, tools, and even repair broken trinkets.' },
+    alchemy_table:     { char: '⚗', color: '#44cc88', cost: { planks: 4, stone: 2 }, work: 25, structureType: 'furniture', category: 'Production', research: 'alchemy', description: 'Required for brewing potions.' },
+    beast_circle:      { char: 'A', color: '#9cf642', cost: { wood: 6 }, work: 28, structureType: 'furniture', category: 'Production', research: 'beast_binding', description: 'Required for binding creatures. Bound animals produce resources.' },
+    enchanting_table:  { char: 'P', color: '#bb88ff', cost: { planks: 4, stone: 3 }, work: 35, structureType: 'furniture', category: 'Production', research: 'arcane_infusion', power: { consumes: 4, speedMult: 1.5 }, description: '1.5x crafting speed. Consumes 4 mana.' },
+    scriptorium:       { char: '𝕊', color: '#4488cc', cost: { planks: 6, stone: 3, leather: 2 }, work: 40, structureType: 'furniture', category: 'Production', research: 'arcane_studies', description: 'Required for crafting spell tomes.' },
+    loom:              { char: 'Ł', color: '#ddaa66', cost: { planks: 4, wood: 3 }, work: 30, structureType: 'furniture', category: 'Production', research: 'textiles', description: 'Required for weaving cloth and crafting clothing.' },
+    golem_forge:       { char: 'Ğ', color: '#cc8833', cost: { stone: 8, runite: 4, planks: 4 }, work: 50, structureType: 'furniture', category: 'Production', research: 'golem_craft', description: 'Animate stone golems. Click to craft.' },
+
+    // === Defense (ordered by progression) ===
+    arcane_sentinel:   { char: 'X', color: '#ff4444', cost: { stone: 5, planks: 3 }, work: 50, structureType: 'furniture', category: 'Defense', passable: { colonist: false, animal: false, enemy: false }, research: 'warding', power: { consumes: 3, damage: 12, range: 4, attackCooldown: 3 }, description: 'Auto-attacks enemies in range 4, 12 dmg. Consumes 3 mana.' },
+    void_nexus:        { char: 'V', color: '#9933ff', cost: { runite: 5, stone: 6, planks: 4 }, work: 60, structureType: 'furniture', category: 'Defense', passable: { colonist: false, animal: false, enemy: false }, research: 'void_summoning', maxCount: 1, description: 'Start wave defense here. Defend it from enemies to earn void essence.' },
+    void_turret:       { char: 'Y', color: '#aa33ff', cost: { stone: 5, planks: 3, void_essence: 6 }, work: 55, structureType: 'furniture', category: 'Defense', passable: { colonist: false, animal: false, enemy: false }, research: 'void_forging', power: { consumes: 5, damage: 28, range: 5, attackCooldown: 5, armorPierce: 0.15 }, description: 'Auto-attacks enemies in range 5, 28 dmg. Void rounds pierce armor (-15% enemy DR). Consumes 5 mana.' },
+    inferno_ward:      { char: 'Ħ', color: '#ff4400', cost: { stone: 5, runite: 3, planks: 2 }, work: 40, structureType: 'furniture', category: 'Defense', research: 'pyroclasm', power: { consumes: 5, warmRadius: 4, damage: 8, attackCooldown: 2 }, description: 'Incinerates nearby enemies (radius 4, 8 dmg/tick). Also warms. Consumes 5 mana.' },
+
+    // === Arcane (ordered by progression) ===
+    mana_crystal:      { char: 'W', color: '#aa44ff', cost: { wood: 8, stone: 4 }, work: 45, structureType: 'furniture', category: 'Arcane', passable: { colonist: false, animal: false, enemy: false }, research: 'ley_channeling', maxCount: 4, maxCountBonusKey: 'manaCrystalBonus', power: { generates: 6 }, description: 'Generates 6 mana for powering magical buildings. Limit: 4 (upgradeable).' },
+    hearth_shrine:     { char: '♥', color: '#ff8866', cost: { stone: 6, planks: 4, runite: 2 }, work: 50, structureType: 'furniture', category: 'Arcane', passable: { colonist: false, animal: false, enemy: false }, research: 'ley_channeling', maxCount: 1, maxCountBonusKey: 'hearthShrineBonus', power: { consumes: 3 }, colonistCapBonus: 1, description: 'A warm beacon that draws settlers. +1 colonist cap. Consumes 3 mana. Build more by surviving void waves.' },
+    ember_heater:      { char: 'H', color: '#ff8844', cost: { stone: 4, planks: 2 }, work: 28, structureType: 'furniture', category: 'Arcane', research: 'ember_magic', power: { consumes: 3, warmRadius: 6, seasonalHeat: true }, description: 'Warms nearby tiles (radius 6) in winter only. Consumes mana only during winter.' },
+    mana_relay:        { char: '⊛', color: '#aa88ff', cost: { planks: 3, runite: 2 }, work: 25, structureType: 'furniture', category: 'Arcane', research: 'arcane_conduits', power: { consumes: 1, radius: 3 }, description: 'Mana buildings within 3 tiles consume 1 less mana (min 1). Does not stack. Consumes 1 mana.' },
+    artifact_pedestal: { char: '◆', color: '#ccaa44', cost: { stone: 8, runite: 2 }, work: 35, structureType: 'furniture', category: 'Arcane', research: 'arcane_infusion', description: 'Place an item to project its effect in a radius. Mana cost varies by item.' },
+    trade_rift:        { char: '⇄', color: '#66ccaa', cost: { runite: 3, stone: 6, planks: 4 }, work: 45, structureType: 'furniture', category: 'Arcane', passable: { colonist: false, animal: false, enemy: false }, research: 'trade_rifts', maxCount: 1, power: { consumes: 3 }, description: 'A rift-linked request board. Far-off traders post barters for mystery goods, with new offers each season. Consumes 3 mana.' },
+    beacon:            { char: '☀', color: '#ffffaa', cost: { stone: 4, runite: 3, planks: 2 }, work: 35, structureType: 'furniture', category: 'Arcane', lightRadius: 15, research: 'brilliance', power: { consumes: 4, radius: 10 }, description: 'Radiant beacon. Massive light radius 15. Consumes 4 mana.' },
+    ritual_chalk:      { char: '◌', color: '#cc99ff', bg: '#2a1a3a', cost: { void_essence: 1 }, work: 8, structureType: 'furniture', category: 'Arcane', dragPlace: true, noShadow: true, research: 'ritual_magic', description: 'Arcane chalk markings. Lay around an Arcane Core in the correct shape to activate a complex structure. Walkable.' },
+    arcane_core:       { char: '◎', color: '#aa66ff', cost: { runite: 4, void_essence: 2, planks: 3 }, work: 45, structureType: 'furniture', category: 'Arcane', research: 'ritual_magic', description: 'Arcane focus point. Draw Ritual Chalk in the correct pattern around it to activate a complex structure. See the Glossary for patterns.' },
+    rift_gate:         { char: 'Ω', color: '#33ccff', cost: { runite: 4, stone: 6, planks: 4, void_essence: 8 }, work: 60, structureType: 'furniture', category: 'Arcane', passable: { colonist: false, animal: false, enemy: false }, research: 'planar_rift', maxCount: 1, power: { consumes: 6 }, description: 'Send exploration parties to other realms. Consumes 6 mana.' },
+};
+
+const BASE_TILE_CHARS = {
+    farm_empty: '=', farm_growing: '%', farm_ready: '*',
+    snow: '*',
+};
+
+const BASE_TILE_COLORS = {
+    farm_empty: '#664400', farm_growing: '#55aa22', farm_ready: '#ffdd00',
+    colonist: '#ffff00', raider: '#ff3333', deer: '#bb8855', rabbit: '#ccaa88', wolf: '#666666',
+    snow: '#ffffff', snowBg: '#888888', cursor: '#ffffff',
+    designation_chop: '#ff8800', designation_mine: '#ff8800', designation_build: '#88dbff', designation_deconstruct: '#ff4444',
+};
+
+export const TILE_CHARS = { ...BASE_TILE_CHARS, ...Object.fromEntries(Object.entries(BUILDINGS).map(([k, v]) => [k, v.char])) };
+export const TILE_COLORS = { ...BASE_TILE_COLORS, ...Object.fromEntries(Object.entries(BUILDINGS).map(([k, v]) => [k, v.color])) };
+
+export const IMPASSABLE_STRUCTURES = new Set(
+    Object.entries(BUILDINGS).filter(([, b]) => b.passable && !b.passable.colonist).map(([k]) => k)
+);
+export const ENEMY_BLOCKED_STRUCTURES = new Set(
+    Object.entries(BUILDINGS).filter(([, b]) => b.passable && !b.passable.enemy).map(([k]) => k)
+);
+export const BREAKABLE_STRUCTURES = new Set(
+    Object.entries(BUILDINGS).filter(([, b]) => b.breakable).map(([k]) => k)
+);
+export const WALL_STRUCTURES = new Set(
+    Object.entries(BUILDINGS).filter(([, b]) => b.structureType === 'wall').map(([k]) => k)
+);
+export const FURNITURE_STRUCTURES = new Set(
+    Object.entries(BUILDINGS).filter(([, b]) => b.structureType === 'furniture').map(([k]) => k)
+);
+export const DOOR_STRUCTURES = new Set(
+    Object.entries(BUILDINGS).filter(([, b]) => b.structureType === 'door').map(([k]) => k)
+);
+export const DRAG_BUILD_TYPES = new Set(
+    Object.entries(BUILDINGS).filter(([, b]) => b.structureType === 'wall' || b.structureType === 'floor' || b.structureType === 'door' || b.dragPlace).map(([k]) => k)
+);
+
+export const COMPLEX_STRUCTURES = {
+    great_forge: {
+        name: 'Great Forge',
+        research: 'masterwork',
+        coreBuild: 'arcane_core',
+        layout: [
+            { dx: -1, dy: -1, req: 'ritual_chalk' }, { dx: 0, dy: -1, req: 'ritual_chalk' }, { dx: 1, dy: -1, req: 'ritual_chalk' },
+            { dx: -1, dy: 0, req: 'ritual_chalk' },  { dx: 1, dy: 0, req: 'ritual_chalk' },
+            { dx: -1, dy: 1, req: 'ritual_chalk' },  { dx: 0, dy: 1, req: 'ritual_chalk' },  { dx: 1, dy: 1, req: 'ritual_chalk' },
+        ],
+        effect: { craftSpeedMult: 2.5, qualityBonus: 2 },
+        activeLightRadius: 4,
+        description: 'Arcane Core surrounded by Ritual Chalk on all 8 adjacent tiles (3x3). 2.5x crafting speed & +2 quality bonus colony-wide.',
+    },
+    ritual_circle: {
+        name: 'Ritual Circle',
+        research: 'advanced_arcana',
+        coreBuild: 'arcane_core',
+        layout: [
+            { dx: 0, dy: -2, req: 'ritual_chalk' },
+            { dx: -1, dy: -1, req: 'ritual_chalk' }, { dx: 1, dy: -1, req: 'ritual_chalk' },
+            { dx: -2, dy: 0, req: 'ritual_chalk' }, { dx: 2, dy: 0, req: 'ritual_chalk' },
+            { dx: -1, dy: 1, req: 'ritual_chalk' }, { dx: 1, dy: 1, req: 'ritual_chalk' },
+            { dx: 0, dy: 2, req: 'ritual_chalk' },
+        ],
+        effect: { spellCooldownMult: 0.7 },
+        activeLightRadius: 4,
+        description: 'Arcane Core with Ritual Chalk in a diamond pattern (5x5). Reduces spell cooldowns by 30% colony-wide.',
+    },
+    anvil_shrine: {
+        name: 'Anvil Shrine',
+        research: 'irrigation',
+        coreBuild: 'arcane_core',
+        layout: [
+            { dx: -1, dy: -1, req: 'ritual_chalk' }, { dx: 0, dy: -1, req: 'ritual_chalk' }, { dx: 1, dy: -1, req: 'ritual_chalk' },
+            { dx: 0, dy: 1, req: 'ritual_chalk' },
+        ],
+        effect: { gatherSpeedMult: 1.5 },
+        activeLightRadius: 3,
+        description: 'Arcane Core with Ritual Chalk in an anvil shape (3 above, 1 below). +50% gathering speed for chopping and mining colony-wide.',
+    },
+    star_ward: {
+        name: 'Star Ward',
+        research: 'fortification',
+        coreBuild: 'arcane_core',
+        layout: [
+            { dx: 0, dy: -2, req: 'ritual_chalk' },
+            { dx: -2, dy: 0, req: 'ritual_chalk' }, { dx: 2, dy: 0, req: 'ritual_chalk' },
+            { dx: 0, dy: 2, req: 'ritual_chalk' },
+        ],
+        effect: { defenseBonusMult: 1.3 },
+        activeLightRadius: 3,
+        description: 'Arcane Core with Ritual Chalk in a cardinal cross (4 tiles at distance 2). +30% colonist outgoing damage colony-wide.',
+    },
+    harvest_sigil: {
+        name: 'Harvest Sigil',
+        research: 'verdant_growth',
+        coreBuild: 'arcane_core',
+        layout: [
+            { dx: 1, dy: 0, req: 'ritual_chalk' }, { dx: 2, dy: 0, req: 'ritual_chalk' }, { dx: 3, dy: 0, req: 'ritual_chalk' },
+            { dx: 3, dy: -1, req: 'ritual_chalk' },
+            { dx: 3, dy: 1, req: 'ritual_chalk' },
+        ],
+        effect: { foodProductionMult: 1.5 },
+        activeLightRadius: 3,
+        description: 'Arcane Core with Ritual Chalk in a plough shape (3 to the right, 2 branching at the end). +50% farm harvest yield colony-wide.',
+    },
+    watchers_eye: {
+        name: "Watcher's Eye",
+        research: 'planar_rift',
+        coreBuild: 'arcane_core',
+        layout: [
+            { dx: 0, dy: -1, req: 'ritual_chalk' },
+            { dx: 0, dy: 1, req: 'ritual_chalk' },
+        ],
+        effect: { expeditionLuckMult: 1.4 },
+        activeLightRadius: 3,
+        description: 'Arcane Core with Ritual Chalk directly above and below (vertical line of 3). +40% expedition loot quantity colony-wide.',
+    },
+    scholars_ring: {
+        name: "Scholar's Ring",
+        research: 'arcane_studies',
+        coreBuild: 'arcane_core',
+        layout: [
+            { dx: 0, dy: -1, req: 'ritual_chalk' },
+            { dx: -1, dy: 0, req: 'ritual_chalk' }, { dx: 1, dy: 0, req: 'ritual_chalk' },
+            { dx: 0, dy: 1, req: 'ritual_chalk' },
+        ],
+        effect: { researchSpeedMult: 1.5 },
+        activeLightRadius: 3,
+        description: 'Arcane Core with Ritual Chalk on the 4 cardinal adjacent tiles (no corners). +50% research point generation colony-wide.',
+    },
+    grand_ritual: {
+        name: 'Grand Altar',
+        research: 'advanced_arcana',
+        coreBuild: 'arcane_core',
+        // Diagonal X at distance 2 (the four far corners of a 5x5). Distinct from
+        // every passive pattern so it can't collide with them.
+        layout: [
+            { dx: -2, dy: -2, req: 'ritual_chalk' }, { dx: 2, dy: -2, req: 'ritual_chalk' },
+            { dx: -1, dy: -1, req: 'ritual_chalk' }, { dx: 1, dy: -1, req: 'ritual_chalk' },
+            { dx: -1, dy: 1, req: 'ritual_chalk' }, { dx: 1, dy: 1, req: 'ritual_chalk' },
+            { dx: -2, dy: 2, req: 'ritual_chalk' }, { dx: 2, dy: 2, req: 'ritual_chalk' },
+        ],
+        effect: { ritualAltar: true },
+        activeLightRadius: 4,
+        description: 'Arcane Core with Ritual Chalk in a great X (both diagonals, corners at distance 2). Lets you perform powerful on-demand rituals for a reagent cost. Requires Advanced Arcana research.',
+    },
+};

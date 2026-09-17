@@ -1,0 +1,719 @@
+import { COLONIST_CONFIG, THOUGHTS, BUILDINGS, RESOURCES, IMPASSABLE_STRUCTURES, WORK_CONFIG, ENCHANTMENT_TIERS, QUALITY_TIERS, TAMED_ANIMALS, MAGIC_STUDY_CONFIG, SPELL_TOMES, SPELLS, MAGIC_SKILLS, COMBAT_VISUALS, RESEARCH, ALL_ITEMS, TRAITS, POTIONS } from '../core/config.js';
+import { spawnParticle, spawnYieldFloaty } from '../ui/overlay-renderer.js';
+import { completeTame, finalizeTame, attemptDangerousTame } from './taming.js';
+import { getPedestalEffect } from '../systems/artifacts.js';
+import { getEquippedItems, getEquipmentStat, addThought, recalcMaxMana, invalidateEquipStatCache, getRaceModifier } from './colonist.js';
+import { getHarvestYield } from '../systems/farming.js';
+import { manhattanDist } from '../world/pathfinding.js';
+import { getCraftQualityBonus, getResearchSpeedMult } from '../systems/complexBuildings.js';
+import { applySpecificQuality, applyEnchantmentEffect } from './item-roll.js';
+
+// Scavenger trait: small chance to double the amount of one resource in a
+// gather yield ({ resourceKey: amount }). Mutates `output` in place. A floating
+// "+N" note is shown so the bonus is visible.
+function applyScavenger(colonist, output, game) {
+    if (!colonist.traits?.includes('scavenger')) return;
+    if (Math.random() >= TRAITS.scavenger.scavengeChance) return;
+    const keys = Object.keys(output).filter(k => output[k] > 0);
+    if (keys.length === 0) return;
+    const key = keys[Math.floor(Math.random() * keys.length)];
+    const bonus = output[key];
+    output[key] += bonus;
+    game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: `Scavenged +${bonus} ${key.replace(/_/g, ' ')}`, color: '#ffdd44', fontSize: 10, ttl: 18, maxTtl: 18 });
+}
+
+// Emit a "+N [sprite]" yield floaty for each resource in a gather/harvest output
+// map ({ resourceKey: amount }). Gated by showOverlays + reduceMotion (it is
+// ambient feedback, not gameplay-critical). Stacks multiple resources vertically
+// so a mixed yield (e.g. wood + a rare drop) reads as separate popups.
+function emitYieldFloaties(game, x, y, output) {
+    if (!game.settings?.showOverlays || game.settings?.reduceMotion) return;
+    let row = 0;
+    for (const key of Object.keys(output)) {
+        const amt = output[key];
+        if (!(amt > 0)) continue;
+        spawnYieldFloaty(game, x, y - row * 0.5, key, amt);
+        row++;
+    }
+}
+
+function applyQuality(item, colonist, game, ...statKeys) {
+    let skill = colonist.skills.crafting || 1;
+    if (game && game.workshopQualities) {
+        const roomId = game.map[colonist.y]?.[colonist.x]?.roomId;
+        if (roomId !== null && roomId !== undefined && game.workshopQualities[roomId]) {
+            skill += game.workshopQualities[roomId].qualityBonus;
+        }
+    }
+    if (colonist.traits?.includes('creative')) skill += TRAITS.creative.qualityBonus;
+    if (colonist.traits?.includes('lucky')) skill += TRAITS.lucky.qualityBonus;
+    if (game && game.research.isResearched('artisans_touch')) skill += WORK_CONFIG.artisanQualityBonus;
+    if (game) skill += getCraftQualityBonus(game);
+    // A tier with `requiresResearch` is excluded from the roll (weight forced to 0)
+    // until that research is unlocked. Masterwork uses this so it is unreachable
+    // until the deep `masterwork` node is researched, and rare even after.
+    const chances = QUALITY_TIERS.map(t => {
+        if (t.requiresResearch && !(game && game.research.isResearched(t.requiresResearch))) return 0;
+        return Math.max(0, t.baseChance + t.perSkill * skill);
+    });
+    const total = chances.reduce((s, c) => s + c, 0);
+    let roll = Math.random() * total;
+    let tier = QUALITY_TIERS[1];
+    for (let i = 0; i < QUALITY_TIERS.length; i++) {
+        roll -= chances[i];
+        if (roll <= 0) { tier = QUALITY_TIERS[i]; break; }
+    }
+    if (tier.key === 'normal') return;
+    item.quality = tier.key;
+    item.name = `${tier.prefix} ${item.name}`;
+    for (const stat of statKeys) {
+        if (item[stat]) item[stat] = Math.round(item[stat] * tier.multiplier * 100) / 100;
+    }
+    if (tier.key === 'superior' && window.game?.stats) {
+        window.game.stats.superiorItemsCrafted++;
+    }
+    // Masterwork is the rare peak tier: stamp the crafting colonist onto the
+    // instance and name them in the tooltip so a masterwork reads as a prized,
+    // owned piece rather than just a higher multiplier.
+    if (tier.key === 'masterwork') {
+        item.craftedBy = colonist.name;
+        const flavour = `A masterwork of ${colonist.name}'s hand.`;
+        item.description = item.description ? `${item.description} ${flavour}` : flavour;
+        if (window.game?.stats) {
+            window.game.stats.masterworkItemsCrafted = (window.game.stats.masterworkItemsCrafted || 0) + 1;
+        }
+    }
+}
+
+function applyEnchantment(item, colonist, game, type) {
+    // Roll for enchantment tier based on colonist's enchantment skill and room quality.
+    let skill = colonist.magicSkills.enchantment || 1;
+    if (game && game.workshopQualities) {
+        const roomId = game.map[colonist.y]?.[colonist.x]?.roomId;
+        if (roomId !== null && roomId !== undefined && game.workshopQualities[roomId]) {
+            skill += game.workshopQualities[roomId].qualityBonus;
+        }
+    }
+    const chances = ENCHANTMENT_TIERS.map(t => Math.max(0, t.baseChance + t.perSkill * skill));
+    const total = chances.reduce((s, c) => s + c, 0);
+    let roll = Math.random() * total;
+    let tier = ENCHANTMENT_TIERS[1];
+    for (let i = 0; i < ENCHANTMENT_TIERS.length; i++) {
+        roll -= chances[i];
+        if (roll <= 0) { tier = ENCHANTMENT_TIERS[i]; break; }
+    }
+
+    // Roll and apply a random enchantment effect at the skill-derived tier. The
+    // per-type effect application is shared with the Trade Rift via item-roll.js.
+    applyEnchantmentEffect(item, type, tier);
+}
+
+function applyThought(colonist, thoughtKey, tick) {
+    const t = THOUGHTS[thoughtKey];
+    if (t) addThought(colonist, t.text, t.moodEffect, t.duration, tick);
+}
+
+function autoAssignNewBed(game, x, y) {
+    let nearest = null, bestDist = Infinity;
+    for (const c of game.colonists) {
+        if (c.hp <= 0 || c.golem || c.assignedBed) continue;
+        const d = manhattanDist(c.x, c.y, x, y);
+        if (d < bestDist) { bestDist = d; nearest = c; }
+    }
+    if (nearest) nearest.assignedBed = { x, y };
+}
+
+function advanceTomeStudy(colonist, game, rate) {
+    if (!colonist.equippedTome) return;
+    const tomeKey = colonist.equippedTome;
+    const tomeDef = SPELL_TOMES[tomeKey];
+    if (!tomeDef) return;
+    const spellDef = SPELLS[tomeDef.spell];
+    if (!spellDef) return;
+    if (colonist.knownSpells.includes(tomeDef.spell)) return;
+
+    const school = spellDef.school;
+    const currentLevel = colonist.magicSkills[school] || 0;
+    if (currentLevel < tomeDef.minSchoolLevel) return;
+
+    if (!colonist.tomeProgress) colonist.tomeProgress = {};
+    if (!colonist.tomeProgress[tomeKey]) colonist.tomeProgress[tomeKey] = 0;
+    const progressAmount = rate !== undefined ? rate : MAGIC_STUDY_CONFIG.studyTicksPerProgress;
+    colonist.tomeProgress[tomeKey] += progressAmount;
+
+    if (!colonist._magicXpAccumulator) colonist._magicXpAccumulator = {};
+    if (!colonist._magicXpAccumulator[school]) colonist._magicXpAccumulator[school] = 0;
+    let studyXpGain = MAGIC_STUDY_CONFIG.xpPerStudyTick;
+    if (colonist.traits.includes('scholar')) studyXpGain *= TRAITS.scholar.magicXpMult;
+    if (colonist.traits.includes('prodigy')) studyXpGain *= TRAITS.prodigy.magicXpMult;
+    if (colonist.traits.includes('magically_inept')) studyXpGain *= TRAITS.magically_inept.magicXpMult;
+    studyXpGain *= getRaceModifier(colonist, 'magicXpMult', 1);
+    colonist._magicXpAccumulator[school] += studyXpGain;
+    if (game.tick % 10 === 0) {
+        game.combatEffects.push({ x: colonist.x, y: colonist.y, char: COMBAT_VISUALS.xpGainChar, color: COMBAT_VISUALS.xpGainColor, ttl: COMBAT_VISUALS.xpGainTtl });
+    }
+    let magicXpNeeded = MAGIC_STUDY_CONFIG.magicXpToLevel + colonist.magicSkills[school] * MAGIC_STUDY_CONFIG.magicXpScalePerLevel;
+    while (colonist._magicXpAccumulator[school] >= magicXpNeeded && colonist.magicSkills[school] < 10) {
+        colonist._magicXpAccumulator[school] -= magicXpNeeded;
+        colonist.magicSkills[school] = Math.min(10, colonist.magicSkills[school] + 1);
+        magicXpNeeded = MAGIC_STUDY_CONFIG.magicXpToLevel + colonist.magicSkills[school] * MAGIC_STUDY_CONFIG.magicXpScalePerLevel;
+        recalcMaxMana(colonist);
+        game.notifications.push({ text: `${colonist.name}'s ${MAGIC_SKILLS[school].name} increased to ${colonist.magicSkills[school]}`, tick: game.tick, type: 'success' });
+        game.eventLog.add(game, `${colonist.name}'s ${MAGIC_SKILLS[school].name} increased to ${colonist.magicSkills[school]}!`, 'success', { type: 'colonist', id: colonist.id });
+        game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: `${MAGIC_SKILLS[school].name} lvl ${colonist.magicSkills[school]}`, color: '#aa66ff', fontSize: 11, ttl: 20, maxTtl: 20 });
+    }
+
+    // Breadth penalty: learning a tome takes longer the more OTHER schools this
+    // colonist already knows spells in, so early focus is cheap and late generalizing
+    // is slow. Rewards committing a colonist to a small number of schools.
+    const otherSchools = new Set();
+    for (const known of colonist.knownSpells) {
+        const s = SPELLS[known]?.school;
+        if (s && s !== school) otherSchools.add(s);
+    }
+    const effectiveWork = tomeDef.learningWork * (1 + otherSchools.size * MAGIC_STUDY_CONFIG.breadthLearningPenalty);
+
+    if (colonist.tomeProgress[tomeKey] >= effectiveWork) {
+        colonist.knownSpells.push(tomeDef.spell);
+        colonist.equippedTome = null;
+        delete colonist.tomeProgress[tomeKey];
+        applyThought(colonist, 'learned_spell', game.tick);
+        game.notifications.push({ text: `${colonist.name} learned ${spellDef.name}!`, tick: game.tick, type: 'success' });
+        game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: `Learned ${spellDef.name}!`, color: '#aa66ff', fontSize: 13, ttl: 25, maxTtl: 25 });
+    }
+}
+
+export function completeTask(colonist, task, game) {
+    switch (task.type) {
+        case 'build': {
+            const tile = game.map[task.y][task.x];
+            const bDef = BUILDINGS[task.buildType];
+            if (bDef && bDef.structureType === 'floor') {
+                tile.floor = task.buildType;
+            } else {
+                tile.structure = task.buildType;
+                tile.passable = !IMPASSABLE_STRUCTURES.has(task.buildType);
+            }
+            tile.designation = null;
+            if (game.mapIndex) game.mapIndex.addStructure(task.x, task.y, task.buildType);
+            if (task.buildType === 'bed') autoAssignNewBed(game, task.x, task.y);
+            if (task.buildType === 'trade_rift' && game.tradeRift && !game.tradeRift.seeded) {
+                game.tradeRift.regenerate(game, 'season');
+                game.tradeRift.regenerate(game, 'year');
+            }
+            game.roomsDirty = true;
+            if (game.waves && game.waves.active) game.waves.invalidatePathPreview();
+            applyThought(colonist, 'built_something', game.tick);
+            game.story.checkMilestone('first_building_placed', game);
+            game.combatEffects.push({ x: task.x, y: task.y, char: COMBAT_VISUALS.buildCompleteChar, color: COMBAT_VISUALS.buildCompleteColor, ttl: COMBAT_VISUALS.buildCompleteTtl });
+            // Build-complete particle burst: starburst of white/yellow particles
+            for (let i = 0; i < 10; i++) {
+                const angle = (i / 10) * Math.PI * 2 + Math.random() * 0.3;
+                const speed = 0.4 + Math.random() * 0.3;
+                spawnParticle(game, {
+                    x: task.x + 0.5, y: task.y + 0.5,
+                    vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+                    decay: 0.08,
+                    color: Math.random() < 0.5 ? '#ffffff' : '#ffee44',
+                    size: 2 + Math.random() * 2,
+                    alpha: 0.9,
+                    shape: 'square',
+                    maxDist: 0.9,
+                });
+            }
+            window.soundManager?.playSFX('build_complete');
+            break;
+        }
+        case 'chop':
+        case 'mine': {
+            const tile = game.map[task.y][task.x];
+            if (tile.resource) {
+                const rDef = RESOURCES[tile.resource.type];
+                if (rDef) {
+                    const output = {};
+                    for (const [res, amt] of Object.entries(rDef.yield)) {
+                        output[res] = rDef.perAmount ? tile.resource.amount * amt : amt;
+                    }
+                    if (colonist.pedestalHarvestBonus > 0) {
+                        for (const k of Object.keys(output)) output[k] += colonist.pedestalHarvestBonus;
+                    }
+                    applyScavenger(colonist, output, game);
+                    game.resources.add(output);
+                    emitYieldFloaties(game, task.x, task.y, output);
+                }
+                tile.resource = null;
+                if (task.type === 'mine') {
+                    tile.terrain = 'dirt';
+                    tile.passable = true;
+                    game.combatEffects.push({ x: task.x, y: task.y, char: COMBAT_VISUALS.mineDustChar, color: COMBAT_VISUALS.mineDustColor, ttl: COMBAT_VISUALS.mineDustTtl });
+                    for (let i = 0; i < 18; i++) {
+                        const angle = -Math.PI * 0.5 + (Math.random() - 0.5) * Math.PI * 1.4;
+                        const speed = 0.7 + Math.random() * 0.9;
+                        spawnParticle(game, {
+                            x: task.x + 0.3 + Math.random() * 0.4, y: task.y + 0.5,
+                            vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+                            ay: 0.4,
+                            decay: 0.45,
+                            color: Math.random() < 0.5 ? '#888888' : '#aaaaaa',
+                            size: 2 + Math.random() * 2,
+                            alpha: 0.9,
+                            shape: 'square',
+                            maxY: task.y + 1,
+                        });
+                    }
+                    window.soundManager?.playSFX('mine_hit');
+                }
+                else {
+                    for (let i = 0; i < 14; i++) {
+                        const angle = -Math.PI * 0.5 + (Math.random() - 0.5) * Math.PI * 1.6;
+                        const speed = 0.7 + Math.random() * 0.9;
+                        spawnParticle(game, {
+                            x: task.x + 0.3 + Math.random() * 0.4, y: task.y + 0.4,
+                            vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+                            ay: 0.4,
+                            decay: 0.45,
+                            color: Math.random() < 0.5 ? '#8B5E3C' : '#c49a6c',
+                            size: 2 + Math.random() * 2.5,
+                            alpha: 0.9,
+                            shape: 'square',
+                            maxY: task.y + 1,
+                        });
+                    }
+                    window.soundManager?.playSFX('chop_hit');
+                }
+            }
+            tile.designation = null;
+            // The tile lost its resource (and mining reverts terrain to dirt), so it
+            // is now bakeable ground. Invalidate the static caches or the old
+            // tree/rock sprite would linger in the baked layer.
+            if (game.minimap) game.minimap.markTerrainDirty();
+            if (game.renderer) game.renderer.markTerrainDirty();
+            applyThought(colonist, 'good_work', game.tick);
+            if (game.tutorial) game.tutorial.flags.gathered = true;
+            break;
+        }
+        case 'plant': {
+            const tile = game.map[task.y][task.x];
+            if (tile.zone) {
+                tile.zone.state = 'growing';
+                tile.zone.growth = 0;
+            }
+            break;
+        }
+        case 'harvest': {
+            const tile = game.map[task.y][task.x];
+            if (tile.zone) {
+                const crop = tile.zone.crop;
+                const yields = {};
+                yields[crop] = getHarvestYield(game, crop);
+                if (colonist.pedestalHarvestBonus > 0) yields[crop] += colonist.pedestalHarvestBonus;
+                applyScavenger(colonist, yields, game);
+                game.resources.add(yields);
+                emitYieldFloaties(game, task.x, task.y, yields);
+                tile.zone.state = 'empty';
+                tile.zone.growth = 0;
+                applyThought(colonist, 'harvested', game.tick);
+                game.combatEffects.push({ x: task.x, y: task.y, char: COMBAT_VISUALS.harvestChar, color: COMBAT_VISUALS.harvestColor, ttl: COMBAT_VISUALS.harvestTtl });
+                window.soundManager?.playSFX('harvest');
+            }
+            break;
+        }
+        case 'enchant': {
+            if (task.itemKey) {
+                const def = ALL_ITEMS[task.itemKey]
+                if (def) {
+                    const item = { ...def, key: task.itemKey };
+                    // Re-apply original item quality
+                    if (def.type === 'weapon') applySpecificQuality(item, task.itemQuality, 'damage');
+                    else if (def.type === 'armor' || def.type === 'helmet') applySpecificQuality(item, task.itemQuality, 'damageReduction');
+                    else if (def.type === 'tool') applySpecificQuality(item, task.itemQuality, 'miningSpeed', 'choppingSpeed', 'farmingSpeed', 'craftingSpeed');
+                    else if (def.type === 'clothes') applySpecificQuality(item, task.itemQuality, 'workSpeedBonus', 'moodBonus', 'coldResistance', 'heatResistance');
+                    else if (def.type === 'boots') applySpecificQuality(item, task.itemQuality, 'moveSpeedBonus', 'damageReduction');
+                    // Apply enchantment based on item type
+                    applyEnchantment(item, colonist, game, task.itemType);
+                    game.resources.addItem(item);
+                    applyThought(colonist, 'enchanted an item', game.tick);
+                    game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: `Enchanted ${item.name}`, color: '#ff00f7', fontSize: 10, ttl: 20, maxTtl: 20 });
+                    window.soundManager?.playSFX('enchant_complete');
+                }
+                const tile = game.map[colonist.y]?.[colonist.x];
+                if (tile?.structure === 'enchanting_table' && game.stats) {
+                    game.stats.itemsEnchanted++;
+                }
+            }
+            break;
+        }
+        case 'craft': {
+            if (task.recipe) {
+                const output = task.recipe.output;
+                let handled = false;
+                for (const key of Object.keys(output)) {
+                    const def = ALL_ITEMS[key];
+                    if (def && def.type !== 'material') {
+                        const item = { ...def, key };
+                        if (def.type === 'weapon') applyQuality(item, colonist, game, 'damage');
+                        else if (def.type === 'armor' || def.type === 'helmet') applyQuality(item, colonist, game, 'damageReduction');
+                        else if (def.type === 'tool') applyQuality(item, colonist, game, 'miningSpeed', 'choppingSpeed', 'farmingSpeed', 'craftingSpeed');
+                        else if (def.type === 'clothes') applyQuality(item, colonist, game, 'workSpeedBonus', 'moodBonus', 'coldResistance', 'heatResistance');
+                        else if (def.type === 'boots') applyQuality(item, colonist, game, 'moveSpeedBonus', 'damageReduction');
+                        game.resources.addItem(item);
+                        handled = true;
+                    }
+                }
+                if (!handled) {
+                    if (colonist.pedestalCraftOutputBonus > 0) {
+                        const bonus = {};
+                        for (const [k, v] of Object.entries(output)) bonus[k] = colonist.pedestalCraftOutputBonus;
+                        game.resources.add(bonus);
+                    }
+                    game.resources.add(output);
+                }
+                const tile = game.map[colonist.y]?.[colonist.x];
+                if (tile?.structure === 'enchanting_table' && game.stats) {
+                    game.stats.itemsEnchanted++;
+                }
+                applyThought(colonist, 'crafted', game.tick);
+                const craftedName = Object.keys(task.recipe.output)[0]?.replace(/_/g, ' ') || 'item';
+                game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: `Crafted ${craftedName}`, color: '#ffcc00', fontSize: 10, ttl: 20, maxTtl: 20 });
+                window.soundManager?.playSFX('craft_complete');
+                if (game.tutorial && output.planks) game.tutorial.flags.craftedPlanks = true;
+            }
+            break;
+        }
+        case 'cook': {
+            if (task.recipe) {
+                const output = { ...task.recipe.output };
+                let handled = false;
+                for (const key of Object.keys(output)) {
+                    if (POTIONS[key]) {
+                        game.resources.addPotion({ ...POTIONS[key], type: key });
+                        handled = true;
+                    }
+                }
+                if (!handled) {
+                    if (output.food && game.research.isResearched('alchemy')) {
+                        output.food += WORK_CONFIG.alchemyFoodBonus;
+                    }
+                    let cookBonus = getPedestalEffect(game, 'cookingBonusFood');
+                    if (colonist.traits?.includes('chef')) cookBonus += TRAITS.chef.cookingBonusFood;
+                    if (output.food && cookBonus > 0) output.food += cookBonus;
+                    game.resources.add(output);
+                }
+                applyThought(colonist, 'cooked', game.tick);
+                if (game.tutorial) game.tutorial.flags.cookedMeal = true;
+            }
+            break;
+        }
+        case 'hunt': {
+            if (task.targetAnimalId) {
+                const animal = game.entities.find(a => a.id === task.targetAnimalId && a.category === 'animal' && !a.tamed);
+                if (animal && animal.hp > 0) {
+                    colonist.huntTargetId = task.targetAnimalId;
+                    colonist.state = 'hunting';
+                    colonist.currentTaskId = null;
+                    colonist.workProgress = 0;
+                    game.taskQueue.complete(task.id);
+                    return;
+                }
+            }
+            break;
+        }
+        case 'extinguish': {
+            const tile = game.map[task.y][task.x];
+            tile.onFire = false;
+            tile.fireTimer = 0;
+            if (game.mapIndex) game.mapIndex.removeFire(task.x, task.y);
+            applyThought(colonist, 'put_out_fire', game.tick);
+            break;
+        }
+        case 'cleanse_blight': {
+            const tile = game.map[task.y][task.x];
+            if (tile.zone && tile.zone.blighted) {
+                tile.zone.blighted = false;
+                delete tile.zone.blightSpreadCount;
+                game.combatEffects.push({ x: task.x, y: task.y, char: '+', color: '#44ff88', ttl: 3 });
+                for (let i = 0; i < 6; i++) {
+                    const angle = (i / 6) * Math.PI * 2;
+                    const speed = 0.3 + Math.random() * 0.2;
+                    spawnParticle(game, {
+                        x: task.x + 0.5, y: task.y + 0.5,
+                        vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+                        decay: 0.1, color: '#44ff88', size: 2, alpha: 0.8, shape: 'circle', maxDist: 0.7,
+                    });
+                }
+            }
+            break;
+        }
+        case 'research': {
+            let researchPts = Math.ceil((colonist.skills.research + 2) * 0.6);
+            const researchMult = getEquipmentStat(colonist, 'researchSpeed');
+            if (researchMult > 0) researchPts = Math.floor(researchPts * researchMult);
+            if (task.diminished) researchPts = Math.max(1, Math.floor(researchPts * 0.5));
+            researchPts = Math.floor(researchPts * getResearchSpeedMult(game));
+            const completedKey = game.research.addProgress(researchPts);
+            if (completedKey) {
+                const tech = RESEARCH[completedKey];
+                const name = tech?.name || completedKey.replace(/_/g, ' ');
+                const desc = tech?.description || '';
+                game.notifications.push({ text: `Research complete: ${name}!`, tick: game.tick, type: 'success' });
+                game.eventLog.add(game, `Research unlocked: ${name}`, 'success', null);
+                game.story.checkMilestone(`research_${completedKey}`, game);
+                game.combatEffects.push({ x: colonist.x, y: colonist.y, char: COMBAT_VISUALS.researchCompleteChar, color: COMBAT_VISUALS.researchCompleteColor, ttl: COMBAT_VISUALS.researchCompleteTtl });
+                window.soundManager?.playSFX('research_complete');
+                if (!game.events.pendingEvent) {
+                    game.events.pendingEvent = {
+                        type: 'research_complete',
+                        text: `Research Complete: ${name}!${desc ? ' ' + desc : ''}`,
+                        choices: ['Dismiss', 'Go to Research'],
+                    };
+                    if (game.settings.pauseOnResearch && !game.paused) {
+                        game.togglePause();
+                        game._eventPaused = true;
+                    }
+                }
+            }
+            let tomeRate = game.research.activeResearch
+                ? MAGIC_STUDY_CONFIG.studyTicksPerProgress
+                : MAGIC_STUDY_CONFIG.tomeStudyBonus;
+            const tomeSpeedMult = getEquipmentStat(colonist, 'tomeStudySpeed');
+            if (tomeSpeedMult > 0) tomeRate *= tomeSpeedMult;
+            advanceTomeStudy(colonist, game, tomeRate);
+            break;
+        }
+        case 'tame': {
+            if (task.targetAnimalId) {
+                const wildAnimal = game.entities.find(a => a.id === task.targetAnimalId && a.category === 'animal' && !a.tamed);
+                const tamedDef = wildAnimal ? TAMED_ANIMALS[wildAnimal.type] : null;
+                let tameResult;
+                if (tamedDef && tamedDef.dangerousTame) {
+                    const result = attemptDangerousTame(game, colonist, task.targetAnimalId);
+                    tameResult = result === 'success' ? true : false;
+                } else {
+                    tameResult = completeTame(game, task.targetAnimalId, colonist.id);
+                }
+                if (tameResult === true) {
+                    applyThought(colonist, 'tamed_animal', game.tick);
+                    game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: 'Tamed!', color: '#44ff44', fontSize: 11, ttl: 12, maxTtl: 12 });
+                } else if (tameResult === 'lead') {
+                    // Animal is pending lead. Enqueue a lead task and claim it immediately
+                    // so this colonist walks it to the pen without releasing to the pool.
+                    const animal = game.entities.find(a => a.id === task.targetAnimalId);
+                    if (animal) {
+                        const pen = game.mapIndex ? game.mapIndex.findNearest('beast_circle', colonist.x, colonist.y) : null;
+                        if (pen) {
+                            const leadTask = game.taskQueue.add({
+                                type: 'lead_animal',
+                                skillRequired: 'animals',
+                                urgent: true,
+                                x: pen.x,
+                                y: pen.y,
+                                penX: pen.x,
+                                penY: pen.y,
+                                workAmount: 5,
+                                targetAnimalId: task.targetAnimalId,
+                            });
+                            game.taskQueue.claim(leadTask.id, colonist.id);
+                            // Skip the normal task completion below so colonist stays active.
+                            game.taskQueue.complete(task.id);
+                            colonist.currentTaskId = leadTask.id;
+                            colonist.state = 'idle';
+                            colonist.workProgress = 0;
+                            return;
+                        }
+                    }
+                }
+            }
+            break;
+        }
+        case 'lead_animal': {
+            if (task.targetAnimalId) {
+                finalizeTame(game, task.targetAnimalId, colonist.id, task.penX, task.penY);
+                applyThought(colonist, 'tamed_animal', game.tick);
+                game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: 'Settled in!', color: '#44ff44', fontSize: 11, ttl: 12, maxTtl: 12 });
+            }
+            break;
+        }
+        case 'feed_animal': {
+            if (task.targetAnimalId) {
+                const animal = game.entities.find(a => a.id === task.targetAnimalId && a.tamed);
+                // Always clear the queued flag so a new task can be issued if food was unavailable.
+                if (animal) animal._feedTaskQueued = false;
+                if (animal && game.resources.has({ food: 1 })) {
+                    game.resources.deduct({ food: 1 });
+                    animal.hunger = 0;
+
+                    animal.bondLevel = (animal.bondLevel || 0) + 1;
+                    applyThought(colonist, 'fed_animal', game.tick);
+
+                    const PET_BOND_THRESHOLD = 5;
+                    const tamedDef = TAMED_ANIMALS[animal.type];
+                    if (animal.bondLevel >= PET_BOND_THRESHOLD && !animal.isPet && !tamedDef?.guardAnimal) {
+                        // Find a colonist without a pet. Prefer the feeder.
+                        const hasPet = (c) => game.entities.some(e => e.tamed && e.isPet && e.bondedColonistId === c.id);
+                        let owner = !hasPet(colonist) ? colonist : game.colonists.find(c => c.hp > 0 && !hasPet(c));
+                        if (owner) {
+                            animal.bondedColonistId = owner.id;
+                            animal.isPet = true;
+                            animal.roles.push({ type: 'pet' });
+                            if (!animal.roleState) animal.roleState = {};
+                            animal.roleState.pet = { state: 'following', noHostileTicks: 0 };
+                            game.notifications.push({ text: `${animal.type} bonded with ${owner.name} as a pet!`, tick: game.tick, type: 'success' });
+                        }
+                    }
+
+                    // Bond the animal to this colonist if it has no bond yet.
+                    if (!animal.bondedColonistId) {
+                        animal.bondedColonistId = colonist.id;
+                    }
+                }
+            }
+            break;
+        }
+        case 'repair': {
+            const tile = game.map[task.y][task.x];
+            if (tile.structure && tile.structureHp !== undefined) {
+                tile.structureHp = undefined;
+                game.combatEffects.push({ x: task.x, y: task.y, char: COMBAT_VISUALS.buildCompleteChar, color: COMBAT_VISUALS.buildCompleteColor, ttl: COMBAT_VISUALS.buildCompleteTtl });
+                applyThought(colonist, 'repaired', game.tick);
+            }
+            break;
+        }
+        case 'repair_trinket': {
+            if (task.colonistId) {
+                const target = game.getColonist(task.colonistId);
+                if (target && target.trinketBroken) {
+                    target.trinketBroken = false;
+                    target._repairQueued = false;
+                    invalidateEquipStatCache(target);
+                    const artName = target.trinket?.name || 'trinket';
+                    game.eventLog.add(game, `${artName} repaired at the anvil`, 'success', null);
+                }
+            }
+            if (game.resources.stockpile.runite >= 1) {
+                game.resources.stockpile.runite -= 1;
+            }
+            applyThought(colonist, 'crafted', game.tick);
+            break;
+        }
+        case 'deconstruct': {
+            const tile = game.map[task.y][task.x];
+            const target = tile.structure || tile.floor;
+            if (target) {
+                const def = BUILDINGS[target];
+                if (def) {
+                    const partial = {};
+                    for (const [res, amt] of Object.entries(def.cost)) {
+                        partial[res] = Math.ceil(amt * COLONIST_CONFIG.deconstructRecovery);
+                    }
+                    game.resources.add(partial);
+                }
+                if (tile.structure) {
+                    if (tile.structure === 'bed') {
+                        for (const c of game.colonists) {
+                            if (c.assignedBed && c.assignedBed.x === task.x && c.assignedBed.y === task.y) {
+                                c.assignedBed = null;
+                            }
+                        }
+                    }
+                    if (game.mapIndex) game.mapIndex.removeStructure(task.x, task.y, tile.structure);
+                    tile.structure = null;
+                    tile.passable = true;
+                } else {
+                    if (game.mapIndex) game.mapIndex.removeStructure(task.x, task.y, tile.floor);
+                    tile.floor = null;
+                }
+                tile.designation = null;
+                game.roomsDirty = true;
+                applyThought(colonist, 'deconstructed', game.tick);
+                game.combatEffects.push({ x: task.x, y: task.y, char: COMBAT_VISUALS.mineDustChar, color: COMBAT_VISUALS.mineDustColor, ttl: COMBAT_VISUALS.mineDustTtl });
+                window.soundManager?.playSFX('chop_hit');
+                for (let i = 0; i < 16; i++) {
+                    const angle = -Math.PI * 0.5 + (Math.random() - 0.5) * Math.PI * 1.6;
+                    const speed = 0.7 + Math.random() * 0.9;
+                    spawnParticle(game, {
+                        x: task.x + 0.3 + Math.random() * 0.4, y: task.y + 0.5,
+                        vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+                        ay: 0.4,
+                        decay: 0.45,
+                        color: Math.random() < 0.5 ? '#aaaaaa' : '#c49a6c',
+                        size: 2 + Math.random() * 2,
+                        alpha: 0.9,
+                        shape: 'square',
+                        maxY: task.y + 1,
+                    });
+                }
+            }
+            break;
+        }
+        case 'deconstruct_floor': {
+            const tile = game.map[task.y][task.x];
+            const target = tile.floor;
+            if (target) {
+                const def = BUILDINGS[target];
+                if (def) {
+                    const partial = {};
+                    for (const [res, amt] of Object.entries(def.cost)) {
+                        partial[res] = Math.ceil(amt * COLONIST_CONFIG.deconstructRecovery);
+                    }
+                    game.resources.add(partial);
+                }
+                if (game.mapIndex) game.mapIndex.removeStructure(task.x, task.y, tile.floor);
+                tile.floor = null;
+                tile.designation = null;
+                game.roomsDirty = true;
+                applyThought(colonist, 'deconstructed', game.tick);
+                game.combatEffects.push({ x: task.x, y: task.y, char: COMBAT_VISUALS.mineDustChar, color: COMBAT_VISUALS.mineDustColor, ttl: COMBAT_VISUALS.mineDustTtl });
+                window.soundManager?.playSFX('chop_hit');
+                for (let i = 0; i < 16; i++) {
+                    const angle = -Math.PI * 0.5 + (Math.random() - 0.5) * Math.PI * 1.6;
+                    const speed = 0.7 + Math.random() * 0.9;
+                    spawnParticle(game, {
+                        x: task.x + 0.3 + Math.random() * 0.4, y: task.y + 0.5,
+                        vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+                        ay: 0.4,
+                        decay: 0.45,
+                        color: Math.random() < 0.5 ? '#aaaaaa' : '#c49a6c',
+                        size: 2 + Math.random() * 2,
+                        alpha: 0.9,
+                        shape: 'square',
+                        maxY: task.y + 1,
+                    });
+                }
+            }
+            break;
+        }
+    }
+
+    if (task.skillRequired && colonist.skills[task.skillRequired] !== undefined) {
+        const maxLevel = COLONIST_CONFIG.skillMaxLevel;
+        if (colonist.skills[task.skillRequired] < maxLevel) {
+            if (!colonist.skillXp) colonist.skillXp = {};
+            if (!colonist.skillXp[task.skillRequired]) colonist.skillXp[task.skillRequired] = 0;
+            let xpGain = task.skillXpGain ?? Math.max(0.5, Math.round(task.workAmount / 10 * 2) / 2);
+            if (colonist.pedestalSkillBonus) xpGain *= (1 + colonist.pedestalSkillBonus);
+            if (colonist.activeEffects) {
+                for (const e of colonist.activeEffects) {
+                    if (e.type === 'scholarship' && e.skillGrowthBonus) xpGain *= (1 + e.skillGrowthBonus);
+                }
+            }
+            if (colonist.traits.includes('prodigy')) xpGain *= TRAITS.prodigy.allSkillXpMult;
+            if (colonist.traits.includes('magically_inept')) xpGain *= TRAITS.magically_inept.mundaneXpMult;
+            xpGain *= getRaceModifier(colonist, 'allSkillXpMult', 1);
+            if (task.skillRequired === 'animals') xpGain *= getRaceModifier(colonist, 'animalXpMult', 1);
+            colonist.skillXp[task.skillRequired] += xpGain;
+            let xpNeeded = COLONIST_CONFIG.skillXpToLevel + colonist.skills[task.skillRequired] * COLONIST_CONFIG.skillXpScalePerLevel;
+            while (colonist.skillXp[task.skillRequired] >= xpNeeded && colonist.skills[task.skillRequired] < maxLevel) {
+                colonist.skillXp[task.skillRequired] -= xpNeeded;
+                colonist.skills[task.skillRequired]++;
+                xpNeeded = COLONIST_CONFIG.skillXpToLevel + colonist.skills[task.skillRequired] * COLONIST_CONFIG.skillXpScalePerLevel;
+                game.eventLog.add(game, `${colonist.name}'s ${task.skillRequired} skill increased to ${colonist.skills[task.skillRequired]}!`, 'success', { type: 'colonist', id: colonist.id });
+                game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: `${task.skillRequired} lvl ${colonist.skills[task.skillRequired]}`, color: '#44ff44', fontSize: 11, ttl: 20, maxTtl: 20 });
+            }
+        }
+    }
+
+    game.taskQueue.complete(task.id);
+    colonist.currentTaskId = null;
+    colonist.state = 'idle';
+    colonist.workProgress = 0;
+}
