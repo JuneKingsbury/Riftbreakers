@@ -1,4 +1,4 @@
-import { getTile } from './battle-map.js';
+import { getTile, hasLineOfSight, MAX_CLIMB } from './battle-map.js';
 import { faceToward, isUnconscious, isDead } from './units.js';
 import { ABILITIES } from './data-registry.js';
 
@@ -36,10 +36,12 @@ export function computeMoveRange(unit, map, allUnits) {
             { x, y: y - 1 },
             { x, y: y + 1 },
         ];
+        const curTile = getTile(map, x, y);
         for (const n of neighbors) {
             const tile = getTile(map, n.x, n.y);
             if (!tile || !tile.passable) continue;
             if (blocked.has(`${n.x},${n.y}`)) continue;
+            if (Math.abs((tile.elevation ?? 0) - (curTile?.elevation ?? 0)) > MAX_CLIMB) continue;
             const remaining = budget - tile.moveCost;
             if (remaining < 0) continue;
             const key = `${n.x},${n.y}`;
@@ -68,6 +70,7 @@ export function computeMovePath(unit, map, allUnits, destX, destY) {
 
     outer: while (queue.length > 0) {
         const { x, y, budget } = queue.shift();
+        const curTile = getTile(map, x, y);
         const neighbors = [
             { x: x - 1, y },
             { x: x + 1, y },
@@ -78,6 +81,7 @@ export function computeMovePath(unit, map, allUnits, destX, destY) {
             const tile = getTile(map, n.x, n.y);
             if (!tile || !tile.passable) continue;
             if (blocked.has(`${n.x},${n.y}`)) continue;
+            if (Math.abs((tile.elevation ?? 0) - (curTile?.elevation ?? 0)) > MAX_CLIMB) continue;
             const remaining = budget - tile.moveCost;
             if (remaining < 0) continue;
             const key = `${n.x},${n.y}`;
@@ -102,18 +106,33 @@ export function computeMovePath(unit, map, allUnits, destX, destY) {
     return steps;
 }
 
-export function computeAttackRange(fromTiles, range, includeStart = false) {
+export function computeAttackRange(fromTiles, range, includeStart = false, requiresLos = false, map = null) {
     const result = new Set();
     for (const key of fromTiles) {
         const [ox, oy] = key.split(',').map(Number);
         for (let dx = -range; dx <= range; dx++) {
             for (let dy = -range; dy <= range; dy++) {
                 if (!includeStart && dx === 0 && dy === 0) continue;
-                if (Math.abs(dx) + Math.abs(dy) <= range) {
-                    result.add(`${ox + dx},${oy + dy}`);
-                }
+                if (Math.abs(dx) + Math.abs(dy) > range) continue;
+                if (requiresLos && map && !hasLineOfSight(map, ox, oy, ox + dx, oy + dy)) continue;
+                result.add(`${ox + dx},${oy + dy}`);
             }
         }
+    }
+    return result;
+}
+
+export function computePatternArea(cx, cy, pattern, rotation) {
+    const result = new Set();
+    for (const [dx, dy] of pattern) {
+        let rx, ry;
+        switch (rotation % 4) {
+            case 1:  rx =  dy; ry = -dx; break;
+            case 2:  rx = -dx; ry = -dy; break;
+            case 3:  rx = -dy; ry =  dx; break;
+            default: rx =  dx; ry =  dy; break;
+        }
+        result.add(`${cx + rx},${cy + ry}`);
     }
     return result;
 }

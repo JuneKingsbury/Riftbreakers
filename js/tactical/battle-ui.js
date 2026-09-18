@@ -7,6 +7,7 @@ export class BattleUI {
         this.renderer = renderer;
         this._onAction    = null;
         this._skillMenuOpen = false;
+        this._sidebarRosterKey = null;
 
         // Mount everything inside a full-screen overlay that sits on top of the
         // game canvas. This avoids the #game overflow:hidden clipping the panels.
@@ -152,7 +153,6 @@ export class BattleUI {
         if (ab.range > 0)    stats.push(`Range: <b>${ab.range}</b>`);
         if (ab.aoe > 0)      stats.push(`AoE: <b>${ab.aoe}</b>`);
         if (ab.mpCost > 0)   stats.push(`MP Cost: <b style="color:#88f;">${ab.mpCost}</b>`);
-        if (ab.actionCost)   stats.push(`CT Cost: <b style="color:#fc8;">${ab.actionCost}</b>`);
         if (stats.length) lines.push(stats.join('  '));
 
         if (ab.chargeTime > 0) {
@@ -199,23 +199,181 @@ export class BattleUI {
     }
 
     _updateSidebar(battle) {
-        const sb    = this._sidebar;
-        const order = battle.previewTurnOrder(8);
-        const u     = battle.activeUnit;
+        const sb = this._sidebar;
+        const u  = battle.activeUnit;
 
-        let html = '<div style="color:#ffcc44;font-weight:bold;margin-bottom:5px;font-size:11px;">TURN ORDER</div>';
-        for (const unit of order) {
-            const col  = unit.team === 'player' ? '#7bf' : '#f76';
-            const hpF  = unit.hp / unit.maxHp;
-            const hpC  = hpF > 0.5 ? '#3c3' : hpF > 0.25 ? '#cc3' : '#c33';
-            const bold = unit === battle.activeUnit ? 'font-weight:bold;' : '';
-            html += `<div style="display:flex;align-items:center;gap:4px;padding:2px 0;border-bottom:1px solid #1e1e30;${bold}">
-                <span style="color:${col};width:14px;text-align:center;">${unit.char}</span>
-                <span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:11px;">${unit.name}</span>
-                <span style="color:${hpC};font-size:10px;">${unit.hp}</span>
-            </div>`;
+        // Stable order within each team: sort by id (creation/roster order).
+        const players = battle.livingUnits.filter(u => u.team === 'player').sort((a, b) => a.id - b.id);
+        const enemies = battle.livingUnits.filter(u => u.team === 'enemy').sort((a, b) => a.id - b.id);
+        const living  = [...players, ...enemies];
+
+        // Roster key uses stable IDs — only changes when units die.
+        const rosterKey = living.map(u => u.id).sort((a, b) => a - b).join(',');
+        if (this._sidebarRosterKey !== rosterKey) {
+            this._sidebarRosterKey = rosterKey;
+            this._rebuildSidebarRoster(sb, players, enemies, living);
         }
 
+        // Fast path: update only the dynamic values in-place every frame.
+        this._patchSidebarRoster(sb, living, u, battle);
+        this._patchSidebarDetails(sb, u, battle);
+    }
+
+    _rebuildSidebarRoster(sb, players, enemies, living) {
+        // Remove existing roster content, keep the detail panel placeholder.
+        sb.querySelectorAll('.tac-roster-row, .tac-roster-header, .tac-team-header').forEach(el => el.remove());
+
+        const detailPanel = sb.querySelector('.tac-detail-panel');
+
+        const insertBefore = (el) => detailPanel ? sb.insertBefore(el, detailPanel) : sb.appendChild(el);
+
+        // Main header.
+        const hdr = document.createElement('div');
+        hdr.className = 'tac-roster-header';
+        hdr.style.cssText = 'color:#ffcc44;font-weight:bold;margin-bottom:8px;font-size:11px;border-bottom:1px solid #335;padding-bottom:4px;';
+        hdr.textContent = 'CHARACTERS';
+        insertBefore(hdr);
+
+        const makeTeamSection = (units, label, col) => {
+            const teamHdr = document.createElement('div');
+            teamHdr.className = 'tac-team-header';
+            teamHdr.style.cssText = `color:${col};font-size:9px;text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;margin-top:4px;`;
+            teamHdr.textContent = label;
+            insertBefore(teamHdr);
+
+            for (const unit of units) {
+                const row = document.createElement('div');
+                row.className = 'tac-roster-row';
+                row.dataset.uid = unit.id;
+                row.style.cssText = 'display:flex;align-items:center;gap:5px;padding:3px 2px;margin-bottom:2px;border:1px solid transparent;border-radius:3px;';
+                row.innerHTML = `
+                    <div class="tac-portrait" style="width:28px;height:28px;flex-shrink:0;border-radius:2px;overflow:hidden;background:#111;border:1px solid ${col}44;"></div>
+                    <div style="flex:1;min-width:0;">
+                        <div style="display:flex;justify-content:space-between;align-items:baseline;">
+                            <span class="tac-name" style="color:${col};font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:70px;">${unit.name}</span>
+                            <span class="tac-hp" style="font-size:9px;">${unit.hp}</span>
+                            <span class="tac-spd" style="font-size:9px;color:#888;"></span>
+                        </div>
+                        <div style="background:#1a1a2a;height:4px;border-radius:2px;margin-top:3px;position:relative;overflow:hidden;">
+                            <div class="tac-ct-ghost" style="position:absolute;top:0;left:0;height:100%;border-radius:2px;width:0%;background:#fff;"></div>
+                            <div class="tac-ct-bar" style="position:relative;height:100%;border-radius:2px;width:0%;transition:width 0.12s linear;"></div>
+                        </div>
+                        <div class="tac-charge-wrap" style="display:none;background:#1a1a2a;height:4px;border-radius:2px;margin-top:2px;position:relative;overflow:hidden;">
+                            <div class="tac-charge-bar" style="background:#ffcc44;height:100%;border-radius:2px;width:0%;transition:width 0.12s linear;"></div>
+                            <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:flex-end;padding-right:2px;pointer-events:none;">
+                                <span style="font-size:7px;color:#00000088;line-height:1;">✦</span>
+                            </div>
+                        </div>
+                    </div>`;
+                insertBefore(row);
+            }
+        };
+
+        makeTeamSection(players, 'Players', '#7bf');
+        makeTeamSection(enemies,  'Enemies', '#f76');
+
+        // Draw portraits after browser layout.
+        requestAnimationFrame(() => this._drawPortraits(sb, living));
+    }
+
+    _drawPortraits(sb, living) {
+        const renderer = this.renderer;
+        if (!renderer) return;
+        sb.querySelectorAll('.tac-roster-row').forEach(row => {
+            const uid  = row.dataset.uid;
+            const unit = living.find(u => String(u.id) === uid);
+            if (!unit) return;
+            const el = row.querySelector('.tac-portrait');
+            if (!el) return;
+            const sprite = renderer._getCompositeSprite(unit, false, null);
+            if (!sprite) return;
+            const w = el.offsetWidth  || 28;
+            const h = el.offsetHeight || 28;
+            let c = el._portraitCanvas;
+            if (!c) {
+                c = document.createElement('canvas');
+                c.style.cssText = 'width:100%;height:100%;display:block;image-rendering:pixelated;';
+                el.appendChild(c);
+                el._portraitCanvas = c;
+            }
+            if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
+            const ctx = c.getContext('2d');
+            ctx.clearRect(0, 0, w, h);
+            const sw = sprite.width, sh = sprite.height;
+            const srcH = Math.round(h / (w / sw));
+            ctx.imageSmoothingEnabled = false;
+            ctx.drawImage(sprite, 0, 0, sw, Math.min(sh, srcH), 0, 0, w, h);
+        });
+    }
+
+    _patchSidebarRoster(sb, living, activeUnit, battle) {
+        const activeBorderCol = activeUnit?.team === 'player' ? '#44ff8866' : '#ffcc4466';
+        // Scale CT bars within each team so the leader shows full.
+        const maxCtPlayer = Math.max(1, ...living.filter(u => u.team === 'player').map(u => u.ct));
+        const maxCtEnemy  = Math.max(1, ...living.filter(u => u.team === 'enemy').map(u => u.ct));
+        sb.querySelectorAll('.tac-roster-row').forEach(row => {
+            const uid  = row.dataset.uid;
+            const unit = living.find(u => String(u.id) === uid);
+            if (!unit) return;
+
+            const isActive = unit === activeUnit;
+            const hpF   = unit.hp / unit.maxHp;
+            const hpC   = hpF > 0.5 ? '#3c3' : hpF > 0.25 ? '#cc3' : '#c33';
+            const maxCt = unit.team === 'player' ? maxCtPlayer : maxCtEnemy;
+            const ctPct = Math.round((unit.ct / maxCt) * 100);
+            const ctC   = isActive ? (unit.team === 'player' ? '#44ff88' : '#ffcc44')
+                                   : (unit.team === 'player' ? '#4af' : '#f64');
+
+            row.style.borderColor = isActive ? activeBorderCol : 'transparent';
+
+            const nameEl = row.querySelector('.tac-name');
+            if (nameEl) nameEl.style.fontWeight = isActive ? 'bold' : 'normal';
+
+            const hpEl  = row.querySelector('.tac-hp');
+            if (hpEl) { hpEl.textContent = `${unit.hp}/${unit.maxHp} HP`; hpEl.style.color = hpC; }
+            const spdEl = row.querySelector('.tac-spd');
+            if (spdEl) spdEl.textContent = `spd:${unit.spd}`;
+
+            const ctBar   = row.querySelector('.tac-ct-bar');
+            const ctGhost = row.querySelector('.tac-ct-ghost');
+            if (ctBar) {
+                const prev = parseFloat(ctBar.dataset.ctPct ?? ctPct);
+                if (ctPct < prev && ctGhost) {
+                    // CT dropped — snap ghost to old value, then let it drain.
+                    ctGhost.style.transition = 'none';
+                    ctGhost.style.width = prev + '%';
+                    // Force reflow so the snap is applied before we re-enable transition.
+                    void ctGhost.offsetWidth;
+                    ctGhost.style.transition = 'width 0.6s ease-out';
+                    ctGhost.style.width = ctPct + '%';
+                } else if (ctPct >= prev && ctGhost) {
+                    // CT rising — keep ghost in sync with no delay.
+                    ctGhost.style.transition = 'none';
+                    ctGhost.style.width = ctPct + '%';
+                }
+                ctBar.dataset.ctPct = ctPct;
+                ctBar.style.width = ctPct + '%';
+                ctBar.style.background = ctC;
+            }
+
+            const chargeWrap = row.querySelector('.tac-charge-wrap');
+            const chargeBar  = row.querySelector('.tac-charge-bar');
+            if (chargeWrap && chargeBar) {
+                const ch = unit._charging;
+                if (ch) {
+                    chargeWrap.style.display = 'block';
+                    chargeBar.style.width = Math.min(100, (ch.ct / ch.needed) * 100) + '%';
+                } else {
+                    chargeWrap.style.display = 'none';
+                }
+            }
+        });
+    }
+
+    _patchSidebarDetails(sb, u, battle) {
+        // Rebuild the static detail + inspect panels via innerHTML — they don't
+        // change structure often and contain no canvases, so this is safe.
+        let html = '';
         if (u) {
             const col  = u.team === 'player' ? '#7bf' : '#f76';
             const hpP  = Math.round(u.hp / u.maxHp * 100);
@@ -246,7 +404,6 @@ export class BattleUI {
             </div>`;
         }
 
-        // Inspect panel: shown when the player clicks a unit that isn't the active unit.
         const insp = this._inspectedUnit;
         if (insp && insp !== u) {
             const col  = insp.team === 'player' ? '#7bf' : '#f76';
@@ -282,7 +439,13 @@ export class BattleUI {
             </div>`;
         }
 
-        sb.innerHTML = html;
+        let panel = sb.querySelector('.tac-detail-panel');
+        if (!panel) {
+            panel = document.createElement('div');
+            panel.className = 'tac-detail-panel';
+            sb.appendChild(panel);
+        }
+        panel.innerHTML = html;
     }
 
     closeSkillMenu() {
@@ -303,6 +466,7 @@ export class BattleUI {
         const DISABLED = 'opacity:0.4;cursor:not-allowed;';
 
         const skillAbs = unit.abilities.filter(k => k !== 'attack' && ABILITIES[k] && !ABILITIES[k].passive);
+        const { hasMoved, hasActed } = this._turnFlags || {};
 
         if (this._skillMenuOpen) {
             let html = `<div style="color:#c8a0ff;font-size:11px;font-weight:bold;margin-bottom:5px;padding-bottom:4px;border-bottom:1px solid #335;">`;
@@ -339,7 +503,6 @@ export class BattleUI {
                 el.addEventListener('mousedown', e => { e.stopPropagation(); this._skillMenuOpen = false; });
             });
         } else {
-            const { hasMoved, hasActed } = this._turnFlags || {};
             let html = `<div style="color:#ffcc44;font-size:11px;font-weight:bold;margin-bottom:5px;padding-bottom:4px;border-bottom:1px solid #335;">${unit.name}'s Turn</div>`;
 
             html += `<button class="tac-btn" data-action="move" style="${BASE}${hasMoved ? DISABLED : ''}">[M] Move${hasMoved ? ' <span style="color:#555;font-size:10px;">(done)</span>' : ''}</button>`;
@@ -365,7 +528,7 @@ export class BattleUI {
         }
 
         const STATIC_TOOLTIPS = {
-            defend: `<span style="color:#7bf;font-weight:bold;">Defend</span><br>Take a defensive stance until your next turn.<br><span style="color:#aaa;">Reduces physical damage taken. Increases evasion against attacks from the front.</span><br>CT Cost: <b style="color:#fc8;">35</b>`,
+            defend: `<span style="color:#7bf;font-weight:bold;">Defend</span><br>Take a defensive stance until your next turn.<br><span style="color:#aaa;">Reduces physical damage taken. Increases evasion against attacks from the front.</span><br>CT Cost: <b style="color:#fc8;">${hasMoved ? 100 : 80}</b>`,
             move:   null,
             skills: null,
             pivot:  null,

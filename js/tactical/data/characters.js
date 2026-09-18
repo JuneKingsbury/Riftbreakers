@@ -6,16 +6,18 @@
 //   team       'player'|'enemy'
 //   x, y       number   Starting tile position
 //   ct         number   Starting charge-time offset (staggers initiative)
+//   xp         object   Map of job key → XP earned, e.g. { novice: 120, evoker: 340 }.
+//                       Drives job levels, ability unlocking, and prerequisite checks.
+//                       Omit a job key (or leave its XP at 0) to treat it as level 1.
 //   statMods   object   Per-stat overrides applied on top of the job's base stats
 //   extraAbilities string[] Additional abilities beyond what the job provides
-//   desc       string   Flavour description (optional)
 //   appearance object   Optional visual description for sprite compositing:
 //     race         'human'|'nymph'|'ferin'|'kobalos'|'bufos'
 //     bodyVariant  number  1-based index, wraps to available count
 //     hairVariant  number  1-based index, wraps to available count
 //     shirtVariant number  1-based index, wraps to available count
 //     nameColor    string  CSS color — tints shirt and used for selection outline
-//     clothesKey   string|null  equipment_worn: sprite key
+//     clothesKey   string|null  cosmetic-only sprite key (grants no stats)
 //     armorKey     string|null
 //     helmetKey    string|null
 //     weaponKey    string|null
@@ -52,11 +54,11 @@ export const CHARACTER_DATA = [
     },
     {
         name: 'Ryn',
-        job: 'conjurer',
+        job: 'earthshaker',
         team: 'player',
         x: 3, y: 11,
         ct: 55,
-        xp: { novice: 120, conjurer: 260 },
+        xp: { novice: 120, evoker: 250, transmuter: 250, earthshaker: 250 },
         appearance: {
             race: 'human', bodyVariant: 1, hairVariant: 2, shirtVariant: 1,
             nameColor: '#44cc66',

@@ -1,6 +1,6 @@
-import { computeMoveRange, computeMovePath, computeAttackRange, computeAoeArea, resolveAbility, ABILITIES } from './abilities.js';
+import { computeMoveRange, computeMovePath, computeAttackRange, computeAoeArea, computePatternArea, resolveAbility, ABILITIES } from './abilities.js';
 import { isDead, isAlive, isConscious, isUnconscious, isStunned, faceToward, setFacing } from './units.js';
-import { getTile } from './battle-map.js';
+import { getTile, applyTerrainEffect } from './battle-map.js';
 import { moveEntity, moveEntityAlongPath } from '../systems/movement-lerp.js';
 
 export const STATES = {
@@ -24,10 +24,11 @@ export class TacticalBattle {
         this.state = STATES.ADVANCE_CT;
         this.activeUnit = null;
         this.selectedAbility = null;
+        this.abilityRotation = 0;
+        this._lastHoverTile = null;
         this.moveRange = new Set();
         this.abilityRange = new Set();
         this.aoePreview = new Set();
-        this.hitPreview = new Set();
         this.hitPreview = new Set();
         this.log = [];
         this.winner = null;
@@ -120,8 +121,11 @@ export class TacticalBattle {
         if (ab.passive) return;
         if (ab.mpCost > this.activeUnit.mp) return;
         this.selectedAbility = abilityKey;
+        this.abilityRotation = 0;
+        this._lastHoverTile = null;
         const fromTile = new Set([`${this.activeUnit.x},${this.activeUnit.y}`]);
-        this.abilityRange = computeAttackRange(fromTile, ab.range);
+        const requiresLos = ab.requiresLos !== false;
+        this.abilityRange = computeAttackRange(fromTile, ab.range, false, requiresLos, this.map);
         this.aoePreview = new Set();
         this.hitPreview = new Set();
         this.setState(STATES.SELECT_ABILITY_TARGET);
@@ -131,11 +135,17 @@ export class TacticalBattle {
     hoverAbilityTarget(tx, ty) {
         if (this.state !== STATES.SELECT_ABILITY_TARGET) return;
         const ab = ABILITIES[this.selectedAbility];
-        if (ab && ab.aoe > 0) {
+        this._lastHoverTile = { x: tx, y: ty };
+        if (ab?.aoePattern) {
+            this.aoePreview = computePatternArea(tx, ty, ab.aoePattern, this.abilityRotation);
+        } else if (ab?.aoe > 0) {
             this.aoePreview = computeAoeArea(tx, ty, ab.aoe);
         } else {
             this.aoePreview = new Set([`${tx},${ty}`]);
         }
+
+        // Tile-targeting abilities don't highlight character hits.
+        if (ab?.targetType === 'tile') { this.hitPreview = new Set(); return; }
 
         // Compute which tiles in the preview contain a valid hittable target.
         const source = this.activeUnit;
@@ -149,6 +159,16 @@ export class TacticalBattle {
                 return true;
             });
             if (hit) this.hitPreview.add(key);
+        }
+    }
+
+    rotateAbility() {
+        if (this.state !== STATES.SELECT_ABILITY_TARGET) return;
+        const ab = ABILITIES[this.selectedAbility];
+        if (!ab?.aoePattern) return;
+        this.abilityRotation = (this.abilityRotation + 1) % 4;
+        if (this._lastHoverTile) {
+            this.hoverAbilityTarget(this._lastHoverTile.x, this._lastHoverTile.y);
         }
     }
 
@@ -185,6 +205,7 @@ export class TacticalBattle {
             source.mp = Math.max(0, source.mp - ab.mpCost);
             source._charging = {
                 ability: this.selectedAbility,
+                rotation: this.abilityRotation,
                 targetX: tx,
                 targetY: ty,
                 ct: 0,
@@ -193,16 +214,25 @@ export class TacticalBattle {
             if (!source.status.includes('charging')) source.status.push('charging');
             this.logMsg(`${source.name} begins channeling ${ab.name}!`);
             this.selectedAbility = null;
+            this.abilityRotation = 0;
             this.abilityRange = new Set();
             this.aoePreview = new Set();
-        this.hitPreview = new Set();
+            this.hitPreview = new Set();
             this.setState(STATES.PLAYER_TURN);
             return true;
         }
 
         source.mp = Math.max(0, source.mp - ab.mpCost);
 
-        const affectedTiles = ab.aoe > 0 ? computeAoeArea(tx, ty, ab.aoe) : new Set([`${tx},${ty}`]);
+        let affectedTiles;
+        if (ab.aoePattern) {
+            affectedTiles = computePatternArea(tx, ty, ab.aoePattern, this.abilityRotation);
+        } else if (ab.aoe > 0) {
+            affectedTiles = computeAoeArea(tx, ty, ab.aoe);
+        } else {
+            affectedTiles = new Set([`${tx},${ty}`]);
+        }
+
         const targets = this.livingUnits.filter(u => {
             const sameTeam = u.team === source.team;
             if (ab.targetType === 'ally' && !sameTeam) return false;
@@ -210,7 +240,7 @@ export class TacticalBattle {
             return affectedTiles.has(`${u.x},${u.y}`);
         });
 
-        if (targets.length === 0 && !ab.isHeal && !ab.isCure) {
+        if (targets.length === 0 && !ab.isHeal && !ab.isCure && ab.targetType !== 'tile') {
             this.logMsg(`${source.name} used ${ab.name} but hit nothing!`);
         }
 
@@ -244,7 +274,16 @@ export class TacticalBattle {
             }
         }
 
+        if (ab.terrainEffect) {
+            for (const key of affectedTiles) {
+                const [ax, ay] = key.split(',').map(Number);
+                applyTerrainEffect(this.map, ax, ay, ab.terrainEffect);
+            }
+            this.logMsg(`${source.name} reshapes the terrain!`);
+        }
+
         this.selectedAbility = null;
+        this.abilityRotation = 0;
         this.abilityRange = new Set();
         this.aoePreview = new Set();
         this.hitPreview = new Set();
@@ -260,13 +299,20 @@ export class TacticalBattle {
             if (!unit._charging) continue;
             if (unit._charging.ct < unit._charging.needed) continue;
 
-            const { ability, targetX, targetY } = unit._charging;
+            const { ability, rotation, targetX, targetY } = unit._charging;
             const ab = ABILITIES[ability];
             unit.status = unit.status.filter(s => s !== 'charging');
             unit._charging = null;
 
             if (ab) {
-                const affectedTiles = ab.aoe > 0 ? computeAoeArea(targetX, targetY, ab.aoe) : new Set([`${targetX},${targetY}`]);
+                let affectedTiles;
+                if (ab.aoePattern) {
+                    affectedTiles = computePatternArea(targetX, targetY, ab.aoePattern, rotation ?? 0);
+                } else if (ab.aoe > 0) {
+                    affectedTiles = computeAoeArea(targetX, targetY, ab.aoe);
+                } else {
+                    affectedTiles = new Set([`${targetX},${targetY}`]);
+                }
                 const targets = this.livingUnits.filter(u => {
                     const sameTeam = u.team === unit.team;
                     if (ab.targetType === 'ally' && !sameTeam) return false;
@@ -299,6 +345,14 @@ export class TacticalBattle {
                     } else if (isUnconscious(target)) {
                         this.logMsg(`${target.name} is knocked unconscious!`);
                     }
+                }
+
+                if (ab.terrainEffect) {
+                    for (const key of affectedTiles) {
+                        const [ax, ay] = key.split(',').map(Number);
+                        applyTerrainEffect(this.map, ax, ay, ab.terrainEffect);
+                    }
+                    this.logMsg(`${unit.name} reshapes the terrain!`);
                 }
             }
 
@@ -395,6 +449,7 @@ export class TacticalBattle {
         this.aoePreview = new Set();
         this.hitPreview = new Set();
         this.selectedAbility = null;
+        this.abilityRotation = 0;
         if (this.state !== STATES.BATTLE_OVER) {
             this.setState(STATES.ADVANCE_CT);
         }
@@ -403,9 +458,10 @@ export class TacticalBattle {
     cancelAction() {
         if (this.state === STATES.SELECT_MOVE || this.state === STATES.SELECT_ABILITY || this.state === STATES.SELECT_ABILITY_TARGET) {
             this.selectedAbility = null;
+            this.abilityRotation = 0;
             this.abilityRange = new Set();
             this.aoePreview = new Set();
-        this.hitPreview = new Set();
+            this.hitPreview = new Set();
             this.moveRange = computeMoveRange(this.activeUnit, this.map, this.livingUnits);
             this.setState(STATES.PLAYER_TURN);
         }

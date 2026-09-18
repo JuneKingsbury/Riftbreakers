@@ -155,6 +155,7 @@ export class WorldMap {
         if (!this.canTravelTo(nodeId)) return false;
         const fromId = this.currentNodeId;
         this.currentNodeId = nodeId;
+        this.day++;
         const node = this.currentNode;
         node.visited = true;
         this._discoverNeighbors(nodeId);

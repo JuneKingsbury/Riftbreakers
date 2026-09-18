@@ -5,6 +5,9 @@
 // Fields:
 //   name          string   Display name
 //   type          'physical'|'magic'|'passive'
+//
+// Inheritance note: to suppress an inherited field (e.g. applyStatus from a parent),
+// set it explicitly to null in the child. Omitting the field leaves the parent's value.
 //   range         number   Tile range (Manhattan distance)
 //   aoe           number   AoE radius (0 = single target)
 //   mpCost        number   MP consumed on use
@@ -21,6 +24,9 @@
 //   passive       bool     True for always-on abilities
 //   passiveMpCost number   MP drained per turn (passive only)
 //   projectileColor string CSS color for the projectile
+//   requiresLos   bool     Whether the ability needs line of sight to the target tile.
+//                          Defaults to true when absent. Set to false for lobbed/indirect
+//                          spells (e.g. AoE fire dropped from the sky).
 //   desc          string   Tooltip description
 
 export const ABILITY_DATA = {
@@ -59,32 +65,35 @@ export const ABILITY_DATA = {
         element: 'fire',
         animType: 'cast',
         projectileColor: '#ff6622',
-        chargeTime: 40,
+        chargeTime: 30,
+        requiresLos: false,
     },
 
     ice: {
         extends: 'fire',
         name: 'Ice',
         aoe: 0,
+        requiresLos: true,
         mpCost: 10,
         basePower: 1.0,
         element: 'ice',
         applyStatus: 'slow',
         statusDuration: 2,
         projectileColor: '#88ddff',
-        chargeTime: 30,
+        chargeTime: 25,
     },
 
     thunder: {
         extends: 'fire',
         name: 'Thunder',
         range: 4,
-        aoe: 0,
+        aoe: 1,
+        requiresLos: true,
         mpCost: 14,
         basePower: 1.2,
         element: 'thunder',
         projectileColor: '#ffee44',
-        chargeTime: 60,
+        chargeTime: 45,
     },
 
     // --- Archer ---
@@ -239,6 +248,7 @@ export const ABILITY_DATA = {
         type: 'magic',
         range: 2,
         aoe: 1,
+        requiresLos: false,
         mpCost: 14,
         actionCost: 55,
         targetType: 'enemy',
@@ -246,7 +256,7 @@ export const ABILITY_DATA = {
         element: 'arcane',
         animType: 'cast',
         projectileColor: '#cc88ff',
-        chargeTime: 35,
+        chargeTime: 25,
         applyStatus: 'stun',
         statusDuration: 1,
         desc: 'Releases a concussive burst of raw magical force, staggering all nearby foes.',
@@ -260,7 +270,7 @@ export const ABILITY_DATA = {
         name: 'Smite',
         type: 'magic',
         range: 1,
-        aoe: 0,
+        aoe: 1,
         mpCost: 16,
         actionCost: 50,
         targetType: 'enemy',
@@ -268,7 +278,7 @@ export const ABILITY_DATA = {
         element: 'holy',
         animType: 'slash',
         projectileColor: '#fff8aa',
-        chargeTime: 45,
+        chargeTime: 35,
         desc: 'Channels divine fire through the weapon for a devastating, consecrated blow.',
     },
 
@@ -287,7 +297,7 @@ export const ABILITY_DATA = {
         name: 'Rift Bolt',
         type: 'magic',
         range: 5,
-        aoe: 0,
+        aoe: 1,
         mpCost: 16,
         actionCost: 50,
         targetType: 'enemy',
@@ -295,7 +305,7 @@ export const ABILITY_DATA = {
         element: 'void',
         animType: 'cast',
         projectileColor: '#55aaff',
-        chargeTime: 50,
+        chargeTime: 40,
         desc: 'Tears a pinhole rift in space, blasting the target with raw dimensional energy.',
     },
 
@@ -304,11 +314,12 @@ export const ABILITY_DATA = {
         name: 'Void Burst',
         range: 3,
         aoe: 2,
+        requiresLos: false,
         mpCost: 20,
         actionCost: 55,
         basePower: 0.8,
         projectileColor: '#3355ff',
-        chargeTime: 65,
+        chargeTime: 50,
         desc: 'Rips open a rift that collapses violently outward, damaging everything nearby.',
     },
 
@@ -321,6 +332,7 @@ export const ABILITY_DATA = {
         type: 'magic',
         range: 2,
         aoe: 2,
+        requiresLos: false,
         mpCost: 14,
         actionCost: 50,
         targetType: 'enemy',
@@ -328,7 +340,7 @@ export const ABILITY_DATA = {
         element: 'earth',
         animType: 'cast',
         projectileColor: '#aa7744',
-        chargeTime: 40,
+        chargeTime: 30,
         applyStatus: 'slow',
         statusDuration: 2,
         desc: 'Slams the earth with seismic force, cracking the ground and slowing all caught within.',
@@ -338,12 +350,13 @@ export const ABILITY_DATA = {
         extends: 'tremor',
         name: 'Stone Spike',
         range: 3,
-        aoe: 0,
+        aoe: 1,
+        requiresLos: true,
         mpCost: 18,
         actionCost: 55,
         basePower: 1.5,
         projectileColor: '#886644',
-        chargeTime: 70,
+        chargeTime: 55,
         applyStatus: null,
         desc: 'Erupts a massive spike of stone beneath the target, dealing concentrated crushing damage.',
     },
@@ -406,11 +419,12 @@ export const ABILITY_DATA = {
         extends: 'spirit_lash',
         name: 'Haunting',
         range: 4,
+        aoe: 1,
         mpCost: 16,
         actionCost: 50,
         basePower: 0.85,
         projectileColor: '#8899ff',
-        chargeTime: 55,
+        chargeTime: 40,
         applyStatus: 'stun',
         statusDuration: 1,
         desc: 'Sends a spirit to possess the target momentarily, stunning them as it tears free.',
@@ -443,11 +457,12 @@ export const ABILITY_DATA = {
         name: 'Spore Cloud',
         range: 2,
         aoe: 2,
+        requiresLos: false,
         mpCost: 14,
         actionCost: 50,
         basePower: 0.7,
         projectileColor: '#88cc44',
-        chargeTime: 35,
+        chargeTime: 25,
         applyStatus: 'slow',
         statusDuration: 2,
         desc: 'Sings up a cloud of narcotic spores that drifts across the battlefield, slowing all caught within.',
@@ -479,11 +494,12 @@ export const ABILITY_DATA = {
         extends: 'doom_hex',
         name: 'Fate Seal',
         range: 3,
+        aoe: 1,
         mpCost: 16,
         actionCost: 50,
         basePower: 0.7,
         projectileColor: '#aa00cc',
-        chargeTime: 50,
+        chargeTime: 40,
         applyStatus: 'stun',
         statusDuration: 1,
         desc: 'Seals a moment in time around the target, briefly locking them out of the flow of causality.',
@@ -550,6 +566,7 @@ export const ABILITY_DATA = {
         type: 'magic',
         range: 2,
         aoe: 2,
+        requiresLos: false,
         mpCost: 14,
         actionCost: 55,
         targetType: 'enemy',
@@ -557,10 +574,46 @@ export const ABILITY_DATA = {
         element: 'nature',
         animType: 'cast',
         projectileColor: '#cc8833',
-        chargeTime: 50,
+        chargeTime: 40,
         applyStatus: 'stun',
         statusDuration: 1,
         desc: 'Lets out a primal howl resonating with transmutation magic, briefly stunning all nearby foes.',
+    },
+
+    // =====================================================================
+    // --- Terrain manipulation ---
+    // =====================================================================
+
+    stone_wall: {
+        name: 'Stone Wall',
+        type: 'magic',
+        range: 3,
+        aoePattern: [[-1, 0], [0, 0], [1, 0]],
+        requiresLos: false,
+        mpCost: 20,
+        actionCost: 55,
+        targetType: 'tile',
+        terrainEffect: { setType: 'wall', setElevation: 2, affectTiles: 'passable' },
+        animType: 'cast',
+        projectileColor: '#886644',
+        chargeTime: 45,
+        desc: 'Erupts a wall of stone from the earth, sealing passage for the rest of the battle.',
+    },
+
+    root_field: {
+        name: 'Root Field',
+        type: 'magic',
+        range: 3,
+        aoePattern: [[0, -1], [-1, 0], [0, 0], [1, 0], [0, 1]],
+        requiresLos: false,
+        mpCost: 16,
+        actionCost: 50,
+        targetType: 'tile',
+        terrainEffect: { setType: 'rubble', affectTiles: 'passable' },
+        animType: 'cast',
+        projectileColor: '#66aa22',
+        chargeTime: 30,
+        desc: 'Chokes an area with tangling roots, turning open ground into difficult terrain.',
     },
 
     // --- Enemy abilities ---
@@ -575,11 +628,11 @@ export const ABILITY_DATA = {
         extends: 'fire',
         name: 'Shadow Bolt',
         range: 4,
-        aoe: 0,
+        aoe: 1,
         mpCost: 14,
         basePower: 1.15,
         element: 'shadow',
         projectileColor: '#aa44ff',
-        chargeTime: 55,
+        chargeTime: 40,
     },
 };

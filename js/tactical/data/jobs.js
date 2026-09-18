@@ -1,6 +1,8 @@
-// Job (class) definitions. Use `extends` to inherit base stats and abilities from
-// another job, then override only what differs. The registry resolves inheritance
-// before exporting the final JOB_STATS table.
+// Job (class) definitions. The registry in data-registry.js exports the final
+// JOB_STATS table for combat use. Jobs do NOT use `extends` — all stats must be
+// listed explicitly. (Inheritance is intentionally avoided here because
+// data-registry.unlockedAbilities reads JOB_DATA raw to preserve abilityLevels;
+// inheriting abilityLevels via extends would silently lose them.)
 //
 // Fields:
 //   maxHp, maxMp  number  Base HP/MP
@@ -9,7 +11,11 @@
 //   mat, mdf      number  Magic attack / defense
 //   move          number  Movement range in tiles
 //   eva           number  Evasion (0-100, treated as % with direction modifier)
-//   abilities     string[] Ability keys this job starts with
+//   abilities     string[]  Ability keys this job can use (all levels combined)
+//   abilityLevels object  Maps ability key → job level required to unlock it.
+//                         Any key in `abilities` absent here defaults to level 1 (unlocked immediately).
+//                         Every ability key in `abilities` should have an entry here to make
+//                         unlock timing explicit.
 //   spriteKey     string  Key into the skin sprite sheet
 //   char          string  Fallback ASCII character
 //   color         string   Fallback CSS color
@@ -179,8 +185,8 @@ export const JOB_DATA = {
         maxHp: 56, maxMp: 32,
         spd: 6, atk: 10, def: 9, mat: 13, mdf: 8,
         move: 3, eva: 10,
-        abilities: ['attack', 'tremor', 'stone_spike'],
-        abilityLevels: { attack: 1, tremor: 1, stone_spike: 3 },
+        abilities: ['attack', 'tremor', 'stone_spike', 'stone_wall'],
+        abilityLevels: { attack: 1, tremor: 1, stone_spike: 3, stone_wall: 2 },
         spriteKey: 'void_brute',
         char: 'E', color: '#aa7744',
         schools: ['evocation', 'transmutation'],
@@ -227,8 +233,8 @@ export const JOB_DATA = {
         maxHp: 40, maxMp: 46,
         spd: 7, atk: 6, def: 5, mat: 13, mdf: 10,
         move: 4, eva: 14,
-        abilities: ['attack', 'verdant_lash', 'spore_cloud', 'regen_aura'],
-        abilityLevels: { attack: 1, verdant_lash: 1, spore_cloud: 2, regen_aura: 4 },
+        abilities: ['attack', 'verdant_lash', 'spore_cloud', 'root_field', 'regen_aura'],
+        abilityLevels: { attack: 1, verdant_lash: 1, spore_cloud: 2, root_field: 3, regen_aura: 4 },
         spriteKey: 'npc_ally',
         char: 'W', color: '#66dd22',
         schools: ['enchantment', 'transmutation'],

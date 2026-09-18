@@ -8,12 +8,12 @@ export const TILE_TYPES = {
 };
 
 export const TILE_DEFS = {
-    grass:  { char: '.', color: '#4a7c4a', bg: '#1a2e1a', passable: true,  moveCost: 1,  elevation: 0, spriteKey: 'grass' },
-    dirt:   { char: ',', color: '#7c6a4a', bg: '#2e2418', passable: true,  moveCost: 1,  elevation: 0, spriteKey: 'dirt' },
-    water:  { char: '~', color: '#3a6a9c', bg: '#0a1e3e', passable: false, moveCost: 99, elevation: 0, spriteKey: 'water' },
-    wall:   { char: '#', color: '#666677', bg: '#111122', passable: false, moveCost: 99, elevation: 0, spriteKey: 'tall_rock' },
-    rubble: { char: ':', color: '#8a7a5a', bg: '#2a1e10', passable: true,  moveCost: 2,  elevation: 0, spriteKey: 'gravel' },
-    high:   { char: '^', color: '#5a9c5a', bg: '#1a3e1a', passable: true,  moveCost: 1,  elevation: 1, spriteKey: 'grass' },
+    grass:  { char: '.', color: '#4a7c4a', bg: '#1a2e1a', passable: true,  moveCost: 1,  elevation: 0, blocksSight: false, spriteKey: 'grass' },
+    dirt:   { char: ',', color: '#7c6a4a', bg: '#2e2418', passable: true,  moveCost: 1,  elevation: 0, blocksSight: false, spriteKey: 'dirt' },
+    water:  { char: '~', color: '#3a6a9c', bg: '#0a1e3e', passable: false, moveCost: 99, elevation: 0, blocksSight: false, spriteKey: 'water' },
+    wall:   { char: '#', color: '#666677', bg: '#111122', passable: false, moveCost: 99, elevation: 0, blocksSight: true,  spriteKey: 'tall_rock' },
+    rubble: { char: ':', color: '#8a7a5a', bg: '#2a1e10', passable: true,  moveCost: 2,  elevation: 0, blocksSight: false, spriteKey: 'gravel' },
+    high:   { char: '^', color: '#5a9c5a', bg: '#1a3e1a', passable: true,  moveCost: 1,  elevation: 1, blocksSight: false, spriteKey: 'grass' },
 };
 
 export function getTileDef(type) {
@@ -28,6 +28,42 @@ function T(type) {
 // Build a 22x16 map programmatically so tile placement is easy to read
 export const MAP_WIDTH  = 22;
 export const MAP_HEIGHT = 16;
+
+// Character -> tile type mapping for the compact grid format used in MAP_DATA.
+const CHAR_TO_TILE = {
+    '.': TILE_TYPES.GRASS,
+    ',': TILE_TYPES.DIRT,
+    '~': TILE_TYPES.WATER,
+    '#': TILE_TYPES.WALL,
+    ':': TILE_TYPES.RUBBLE,
+    '^': TILE_TYPES.HIGH,
+};
+
+/**
+ * Build a map object from a MAP_DATA entry (see data/maps.js).
+ * @param {object} mapDef — one entry from MAP_DATA
+ * @returns {{ width, height, tiles, playerSpawns, enemySpawns }}
+ */
+export function loadMapData(mapDef) {
+    const { width, height, tiles: tileRows, elevation: elevRows,
+            playerSpawns, enemySpawns } = mapDef;
+
+    const tiles = [];
+    for (let y = 0; y < height; y++) {
+        const tileRow = tileRows[y] || '';
+        const elevRow = elevRows[y] || '';
+        for (let x = 0; x < width; x++) {
+            const ch   = tileRow[x] || '.';
+            const type = CHAR_TO_TILE[ch] || TILE_TYPES.GRASS;
+            const def  = getTileDef(type);
+            const tile = { type, ...def };
+            const elevCh = elevRow[x];
+            if (elevCh && elevCh !== '0') tile.elevation = parseInt(elevCh, 10) || 0;
+            tiles.push(tile);
+        }
+    }
+    return { width, height, tiles, playerSpawns, enemySpawns };
+}
 
 export function createDemoMap() {
     const W = MAP_WIDTH;
@@ -102,6 +138,51 @@ export function createDemoMap() {
     }
 
     return { width: W, height: H, tiles };
+}
+
+// Maximum elevation step a unit can climb in a single tile transition.
+export const MAX_CLIMB = 1;
+
+/**
+ * Bresenham line-of-sight check between two grid positions.
+ * A tile blocks sight if tile.blocksSight is true OR its elevation exceeds
+ * the higher of the two endpoints' elevations (tall terrain blocks over the top).
+ * The source and destination tiles themselves are never treated as blockers —
+ * only the intermediate tiles on the path are checked.
+ */
+export function hasLineOfSight(map, x1, y1, x2, y2) {
+    const srcTile  = getTile(map, x1, y1);
+    const destTile = getTile(map, x2, y2);
+    const eyeElev  = Math.max(srcTile?.elevation ?? 0, destTile?.elevation ?? 0);
+
+    let x = x1, y = y1;
+    const dx = Math.abs(x2 - x1), dy = Math.abs(y2 - y1);
+    const sx = x1 < x2 ? 1 : -1, sy = y1 < y2 ? 1 : -1;
+    let err = dx - dy;
+
+    while (!(x === x2 && y === y2)) {
+        const e2 = err * 2;
+        if (e2 > -dy) { err -= dy; x += sx; }
+        if (e2 <  dx) { err += dx; y += sy; }
+        if (x === x2 && y === y2) break;
+        const tile = getTile(map, x, y);
+        if (!tile) return false;
+        if (tile.blocksSight) return false;
+        if (tile.elevation > eyeElev) return false;
+    }
+    return true;
+}
+
+export function applyTerrainEffect(map, x, y, effect) {
+    const tile = getTile(map, x, y);
+    if (!tile) return;
+    const { setType, setElevation, affectTiles = 'all' } = effect;
+    if (affectTiles === 'passable'   && !tile.passable) return;
+    if (affectTiles === 'impassable' &&  tile.passable) return;
+    const def = getTileDef(setType);
+    Object.assign(tile, def);
+    tile.type = setType;
+    if (setElevation !== undefined) tile.elevation = setElevation;
 }
 
 export function getTile(map, x, y) {

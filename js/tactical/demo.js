@@ -192,7 +192,7 @@ export function startDemoBattle(containerEl, skinManager, onExit) {
         } else if (action === 'defend') {
             if (!turnHasActed) {
                 battle.enterDefendMode();
-                battle.endTurn(35);
+                battle.endTurn(turnHasMoved ? 100 : 80);
                 scheduleNextTurn();
             }
         } else if (action === 'pivot') {
@@ -328,7 +328,7 @@ export function startDemoBattle(containerEl, skinManager, onExit) {
                 const animMs = (source && !isCharged)
                     ? playAbilityAnimation(source, tile.x, tile.y, abilityKey)
                     : 0;
-                const cost = ABILITIES[abilityKey]?.actionCost ?? 35;
+                const cost = turnHasMoved ? 100 : 80;
                 // For charged abilities the turn ends immediately (unit is now channeling).
                 // For instant abilities wait for the animation to finish before advancing.
                 if (isCharged) {
@@ -405,7 +405,7 @@ export function startDemoBattle(containerEl, skinManager, onExit) {
             if (e.key === 'd' || e.key === 'D') {
                 if (!turnHasActed) {
                     battle.enterDefendMode();
-                    battle.endTurn(35);
+                    battle.endTurn(turnHasMoved ? 100 : 80);
                     scheduleNextTurn();
                 }
                 return;

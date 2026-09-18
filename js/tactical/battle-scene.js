@@ -1,4 +1,5 @@
-import { createDemoMap } from './battle-map.js';
+import { loadMapData } from './battle-map.js';
+import { MAP_DATA } from './data/maps.js';
 import { createUnitFromCharData, faceToward } from './units.js';
 import { TacticalBattle, STATES } from './battle.js';
 import { BattleRenderer } from './battle-renderer.js';
@@ -10,18 +11,31 @@ import { unlockedAbilities } from './data-registry.js';
 import { CHARACTER_DATA } from './data/characters.js';
 import { equipmentStatBonuses } from './data/equipment.js';
 
-function buildUnits(worldMap) {
+function buildUnits(worldMap, playerSpawns, enemySpawns) {
     // Player units come from worldMap.party (live roster) so equipment/appearance
     // changes on the world map are reflected in battle. Enemies always use CHARACTER_DATA.
     const partyData  = worldMap?.party ?? CHARACTER_DATA.filter(c => c.team === 'player');
     const enemyData  = CHARACTER_DATA.filter(c => c.team === 'enemy');
-    const units      = [...partyData, ...enemyData].map(charData => {
+    const units      = [...partyData, ...enemyData].map((charData) => {
         const equipBonuses = equipmentStatBonuses(charData.appearance);
         const mergedMods   = { ...(charData.statMods || {}), };
         for (const [k, v] of Object.entries(equipBonuses)) {
             mergedMods[k] = (mergedMods[k] || 0) + v;
         }
-        const unit = createUnitFromCharData({ ...charData, statMods: mergedMods });
+        // Determine spawn position from map data; fall back to charData position if
+        // there are fewer spawn tiles than units.
+        let spawnX = charData.x;
+        let spawnY = charData.y;
+        if (charData.team === 'player') {
+            const pIdx = partyData.indexOf(charData);
+            const spawn = playerSpawns?.[pIdx];
+            if (spawn) { spawnX = spawn.x; spawnY = spawn.y; }
+        } else {
+            const eIdx = enemyData.indexOf(charData);
+            const spawn = enemySpawns?.[eIdx];
+            if (spawn) { spawnX = spawn.x; spawnY = spawn.y; }
+        }
+        const unit = createUnitFromCharData({ ...charData, statMods: mergedMods, x: spawnX, y: spawnY });
         // For player units with XP data, restrict abilities to those unlocked at current job level.
         if (charData.xp) {
             const unlocked = new Set(unlockedAbilities(charData.job, charData.xp));
@@ -59,8 +73,9 @@ export class BattleScene {
         this._sm        = sceneManager;
         this._stopped   = false;
 
-        const map   = createDemoMap();
-        const units = buildUnits(this._worldMap);
+        const mapDef = MAP_DATA[Math.floor(Math.random() * MAP_DATA.length)];
+        const map    = loadMapData(mapDef);
+        const units  = buildUnits(this._worldMap, map.playerSpawns, map.enemySpawns);
 
         this._battle = new TacticalBattle(map, units);
 
@@ -78,7 +93,7 @@ export class BattleScene {
         this._renderer.canvas.addEventListener('mousemove',    this._onMouseMove   = (e) => this._handleMouseMove(e));
         this._renderer.canvas.addEventListener('mouseup',      this._onMouseUp     = (e) => this._handleMouseUp(e));
         this._renderer.canvas.addEventListener('click',        this._onCanvasClick = (e) => this._handleCanvasClick(e));
-        this._renderer.canvas.addEventListener('contextmenu',  this._onContextMenu = (e) => { e.preventDefault(); if (this._ui._skillMenuOpen) { this._ui.closeSkillMenu(); return; } this._battle.cancelAction(); });
+        this._renderer.canvas.addEventListener('contextmenu',  this._onContextMenu = (e) => { e.preventDefault(); if (this._ui._skillMenuOpen) { this._ui.closeSkillMenu(); return; } this._cancelTargeting(); });
         this._renderer.canvas.addEventListener('wheel',        this._onWheel       = (e) => { e.preventDefault(); const d = e.deltaY > 0 ? -2 : 2; this._renderer.tileSize = Math.max(24, Math.min(80, this._renderer.tileSize + d)); }, { passive: false });
         document.addEventListener('keydown', this._onKeydown = (e) => this._handleKeydown(e));
         document.addEventListener('keyup',   this._onKeyup   = (e) => this._handleKeyup(e));
@@ -89,6 +104,7 @@ export class BattleScene {
         this._panStart  = { x: 0, y: 0 };
         this._panCam    = { x: 0, y: 0 };
         this._PAN_THRESHOLD = 4;
+        this._abilityFromSkillMenu = false;
 
         this._scheduleNextTurn();
     }
@@ -128,6 +144,7 @@ export class BattleScene {
     _resetTurn() {
         this._turnHasMoved = false;
         this._turnHasActed = false;
+        this._abilityFromSkillMenu = false;
     }
 
     _playAbilityAnimation(source, targetX, targetY, abilityKey) {
@@ -195,10 +212,20 @@ export class BattleScene {
         };
 
         if (chargeMs > 0) {
-            this._enemyTimer = setTimeout(proceed, chargeMs + 150);
+            // Center on the first unit whose charge fired so the player can watch.
+            const first = firedCharges[0];
+            if (first) this._renderer.centerOn(first.unit.x, first.unit.y, this._battle.map.width, this._battle.map.height);
+            this._enemyTimer = setTimeout(proceed, chargeMs + 800);
         } else {
             proceed();
         }
+    }
+
+    _cancelTargeting() {
+        const fromMenu = this._abilityFromSkillMenu;
+        this._abilityFromSkillMenu = false;
+        this._battle.cancelAction();
+        if (fromMenu) this._ui._skillMenuOpen = true;
     }
 
     _handleAction(action, abilityKey) {
@@ -206,11 +233,16 @@ export class BattleScene {
         if (action === 'move') {
             if (!this._turnHasMoved) this._battle.enterMoveMode();
         } else if (action === 'ability') {
-            if (!this._turnHasActed) this._battle.enterAbilityMode(abilityKey);
+            if (!this._turnHasActed) {
+                this._abilityFromSkillMenu = true;
+                this._battle.enterAbilityMode(abilityKey);
+                const ab = ABILITIES[abilityKey];
+                if (ab?.aoePattern) this._battle.logMsg(`${ab.name} ready — press R to rotate.`);
+            }
         } else if (action === 'defend') {
             if (!this._turnHasActed) {
                 this._battle.enterDefendMode();
-                this._battle.endTurn(35);
+                this._battle.endTurn(this._turnHasMoved ? 100 : 80);
                 this._scheduleNextTurn();
             }
         } else if (action === 'pivot') {
@@ -312,9 +344,10 @@ export class BattleScene {
             const source     = this._battle.activeUnit;
             if (this._battle.commitAbility(tile.x, tile.y)) {
                 this._turnHasActed = true;
+                this._abilityFromSkillMenu = false;
                 const isCharged = ABILITIES[abilityKey]?.chargeTime > 0;
                 const animMs = (source && !isCharged) ? this._playAbilityAnimation(source, tile.x, tile.y, abilityKey) : 0;
-                const cost = ABILITIES[abilityKey]?.actionCost ?? 35;
+                const cost = this._turnHasMoved ? 100 : 80;
                 if (isCharged) {
                     this._battle.endTurn(cost);
                     if (this._battle.state !== STATES.BATTLE_OVER) this._scheduleNextTurn();
@@ -340,9 +373,10 @@ export class BattleScene {
         }
         if (e.key === 'q' || e.key === 'Q') { this._renderer.rotateView(-1); e.preventDefault(); return; }
         if (e.key === 'e' || e.key === 'E') { this._renderer.rotateView(1);  e.preventDefault(); return; }
+        if (e.key === 'r' || e.key === 'R') { this._battle.rotateAbility(); return; }
         if (e.key === 'Escape') {
             if (this._ui._skillMenuOpen) { this._ui.closeSkillMenu(); return; }
-            this._battle.cancelAction(); return;
+            this._cancelTargeting(); return;
         }
 
         if (this._battle.state === STATES.PLAYER_TURN) {
@@ -358,7 +392,7 @@ export class BattleScene {
             if (e.key === 'd' || e.key === 'D') {
                 if (!this._turnHasActed) {
                     this._battle.enterDefendMode();
-                    this._battle.endTurn(35);
+                    this._battle.endTurn(this._turnHasMoved ? 100 : 80);
                     this._scheduleNextTurn();
                 } return;
             }
@@ -374,7 +408,12 @@ export class BattleScene {
                 const unit = this._battle.activeUnit;
                 const skillAbs = unit?.abilities.filter(k => k !== 'attack' && ABILITIES[k] && !ABILITIES[k].passive) || [];
                 const chosen = skillAbs[digit - 1];
-                if (chosen) { this._ui.closeSkillMenu(); this._battle.enterAbilityMode(chosen); }
+                if (chosen) {
+                    this._ui.closeSkillMenu();
+                    this._abilityFromSkillMenu = true;
+                    this._battle.enterAbilityMode(chosen);
+                    if (ABILITIES[chosen]?.aoePattern) this._battle.logMsg(`${ABILITIES[chosen].name} ready — press R to rotate.`);
+                }
                 return;
             }
         }
