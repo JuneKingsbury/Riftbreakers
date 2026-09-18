@@ -30,3 +30,36 @@ function buildTable(rawData) {
 
 export const ABILITIES = buildTable(ABILITY_DATA);
 export const JOB_STATS = buildTable(JOB_DATA);
+
+// XP required to reach each level. Index = level, so XP_THRESHOLDS[2] is the
+// XP needed for level 2. Level 1 is the starting level (0 XP required).
+export const XP_THRESHOLDS = [0, 0, 100, 250, 500, 900, 1400, 2100, 3000];
+
+// Returns the level (1-based) a character has reached in a given job.
+export function jobLevel(xpMap, jobKey) {
+    const xp = (xpMap || {})[jobKey] || 0;
+    let level = 1;
+    for (let l = XP_THRESHOLDS.length - 1; l >= 2; l--) {
+        if (xp >= XP_THRESHOLDS[l]) { level = l; break; }
+    }
+    return level;
+}
+
+// Returns true if the character's xpMap satisfies all prerequisites for jobKey.
+export function meetsPrerequisites(xpMap, jobKey) {
+    const prereqs = JOB_DATA[jobKey]?.prerequisites;
+    if (!prereqs || prereqs.length === 0) return true;
+    return prereqs.every(p => jobLevel(xpMap, p.job) >= p.level);
+}
+
+// Returns a human-readable string of unmet prerequisites, e.g. "Evoker Lv.3, Warden Lv.3".
+export function missingPrerequisites(xpMap, jobKey) {
+    const prereqs = JOB_DATA[jobKey]?.prerequisites || [];
+    return prereqs
+        .filter(p => jobLevel(xpMap, p.job) < p.level)
+        .map(p => {
+            const label = p.job.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+            return `${label} Lv.${p.level}`;
+        })
+        .join(', ');
+}

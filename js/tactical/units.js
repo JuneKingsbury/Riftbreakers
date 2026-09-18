@@ -5,7 +5,7 @@ let _nextId = 1;
 // Re-export for callers that import JOB_STATS from this module.
 export { JOB_STATS };
 
-export function createUnit(name, job, team, x, y, { statMods = {}, extraAbilities = [], ct = 0 } = {}) {
+export function createUnit(name, job, team, x, y, { statMods = {}, extraAbilities = [], ct = 0, appearance = null } = {}) {
     const base = JOB_STATS[job];
     const maxHp = (base.maxHp + (statMods.maxHp ?? 0));
     const maxMp = (base.maxMp + (statMods.maxMp ?? 0));
@@ -34,6 +34,7 @@ export function createUnit(name, job, team, x, y, { statMods = {}, extraAbilitie
         status: [],
         facing: 'south',
         _floats: [],
+        appearance,
     };
 }
 
@@ -43,6 +44,7 @@ export function createUnitFromCharData(charData) {
         statMods:       charData.statMods      ?? {},
         extraAbilities: charData.extraAbilities ?? [],
         ct:             charData.ct            ?? 0,
+        appearance:     charData.appearance    ?? null,
     });
 }
 

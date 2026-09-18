@@ -150,17 +150,37 @@ export const NODES = [
     },
 ];
 
+// cost only — name and stat description are derived from EQUIPMENT in the UI layer
 export const SHOP_ITEMS = [
-    { id: 'iron_sword',    name: 'Iron Sword',      cost: 120, desc: 'A reliable blade. +8 ATK.' },
-    { id: 'kite_shield',   name: 'Kite Shield',     cost: 90,  desc: 'Reinforced steel. +5 DEF.' },
-    { id: 'mage_robe',     name: 'Mage Robe',       cost: 100, desc: 'Arcane-woven cloth. +6 MAT, +3 MDF.' },
-    { id: 'leather_boots', name: 'Leather Boots',   cost: 60,  desc: 'Worn but supple. +1 MOV.' },
-    { id: 'potion',        name: 'Potion',           cost: 30,  desc: 'Restores 40 HP in battle.' },
-    { id: 'ether',         name: 'Ether',            cost: 50,  desc: 'Restores 25 MP in battle.' },
-    { id: 'antidote',      name: 'Antidote',         cost: 20,  desc: 'Removes poison and slow.' },
-    { id: 'hi_potion',     name: 'Hi-Potion',        cost: 75,  desc: 'Restores 80 HP in battle.' },
-    { id: 'elven_bow',     name: 'Elven Longbow',    cost: 150, desc: 'Elvish craft. +10 ATK, +1 range.' },
-    { id: 'staff_arcana',  name: 'Arcane Staff',     cost: 140, desc: 'Carved from Riftthorn. +12 MAT.' },
+    // ---- Light gear ----
+    { id: 'wooden_club',       cost:  40 },
+    { id: 'wooden_wand',       cost:  40 },
+    { id: 'leather_vest',      cost:  60 },
+    { id: 'wool_cap',          cost:  30 },
+    { id: 'hunters_quiver',    cost:  50 },
+    { id: 'lantern',           cost:  40 },
+    // ---- Mid gear ----
+    { id: 'iron_sword',        cost: 120 },
+    { id: 'hunting_bow',       cost: 140 },
+    { id: 'iron_chainmail',    cost: 200 },
+    { id: 'iron_helmet',       cost: 150 },
+    { id: 'iron_shield',       cost: 130 },
+    { id: 'runic_wand',        cost: 180 },
+    { id: 'enchanted_tunic',   cost: 160 },
+    // ---- Advanced gear ----
+    { id: 'runic_blade',       cost: 350 },
+    { id: 'runic_plate',       cost: 500 },
+    { id: 'runic_hood',        cost: 280 },
+    { id: 'crystal_staff',     cost: 380 },
+    { id: 'bottomless_quiver', cost: 300 },
+    { id: 'crystal_aegis',     cost: 320 },
+    { id: 'staff_of_regrowth', cost: 360 },
+    // ---- Rare gear ----
+    { id: 'void_staff',        cost: 600 },
+    { id: 'void_crown',        cost: 550 },
+    { id: 'runic_greatsword',  cost: 480 },
+    { id: 'frostplate',        cost: 520 },
+    { id: 'void_longbow',      cost: 580 },
 ];
 
 export const QUESTS = [

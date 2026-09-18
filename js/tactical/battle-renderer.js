@@ -68,6 +68,8 @@ export class BattleRenderer {
         this._spinDir      = 1;   // +1 CW, -1 CCW
         this._spinPivotU   = 0;   // virtual U of pivot tile in _spinFrom coords
         this._spinPivotV   = 0;
+        this._spinPivotSX  = 0;   // screen-pixel X of pivot tile at spin start
+        this._spinPivotSY  = 0;
         this._spinQueue    = 0;   // pending delta to apply after current spin
         this._mapW = 22;
         this._mapH = 16;
@@ -178,6 +180,10 @@ export class BattleRenderer {
         this._spinDir     = delta > 0 ? 1 : -1;
         this._spinPivotU  = uc;
         this._spinPivotV  = vc;
+        // Capture exact pixel position of the pivot tile at spin start so
+        // tileToScreen can anchor to it regardless of camX/camY drift.
+        this._spinPivotSX = (uc - vc) * hw + this.camX;
+        this._spinPivotSY = (uc + vc) * hh + this.camY;
         this._spinQueue   = 0;
 
         // Commit viewAngle immediately so painter sort and hit-testing are correct.
@@ -220,20 +226,13 @@ export class BattleRenderer {
         const du = u - pu;
         const dv = v - pv;
 
-        const te = this._spinT * this._spinT * (3 - 2 * this._spinT); // smoothstep
-        const s   = 1 - 2 * te;
-        const dir = this._spinDir;
-        const A   = (1 + dir) / 2 + (1 - dir) / 2 * s;
-        const B   = (1 - dir) / 2 + (1 + dir) / 2 * s;
-
-        // Pivot screen position derived live from camX/camY so camera movement
-        // during the spin doesn't accumulate drift.
-        const pivotSX = (pu - pv) * hw + this.camX;
-        const pivotSY = (pu + pv) * hh + this.camY;
+        const te   = this._spinT * this._spinT * (3 - 2 * this._spinT);
+        const alpha = this._spinDir * te * Math.PI / 2;
+        const cosA = Math.cos(alpha), sinA = Math.sin(alpha);
 
         return {
-            x: Math.round(hw * (du * A - dv * B) + pivotSX),
-            y: Math.round(hh * (du * B + dv * A) + pivotSY),
+            x: Math.round(hw * (du * (cosA + sinA) - dv * (cosA - sinA)) + this._spinPivotSX),
+            y: Math.round(hh * (du * (cosA - sinA) + dv * (cosA + sinA)) + this._spinPivotSY),
         };
     }
 
@@ -367,6 +366,30 @@ export class BattleRenderer {
         });
     }
 
+    // Returns the canvas to draw for a unit: composited layers when unit.appearance
+    // is set, otherwise the flat job sprite. Pass outlined=true to get the
+    // selection-glow version (highlight ring for composited, addOutline for flat).
+    _getCompositeSprite(unit, outlined, outlineColor) {
+        const sm = this.skinManager;
+        if (!sm) return null;
+        if (unit.appearance) {
+            const a = unit.appearance;
+            return sm.getCompositedColonistSprite(
+                unit.id, false,
+                a.race, a.armorKey, a.helmetKey,
+                a.bodyVariant, a.hairVariant, a.shirtVariant,
+                a.nameColor,
+                a.weaponKey, a.toolKey, null,
+                outlined
+            );
+        }
+        if (unit.spriteKey) {
+            if (outlined) return this._getOutlinedSprite(unit.spriteKey, outlineColor);
+            return sm.getSprite('entities', unit.spriteKey);
+        }
+        return null;
+    }
+
     _getOutlinedSprite(spriteKey, color) {
         const cacheKey = spriteKey + ':' + color;
         if (this._outlineCache.has(cacheKey)) return this._outlineCache.get(cacheKey);
@@ -394,28 +417,13 @@ export class BattleRenderer {
         return null;
     }
 
-    // Returns the E and W vertex offsets from the N vertex, accounting for spin.
-    // At rest: E=(+hw,+hh), W=(-hw,+hh). During spin these rotate with the grid.
-    _isoVerts(hw, hh) {
-        if (!this._spinActive) {
-            return { ex: hw, ey: hh, wx: -hw, wy: hh };
-        }
-        const te  = this._spinT * this._spinT * (3 - 2 * this._spinT);
-        const s   = 1 - 2 * te;
-        const dir = this._spinDir;
-        const A   = (1 + dir) / 2 + (1 - dir) / 2 * s;
-        const B   = (1 - dir) / 2 + (1 + dir) / 2 * s;
-        return { ex: hw * A, ey: hh * B, wx: -hw * B, wy: hh * A };
-    }
-
     // Draw a diamond (iso tile top face) path.
     _diamondPath(ctx, nx, ny, hw, hh) {
-        const { ex, ey, wx, wy } = this._isoVerts(hw, hh);
         ctx.beginPath();
-        ctx.moveTo(nx,          ny);          // N vertex (top)
-        ctx.lineTo(nx + ex,     ny + ey);     // E vertex
-        ctx.lineTo(nx + ex + wx, ny + ey + wy); // S vertex
-        ctx.lineTo(nx + wx,     ny + wy);     // W vertex
+        ctx.moveTo(nx,      ny);
+        ctx.lineTo(nx + hw, ny + hh);
+        ctx.lineTo(nx,      ny + hh * 2);
+        ctx.lineTo(nx - hw, ny + hh);
         ctx.closePath();
     }
 
@@ -494,18 +502,15 @@ export class BattleRenderer {
                 const ts2 = this.tileSize, hw2 = ts2 / 2, hh2 = ts2 / 4;
                 const pu = this._spinPivotU, pv = this._spinPivotV;
 
-                // Capture where the pivot tile sits right now (camX/camY still in _spinFrom space).
-                const pivotSX = (pu - pv) * hw2 + this.camX;
-                const pivotSY = (pu + pv) * hh2 + this.camY;
-
                 this._spinActive = false;
 
-                // Recompute camX/camY so the pivot tile stays at that same screen pixel
-                // in the new viewAngle, with no snap.
+                // Set camX/camY so the pivot tile lands at exactly the same screen
+                // pixel it was at when the spin started (_spinPivotSX/SY), now
+                // expressed in the new viewAngle.
                 const { tx: ptx, ty: pty } = this._fromVirtualAngle(pu, pv, mW, mH, this._spinFrom);
                 const { u: uf, v: vf } = this._toVirtualAngle(ptx, pty, mW, mH, this.viewAngle);
-                this.camX = Math.round(pivotSX - (uf - vf) * hw2);
-                this.camY = Math.round(pivotSY - (uf + vf) * hh2);
+                this.camX = Math.round(this._spinPivotSX - (uf - vf) * hw2);
+                this.camY = Math.round(this._spinPivotSY - (uf + vf) * hh2);
                 this._camTargetX = this.camX;
                 this._camTargetY = this.camY;
                 this._clampCam(mW, mH);
@@ -527,18 +532,22 @@ export class BattleRenderer {
         const hh  = ts / 4;   // iso diamond half-height
         const { map, units, activeUnit } = battle;
 
+
         // Cache map dimensions so _toVirtual/_fromVirtual work outside render loop.
         this._mapW = map.width;
         this._mapH = map.height;
 
         if (this._autoCenterNext && activeUnit) {
-            this.centerOn(activeUnit.x, activeUnit.y, map.width, map.height);
+            if (!this._spinActive) {
+                this.centerOn(activeUnit.x, activeUnit.y, map.width, map.height);
+            }
             this._autoCenterNext = false;
         }
 
         // While a unit is actively moving, keep the camera target on their
         // interpolated render position so it follows the walk smoothly.
-        {
+        // Suppressed during spin so camX/camY don't drift from the frozen anchor.
+        if (!this._spinActive) {
             const movingUnit = units.find(u => isEntityMoving(u));
             if (movingUnit) {
                 const rp = getEntityRenderPos(movingUnit, now);
@@ -547,7 +556,8 @@ export class BattleRenderer {
         }
 
         // Lerp camera toward target (smooth centering).
-        if (this._camTargetX !== null) {
+        // Frozen during spin: camX/camY must stay at the value used for _spinPivotSX/SY.
+        if (!this._spinActive && this._camTargetX !== null) {
             const CAM_LERP = 1 - Math.pow(0.004, dt / 1000);
             const dx = this._camTargetX - this.camX;
             const dy = this._camTargetY - this.camY;
@@ -756,10 +766,10 @@ export class BattleRenderer {
             }
 
             let drew = false;
-            if (useSprites && unit.spriteKey) {
+            if (useSprites && (unit.appearance || unit.spriteKey)) {
                 if (unit === activeUnit) {
                     const outlineColor = unit.team === 'player' ? '#ffee44' : '#ff4444';
-                    const outlined = this._getOutlinedSprite(unit.spriteKey, outlineColor);
+                    const outlined = this._getCompositeSprite(unit, true, outlineColor);
                     if (outlined) {
                         const pulse = 0.6 + 0.4 * Math.sin(this._pulse);
                         ctx.globalAlpha = unconscious ? 0.5 * pulse : pulse;
@@ -768,7 +778,7 @@ export class BattleRenderer {
                     }
                 }
                 if (unconscious) ctx.filter = 'grayscale(1)';
-                const img = sm.getSprite('entities', unit.spriteKey);
+                const img = this._getCompositeSprite(unit, false, null);
                 if (img) {
                     ctx.imageSmoothingEnabled = false;
                     ctx.drawImage(img, spx, spy - growPx, sw, sh + growPx);
@@ -856,28 +866,17 @@ export class BattleRenderer {
             const nx = sp.x;
             const ny = sp.y - elevOff;
 
-            // Spinning-aware E/W vertex offsets (collapse to ±hw/hh at rest).
-            const { ex: EX, ey: EY, wx: WX, wy: WY } = this._isoVerts(hw, hh);
-            // Derived S vertex offset from N = E + W
-            const SX = EX + WX, SY = EY + WY;
-
             // --- North/West side faces (back-facing, in shade) ---
-            // Suppressed during spin: sheared diamonds don't cover these faces
-            // correctly mid-rotation, causing bleed-through on interior tiles.
-            // They're never visible at either resting angle so the omission is
-            // undetectable to the player.
+            // Suppressed during spin: painter order is _spinFrom-based so these
+            // back faces can bleed through covering tiles mid-rotation.
             if (!this._spinActive) {
                 const { northNeighbor, westNeighbor } = this._virtualNorthWestNeighbors(tx, ty);
                 const tileN   = getTile(map, northNeighbor.tx, northNeighbor.ty);
                 const elevN   = this._elevOffset(tileN);
                 const faceH_N = elevOff - elevN;
                 if (faceH_N > 0) {
-                    const nv2x = nx,        nv2y = ny;
-                    const ev2x = nx + EX,   ev2y = ny + EY;
-                    const ev3x = ev2x,      ev3y = ev2y + faceH_N;
-                    const nv3x = nv2x,      nv3y = nv2y + faceH_N;
                     ctx.fillStyle = LEDGE_SHADOW;
-                    this._parallelogram(ctx, nv2x, nv2y, ev2x, ev2y, ev3x, ev3y, nv3x, nv3y);
+                    this._parallelogram(ctx, nx, ny, nx + hw, ny + hh, nx + hw, ny + hh + faceH_N, nx, ny + faceH_N);
                     ctx.fill();
                 }
 
@@ -885,49 +884,38 @@ export class BattleRenderer {
                 const elevW   = this._elevOffset(tileW);
                 const faceH_W = elevOff - elevW;
                 if (faceH_W > 0) {
-                    const nv2x = nx,        nv2y = ny;
-                    const wv2x = nx + WX,   wv2y = ny + WY;
-                    const wv3x = wv2x,      wv3y = wv2y + faceH_W;
-                    const nv3x = nv2x,      nv3y = nv2y + faceH_W;
                     ctx.fillStyle = LEDGE_SHADOW;
-                    this._parallelogram(ctx, nv2x, nv2y, wv2x, wv2y, wv3x, wv3y, nv3x, nv3y);
+                    this._parallelogram(ctx, nx, ny, nx - hw, ny + hh, nx - hw, ny + hh + faceH_W, nx, ny + faceH_W);
                     ctx.fill();
                 }
             }
 
-            // --- South side face (visible when this tile is higher than virtual-south neighbor) ---
+            // --- South side face ---
             const { southNeighbor, eastNeighbor } = this._virtualNeighbors(tx, ty);
             const tileS   = getTile(map, southNeighbor.tx, southNeighbor.ty);
             const elevS   = this._elevOffset(tileS);
             const faceH_S = elevOff - elevS;
             if (faceH_S > 0) {
-                // South face: W..S edge of diamond going downward.
-                const wx  = nx + WX,  wy  = ny + WY;
-                const sx2 = nx + SX,  sy2 = ny + SY;
-                const sx3 = sx2,      sy3 = sy2 + faceH_S;
-                const wx3 = wx,       wy3 = wy  + faceH_S;
+                const wx  = nx - hw, wy  = ny + hh;
+                const sx2 = nx,      sy2 = ny + hh * 2;
                 ctx.fillStyle = LEDGE_DARK;
-                this._parallelogram(ctx, wx, wy, sx2, sy2, sx3, sy3, wx3, wy3);
+                this._parallelogram(ctx, wx, wy, sx2, sy2, sx2, sy2 + faceH_S, wx, wy + faceH_S);
                 ctx.fill();
-                // Lighter strip at top.
                 const stripH = Math.ceil(faceH_S * 0.25);
                 ctx.fillStyle = LEDGE_LIGHT;
                 this._parallelogram(ctx, wx, wy, sx2, sy2, sx2, sy2 + stripH, wx, wy + stripH);
                 ctx.fill();
             }
 
-            // --- East side face (visible when this tile is higher than virtual-east neighbor) ---
+            // --- East side face ---
             const tileE   = getTile(map, eastNeighbor.tx, eastNeighbor.ty);
             const elevE   = this._elevOffset(tileE);
             const faceH_E = elevOff - elevE;
             if (faceH_E > 0) {
-                // East face: E..S edge of diamond going downward.
-                const ex  = nx + EX, ey  = ny + EY;
-                const sx2 = nx + SX, sy2 = ny + SY;
-                const sx3 = sx2,     sy3 = sy2 + faceH_E;
-                const ex3 = ex,      ey3 = ey  + faceH_E;
+                const ex  = nx + hw, ey  = ny + hh;
+                const sx2 = nx,      sy2 = ny + hh * 2;
                 ctx.fillStyle = LEDGE_DARK;
-                this._parallelogram(ctx, ex, ey, sx2, sy2, sx3, sy3, ex3, ey3);
+                this._parallelogram(ctx, ex, ey, sx2, sy2, sx2, sy2 + faceH_E, ex, ey + faceH_E);
                 ctx.fill();
                 const stripH = Math.ceil(faceH_E * 0.25);
                 ctx.fillStyle = '#6a4828';
@@ -941,39 +929,49 @@ export class BattleRenderer {
             ctx.fill();
 
             if (useSprites) {
+                // Compose sprite-space rotation into the iso setTransform so the
+                // texture stays world-fixed during a spin. Rotating the camera CW
+                // means the texture must rotate CCW inside the diamond (r = -alpha).
+                // The composed matrix for iso + rotation r around sprite center:
+                //   a=(hw/ts)*(c-s), b=(hh/ts)*(c+s), c=-(hw/ts)*(c+s), d=(hh/ts)*(c-s)
+                //   e=nx+hw*sinR,    f=ny+hh*(1-cosR)
+                let stA, stB, stC, stD, stE, stF;
+                if (this._spinActive) {
+                    const te   = this._spinT * this._spinT * (3 - 2 * this._spinT);
+                    const r    = -this._spinDir * te * Math.PI / 2;
+                    const cosR = Math.cos(r), sinR = Math.sin(r);
+                    stA = (hw / ts) * (cosR - sinR);
+                    stB = (hh / ts) * (cosR + sinR);
+                    stC = -(hw / ts) * (cosR + sinR);
+                    stD = (hh / ts) * (cosR - sinR);
+                    stE = nx + hw * sinR;
+                    stF = ny + hh * (1 - cosR);
+                } else {
+                    stA = hw / ts; stB = hh / ts; stC = -hw / ts; stD = hh / ts;
+                    stE = nx;      stF = ny;
+                }
+
                 const img = sm.getSprite('terrain', def.spriteKey) || sm.getSprite('terrain', 'grass');
                 if (img) {
-                    // setTransform maps the full ts x ts sprite to the diamond.
-                    // Columns are the E-axis and W-axis directions (spin-aware).
                     ctx.save();
-                    ctx.setTransform(EX / ts, EY / ts, WX / ts, WY / ts, nx, ny);
+                    ctx.setTransform(stA, stB, stC, stD, stE, stF);
                     ctx.imageSmoothingEnabled = false;
                     ctx.drawImage(img, 0, 0, ts, ts);
                     ctx.restore();
                     ctx.imageSmoothingEnabled = false;
                 }
-            } else {
-                // ASCII fallback: draw char at diamond center.
-                ctx.fillStyle = def.color;
-                ctx.font = `bold ${Math.round(hh * 1.2)}px 'Courier New', monospace`;
-                ctx.fillText(def.char, nx + (EX + WX) / 2, ny + (EY + WY) / 2);
-            }
 
-            // Animated overlays drawn into diamond clip region.
-            if (useSprites) {
                 if (tile.type === 'grass' || tile.type === 'high') {
                     const tuft = sm.getSprite('effects', 'grass_tuft');
                     if (tuft) {
                         const period = 2500;
                         const amp    = 0.022;
                         const phase  = (now / period) * Math.PI * 2 + (tileKey % 1000) / 1000 * 6.28;
-                        const rot    = Math.sin(phase) * amp;
+                        const sway   = Math.sin(phase) * amp;
                         ctx.save();
-                        // Apply sway rotation around the iso center of the diamond,
-                        // then project the full ts x ts sprite onto the diamond face.
-                        ctx.setTransform(EX / ts, EY / ts, WX / ts, WY / ts, nx, ny);
+                        ctx.setTransform(stA, stB, stC, stD, stE, stF);
                         ctx.translate(ts / 2, ts / 2);
-                        ctx.rotate(rot);
+                        ctx.rotate(sway);
                         ctx.translate(-ts / 2, -ts / 2);
                         ctx.imageSmoothingEnabled = false;
                         ctx.drawImage(tuft, 0, 0, ts, ts);
@@ -991,7 +989,7 @@ export class BattleRenderer {
                         const alpha   = Math.max(0, Math.min(1, alphaBase + alphaVar * Math.cos(phase)));
                         ctx.save();
                         ctx.globalAlpha = alpha;
-                        ctx.setTransform(EX / ts, EY / ts, WX / ts, WY / ts, nx, ny);
+                        ctx.setTransform(stA, stB, stC, stD, stE, stF);
                         ctx.imageSmoothingEnabled = false;
                         ctx.drawImage(waves, 0, 0, ts, ts);
                         ctx.restore();
@@ -999,6 +997,10 @@ export class BattleRenderer {
                         ctx.imageSmoothingEnabled = false;
                     }
                 }
+            } else {
+                ctx.fillStyle = def.color;
+                ctx.font = `bold ${Math.round(hh * 1.2)}px 'Courier New', monospace`;
+                ctx.fillText(def.char, nx, ny + hh);
             }
 
             // Subtle high-ground tint.
@@ -1149,8 +1151,8 @@ export class BattleRenderer {
 
                 ctx.save();
                 ctx.globalAlpha = 0.42;
-                if (useSprites && unit.spriteKey) {
-                    const img = sm.getSprite('entities', unit.spriteKey);
+                if (useSprites && (unit.appearance || unit.spriteKey)) {
+                    const img = this._getCompositeSprite(unit, false, null);
                     if (img) {
                         ctx.imageSmoothingEnabled = false;
                         ctx.drawImage(img, spx, spy, sw, sh);

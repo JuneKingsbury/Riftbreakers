@@ -1,4 +1,5 @@
 import { NODES, QUESTS, EVENTS } from './world-map-data.js';
+import { CHARACTER_DATA } from './data/characters.js';
 
 export class RoamingEnemy {
     constructor(id, nodeId, spriteKey, name, battleScenarioId) {
@@ -21,10 +22,31 @@ export class WorldMap {
         this.completedQuests = new Set();
         this.gold = 200;
         this.day = 1;
-        this.inventory = [];
         this._nodeMap = Object.fromEntries(this.nodes.map(n => [n.id, n]));
         this._usedEventIds = new Set();
         this._rand = 0;
+
+        // Party roster: player characters from CHARACTER_DATA, deep-cloned so
+        // appearance (equipment, colors) can be mutated independently.
+        this.party = CHARACTER_DATA
+            .filter(c => c.team === 'player')
+            .map(c => ({
+                ...c,
+                appearance: c.appearance ? { ...c.appearance } : null,
+                xp: c.xp ? { ...c.xp } : {},
+            }));
+
+        // Inventory: { itemKey: count }. Seeded with one copy of each item
+        // currently equipped across the party so the inventory view is coherent
+        // from the start (equipped items count as "owned").
+        this.inventory = {};
+        for (const member of this.party) {
+            if (!member.appearance) continue;
+            for (const field of ['armorKey','helmetKey','weaponKey','toolKey']) {
+                const key = member.appearance[field];
+                if (key) this.inventory[key] = (this.inventory[key] || 0) + 1;
+            }
+        }
 
         // Roaming enemies
         this.roamingEnemies = [
@@ -39,6 +61,80 @@ export class WorldMap {
 
     getNode(id) { return this._nodeMap[id] || null; }
 
+    // ---- Inventory helpers ----
+
+    addItem(key, count = 1) {
+        this.inventory[key] = (this.inventory[key] || 0) + count;
+    }
+
+    removeItem(key, count = 1) {
+        if (!this.inventory[key]) return false;
+        this.inventory[key] -= count;
+        if (this.inventory[key] <= 0) delete this.inventory[key];
+        return true;
+    }
+
+    hasItem(key) {
+        return (this.inventory[key] || 0) > 0;
+    }
+
+    itemCount(key) {
+        return this.inventory[key] || 0;
+    }
+
+    // Equip an item onto a party member's slot. The previously equipped item
+    // (if any) goes back into inventory; the new item is taken from inventory
+    // or stripped from whoever else currently has it equipped.
+    // Pass newKey = null to unequip without replacing.
+    equipItem(memberName, field, newKey) {
+        const member = this.party.find(m => m.name === memberName);
+        if (!member?.appearance) return false;
+
+        const oldKey = member.appearance[field];
+
+        if (newKey && !this.hasItem(newKey)) {
+            // Check if another party member has it equipped in any slot
+            let stripped = false;
+            for (const other of this.party) {
+                if (other.name === memberName || !other.appearance) continue;
+                for (const f of ['armorKey','helmetKey','weaponKey','toolKey']) {
+                    if (other.appearance[f] === newKey) {
+                        other.appearance[f] = null;
+                        stripped = true;
+                        break;
+                    }
+                }
+                if (stripped) break;
+            }
+            if (!stripped) return false;
+        }
+
+        // Put old item back
+        if (oldKey) this.addItem(oldKey);
+
+        // Take new item out of inventory (may already be gone if stripped above)
+        if (newKey) this.removeItem(newKey);
+
+        member.appearance[field] = newKey || null;
+        return true;
+    }
+
+    // Returns a map of { itemKey: memberName } for every item currently equipped
+    // across the whole party, so the UI can annotate dropdowns.
+    equippedByMap() {
+        const map = {};
+        for (const member of this.party) {
+            if (!member.appearance) continue;
+            for (const f of ['armorKey','helmetKey','weaponKey','toolKey']) {
+                const k = member.appearance[f];
+                if (k) map[k] = member.name;
+            }
+        }
+        return map;
+    }
+
+    // ---- Travel / map ----
+
     canTravelTo(nodeId) {
         const node = this._nodeMap[nodeId];
         if (!node || !node.discovered) return false;
@@ -52,7 +148,6 @@ export class WorldMap {
         const node = this.currentNode;
         node.visited = true;
         this._discoverNeighbors(nodeId);
-        // Tick enemies and check for collisions (same node OR crossing paths)
         this._lastEncounters = this._tickRoamingEnemies(fromId, nodeId);
         return true;
     }
@@ -70,8 +165,7 @@ export class WorldMap {
         return this.currentNode.actions || [];
     }
 
-    // BFS over discovered+connected nodes. Returns [id, id, ...] excluding start,
-    // or null if no path exists.
+    // BFS over discovered+connected nodes.
     findPath(fromId, toId) {
         if (fromId === toId) return [];
         const visited = new Set([fromId]);
@@ -93,7 +187,6 @@ export class WorldMap {
         return null;
     }
 
-    // Returns a random event, cycling through all before repeating
     drawRandomEvent() {
         const available = EVENTS.filter(e => !this._usedEventIds.has(e.id));
         const pool = available.length > 0 ? available : EVENTS;
@@ -103,7 +196,6 @@ export class WorldMap {
         return ev;
     }
 
-    // Simple deterministic-ish rand using day+nodeId to avoid pure random
     _seededRand() {
         let h = this.day * 31 + this.currentNodeId.length * 17 + this._usedEventIds.size * 7;
         h = ((h >>> 16) ^ h) * 0x45d9f3b;
@@ -125,12 +217,10 @@ export class WorldMap {
         return true;
     }
 
-    // Returns quests that are ready to turn in at the current location
     getReadyQuests() {
         return this.activeQuests.filter(q => q.targetNodeId === this.currentNodeId);
     }
 
-    // Completes a single quest by id, applies rewards, returns the quest object or null
     turnInQuest(questId) {
         const idx = this.activeQuests.findIndex(q => q.id === questId && q.targetNodeId === this.currentNodeId);
         if (idx === -1) return null;
@@ -138,9 +228,7 @@ export class WorldMap {
         q.completed = true;
         this.completedQuests.add(q.id);
         this.gold += q.rewardGold || 0;
-        for (const item of (q.rewardItems || [])) {
-            this.inventory.push(item);
-        }
+        for (const item of (q.rewardItems || [])) this.addItem(item);
         return q;
     }
 
@@ -164,14 +252,11 @@ export class WorldMap {
         this._lastEncounters = this._tickRoamingEnemies(null, null);
     }
 
-    // Returns any roaming enemies that collided with the player this tick.
-    // fromId/toId are the player's travel edge (null for rest).
     _tickRoamingEnemies(playerFrom, playerTo) {
         const encounters = [];
         for (const enemy of this.roamingEnemies) {
             if (enemy.defeated) continue;
             const prevNodeId = enemy.nodeId;
-            // Move enemy one step along a random discovered connection
             const node = this._nodeMap[enemy.nodeId];
             if (node) {
                 const options = node.connections.filter(id => this._nodeMap[id]);
@@ -184,15 +269,12 @@ export class WorldMap {
                     }
                 }
             }
-            // Collision: enemy landed on player's node
             if (enemy.nodeId === this.currentNodeId) {
                 encounters.push({ enemy, crossed: false });
                 continue;
             }
-            // Crossing paths: enemy moved to player's origin while player moved to enemy's origin
             if (playerFrom && playerTo &&
                 enemy.nodeId === playerFrom && prevNodeId === playerTo) {
-                // Send the enemy back so both characters meet at the player's destination
                 enemy.nodeId = playerTo;
                 encounters.push({ enemy, crossed: true });
             }
@@ -200,7 +282,6 @@ export class WorldMap {
         return encounters;
     }
 
-    // Consume and return pending encounters (called by scene after travel).
     popEncounters() {
         const enc = this._lastEncounters || [];
         this._lastEncounters = [];

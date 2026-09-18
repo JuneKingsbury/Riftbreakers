@@ -7,11 +7,23 @@ import { runEnemyTurn } from './enemy-ai.js';
 import { isEntityMoving } from '../systems/movement-lerp.js';
 import { ABILITIES } from './abilities.js';
 import { CHARACTER_DATA } from './data/characters.js';
+import { equipmentStatBonuses } from './data/equipment.js';
 
-function buildUnits() {
-    const units = CHARACTER_DATA.map(charData => createUnitFromCharData(charData));
-    const players = units.filter(u => u.team === 'player');
-    const enemies = units.filter(u => u.team === 'enemy');
+function buildUnits(worldMap) {
+    // Player units come from worldMap.party (live roster) so equipment/appearance
+    // changes on the world map are reflected in battle. Enemies always use CHARACTER_DATA.
+    const partyData  = worldMap?.party ?? CHARACTER_DATA.filter(c => c.team === 'player');
+    const enemyData  = CHARACTER_DATA.filter(c => c.team === 'enemy');
+    const units      = [...partyData, ...enemyData].map(charData => {
+        const equipBonuses = equipmentStatBonuses(charData.appearance);
+        const mergedMods   = { ...(charData.statMods || {}), };
+        for (const [k, v] of Object.entries(equipBonuses)) {
+            mergedMods[k] = (mergedMods[k] || 0) + v;
+        }
+        return createUnitFromCharData({ ...charData, statMods: mergedMods });
+    });
+    const players    = units.filter(u => u.team === 'player');
+    const enemies    = units.filter(u => u.team === 'enemy');
     const avg = (arr, key) => arr.reduce((s, u) => s + u[key], 0) / arr.length;
     const enemyCx = avg(enemies, 'x'), enemyCy = avg(enemies, 'y');
     const playerCx = avg(players, 'x'), playerCy = avg(players, 'y');
@@ -41,7 +53,7 @@ export class BattleScene {
         this._stopped   = false;
 
         const map   = createDemoMap();
-        const units = buildUnits();
+        const units = buildUnits(this._worldMap);
 
         this._battle = new TacticalBattle(map, units);
 

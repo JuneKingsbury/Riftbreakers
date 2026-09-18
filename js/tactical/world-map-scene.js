@@ -15,8 +15,9 @@ export class WorldMapScene {
     }
 
     enter(containerEl, skinManager, sceneManager) {
-        this._container = containerEl;
-        this._sm        = sceneManager;
+        this._container  = containerEl;
+        this._sm         = sceneManager;
+        this._skinManager = skinManager;
 
         if (!this._worldMap) {
             this._worldMap = new WorldMap();
@@ -242,7 +243,10 @@ export class WorldMapScene {
                 break;
             }
             case 'shop':
-                this._ui.showShop(wm, null);
+                this._ui.showShop(wm, this._skinManager, null);
+                break;
+            case 'inventory':
+                this._ui.showInventory(wm, this._skinManager);
                 break;
             case 'questboard':
                 this._ui.showQuestBoard(wm, null);
@@ -264,6 +268,9 @@ export class WorldMapScene {
                 if (scenarioId) this._startBattle(scenarioId);
                 break;
             }
+            case 'party':
+                this._ui.showParty(wm, this._skinManager);
+                break;
             case 'turnin': {
                 if (!questId) break;
                 const quest = wm.activeQuests.find(q => q.id === questId);
