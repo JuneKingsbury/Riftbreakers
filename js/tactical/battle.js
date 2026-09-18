@@ -36,6 +36,7 @@ export class TacticalBattle {
         this._pendingEnemy = null;
         this.onLogMessage = null;
         this.onStateChange = null;
+        this._ctPreSpent = 0;
     }
 
     get livingUnits() {
@@ -186,6 +187,10 @@ export class TacticalBattle {
             moveEntity(unit, tx, ty, 180);
         }
         this.logMsg(`${unit.name} moved to (${tx}, ${ty}).`);
+        // Pre-spend move CT so the bar drops immediately on move.
+        const moveCost = 20;
+        unit.ct = Math.max(0, unit.ct - moveCost);
+        this._ctPreSpent += moveCost;
         this.setState(STATES.PLAYER_TURN);
         this.moveRange = new Set();
         this.abilityRange = new Set();
@@ -203,6 +208,11 @@ export class TacticalBattle {
 
         if (ab.chargeTime && ab.chargeTime > 0) {
             source.mp = Math.max(0, source.mp - ab.mpCost);
+            faceToward(source, tx, ty);
+            // Pre-spend action CT so the bar drops immediately.
+            const actCost = ab.actionCost ?? 60;
+            source.ct = Math.max(0, source.ct - actCost);
+            this._ctPreSpent += actCost;
             source._charging = {
                 ability: this.selectedAbility,
                 rotation: this.abilityRotation,
@@ -223,6 +233,11 @@ export class TacticalBattle {
         }
 
         source.mp = Math.max(0, source.mp - ab.mpCost);
+        faceToward(source, tx, ty);
+        // Pre-spend action CT so the bar drops immediately.
+        const actCost = ab.actionCost ?? 60;
+        source.ct = Math.max(0, source.ct - actCost);
+        this._ctPreSpent += actCost;
 
         let affectedTiles;
         if (ab.aoePattern) {
@@ -432,7 +447,9 @@ export class TacticalBattle {
     endTurn(ctCost) {
         const cost = ctCost ?? 20;
         if (this.activeUnit) {
-            this.activeUnit.ct -= cost;
+            // Only deduct whatever hasn't been pre-spent by commitMove/commitAbility.
+            const remaining = Math.max(0, cost - this._ctPreSpent);
+            this.activeUnit.ct -= remaining;
             if (this.activeUnit.ct < 0) this.activeUnit.ct = 0;
 
             // Passive MP drain
@@ -444,6 +461,7 @@ export class TacticalBattle {
             }
         }
         this.activeUnit = null;
+        this._ctPreSpent = 0;
         this.moveRange = new Set();
         this.abilityRange = new Set();
         this.aoePreview = new Set();
