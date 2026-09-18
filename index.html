@@ -21,13 +21,11 @@
             </filter>
         </defs>
     </svg>
+
     <div id="start-screen">
         <canvas id="start-bg-canvas"></canvas>
         <h1>Riftbreakers</h1>
-        <div id="demo-banner-start" style="display:none;">DEMO MODE</div>
-        <p>
-            A tactics RPG set in the world of Rifthold.
-        </p>
+        <p>A tactics RPG set in the world of Rifthold.</p>
         <div class="start-btn-grid">
             <div class="start-btn-row">
                 <button id="demo-battle" style="background:#1a2a1a;border-color:#4a8;color:#afa;">New Game</button>
@@ -38,175 +36,33 @@
                 <button id="start-credits" data-modal-open>Credits</button>
             </div>
         </div>
-        <p style="font-size:12px; color:#999;">
-            <b><u>Controls</u></b><br>
-            [WASD]/[Arrows]=Pan | [B]=Build | [F]=Farm | [G]=Gather | [P]=Priorities | [C]=Craft | [R]=Research | [I]=Inventory | [V]=Rifts | [J]=Story | [H]=Warmth Overlay | [Y]=Defense Overlay | [U]=Room Quality Overlay | [K]=Aura Overlay | [Esc]=Settings | [Tab]=Toggle Chop/Mine | [Space]=Pause | [,/&lt;]/[./&gt;]=Speed | [+]/[-]/[Wheel]=Zoom | [/]=Reset Minimap | [Q]=Draft/Undraft | [E]=Select All | [N]=Next Idle | [<b>[</b>]/[<b>]</b>]=Cycle Colonist | [Click]=Select/Place | [Click+Drag]=Area select | [Middle-drag]=Pan | [Right-click]=Cancel/Mark for Destruction | [Esc]=Close/Cancel<br>
-            Keys can be remapped in Settings &rarr; Controls / Keybindings.
-        </p>
         <div id="version-label" style="color:#999;"></div>
-        <input type="file" id="import-file" accept=".json" style="display:none">
-        <div id="start-settings-panel" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); padding:20px; border:1px solid #555; border-radius:8px; background:#1e1e32; text-align:left; width:min(600px, 92vw); max-width:92vw; max-height:80vh; overflow-y:auto; z-index:1000; box-shadow:0 8px 32px rgba(0,0,0,0.7);">
+
+        <div id="start-settings-panel" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); padding:20px; border:1px solid #555; border-radius:8px; background:#1e1e32; text-align:left; width:min(520px, 92vw); max-width:92vw; max-height:80vh; overflow-y:auto; z-index:1000; box-shadow:0 8px 32px rgba(0,0,0,0.7);">
             <button data-modal-close onclick="document.getElementById('start-settings-panel').style.display='none';document.getElementById('modal-backdrop').style.display='none'" style="position:absolute; top:8px; right:12px; background:none; border:none; color:#aaa; font-size:18px; cursor:pointer; z-index:1;">&times;</button>
             <div style="margin-bottom:12px; padding-right:24px;">
-                <div style="color:#ffcc00; font-weight:bold;">Game Settings</div>
+                <div style="color:#ffcc00; font-weight:bold;">Settings</div>
             </div>
             <div class="settings-tabs" style="display:flex; gap:4px; margin-bottom:8px; border-bottom:1px solid #444;">
                 <button data-start-tab-btn="general" class="settings-tab-btn active" style="flex:1; padding:5px 8px; background:#2a2a4e; color:#ffcc00; border:1px solid #444; border-bottom:none; border-radius:4px 4px 0 0; cursor:pointer; font-family:inherit; font-size:inherit;">General</button>
                 <button data-start-tab-btn="graphics" class="settings-tab-btn" style="flex:1; padding:5px 8px; background:#16162a; color:#999; border:1px solid #444; border-bottom:none; border-radius:4px 4px 0 0; cursor:pointer; font-family:inherit; font-size:inherit;">Graphics</button>
-                <button data-start-tab-btn="controls" class="settings-tab-btn" style="flex:1; padding:5px 8px; background:#16162a; color:#999; border:1px solid #444; border-bottom:none; border-radius:4px 4px 0 0; cursor:pointer; font-family:inherit; font-size:inherit;">Controls</button>
                 <button data-start-tab-btn="devtools" class="settings-tab-btn" style="flex:1; padding:5px 8px; background:#16162a; color:#999; border:1px solid #444; border-bottom:none; border-radius:4px 4px 0 0; cursor:pointer; font-family:inherit; font-size:inherit;">Dev Tools</button>
             </div>
-            <div class="settings-section" data-start-tab="graphics" style="display:none;">
-                <div class="settings-section-title">Visual</div>
-                <div class="settings-row">
-                    <label for="start-skin">Tile Skin:</label>
-                    <select id="start-skin" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">
-                        <option value="ascii">ASCII (default)</option>
-                    </select>
-                </div>
-                <div class="settings-row">
-                    <label for="start-names">Colonist names:</label>
-                    <select id="start-names" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">
-                        <option value="off">Off</option>
-                        <option value="selected" selected>Selected</option>
-                        <option value="always">Always</option>
-                    </select>
-                </div>
-                <div class="settings-row">
-                    <label for="start-ui-font-size">UI Font Size: <span id="start-ui-font-val">Medium</span></label>
-                    <input type="range" id="start-ui-font-size" min="0.75" max="1.4" step="0.05" value="1" style="width:80px" oninput="document.getElementById('start-ui-font-val').textContent=this.value<=0.8?'Small':this.value>=1.2?'Large':'Medium'">
-                </div>
-                <div class="settings-row">
-                    <label for="start-temp-unit">Temperature unit:</label>
-                    <select id="start-temp-unit" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">
-                        <option value="F" selected>Fahrenheit (&deg;F)</option>
-                        <option value="C">Celsius (&deg;C)</option>
-                    </select>
-                </div>
-            </div>
-            <div class="settings-section" data-start-tab="general">
-                <div class="settings-section-title">Save Data</div>
-                <div class="settings-row" style="gap:8px;">
-                    <button id="export-game" disabled style="flex:1;padding:4px 8px;font-size:11px;">Export Save</button>
-                    <button id="import-game" style="flex:1;padding:4px 8px;font-size:11px;">Import Save</button>
-                </div>
-            </div>
+
             <div class="settings-section" data-start-tab="general">
                 <div class="settings-section-title">Audio</div>
                 <div class="settings-row">
-                    <label for="start-music-vol">Music Volume: <span id="start-music-vol-val">70</span></label>
-                    <input type="range" id="start-music-vol" min="0" max="100" value="70" style="width:80px" oninput="document.getElementById('start-music-vol-val').textContent=this.value">
+                    <label for="start-music-vol">Music Volume: <span id="start-music-vol-val">50</span></label>
+                    <input type="range" id="start-music-vol" min="0" max="100" value="50" style="width:80px" oninput="document.getElementById('start-music-vol-val').textContent=this.value">
                 </div>
                 <div class="settings-row">
                     <label for="start-sfx-vol">SFX Volume: <span id="start-sfx-vol-val">80</span></label>
                     <input type="range" id="start-sfx-vol" min="0" max="100" value="80" style="width:80px" oninput="document.getElementById('start-sfx-vol-val').textContent=this.value">
                 </div>
             </div>
-            <div class="settings-section" data-start-tab="general">
-                <div class="settings-section-title">Gameplay</div>
-                <div class="settings-row">
-                    <label for="start-autocook">Auto-cook meal target:</label>
-                    <select id="start-autocook" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">
-                        <option value="0" selected>Off</option>
-                        <option value="5">5 meals</option>
-                        <option value="10">10 meals</option>
-                        <option value="20">20 meals</option>
-                        <option value="50">50 meals</option>
-                    </select>
-                </div>
-                <div class="settings-row">
-                    <label for="start-autosave">Auto-save interval:</label>
-                    <select id="start-autosave" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">
-                        <option value="0">Off</option>
-                        <option value="12">Every 12 hours</option>
-                        <option value="24" selected>Every 24 hours</option>
-                        <option value="48">Every 48 hours</option>
-                    </select>
-                </div>
-                <div class="settings-row"><input type="checkbox" id="start-autopause-hostile" checked><label for="start-autopause-hostile">Auto-pause on hostile event (raids)</label></div>
-                <div class="settings-row"><input type="checkbox" id="start-autopause-event" checked><label for="start-autopause-event">Auto-pause on choice events (wanderers, caravans)</label></div>
-                <div class="settings-row"><input type="checkbox" id="start-pause-death" checked><label for="start-pause-death">Auto-pause on colonist death</label></div>
-                <div class="settings-row"><input type="checkbox" id="start-pause-low-health" checked><label for="start-pause-low-health">Auto-pause on critically low colonist health</label></div>
-                <div class="settings-row"><input type="checkbox" id="start-pause-research" checked><label for="start-pause-research">Auto-pause on research complete</label></div>
-                <div class="settings-row"><input type="checkbox" id="start-peaceful-check"><label for="start-peaceful-check">Peaceful mode (no raids/hostile animals)</label></div>
-                <div class="settings-row"><input type="checkbox" id="start-demo-mode"><label for="start-demo-mode">Demo Mode (locks advanced research)</label></div>
-            </div>
-            <div class="settings-section" data-start-tab="graphics" style="display:none;">
-                <div class="settings-section-title">Effects & Performance</div>
-                <div class="settings-row"><input type="checkbox" id="start-overlays" checked onchange="document.querySelectorAll('#start-night,#start-weather,#start-damage-flash,#start-screen-shake,#start-combat-particles,#start-projectiles,#start-equip-overlays,#start-progress-bars,#start-portal-path,#start-breathing,#start-walk-sway,#start-attack-swing,#start-action-anims,#start-tree-sway,#start-terrain-detail,#start-expedition-extras,#start-minimap').forEach(el=>el.checked=this.checked)"><label for="start-overlays">Master toggle: all combat/overlay effects</label></div>
-                <div class="settings-row"><input type="checkbox" id="start-night" checked><label for="start-night">Show night lighting/darkness (High Performance Impact)</label></div>
-                <div class="settings-row"><input type="checkbox" id="start-weather" checked><label for="start-weather">Show weather particles</label></div>
-                <div class="settings-row"><label for="start-particle-density">Particle Density: <span id="start-particle-density-val">100%</span></label><input type="range" id="start-particle-density" min="10" max="100" step="10" value="100" style="width:80px" oninput="document.getElementById('start-particle-density-val').textContent=this.value+'%'"></div>
-                <div class="settings-row"><input type="checkbox" id="start-damage-flash" checked><label for="start-damage-flash">Damage flash on hit</label></div>
-                <div class="settings-row"><input type="checkbox" id="start-screen-shake" checked><label for="start-screen-shake">Enable screen shake</label></div>
-                <div class="settings-row"><input type="checkbox" id="start-combat-particles" checked><label for="start-combat-particles">Combat/action particles (sparks, skulls)</label></div>
-                <div class="settings-row"><input type="checkbox" id="start-projectiles" checked><label for="start-projectiles">Projectile trails (arrows, bolts)</label></div>
-                <div class="settings-row"><input type="checkbox" id="start-equip-overlays" checked><label for="start-equip-overlays">Show equipped armor/helmets on colonists (sprite mode)</label></div>
-                <div class="settings-row"><input type="checkbox" id="start-progress-bars" checked><label for="start-progress-bars">Progress & health bars</label></div>
-                <div class="settings-row"><input type="checkbox" id="start-portal-path" checked><label for="start-portal-path">Portal path highlighting</label></div>
-                <div class="settings-row"><input type="checkbox" id="start-breathing" checked><label for="start-breathing">Entity breathing animation</label></div>
-                <div class="settings-row"><input type="checkbox" id="start-walk-sway" checked><label for="start-walk-sway">Walking sway animation</label></div>
-                <div class="settings-row"><input type="checkbox" id="start-attack-swing" checked><label for="start-attack-swing">Attack swing animation</label></div>
-                <div class="settings-row"><input type="checkbox" id="start-action-anims" checked><label for="start-action-anims">Action animations (attack, cast, work, hit)</label></div>
-                <div class="settings-row"><input type="checkbox" id="start-tree-sway" checked><label for="start-tree-sway">Tree sway (wind, stronger in storms)</label></div>
-                <div class="settings-row"><input type="checkbox" id="start-terrain-detail" checked><label for="start-terrain-detail">Terrain detail (grass tufts, water waves)</label></div>
-                <div class="settings-row"><input type="checkbox" id="start-expedition-extras" checked><label for="start-expedition-extras">Expedition extra animations</label></div>
-                <div class="settings-row"><input type="checkbox" id="start-reduce-motion"><label for="start-reduce-motion">Reduce motion (damps ambient sway/breathing/pulses)</label></div>
-                <div class="settings-row"><input type="checkbox" id="start-minimap" checked><label for="start-minimap">Show minimap</label></div>
-                <div class="settings-row">
-                    <label for="start-dither-dist">Dithering Distance:</label>
-                    <select id="start-dither-dist" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">
-                        <option value="none">Off</option>
-                        <option value="minimal">Minimal</option>
-                        <option value="light" selected>Light (default)</option>
-                        <option value="normal">Normal</option>
-                        <option value="heavy">Heavy</option>
-                        <option value="extreme">Extreme</option>
-                    </select>
-                </div>
-                <div class="settings-row">
-                    <label for="start-dither-qual">Dithering Quality:</label>
-                    <select id="start-dither-qual" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">
-                        <option value="chunky">Chunky (4x4 blocks)</option>
-                        <option value="low">Low (3x3 blocks)</option>
-                        <option value="medium" selected>Medium (2x2 blocks, default)</option>
-                        <option value="high">High (single pixels)</option>
-                    </select>
-                </div>
-                <div class="settings-row"><input type="checkbox" id="start-fps"><label for="start-fps">Show FPS counter</label></div>
-                <div class="settings-row"><input type="checkbox" id="start-fps-cap"><label for="start-fps-cap">Cap framerate to 30 FPS (reduces CPU/GPU usage)</label></div>
-            </div>
+
             <div class="settings-section" data-start-tab="general">
                 <div class="settings-section-title">Accessibility</div>
-                <div class="settings-row"><input type="checkbox" id="start-darken-pause" checked><label for="start-darken-pause">Darken screen when paused</label></div>
-                <div class="settings-row"><input type="checkbox" id="start-pause-focus" checked><label for="start-pause-focus">Pause when window loses focus</label></div>
-                <div class="settings-row">
-                    <label for="start-toolbar-mode">Mobile button bar:</label>
-                    <select id="start-toolbar-mode" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">
-                        <option value="auto" selected>Auto</option>
-                        <option value="always">Always</option>
-                        <option value="never">Never</option>
-                    </select>
-                </div>
-                <div class="settings-row">
-                    <label for="start-layout-mode">Layout mode:</label>
-                    <select id="start-layout-mode" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">
-                        <option value="auto" selected>Auto (detect screen size)</option>
-                        <option value="separate">Separate</option>
-                        <option value="tabbed">Tabbed</option>
-                    </select>
-                </div>
-                <div class="settings-row">
-                    <label for="start-notif-dur">Notification duration:</label>
-                    <select id="start-notif-dur" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">
-                        <option value="50">Short (50 ticks)</option>
-                        <option value="100" selected>Normal (100 ticks)</option>
-                        <option value="200">Long (200 ticks)</option>
-                        <option value="500">Persistent (500 ticks)</option>
-                    </select>
-                </div>
-                <div class="settings-row"><input type="checkbox" id="start-colonist-highlight"><label for="start-colonist-highlight">Show colonist color outline (sprite mode)</label></div>
-                <div class="settings-row"><input type="checkbox" id="start-large-clicks"><label for="start-large-clicks">Larger click targets (buttons & checkboxes)</label></div>
                 <div class="settings-row">
                     <label for="start-colorblind">Colorblind mode:</label>
                     <select id="start-colorblind" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">
@@ -217,50 +73,27 @@
                     </select>
                 </div>
             </div>
+
             <div class="settings-section" data-start-tab="general" style="border-bottom:none; text-align:center;">
-                <button id="start-reset-defaults" style="padding:6px 16px; font-size:11px; background:#442222; border:1px solid #664444; color:#ff8888; border-radius:4px; cursor:pointer;">Reset all settings to Default</button>
+                <button id="start-reset-defaults" style="padding:6px 16px; font-size:11px; background:#442222; border:1px solid #664444; color:#ff8888; border-radius:4px; cursor:pointer;">Reset to Defaults</button>
             </div>
-            <div class="settings-section" data-start-tab="controls" style="display:none;">
-                <div class="settings-section-title">Controls / Keybindings</div>
-                <div id="start-keybindings"></div>
-                <div class="settings-row" style="margin-top:6px;">
-                    <button id="start-reset-keybinds" style="padding:4px 10px; font-size:11px; background:#442222; border:1px solid #664444; color:#ff8888; border-radius:4px; cursor:pointer;">Reset all keybinds to Default</button>
+
+            <div class="settings-section" data-start-tab="graphics" style="display:none;">
+                <div class="settings-section-title">Visual</div>
+                <div class="settings-row">
+                    <label for="start-skin">Tile Skin:</label>
+                    <select id="start-skin" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">
+                        <option value="ascii">ASCII (default)</option>
+                    </select>
                 </div>
             </div>
+
             <div class="settings-section" data-start-tab="devtools" style="display:none;">
                 <div class="settings-section-title">Dev Tools</div>
                 <table style="width:100%; border-collapse:collapse;">
                     <tr>
-                        <td style="padding:4px 8px 4px 0;"><button id="start-blueprint" style="width:100%;padding:6px 10px;">Blueprint</button></td>
-                        <td style="padding:4px 0; color:#aaa; font-size:11px;">Design building layouts visually on a grid</td>
-                    </tr>
-                    <tr>
                         <td style="padding:4px 8px 4px 0;"><button id="start-skin-editor" style="width:100%;padding:6px 10px;">Skin</button></td>
                         <td style="padding:4px 0; color:#aaa; font-size:11px;">Pixel art editor for custom game sprites</td>
-                    </tr>
-                    <tr>
-                        <td style="padding:4px 8px 4px 0;"><button id="start-realm-editor" style="width:100%;padding:6px 10px;">Realm</button></td>
-                        <td style="padding:4px 0; color:#aaa; font-size:11px;">Create expedition realms with loot, enemies, and events</td>
-                    </tr>
-                    <tr>
-                        <td style="padding:4px 8px 4px 0;"><button id="start-entity-editor" style="width:100%;padding:6px 10px;">Entity</button></td>
-                        <td style="padding:4px 0; color:#aaa; font-size:11px;">Define animals and creatures with roles and behaviors</td>
-                    </tr>
-                    <tr>
-                        <td style="padding:4px 8px 4px 0;"><button id="start-equipment-editor" style="width:100%;padding:6px 10px;">Equipment</button></td>
-                        <td style="padding:4px 0; color:#aaa; font-size:11px;">Create weapons, armor, tools, and artifacts</td>
-                    </tr>
-                    <tr>
-                        <td style="padding:4px 8px 4px 0;"><button id="start-spell-editor" style="width:100%;padding:6px 10px;">Spell</button></td>
-                        <td style="padding:4px 0; color:#aaa; font-size:11px;">Design spells and their associated tome recipes</td>
-                    </tr>
-                    <tr>
-                        <td style="padding:4px 8px 4px 0;"><button id="start-equipment-editor-pro" style="width:100%;padding:6px 10px;">Equipment Pro</button></td>
-                        <td style="padding:4px 0; color:#aaa; font-size:11px;">Full equipment file editor with in-game preview</td>
-                    </tr>
-                    <tr>
-                        <td style="padding:4px 8px 4px 0;"><button id="start-realm-editor-pro" style="width:100%;padding:6px 10px;">Realm Pro</button></td>
-                        <td style="padding:4px 0; color:#aaa; font-size:11px;">Full exploration file editor with in-game preview</td>
                     </tr>
                 </table>
             </div>
@@ -268,153 +101,29 @@
     </div>
 
     <div id="modal-backdrop" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:999;"></div>
-    <div id="glossary-panel" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); padding:24px; border:1px solid #555; border-radius:8px; background:#1e1e32; text-align:left; width:640px; max-width:90vw; max-height:80vh; overflow-y:auto; font-size:12px; line-height:1.6; color:#ccc; z-index:1000; box-shadow:0 8px 32px rgba(0,0,0,0.7);">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-            <div style="color:#ffcc00; font-weight:bold; font-size:14px;">Game Glossary</div>
-            <button data-modal-close onclick="document.getElementById('glossary-panel').style.display='none';document.getElementById('modal-backdrop').style.display='none'" style="background:none; border:none; color:#aaa; font-size:18px; cursor:pointer;">&times;</button>
-        </div>
-        <div id="glossary-body"></div>
-    </div>
 
     <div id="credits-panel" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); padding:24px; border:1px solid #555; border-radius:8px; background:#1e1e32; text-align:left; width:400px; max-width:90vw; max-height:80vh; overflow-y:auto; font-size:12px; line-height:1.6; color:#ccc; z-index:1000; box-shadow:0 8px 32px rgba(0,0,0,0.7);">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
             <div style="color:#ffcc00; font-weight:bold; font-size:14px;">Credits</div>
             <button data-modal-close onclick="document.getElementById('credits-panel').style.display='none';document.getElementById('modal-backdrop').style.display='none'" style="background:none; border:none; color:#aaa; font-size:18px; cursor:pointer;">&times;</button>
         </div>
-        <div id="credits-body"></div>
+        <div style="color:#aaa;margin-bottom:6px;"><b>Design &amp; Development</b></div>
+        <div style="margin-bottom:20px;">June &ldquo;Mars&rdquo; Kingsbury</div>
+        <div style="color:#aaa;margin-bottom:6px;"><b>Additional Sprites</b></div>
+        <div style="margin-bottom:4px;">Mini World by Shade</div>
+        <div style="margin-bottom:4px;">Puny World by Shade</div>
+        <div style="margin-bottom:4px;">Puny Dungeon by Shade</div>
+        <div style="margin-bottom:4px;">16x16 Items by Glionox</div>
+        <div style="margin-bottom:4px;">Free Effect and Bullet 16x16 by BDragon1727</div>
+        <div style="margin-bottom:20px;">Free Smoke Fx Pixel 2 by BDragon1727</div>
+        <div style="color:#aaa;margin-bottom:6px;"><b>Music &amp; SFX</b></div>
+        <div style="margin-bottom:4px;">NOT JAM MUSIC PACK by NOT JAM</div>
+        <div style="margin-bottom:4px;">bfxr by increpare</div>
+        <div style="margin-bottom:20px;">Retro Sounds by DASK</div>
+        <div style="margin-bottom:20px;"><i>"Thank you for playing!"</i> &mdash;Mars</div>
     </div>
 
-    <div id="changelog-panel" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); padding:24px; border:1px solid #555; border-radius:8px; background:#1e1e32; text-align:left; width:640px; max-width:90vw; max-height:80vh; overflow-y:auto; font-size:12px; line-height:1.6; color:#ccc; z-index:1000; box-shadow:0 8px 32px rgba(0,0,0,0.7);">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-            <div style="color:#ffcc00; font-weight:bold; font-size:14px;">Changelog</div>
-            <button data-modal-close onclick="document.getElementById('changelog-panel').style.display='none';document.getElementById('modal-backdrop').style.display='none'" style="background:none; border:none; color:#aaa; font-size:18px; cursor:pointer;">&times;</button>
-        </div>
-        <div id="changelog-body"></div>
-    </div>
-
-
-    <div id="colonists-panel" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); padding:20px; border:1px solid #555; border-radius:8px; background:#1e1e32; text-align:left; width:700px; max-width:95vw; max-height:85vh; overflow-y:auto; z-index:1000; box-shadow:0 8px 32px rgba(0,0,0,0.7);">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
-            <div style="color:#ffcc00; font-weight:bold; font-size:14px;">Starting Colonists</div>
-            <button data-modal-close onclick="document.getElementById('colonists-panel').style.display='none';document.getElementById('modal-backdrop').style.display='none'" style="background:none; border:none; color:#aaa; font-size:18px; cursor:pointer;">&times;</button>
-        </div>
-        <div style="color:#aaa; font-size:11px; margin-bottom:14px;">Customize your starting colonists. Skill points: 18 total (max 8 per skill). Traits budget: 3 points (up to 3 traits). Random colonists get slightly more points to offset the luck of the draw.</div>
-        <div id="colonist-slots-container" style="display:flex; gap:12px; flex-wrap:wrap; justify-content:center;"></div>
-    </div>
-
-    <div id="blueprint-editor" style="display:none;"></div>
     <div id="skin-editor" style="display:none;"></div>
-    <div id="realm-editor" style="display:none;"></div>
-    <div id="entity-editor" style="display:none;"></div>
-    <div id="equipment-editor" style="display:none;"></div>
-    <div id="spell-editor" style="display:none;"></div>
-    <div id="equipment-editor-pro" style="display:none;"></div>
-    <div id="realm-editor-pro" style="display:none;"></div>
-
-    <div id="game-container">
-        <div id="status-bar">
-            <span id="status-info"></span>
-            <span class="status-controls">
-                <button id="btn-cycle-back" title="Cycle Back">[<]</button>
-                <button id="btn-cycle-forward" title="Cycle Forward">[>]</button>
-                <span class="status-controls-sep"></span>
-                <button id="btn-zoom-in" title="Zoom In">[+]</button>
-                <button id="btn-zoom-out" title="Zoom Out">[-]</button>
-                <span class="status-controls-sep"></span>
-                <button id="btn-pause" title="Pause">||</button>
-                <button id="btn-speed-1" title="1x Speed">1x</button>
-                <button id="btn-speed-2" title="2x Speed">2x</button>
-                <button id="btn-speed-3" title="3x Speed">3x</button>
-                <span class="status-controls-sep"></span>
-                <button id="btn-settings" title="Settings">&#9881;</button>
-            </span>
-        </div>
-        <div id="game-area">
-            <pre id="game"></pre>
-            <div id="notifications"></div>
-            <div id="pause-overlay">||</div>
-            <div id="tile-tooltip"></div>
-            <div id="tutorial-note" style="display:none"></div>
-        </div>
-        <div id="build-panel"></div>
-        <div id="info-panel" class="footer-panel">
-            <div id="info-resize-handle" class="resize-handle resize-handle-left"></div>
-            <div id="info-content">
-                <div class="info-header">Info</div>
-                <div class="info-row">Click a colonist, animal, or tile for info.</div>
-            </div>
-        </div>
-        <div id="game-footer">
-            <div id="footer-resize-handle" class="resize-handle resize-handle-top"></div>
-            <div id="footer-tabs">
-                <button class="footer-tab" data-tab="info">Info</button>
-                <button class="footer-tab" data-tab="colonists">Colonists</button>
-                <button class="footer-tab" data-tab="log">Log</button>
-                <button class="footer-tab" data-tab="minimap">Map</button>
-            </div>
-            <div id="footer-content">
-                <div id="colonist-hud" class="footer-panel"></div>
-                <div class="footer-panel-resize" data-resize-left="colonist-hud" data-resize-right="event-log"></div>
-                <div id="event-log" class="footer-panel"></div>
-                <div id="minimap-container">
-                    <canvas id="minimap"></canvas>
-                </div>
-            </div>
-        </div>
-        <div id="bottom-bar">
-            <div id="mode-bar"></div>
-        </div>
-        <div id="touch-toolbar">
-            <button id="touch-destroy-btn" onclick="window.game?.input.toggleDestroyMode()">Destroy</button>
-            <button id="touch-pan-btn" onclick="window.game?.input.toggleTouchPanMode()">Pan</button>
-            <button id="touch-rally-btn" onclick="window.game?.input.toggleRallyMode()">Rally</button>
-            <button id="touch-selectall-btn" onclick="window.game?.input.selectAllColonists()">Select All</button>
-            <button id="touch-idle-btn" onclick="window.game?.cycleIdleColonist()">Next Idle</button>
-            <button id="touch-draft-btn" onclick="window.game?.input.toggleDraftSelected()">Draft</button>
-            <button onclick="window.game?.togglePause()">Pause</button>
-        </div>
-        <div id="panel-overlay" class="panel-overlay"></div>
-        <div id="priority-panel"></div>
-        <div id="craft-panel"></div>
-        <div id="event-panel"></div>
-        <div id="research-panel"></div>
-        <div id="inventory-panel"></div>
-        <div id="settings-panel"></div>
-        <div id="arcane-panel"></div>
-        <div id="story-panel"></div>
-    </div>
-
-    <div id="outro-overlay" style="display:none;">
-        <div id="outro-scroll">
-            <div style="height:60vh;"></div>
-            <div style="color:#ffcc44;font-size:22px;font-weight:bold;margin-bottom:24px;">Riftbreakers</div>
-            <div style="max-width:500px;margin:0 auto;line-height:1.8;color:#ccc;font-size:13px;text-align:left;white-space:pre-wrap;tab-size:4;">
-                <p>&Tab;With the Crusade halted, your colonists could finally return to their homes. For some this meant a quick trip through the rifts to start rebuilding their old homes, anxiously awaiting the return of their friends and family they've spent all these years separated from. For others this meant staying put, comfortable in the colony they helped grow and this new family of once strangers that they've built together.</p>
-                <p>&Tab;The choice was easy for you. This community has quickly become yours, with all of your actions helping push the colonists towards a safe and happy life in the Frontier. You'll stay as long as you're needed for your friends who now call this colony their home.</p>
-            </div>
-            <div style="margin-top:60px;color:#888;font-size:11px;letter-spacing:1px;">CREDITS</div>
-            <div style="margin-top:20px;color:#ccc;font-size:12px;">
-                <div style="color:#aaa;margin-bottom:6px;"><b>Design &amp; Development</b></div>
-                <div style="margin-bottom:20px;">June &ldquo;Mars&rdquo; Kingsbury</div>
-                <div style="color:#aaa;margin-bottom:6px;"><b>Additional Sprites</b></div>
-                <div style="margin-bottom:4px;">Mini World by Shade</div>
-                <div style="margin-bottom:4px;">Puny World by Shade</div>
-                <div style="margin-bottom:4px;">Puny Dungeon by Shade</div>
-                <div style="margin-bottom:4px;">16x16 Items by Glionox</div>
-                <div style="margin-bottom:4px;">Free Effect and Bullet 16x16 by BDragon1727</div>
-                <div style="margin-bottom:20px;">Free Smoke Fx Pixel 2 by BDragon1727</div>
-                <div style="color:#aaa;margin-bottom:6px;"><b>Music &amp; SFX</b></div>
-                <div style="margin-bottom:4px;">NOT JAM MUSIC PACK by NOT JAM</div>
-                <div style="margin-bottom:4px;">bfxr by increpare</div>
-                <div style="margin-bottom:20px;">Retro Sounds by DASK</div>
-            </div>
-            <button id="outro-return-btn" style="padding:10px 28px;background:#2a2a3e;color:#ffcc44;border:1px solid #555;border-radius:4px;cursor:pointer;font-family:inherit;font-size:13px;margin-bottom:5vh;">Return to Title</button>
-            <div style="max-width:500px;margin:0 auto;line-height:1.8;color:#ccc;font-size:13px;">
-                <i>"Thank you for playing my game. I hope your colony brought you joy!"</i> -Mars
-            </div>
-            <img class="pixel-art" src="portraits/mars.png" alt="A drawing of game dev Mars" style="margin-top:20px;">
-        </div>
-    </div>
 
     <div id="ui-tooltip"></div>
     <script src="lib/jszip.min.js"></script>

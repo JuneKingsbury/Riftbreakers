@@ -59,6 +59,16 @@ export class BattleRenderer {
 
         this.viewAngle  = 0;  // 0=N, 1=E, 2=S, 3=W
         this._rotateBtns = [];
+
+        // Spin animation state (smooth Q/E rotation)
+        this._spinActive   = false;
+        this._spinT        = 0;
+        this._spinDuration = 300;
+        this._spinFrom     = 0;
+        this._spinDir      = 1;   // +1 CW, -1 CCW
+        this._spinPivotU   = 0;   // virtual U of pivot tile in _spinFrom coords
+        this._spinPivotV   = 0;
+        this._spinQueue    = 0;   // pending delta to apply after current spin
         this._mapW = 22;
         this._mapH = 16;
 
@@ -94,33 +104,55 @@ export class BattleRenderer {
             case 3: return { tx: v,             ty: H - 1 - u };
         }
     }
+    _toVirtualAngle(tx, ty, W, H, angle) {
+        switch (((angle % 4) + 4) % 4) {
+            case 0: return { u: tx,             v: ty };
+            case 1: return { u: ty,             v: W - 1 - tx };
+            case 2: return { u: W - 1 - tx,     v: H - 1 - ty };
+            case 3: return { u: H - 1 - ty,     v: tx };
+        }
+    }
+    _fromVirtualAngle(u, v, W, H, angle) {
+        switch (((angle % 4) + 4) % 4) {
+            case 0: return { tx: u,             ty: v };
+            case 1: return { tx: W - 1 - v,     ty: u };
+            case 2: return { tx: W - 1 - u,     ty: H - 1 - v };
+            case 3: return { tx: v,             ty: H - 1 - u };
+        }
+    }
     _vDims(mapW, mapH) {
         return (this.viewAngle === 1 || this.viewAngle === 3)
             ? { vW: mapH, vH: mapW }
             : { vW: mapW, vH: mapH };
     }
     // Virtual-space neighbors used for side-face visibility tests.
-    // The W-S diamond edge (south face) is always at virtual v+1.
-    // The E-S diamond edge (east face) is always at virtual u+1.
+    // During a spin, use _spinFrom so neighbor lookups match the face geometry
+    // (which is also computed in _spinFrom virtual space).
     _virtualNeighbors(tx, ty) {
         const W = this._mapW, H = this._mapH;
-        const { u, v } = this._toVirtual(tx, ty, W, H);
-        const sn = this._fromVirtual(u,     v + 1, W, H);
-        const en = this._fromVirtual(u + 1, v,     W, H);
+        const a = this._spinActive ? this._spinFrom : this.viewAngle;
+        const { u, v } = this._toVirtualAngle(tx, ty, W, H, a);
+        const sn = this._fromVirtualAngle(u,     v + 1, W, H, a);
+        const en = this._fromVirtualAngle(u + 1, v,     W, H, a);
         return { southNeighbor: sn, eastNeighbor: en };
     }
-    // North/west virtual neighbors for shaded faces.
     _virtualNorthWestNeighbors(tx, ty) {
         const W = this._mapW, H = this._mapH;
-        const { u, v } = this._toVirtual(tx, ty, W, H);
-        const nn = this._fromVirtual(u,     v - 1, W, H);
-        const wn = this._fromVirtual(u - 1, v,     W, H);
+        const a = this._spinActive ? this._spinFrom : this.viewAngle;
+        const { u, v } = this._toVirtualAngle(tx, ty, W, H, a);
+        const nn = this._fromVirtualAngle(u,     v - 1, W, H, a);
+        const wn = this._fromVirtualAngle(u - 1, v,     W, H, a);
         return { northNeighbor: nn, westNeighbor: wn };
     }
     // Rotate view by delta steps (positive = CW, negative = CCW).
-    // Preserves the world tile currently at screen center so the map
-    // stays in place visually instead of snapping to the active unit.
+    // Starts a 300ms spin animation; preserves the world tile at screen center.
     rotateView(delta) {
+        if (this._spinActive) {
+            const newQ = this._spinQueue + delta;
+            this._spinQueue = Math.max(-1, Math.min(1, newQ));
+            return;
+        }
+
         const W = this._mapW, H = this._mapH;
         const ts = this.tileSize, hw = ts / 2, hh = ts / 4;
         const cw = (this.canvas.width - 190) / 2;
@@ -134,13 +166,22 @@ export class BattleRenderer {
         const { vW, vH } = this._vDims(W, H);
         const uc = Math.max(0, Math.min(vW - 1, Math.round(u0)));
         const vc = Math.max(0, Math.min(vH - 1, Math.round(v0)));
-        const centerWorld = this._fromVirtual(uc, vc, W, H);
 
+        // Cancel any in-progress camera lerp so it doesn't fight the spin.
+        this._camTargetX = null;
+        this._camTargetY = null;
+
+        // Initialize spin state.
+        this._spinActive  = true;
+        this._spinT       = 0;
+        this._spinFrom    = this.viewAngle;
+        this._spinDir     = delta > 0 ? 1 : -1;
+        this._spinPivotU  = uc;
+        this._spinPivotV  = vc;
+        this._spinQueue   = 0;
+
+        // Commit viewAngle immediately so painter sort and hit-testing are correct.
         this.viewAngle = ((this.viewAngle + delta) % 4 + 4) % 4;
-
-        // Re-center on the same world tile in the new view orientation (instant snap,
-        // no lerp - rotation should pivot in place without sliding).
-        this._snapCamTo(centerWorld.tx, centerWorld.ty, W, H);
     }
 
     // Elevation lift in pixels for a tile.
@@ -152,13 +193,47 @@ export class BattleRenderer {
     // camX/camY are pixel offsets (not tile offsets).
     // Applies virtual rotation via _toVirtual before projecting.
     tileToScreen(tx, ty) {
-        const { u, v } = this._toVirtual(tx, ty, this._mapW, this._mapH);
         const ts = this.tileSize;
         const hw = ts / 2;
         const hh = ts / 4;
+
+        if (!this._spinActive) {
+            const { u, v } = this._toVirtual(tx, ty, this._mapW, this._mapH);
+            return {
+                x: Math.round((u - v) * hw + this.camX),
+                y: Math.round((u + v) * hh + this.camY),
+            };
+        }
+
+        // During spin: interpolate linearly between the FROM and TO iso projections.
+        // We use FROM virtual coords (u,v) and the pivot offset (du,dv). The FROM→TO
+        // transform is a shear (not a pure rotation, because hw≠hh), so we blend the
+        // 2×2 projection matrix from I at t=0 to M at t=1. This lands every tile
+        // exactly on its correct position at both ends with no jump.
+        //
+        // For CW (+1):  TO position = hw*(du+dv), hh*(dv-du)
+        // For CCW (-1): TO position = hw*(-du-dv), hh*(du-dv)
+        // Unified: let s = 1-2*te,  A = (1+dir)/2 + (1-dir)/2*s,  B = 1-A
+        //   x = hw*(du*A - dv*B),  y = hh*(du*B + dv*A)
+        const pu = this._spinPivotU, pv = this._spinPivotV;
+        const { u, v } = this._toVirtualAngle(tx, ty, this._mapW, this._mapH, this._spinFrom);
+        const du = u - pu;
+        const dv = v - pv;
+
+        const te = this._spinT * this._spinT * (3 - 2 * this._spinT); // smoothstep
+        const s   = 1 - 2 * te;
+        const dir = this._spinDir;
+        const A   = (1 + dir) / 2 + (1 - dir) / 2 * s;
+        const B   = (1 - dir) / 2 + (1 + dir) / 2 * s;
+
+        // Pivot screen position derived live from camX/camY so camera movement
+        // during the spin doesn't accumulate drift.
+        const pivotSX = (pu - pv) * hw + this.camX;
+        const pivotSY = (pu + pv) * hh + this.camY;
+
         return {
-            x: Math.round((u - v) * hw + this.camX),
-            y: Math.round((u + v) * hh + this.camY),
+            x: Math.round(hw * (du * A - dv * B) + pivotSX),
+            y: Math.round(hh * (du * B + dv * A) + pivotSY),
         };
     }
 
@@ -265,12 +340,13 @@ export class BattleRenderer {
         const hw = ts / 2;
         const hh = ts / 4;
         const { vW, vH } = this._vDims(mapW, mapH);
-        const minX = -(vH - 1) * hw;
-        const maxX = (vW - 1) * hw + (this.canvas.width - 190);
-        const minY = 0;
-        const maxY = (vW + vH - 2) * hh + this.canvas.height;
-        this.camX = Math.max(minX - 50, Math.min(maxX, this.camX));
-        this.camY = Math.max(minY - 50, Math.min(maxY, this.camY));
+        const pad = Math.max(this.canvas.width, this.canvas.height);
+        const minX = -(vH - 1) * hw  - pad;
+        const maxX = (vW - 1) * hw   + (this.canvas.width - 190) + pad;
+        const minY = -pad;
+        const maxY = (vW + vH - 2) * hh + this.canvas.height + pad;
+        this.camX = Math.max(minX, Math.min(maxX, this.camX));
+        this.camY = Math.max(minY, Math.min(maxY, this.camY));
     }
 
     _resize() {
@@ -318,13 +394,28 @@ export class BattleRenderer {
         return null;
     }
 
+    // Returns the E and W vertex offsets from the N vertex, accounting for spin.
+    // At rest: E=(+hw,+hh), W=(-hw,+hh). During spin these rotate with the grid.
+    _isoVerts(hw, hh) {
+        if (!this._spinActive) {
+            return { ex: hw, ey: hh, wx: -hw, wy: hh };
+        }
+        const te  = this._spinT * this._spinT * (3 - 2 * this._spinT);
+        const s   = 1 - 2 * te;
+        const dir = this._spinDir;
+        const A   = (1 + dir) / 2 + (1 - dir) / 2 * s;
+        const B   = (1 - dir) / 2 + (1 + dir) / 2 * s;
+        return { ex: hw * A, ey: hh * B, wx: -hw * B, wy: hh * A };
+    }
+
     // Draw a diamond (iso tile top face) path.
     _diamondPath(ctx, nx, ny, hw, hh) {
+        const { ex, ey, wx, wy } = this._isoVerts(hw, hh);
         ctx.beginPath();
-        ctx.moveTo(nx,      ny);          // N vertex (top)
-        ctx.lineTo(nx + hw, ny + hh);     // E vertex
-        ctx.lineTo(nx,      ny + hh * 2); // S vertex
-        ctx.lineTo(nx - hw, ny + hh);     // W vertex
+        ctx.moveTo(nx,          ny);          // N vertex (top)
+        ctx.lineTo(nx + ex,     ny + ey);     // E vertex
+        ctx.lineTo(nx + ex + wx, ny + ey + wy); // S vertex
+        ctx.lineTo(nx + wx,     ny + wy);     // W vertex
         ctx.closePath();
     }
 
@@ -388,6 +479,44 @@ export class BattleRenderer {
         this._pulse = (this._pulse + dt * 0.003) % (Math.PI * 2);
         this._resize();
 
+        // Ensure map dims are fresh before spin tick uses them.
+        if (battle && battle.map) {
+            this._mapW = battle.map.width;
+            this._mapH = battle.map.height;
+        }
+
+        // Advance spin animation.
+        if (this._spinActive) {
+            this._spinT += dt / this._spinDuration;
+            if (this._spinT >= 1) {
+                this._spinT = 1;
+                const mW = this._mapW, mH = this._mapH;
+                const ts2 = this.tileSize, hw2 = ts2 / 2, hh2 = ts2 / 4;
+                const pu = this._spinPivotU, pv = this._spinPivotV;
+
+                // Capture where the pivot tile sits right now (camX/camY still in _spinFrom space).
+                const pivotSX = (pu - pv) * hw2 + this.camX;
+                const pivotSY = (pu + pv) * hh2 + this.camY;
+
+                this._spinActive = false;
+
+                // Recompute camX/camY so the pivot tile stays at that same screen pixel
+                // in the new viewAngle, with no snap.
+                const { tx: ptx, ty: pty } = this._fromVirtualAngle(pu, pv, mW, mH, this._spinFrom);
+                const { u: uf, v: vf } = this._toVirtualAngle(ptx, pty, mW, mH, this.viewAngle);
+                this.camX = Math.round(pivotSX - (uf - vf) * hw2);
+                this.camY = Math.round(pivotSY - (uf + vf) * hh2);
+                this._camTargetX = this.camX;
+                this._camTargetY = this.camY;
+                this._clampCam(mW, mH);
+                if (this._spinQueue !== 0) {
+                    const q = this._spinQueue;
+                    this._spinQueue = 0;
+                    this.rotateView(q);
+                }
+            }
+        }
+
         const ctx = this.ctx;
         ctx.imageSmoothingEnabled = false;
 
@@ -431,7 +560,7 @@ export class BattleRenderer {
                 this.camX += dx * CAM_LERP;
                 this.camY += dy * CAM_LERP;
             }
-            this._clampCam(map.width, map.height);
+            if (!this._spinActive) this._clampCam(map.width, map.height);
         }
 
         // Keyboard pan (pixels/sec). Cancels active lerp so manual panning
@@ -445,7 +574,7 @@ export class BattleRenderer {
         if (this._panKeys.right) this.camX -= panPx;
         if (this._panKeys.up)    this.camY += panPx;
         if (this._panKeys.down)  this.camY -= panPx;
-        this._clampCam(map.width, map.height);
+        if (!this._spinActive) this._clampCam(map.width, map.height);
 
         ctx.fillStyle = '#0a0a12';
         ctx.fillRect(0, 0, W, H);
@@ -468,12 +597,17 @@ export class BattleRenderer {
         // Tiles draw before units on the same diagonal so elevated terrain occludes units behind it.
         const liveUnits = units.filter(u => isAlive(u));
 
+        // During a spin, painter order must use _spinFrom so depth sort matches
+        // the coordinate space tiles are actually drawn in.
+        const sortAngle = this._spinActive ? this._spinFrom : this.viewAngle;
+        const toVSort = (tx, ty) => this._toVirtualAngle(tx, ty, map.width, map.height, sortAngle);
+
         const drawList = [];
         for (let ty = 0; ty < map.height; ty++) {
             for (let tx = 0; tx < map.width; tx++) {
                 const tile = map.tiles[ty * map.width + tx];
                 if (tile) {
-                    const vt = this._toVirtual(tx, ty, map.width, map.height);
+                    const vt = toVSort(tx, ty);
                     drawList.push({ kind: 'tile', tx, ty, tile, diag: vt.u + vt.v, vv: vt.v });
                 }
             }
@@ -486,8 +620,8 @@ export class BattleRenderer {
             const vizY  = unit._vizY  != null ? unit._vizY  : unit.y;
             const prevX = unit._prevX != null ? unit._prevX : unit.x;
             const prevY = unit._prevY != null ? unit._prevY : unit.y;
-            const vViz  = this._toVirtual(vizX,  vizY,  map.width, map.height);
-            const vPrev = this._toVirtual(prevX, prevY, map.width, map.height);
+            const vViz  = toVSort(vizX,  vizY);
+            const vPrev = toVSort(prevX, prevY);
             drawList.push({ kind: 'unit', unit, diag: Math.max(vViz.u + vViz.v, vPrev.u + vPrev.v) });
         }
         drawList.sort((a, b) => {
@@ -722,33 +856,39 @@ export class BattleRenderer {
             const nx = sp.x;
             const ny = sp.y - elevOff;
 
-            // --- North side face (in shade - virtual-north neighbor is lower) ---
-            {
+            // Spinning-aware E/W vertex offsets (collapse to ±hw/hh at rest).
+            const { ex: EX, ey: EY, wx: WX, wy: WY } = this._isoVerts(hw, hh);
+            // Derived S vertex offset from N = E + W
+            const SX = EX + WX, SY = EY + WY;
+
+            // --- North/West side faces (back-facing, in shade) ---
+            // Suppressed during spin: sheared diamonds don't cover these faces
+            // correctly mid-rotation, causing bleed-through on interior tiles.
+            // They're never visible at either resting angle so the omission is
+            // undetectable to the player.
+            if (!this._spinActive) {
                 const { northNeighbor, westNeighbor } = this._virtualNorthWestNeighbors(tx, ty);
                 const tileN   = getTile(map, northNeighbor.tx, northNeighbor.ty);
                 const elevN   = this._elevOffset(tileN);
                 const faceH_N = elevOff - elevN;
                 if (faceH_N > 0) {
-                    // North face: N..E edge of diamond going downward.
-                    const nv2x = nx,      nv2y = ny;            // N vertex of top face
-                    const ev2x = nx + hw, ev2y = ny + hh;       // E vertex of top face
-                    const ev3x = nx + hw, ev3y = ev2y + faceH_N;
-                    const nv3x = nx,      nv3y = nv2y + faceH_N;
+                    const nv2x = nx,        nv2y = ny;
+                    const ev2x = nx + EX,   ev2y = ny + EY;
+                    const ev3x = ev2x,      ev3y = ev2y + faceH_N;
+                    const nv3x = nv2x,      nv3y = nv2y + faceH_N;
                     ctx.fillStyle = LEDGE_SHADOW;
                     this._parallelogram(ctx, nv2x, nv2y, ev2x, ev2y, ev3x, ev3y, nv3x, nv3y);
                     ctx.fill();
                 }
 
-                // --- West side face (in shade - virtual-west neighbor is lower) ---
                 const tileW   = getTile(map, westNeighbor.tx, westNeighbor.ty);
                 const elevW   = this._elevOffset(tileW);
                 const faceH_W = elevOff - elevW;
                 if (faceH_W > 0) {
-                    // West face: N..W edge of diamond going downward.
-                    const nv2x = nx,      nv2y = ny;
-                    const wv2x = nx - hw, wv2y = ny + hh;
-                    const wv3x = nx - hw, wv3y = wv2y + faceH_W;
-                    const nv3x = nx,      nv3y = nv2y + faceH_W;
+                    const nv2x = nx,        nv2y = ny;
+                    const wv2x = nx + WX,   wv2y = ny + WY;
+                    const wv3x = wv2x,      wv3y = wv2y + faceH_W;
+                    const nv3x = nv2x,      nv3y = nv2y + faceH_W;
                     ctx.fillStyle = LEDGE_SHADOW;
                     this._parallelogram(ctx, nv2x, nv2y, wv2x, wv2y, wv3x, wv3y, nv3x, nv3y);
                     ctx.fill();
@@ -762,11 +902,10 @@ export class BattleRenderer {
             const faceH_S = elevOff - elevS;
             if (faceH_S > 0) {
                 // South face: W..S edge of diamond going downward.
-                // Top edge = W vertex + S vertex of the top face.
-                const wx  = nx - hw,  wy  = ny + hh;       // W vertex of top face
-                const sx2 = nx,       sy2 = ny + hh * 2;   // S vertex of top face
-                const sx3 = nx,       sy3 = sy2 + faceH_S; // S vertex of bottom
-                const wx3 = nx - hw,  wy3 = wy  + faceH_S; // W vertex of bottom
+                const wx  = nx + WX,  wy  = ny + WY;
+                const sx2 = nx + SX,  sy2 = ny + SY;
+                const sx3 = sx2,      sy3 = sy2 + faceH_S;
+                const wx3 = wx,       wy3 = wy  + faceH_S;
                 ctx.fillStyle = LEDGE_DARK;
                 this._parallelogram(ctx, wx, wy, sx2, sy2, sx3, sy3, wx3, wy3);
                 ctx.fill();
@@ -783,10 +922,10 @@ export class BattleRenderer {
             const faceH_E = elevOff - elevE;
             if (faceH_E > 0) {
                 // East face: E..S edge of diamond going downward.
-                const ex  = nx + hw, ey  = ny + hh;
-                const sx2 = nx,      sy2 = ny + hh * 2;
-                const sx3 = nx,      sy3 = sy2 + faceH_E;
-                const ex3 = nx + hw, ey3 = ey  + faceH_E;
+                const ex  = nx + EX, ey  = ny + EY;
+                const sx2 = nx + SX, sy2 = ny + SY;
+                const sx3 = sx2,     sy3 = sy2 + faceH_E;
+                const ex3 = ex,      ey3 = ey  + faceH_E;
                 ctx.fillStyle = LEDGE_DARK;
                 this._parallelogram(ctx, ex, ey, sx2, sy2, sx3, sy3, ex3, ey3);
                 ctx.fill();
@@ -804,14 +943,10 @@ export class BattleRenderer {
             if (useSprites) {
                 const img = sm.getSprite('terrain', def.spriteKey) || sm.getSprite('terrain', 'grass');
                 if (img) {
-                    // setTransform maps the full ts x ts sprite to the diamond:
-                    //   (0,0)   -> N vertex (nx, ny)
-                    //   (ts,0)  -> E vertex (nx+hw, ny+hh)
-                    //   (0,ts)  -> W vertex (nx-hw, ny+hh)
-                    //   (ts,ts) -> S vertex (nx, ny+2*hh)
-                    // No clip needed; the square maps exactly to the diamond.
+                    // setTransform maps the full ts x ts sprite to the diamond.
+                    // Columns are the E-axis and W-axis directions (spin-aware).
                     ctx.save();
-                    ctx.setTransform(hw / ts, hh / ts, -hw / ts, hh / ts, nx, ny);
+                    ctx.setTransform(EX / ts, EY / ts, WX / ts, WY / ts, nx, ny);
                     ctx.imageSmoothingEnabled = false;
                     ctx.drawImage(img, 0, 0, ts, ts);
                     ctx.restore();
@@ -821,7 +956,7 @@ export class BattleRenderer {
                 // ASCII fallback: draw char at diamond center.
                 ctx.fillStyle = def.color;
                 ctx.font = `bold ${Math.round(hh * 1.2)}px 'Courier New', monospace`;
-                ctx.fillText(def.char, nx, ny + hh);
+                ctx.fillText(def.char, nx + (EX + WX) / 2, ny + (EY + WY) / 2);
             }
 
             // Animated overlays drawn into diamond clip region.
@@ -836,7 +971,7 @@ export class BattleRenderer {
                         ctx.save();
                         // Apply sway rotation around the iso center of the diamond,
                         // then project the full ts x ts sprite onto the diamond face.
-                        ctx.setTransform(hw / ts, hh / ts, -hw / ts, hh / ts, nx, ny);
+                        ctx.setTransform(EX / ts, EY / ts, WX / ts, WY / ts, nx, ny);
                         ctx.translate(ts / 2, ts / 2);
                         ctx.rotate(rot);
                         ctx.translate(-ts / 2, -ts / 2);
@@ -856,7 +991,7 @@ export class BattleRenderer {
                         const alpha   = Math.max(0, Math.min(1, alphaBase + alphaVar * Math.cos(phase)));
                         ctx.save();
                         ctx.globalAlpha = alpha;
-                        ctx.setTransform(hw / ts, hh / ts, -hw / ts, hh / ts, nx, ny);
+                        ctx.setTransform(EX / ts, EY / ts, WX / ts, WY / ts, nx, ny);
                         ctx.imageSmoothingEnabled = false;
                         ctx.drawImage(waves, 0, 0, ts, ts);
                         ctx.restore();
@@ -1227,7 +1362,9 @@ export class BattleRenderer {
 
         // Each CW rotation shifts all compass angles by -PI/2 so labels
         // track world direction regardless of view orientation.
-        const rotOffset = this.viewAngle * (-Math.PI / 2);
+        const rotOffset = this._spinActive
+            ? (this._spinFrom + this._spinDir * (this._spinT * this._spinT * (3 - 2 * this._spinT))) * (-Math.PI / 2)
+            : this.viewAngle * (-Math.PI / 2);
         const DIRS = [
             { label: 'N', baseAngle: -1 * Math.PI / 4, color: '#f66', major: true  },
             { label: 'E', baseAngle:  1 * Math.PI / 4, color: '#ccc', major: false },
