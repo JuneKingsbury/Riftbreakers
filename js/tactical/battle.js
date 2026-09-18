@@ -188,7 +188,7 @@ export class TacticalBattle {
                 targetX: tx,
                 targetY: ty,
                 ct: 0,
-                needed: ab.chargeTime * 10,
+                needed: ab.chargeTime,
             };
             if (!source.status.includes('charging')) source.status.push('charging');
             this.logMsg(`${source.name} begins channeling ${ab.name}!`);
@@ -317,7 +317,7 @@ export class TacticalBattle {
         unit.mp = Math.max(0, unit.mp - ab.mpCost);
 
         if (ab.chargeTime && ab.chargeTime > 0) {
-            unit._charging = { ability: abilityKey, targetX: tx, targetY: ty, ct: 0, needed: ab.chargeTime * 10 };
+            unit._charging = { ability: abilityKey, targetX: tx, targetY: ty, ct: 0, needed: ab.chargeTime };
             if (!unit.status.includes('charging')) unit.status.push('charging');
             this.logMsg(`${unit.name} begins channeling ${ab.name}!`);
             return;
