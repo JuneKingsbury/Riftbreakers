@@ -2,7 +2,7 @@ import { getTileDef, getTile } from './battle-map.js';
 import { STATES } from './battle.js';
 import { ABILITIES } from './abilities.js';
 import { getEntityRenderPos, isEntityMoving } from '../systems/movement-lerp.js';
-import { isAlive, isUnconscious } from './units.js';
+import { isAlive, isUnconscious, setFacing } from './units.js';
 
 const TILE_SIZE  = 48;
 const HP_BAR_H   = 5;
@@ -684,11 +684,10 @@ export class BattleRenderer {
                 const dx = vizX - unit._prevX;
                 const dy = vizY - unit._prevY;
                 if (dx !== 0 || dy !== 0) {
-                    if (Math.abs(dx) >= Math.abs(dy)) {
-                        unit.facing = dx > 0 ? 'east' : 'west';
-                    } else {
-                        unit.facing = dy > 0 ? 'south' : 'north';
-                    }
+                    const newF = Math.abs(dx) >= Math.abs(dy)
+                        ? (dx > 0 ? 'east' : 'west')
+                        : (dy > 0 ? 'south' : 'north');
+                    setFacing(unit, newF);
                 }
             }
             const isoSp = this.tileToScreen(rp.x, rp.y);
@@ -929,32 +928,10 @@ export class BattleRenderer {
             ctx.fill();
 
             if (useSprites) {
-                // Compose sprite-space rotation into the iso setTransform so the
-                // texture stays world-fixed during a spin. Rotating the camera CW
-                // means the texture must rotate CCW inside the diamond (r = -alpha).
-                // The composed matrix for iso + rotation r around sprite center:
-                //   a=(hw/ts)*(c-s), b=(hh/ts)*(c+s), c=-(hw/ts)*(c+s), d=(hh/ts)*(c-s)
-                //   e=nx+hw*sinR,    f=ny+hh*(1-cosR)
-                let stA, stB, stC, stD, stE, stF;
-                if (this._spinActive) {
-                    const te   = this._spinT * this._spinT * (3 - 2 * this._spinT);
-                    const r    = -this._spinDir * te * Math.PI / 2;
-                    const cosR = Math.cos(r), sinR = Math.sin(r);
-                    stA = (hw / ts) * (cosR - sinR);
-                    stB = (hh / ts) * (cosR + sinR);
-                    stC = -(hw / ts) * (cosR + sinR);
-                    stD = (hh / ts) * (cosR - sinR);
-                    stE = nx + hw * sinR;
-                    stF = ny + hh * (1 - cosR);
-                } else {
-                    stA = hw / ts; stB = hh / ts; stC = -hw / ts; stD = hh / ts;
-                    stE = nx;      stF = ny;
-                }
-
                 const img = sm.getSprite('terrain', def.spriteKey) || sm.getSprite('terrain', 'grass');
                 if (img) {
                     ctx.save();
-                    ctx.setTransform(stA, stB, stC, stD, stE, stF);
+                    ctx.setTransform(hw / ts, hh / ts, -hw / ts, hh / ts, nx, ny);
                     ctx.imageSmoothingEnabled = false;
                     ctx.drawImage(img, 0, 0, ts, ts);
                     ctx.restore();
@@ -969,7 +946,7 @@ export class BattleRenderer {
                         const phase  = (now / period) * Math.PI * 2 + (tileKey % 1000) / 1000 * 6.28;
                         const sway   = Math.sin(phase) * amp;
                         ctx.save();
-                        ctx.setTransform(stA, stB, stC, stD, stE, stF);
+                        ctx.setTransform(hw / ts, hh / ts, -hw / ts, hh / ts, nx, ny);
                         ctx.translate(ts / 2, ts / 2);
                         ctx.rotate(sway);
                         ctx.translate(-ts / 2, -ts / 2);
@@ -989,7 +966,7 @@ export class BattleRenderer {
                         const alpha   = Math.max(0, Math.min(1, alphaBase + alphaVar * Math.cos(phase)));
                         ctx.save();
                         ctx.globalAlpha = alpha;
-                        ctx.setTransform(stA, stB, stC, stD, stE, stF);
+                        ctx.setTransform(hw / ts, hh / ts, -hw / ts, hh / ts, nx, ny);
                         ctx.imageSmoothingEnabled = false;
                         ctx.drawImage(waves, 0, 0, ts, ts);
                         ctx.restore();
@@ -1250,10 +1227,47 @@ export class BattleRenderer {
             // name CW by viewAngle and look up in FACING_ROT (which bakes in the
             // non-uniform iso axis angles) rather than adding a flat angle offset.
             const DIRS_CW = ['north', 'east', 'south', 'west'];
-            const facingIdx = DIRS_CW.indexOf(unit.facing || 'south');
-            // Subtract viewAngle: rotating camera CW makes world directions appear CCW.
-            const rotatedFacing = DIRS_CW[(facingIdx - this.viewAngle + 4) % 4];
-            const arrowRot = FACING_ROT[rotatedFacing] || 0;
+            const FACING_TURN_MS = 150;
+
+            // Resolve the visual facing angle accounting for both a camera spin
+            // and a unit turn, each interpolating along the shortest arc.
+            const visualViewAngle = this._spinActive
+                ? this._spinFrom + this._spinDir * this._spinT * this._spinT * (3 - 2 * this._spinT)
+                : this.viewAngle;
+
+            const toWorldAngle = (facing) => {
+                // Fractional viewAngle offset rotates the arrow continuously.
+                const steps = DIRS_CW.indexOf(facing || 'south');
+                const rotSteps = ((steps - visualViewAngle) % 4 + 4) % 4;
+                // Interpolate between the two bracketing FACING_ROT entries.
+                const lo = Math.floor(rotSteps) % 4;
+                const hi = (lo + 1) % 4;
+                const t  = rotSteps - Math.floor(rotSteps);
+                let a0 = FACING_ROT[DIRS_CW[lo]], a1 = FACING_ROT[DIRS_CW[hi]];
+                let d = a1 - a0;
+                if (d >  Math.PI) d -= Math.PI * 2;
+                if (d < -Math.PI) d += Math.PI * 2;
+                return a0 + d * t;
+            };
+
+            let arrowRot;
+            if (unit._prevFacing && unit._facingChangeAt) {
+                const elapsed = now - unit._facingChangeAt;
+                if (elapsed < FACING_TURN_MS) {
+                    const te = elapsed / FACING_TURN_MS;
+                    const fromAngle = toWorldAngle(unit._prevFacing);
+                    const toAngle   = toWorldAngle(unit.facing);
+                    let diff = toAngle - fromAngle;
+                    if (diff >  Math.PI) diff -= Math.PI * 2;
+                    if (diff < -Math.PI) diff += Math.PI * 2;
+                    arrowRot = fromAngle + diff * te;
+                } else {
+                    unit._prevFacing = null;
+                    arrowRot = toWorldAngle(unit.facing);
+                }
+            } else {
+                arrowRot = toWorldAngle(unit.facing);
+            }
             const arrowColor = unit.team === 'player' ? '#7bf' : '#f76';
 
             ctx.save();

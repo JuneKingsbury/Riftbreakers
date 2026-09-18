@@ -52,6 +52,16 @@ export function meetsPrerequisites(xpMap, jobKey) {
     return prereqs.every(p => jobLevel(xpMap, p.job) >= p.level);
 }
 
+// Returns the subset of a job's abilities that are unlocked at the character's current job level.
+// Uses JOB_DATA (raw) so abilityLevels is never lost to inheritance resolution.
+export function unlockedAbilities(jobKey, xpMap) {
+    const job = JOB_DATA[jobKey];
+    if (!job) return [];
+    const lv = jobLevel(xpMap, jobKey);
+    const levels = job.abilityLevels || {};
+    return (job.abilities || []).filter(k => (levels[k] ?? 1) <= lv);
+}
+
 // Returns a human-readable string of unmet prerequisites, e.g. "Evoker Lv.3, Warden Lv.3".
 export function missingPrerequisites(xpMap, jobKey) {
     const prereqs = JOB_DATA[jobKey]?.prerequisites || [];

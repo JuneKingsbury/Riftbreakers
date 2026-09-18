@@ -48,6 +48,8 @@ export class WorldMap {
             }
         }
 
+        this.inventory['stone_spear'] = (this.inventory['stone_spear'] || 0) + 1;
+
         // Roaming enemies
         this.roamingEnemies = [
             new RoamingEnemy('raiders', 'amber_crossroads', 'raider_brute', 'Raider Band', 'bandit_ambush'),
@@ -119,15 +121,23 @@ export class WorldMap {
         return true;
     }
 
-    // Returns a map of { itemKey: memberName } for every item currently equipped
-    // across the whole party, so the UI can annotate dropdowns.
-    equippedByMap() {
+    // Returns a map of { itemKey: memberName } for items equipped across the party.
+    // When the same item key is worn by multiple members, the first member found
+    // who is NOT the given viewer is returned — keeping the "[Name]" annotation
+    // pointing at someone other than the viewer. Pass viewerName to get that behaviour;
+    // omit it to get last-writer behaviour (used for inventory display).
+    equippedByMap(viewerName) {
         const map = {};
         for (const member of this.party) {
             if (!member.appearance) continue;
             for (const f of ['armorKey','helmetKey','weaponKey','toolKey']) {
                 const k = member.appearance[f];
-                if (k) map[k] = member.name;
+                if (!k) continue;
+                // Only overwrite if we don't yet have an entry, or the current
+                // entry is the viewer themselves (prefer showing someone else).
+                if (!map[k] || map[k] === viewerName) {
+                    map[k] = member.name;
+                }
             }
         }
         return map;

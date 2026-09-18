@@ -53,13 +53,16 @@ export function runEnemyTurn(unit, battle, onAbility) {
         if (!moveDest) moveDest = { x: unit.x, y: unit.y };
     }
 
+    // Face toward destination before moving — faceToward uses unit.x/y as origin,
+    // and moveEntity* immediately updates unit.x/y to the destination, so we must
+    // call setFacing first while the unit is still at its current position.
+    faceToward(unit, moveDest.x, moveDest.y);
     const path = computeMovePath(unit, battle.map, battle.livingUnits, moveDest.x, moveDest.y);
     if (path && path.length > 0) {
         moveEntityAlongPath(unit, path, 180);
     } else {
         moveEntity(unit, moveDest.x, moveDest.y, 180);
     }
-    faceToward(unit, moveDest.x, moveDest.y);
     battle.logMsg(`${unit.name} moves to (${unit.x}, ${unit.y}).`);
 
     // Check if we can now attack

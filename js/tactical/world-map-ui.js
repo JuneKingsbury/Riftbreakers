@@ -1,5 +1,5 @@
 import { SHOP_ITEMS, NODES } from './world-map-data.js';
-import { JOB_STATS, ABILITIES, jobLevel, meetsPrerequisites, missingPrerequisites, XP_THRESHOLDS } from './data-registry.js';
+import { JOB_STATS, ABILITIES, jobLevel, unlockedAbilities, meetsPrerequisites, missingPrerequisites, XP_THRESHOLDS } from './data-registry.js';
 import { EQUIPMENT, equipmentStatBonuses } from './data/equipment.js';
 
 const NODE_NAME_MAP = Object.fromEntries(NODES.map(n => [n.id, n.name]));
@@ -706,16 +706,21 @@ export class WorldMapUI {
         // "free" = in inventory (unequipped copies). "onOther" = equipped by another
         // party member with no free copy in inventory. Items on others are only included
         // if there is no free copy available (so we always consume inventory first).
-        const equippedBy = worldMap.equippedByMap();
+        const equippedBy = worldMap.equippedByMap(member.name);
         const optsForSlot = (slotName, curKey) => {
             // Items with at least one unequipped copy in inventory
             const free = Object.keys(worldMap.inventory)
                 .filter(k => EQUIPMENT[k]?.slot === slotName && worldMap.inventory[k] > 0);
             const freeSet = new Set(free);
 
-            // Items worn by another party member that have no free copy
+            // Items worn by another party member that have no free copy.
+            // Exclude curKey: if this member already has it in this slot it is
+            // never "on someone else" regardless of what equippedByMap returns
+            // (equippedByMap only tracks the last writer when the same item is
+            // equipped by multiple members simultaneously).
             const onOthers = Object.entries(equippedBy)
                 .filter(([k, name]) =>
+                    k !== curKey &&
                     name !== member.name &&
                     EQUIPMENT[k]?.slot === slotName &&
                     !freeSet.has(k)
@@ -819,32 +824,55 @@ export class WorldMapUI {
         const abilityKeys = jobData.abilities || [];
         if (abilityKeys.length > 0) {
             html += `<div style="font-size:10px;color:#fc8;text-transform:uppercase;margin-bottom:5px;">Skills</div>`;
-            for (const key of abilityKeys) {
-                const ab = ABILITIES[key];
-                if (!ab) continue;
-                const isPassive = ab.passive || ab.type === 'passive';
-                const typeCol   = isPassive ? '#88aacc' : ab.type === 'magic' ? '#cc88ff' : '#ffaa66';
-                const typeLabel = isPassive ? 'Passive' : ab.type === 'magic' ? 'Magic' : 'Physical';
+            const unlockedSet   = new Set(unlockedAbilities(member.job, member.xp));
+            const abilityLevels = jobData.abilityLevels || {};
 
-                // Build a compact stat line
+            for (const key of abilityKeys) {
+                const ab       = ABILITIES[key];
+                if (!ab) continue;
+                const isUnlocked = unlockedSet.has(key);
+                const unlockLv   = abilityLevels[key] ?? 1;
+                const isPassive  = ab.passive || ab.type === 'passive';
+                const typeCol    = !isUnlocked ? '#444'
+                    : isPassive           ? '#88aacc'
+                    : ab.type === 'magic' ? '#cc88ff'
+                    : '#ffaa66';
+                const typeLabel  = isPassive ? 'Passive' : ab.type === 'magic' ? 'Magic' : 'Physical';
+
                 const parts = [];
-                if (!isPassive) {
-                    if (ab.mpCost)      parts.push(`${ab.mpCost} MP`);
-                    if (ab.range)       parts.push(`Range ${ab.range}`);
-                    if (ab.aoe)         parts.push(`AoE ${ab.aoe}`);
-                    if (ab.chargeTime)  parts.push(`Charge ${ab.chargeTime}`);
-                } else {
-                    if (ab.passiveMpCost) parts.push(`${ab.passiveMpCost} MP/turn`);
+                if (isUnlocked) {
+                    if (!isPassive) {
+                        if (ab.mpCost)     parts.push(`${ab.mpCost} MP`);
+                        if (ab.range)      parts.push(`Range ${ab.range}`);
+                        if (ab.aoe)        parts.push(`AoE ${ab.aoe}`);
+                        if (ab.chargeTime) parts.push(`Charge ${ab.chargeTime}`);
+                    } else {
+                        if (ab.passiveMpCost) parts.push(`${ab.passiveMpCost} MP/turn`);
+                    }
                 }
 
-                html += `<div style="margin-bottom:5px;padding:5px 7px;
-                                     background:#0a0a1c;border:1px solid #2a2a3a;border-radius:3px;">
-                    <div style="display:flex;align-items:baseline;gap:6px;margin-bottom:2px;">
-                        <span style="font-size:11px;color:#ddd;font-weight:bold;">${ab.name}</span>
-                        <span style="font-size:9px;color:${typeCol};text-transform:uppercase;">${typeLabel}</span>
-                        ${parts.length ? `<span style="font-size:9px;color:#556;margin-left:auto;">${parts.join(' · ')}</span>` : ''}
-                    </div>
-                    ${ab.desc ? `<div style="font-size:10px;color:#778;line-height:1.5;">${ab.desc}</div>` : ''}
+                let powerHint = '';
+                if (isUnlocked && ab.basePower) {
+                    const statKey = ab.type === 'physical' ? 'atk' : 'mat';
+                    const base    = (jobStats[statKey] || 0) + (bonuses[statKey] || 0);
+                    powerHint = `~${Math.round(ab.basePower * base)}`;
+                }
+
+                const namCol   = isUnlocked ? '#ddd' : '#444';
+                const bgCol    = isUnlocked ? '#0a0a1c' : '#080810';
+                const borderCol = isUnlocked ? '#2a2a3a' : '#181820';
+
+                html += `<div class="wm-skill-card" data-ability="${key}"
+                              style="margin-bottom:4px;padding:4px 7px;cursor:default;
+                                     background:${bgCol};border:1px solid ${borderCol};border-radius:3px;
+                                     display:flex;align-items:center;gap:6px;">
+                    <span style="font-size:11px;color:${namCol};font-weight:bold;flex:1;">${ab.name}</span>
+                    ${isUnlocked
+                        ? `<span style="font-size:9px;color:${typeCol};text-transform:uppercase;">${typeLabel}</span>
+                           ${parts.length ? `<span style="font-size:9px;color:#556;">${parts.join(' · ')}</span>` : ''}
+                           ${powerHint ? `<span style="font-size:10px;color:#fc8;min-width:28px;text-align:right;">${powerHint}</span>` : ''}`
+                        : `<span style="font-size:9px;color:#445;">Unlocks Lv.${unlockLv}</span>`
+                    }
                 </div>`;
             }
         }
@@ -886,10 +914,17 @@ export class WorldMapUI {
             sel.addEventListener('change', () => {
                 const field  = sel.dataset.field;
                 const newKey = sel.value || null;
-                if (worldMap.equipItem(member.name, field, newKey)) {
-                    skinManager?.invalidateComposite('party_' + member.name);
-                    this._showPartyMember(member, worldMap, skinManager);
+                worldMap.equipItem(member.name, field, newKey);
+                // Invalidate composites for every party member — the stripped
+                // member's portrait would otherwise stay stale.
+                if (skinManager) {
+                    for (const m of worldMap.party) {
+                        skinManager.invalidateComposite('party_' + m.name);
+                    }
                 }
+                // Always re-render so the dropdown reflects actual state,
+                // even if equipItem returned false.
+                this._showPartyMember(member, worldMap, skinManager);
             });
         });
 
@@ -900,6 +935,31 @@ export class WorldMapUI {
         });
 
         inner.querySelector('#wm-party-back').addEventListener('click', () => this._modalBack());
+
+        // Skill card tooltips
+        const memberStats = {};
+        for (const k of ['atk','def','mat','mdf','spd','move','eva','maxHp','maxMp']) {
+            memberStats[k] = (jobStats[k] || 0) + (bonuses[k] || 0);
+        }
+        const unlockedSetForTip = new Set(unlockedAbilities(member.job, member.xp));
+        const abilityLevelsForTip = jobData.abilityLevels || {};
+        inner.querySelectorAll('.wm-skill-card').forEach(card => {
+            const ab  = ABILITIES[card.dataset.ability];
+            if (!ab) return;
+            const isUnlocked = unlockedSetForTip.has(card.dataset.ability);
+            const unlockLv   = abilityLevelsForTip[card.dataset.ability] ?? 1;
+            const tipHtml    = isUnlocked
+                ? this._abilityTooltipHtml(ab, memberStats)
+                : `<span style="color:#888;font-weight:bold;">${ab.name}</span><br>`
+                  + `<span style="color:#445;">Locked — reach ${_jobLabel(member.job)} Lv.${unlockLv} to unlock.</span>`;
+            card.addEventListener('mouseenter', (e) => {
+                this._tooltip.innerHTML = tipHtml;
+                this._tooltip.style.display = 'block';
+                this._positionTooltip(e.clientX, e.clientY);
+            });
+            card.addEventListener('mousemove',  (e) => this._positionTooltip(e.clientX, e.clientY));
+            card.addEventListener('mouseleave', ()  => { this._tooltip.style.display = 'none'; });
+        });
     }
     // ---------- Inventory screen ----------
     showInventory(worldMap, skinManager) {
@@ -1055,6 +1115,55 @@ export class WorldMapUI {
         });
 
         inner.querySelector('#wm-inv-back').addEventListener('click', () => this._modalBack());
+    }
+
+    // Builds tooltip HTML for an ability, using memberStats for estimated damage.
+    // memberStats should be { atk, mat, ... } already including equipment bonuses.
+    _abilityTooltipHtml(ab, memberStats) {
+        const lines = [];
+        const typeColor = ab.passive || ab.type === 'passive' ? '#888'
+            : ab.type === 'magic'    ? '#c8a0ff'
+            : '#ffcc88';
+        lines.push(`<span style="color:${typeColor};font-weight:bold;">${ab.name}</span>`);
+
+        const tags = [];
+        if (ab.type === 'physical') tags.push('<span style="color:#ffcc88;">Physical</span>');
+        if (ab.type === 'magic')    tags.push('<span style="color:#c8a0ff;">Magic</span>');
+        if (ab.element)             tags.push(`<span style="color:#88ccff;">${ab.element[0].toUpperCase() + ab.element.slice(1)}</span>`);
+        if (ab.passive)             tags.push('<span style="color:#888;">Passive</span>');
+        if (tags.length)            lines.push(tags.join(' · '));
+
+        if (ab.desc) {
+            lines.push(`<span style="color:#aaa;">${ab.desc}</span>`);
+        }
+
+        const stats = [];
+        if (ab.range > 0)   stats.push(`Range: <b>${ab.range}</b>`);
+        if (ab.aoe > 0)     stats.push(`AoE: <b>${ab.aoe}</b>`);
+        if (ab.mpCost > 0)  stats.push(`MP: <b style="color:#88f;">${ab.mpCost}</b>`);
+        if (ab.actionCost)  stats.push(`CT: <b style="color:#fc8;">${ab.actionCost}</b>`);
+        if (ab.passiveMpCost) stats.push(`${ab.passiveMpCost} MP/turn`);
+        if (stats.length) lines.push(stats.join('  '));
+
+        if (ab.chargeTime > 0) {
+            lines.push(`<span style="color:#c8f;">Charge: ${ab.chargeTime} ticks</span>`);
+        }
+
+        if (ab.basePower && memberStats) {
+            const pct     = Math.round(ab.basePower * 100);
+            const statKey = ab.type === 'physical' ? 'atk' : 'mat';
+            const base    = (memberStats[statKey] || 0);
+            const est     = Math.round(ab.basePower * base);
+            lines.push(`Power: <b>${pct}%</b> of ${statKey.toUpperCase()} &mdash; est. <b style="color:#fc8;">~${est}</b>`);
+        }
+
+        if (ab.applyStatus) {
+            lines.push(`Applies: <b style="color:#fc6;">${ab.applyStatus}</b>${ab.statusDuration ? ` (${ab.statusDuration} turns)` : ''}`);
+        }
+        if (ab.isHeal) lines.push(`<span style="color:#8f8;">Restores HP</span>`);
+        if (ab.isCure) lines.push(`<span style="color:#aff;">Removes status effects</span>`);
+
+        return lines.join('<br>');
     }
 }
 

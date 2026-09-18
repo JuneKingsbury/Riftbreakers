@@ -59,9 +59,15 @@ export function faceToward(unit, tx, ty) {
     const dy = ty - unit.y;
     const ax = Math.abs(dx);
     const ay = Math.abs(dy);
-    if (ax >= ay) {
-        unit.facing = dx >= 0 ? 'east' : 'west';
-    } else {
-        unit.facing = dy >= 0 ? 'south' : 'north';
-    }
+    const newFacing = ax >= ay
+        ? (dx >= 0 ? 'east' : 'west')
+        : (dy >= 0 ? 'south' : 'north');
+    setFacing(unit, newFacing);
+}
+
+export function setFacing(unit, newFacing) {
+    if (unit.facing === newFacing) return;
+    unit._prevFacing     = unit.facing || newFacing;
+    unit._facingChangeAt = performance.now();
+    unit.facing          = newFacing;
 }

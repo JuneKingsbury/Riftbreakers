@@ -6,6 +6,7 @@ import { BattleUI } from './battle-ui.js';
 import { runEnemyTurn } from './enemy-ai.js';
 import { isEntityMoving } from '../systems/movement-lerp.js';
 import { ABILITIES } from './abilities.js';
+import { unlockedAbilities } from './data-registry.js';
 import { CHARACTER_DATA } from './data/characters.js';
 import { equipmentStatBonuses } from './data/equipment.js';
 
@@ -20,7 +21,13 @@ function buildUnits(worldMap) {
         for (const [k, v] of Object.entries(equipBonuses)) {
             mergedMods[k] = (mergedMods[k] || 0) + v;
         }
-        return createUnitFromCharData({ ...charData, statMods: mergedMods });
+        const unit = createUnitFromCharData({ ...charData, statMods: mergedMods });
+        // For player units with XP data, restrict abilities to those unlocked at current job level.
+        if (charData.xp) {
+            const unlocked = new Set(unlockedAbilities(charData.job, charData.xp));
+            unit.abilities = unit.abilities.filter(k => unlocked.has(k));
+        }
+        return unit;
     });
     const players    = units.filter(u => u.team === 'player');
     const enemies    = units.filter(u => u.team === 'enemy');

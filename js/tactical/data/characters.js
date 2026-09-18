@@ -26,11 +26,11 @@ export const CHARACTER_DATA = [
     // ---- Player party ----
     {
         name: 'Aldric',
-        job: 'knight',
+        job: 'paladin',
         team: 'player',
         x: 3, y: 8,
         ct: 40,
-        xp: { novice: 120, knight: 340, paladin: 80 },
+        xp: { novice: 120, evoker: 340, warden: 340, paladin: 80 },
         appearance: {
             race: 'human', bodyVariant: 1, hairVariant: 1, shirtVariant: 1,
             nameColor: '#4488ff',
@@ -39,11 +39,11 @@ export const CHARACTER_DATA = [
     },
     {
         name: 'Lyria',
-        job: 'mage',
+        job: 'battlemage',
         team: 'player',
         x: 2, y: 6,
         ct: 10,
-        xp: { novice: 120, evoker: 210, mage: 175, battlemage: 40 },
+        xp: { novice: 120, evoker: 340, enchanter: 340, battlemage: 40 },
         appearance: {
             race: 'human', bodyVariant: 2, hairVariant: 3, shirtVariant: 2,
             nameColor: '#cc44ff',
@@ -52,11 +52,11 @@ export const CHARACTER_DATA = [
     },
     {
         name: 'Ryn',
-        job: 'archer',
+        job: 'conjurer',
         team: 'player',
         x: 3, y: 11,
         ct: 55,
-        xp: { novice: 120, conjurer: 190, archer: 260 },
+        xp: { novice: 120, conjurer: 260 },
         appearance: {
             race: 'human', bodyVariant: 1, hairVariant: 2, shirtVariant: 1,
             nameColor: '#44cc66',
@@ -65,11 +65,11 @@ export const CHARACTER_DATA = [
     },
     {
         name: 'Fenn',
-        job: 'healer',
+        job: 'sanctifier',
         team: 'player',
         x: 2, y: 9,
         ct: 25,
-        xp: { novice: 120, warden: 155, healer: 220, sanctifier: 60 },
+        xp: { novice: 120, warden: 340, enchanter: 340, sanctifier: 60 },
         appearance: {
             race: 'human', bodyVariant: 2, hairVariant: 4, shirtVariant: 2,
             nameColor: '#ffcc44',

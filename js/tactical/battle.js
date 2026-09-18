@@ -1,5 +1,5 @@
 import { computeMoveRange, computeMovePath, computeAttackRange, computeAoeArea, resolveAbility, ABILITIES } from './abilities.js';
-import { isDead, isAlive, isConscious, isUnconscious, isStunned, faceToward } from './units.js';
+import { isDead, isAlive, isConscious, isUnconscious, isStunned, faceToward, setFacing } from './units.js';
 import { getTile } from './battle-map.js';
 import { moveEntity, moveEntityAlongPath } from '../systems/movement-lerp.js';
 
@@ -159,12 +159,12 @@ export class TacticalBattle {
         if (!this.moveRange.has(key)) return false;
         const unit = this.activeUnit;
         const path = computeMovePath(unit, this.map, this.livingUnits, tx, ty);
+        faceToward(unit, tx, ty);
         if (path && path.length > 0) {
             moveEntityAlongPath(unit, path, 180);
         } else {
             moveEntity(unit, tx, ty, 180);
         }
-        faceToward(unit, tx, ty);
         this.logMsg(`${unit.name} moved to (${tx}, ${ty}).`);
         this.setState(STATES.PLAYER_TURN);
         this.moveRange = new Set();
@@ -370,7 +370,7 @@ export class TacticalBattle {
         if (this.state !== STATES.PLAYER_TURN) return false;
         const order = ['north', 'east', 'south', 'west'];
         const idx = order.indexOf(this.activeUnit.facing);
-        this.activeUnit.facing = order[(idx + 1) % 4];
+        setFacing(this.activeUnit, order[(idx + 1) % 4]);
         this.logMsg(`${this.activeUnit.name} pivots to face ${this.activeUnit.facing}.`);
         return true;
     }
