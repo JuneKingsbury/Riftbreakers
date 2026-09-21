@@ -1,5 +1,7 @@
 import { NODES, QUESTS, EVENTS, BATTLE_SCENARIOS, ROAMING_SPAWN_POOL, PINNED_ENCOUNTER_DATA } from './world-map-data.js';
 import { CHARACTER_DATA } from './data/characters.js';
+import { EQUIPMENT } from './data/equipment.js';
+import { allowedEquipTypes } from './data-registry.js';
 
 export class RoamingEnemy {
     constructor(id, nodeId, spriteKey, name, battleScenarioId, opts = {}) {
@@ -108,6 +110,18 @@ export class WorldMap {
         return this.inventory[key] || 0;
     }
 
+    // Returns true if itemKey is allowed in the given slot for the member's current job.
+    canEquip(memberName, itemKey) {
+        if (!itemKey) return true;
+        const member = this.party.find(m => m.name === memberName);
+        if (!member) return false;
+        const item = EQUIPMENT[itemKey];
+        if (!item) return false;
+        const allowed = allowedEquipTypes(member.job, item.slot);
+        if (allowed === null) return true; // unrestricted job
+        return allowed.has(item.type);
+    }
+
     // Equip an item onto a party member's slot. The previously equipped item
     // (if any) goes back into inventory; the new item is taken from inventory
     // or stripped from whoever else currently has it equipped.
@@ -115,6 +129,8 @@ export class WorldMap {
     equipItem(memberName, field, newKey) {
         const member = this.party.find(m => m.name === memberName);
         if (!member?.appearance) return false;
+
+        if (newKey && !this.canEquip(memberName, newKey)) return false;
 
         const oldKey = member.appearance[field];
 

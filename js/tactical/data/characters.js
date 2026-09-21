@@ -11,6 +11,8 @@
 //                       Omit a job key (or leave its XP at 0) to treat it as level 1.
 //   statMods   object   Per-stat overrides applied on top of the job's base stats
 //   extraAbilities string[] Additional abilities beyond what the job provides
+//   supportSkill   string|null  Cross-job skill slot: one unlocked ability from any other job
+//   supportPassive string|null  Cross-job passive slot: one unlocked passive from any other job
 //   appearance object   Optional visual description for sprite compositing:
 //     race         'human'|'nymph'|'ferin'|'kobalos'|'bufos'
 //     bodyVariant  number  1-based index, wraps to available count
@@ -28,54 +30,62 @@ export const CHARACTER_DATA = [
     // ---- Player party ----
     {
         name: 'Aldric',
-        job: 'paladin',
+        job: 'warden',
         team: 'player',
         x: 3, y: 8,
         ct: 40,
-        xp: { novice: 120, evoker: 340, warden: 340, paladin: 80 },
+        xp: { novice: 120, warden: 60 },
+        supportSkill: null,
+        supportPassive: null,
         appearance: {
             race: 'human', bodyVariant: 1, hairVariant: 1, shirtVariant: 1,
             nameColor: '#4488ff',
-            armorKey: 'runic_plate', helmetKey: 'iron_helmet', weaponKey: 'runic_blade', toolKey: null,
+            armorKey: 'iron_brigandine', helmetKey: 'iron_helmet', weaponKey: 'iron_sword', toolKey: 'iron_shield',
         },
     },
     {
         name: 'Lyria',
-        job: 'battlemage',
+        job: 'evoker',
         team: 'player',
         x: 2, y: 6,
         ct: 10,
-        xp: { novice: 120, evoker: 340, enchanter: 340, battlemage: 40 },
+        xp: { novice: 120, evoker: 60 },
+        supportSkill: null,
+        supportPassive: null,
         appearance: {
             race: 'human', bodyVariant: 2, hairVariant: 3, shirtVariant: 2,
             nameColor: '#cc44ff',
-            armorKey: 'mana_weave_robe', helmetKey: 'runic_hood', weaponKey: 'crystal_staff', toolKey: null,
+            armorKey: 'mana_weave_robe', helmetKey: 'scholars_spectacles', weaponKey: 'runic_wand', toolKey: null,
         },
     },
     {
         name: 'Ryn',
-        job: 'earthshaker',
+        job: 'runebow',
         team: 'player',
         x: 3, y: 11,
         ct: 55,
-        xp: { novice: 120, evoker: 250, transmuter: 250, earthshaker: 250 },
+        xp: { novice: 120, runebow: 60 },
+        supportSkill: null,
+        supportPassive: null,
         appearance: {
             race: 'human', bodyVariant: 1, hairVariant: 2, shirtVariant: 1,
             nameColor: '#44cc66',
-            armorKey: 'leather_vest', helmetKey: 'sharpshooters_visor', weaponKey: 'hunting_bow', toolKey: 'hunters_quiver',
+            armorKey: 'leather_vest', helmetKey: 'leather_cap', weaponKey: 'short_bow', toolKey: 'hunters_quiver',
         },
     },
     {
         name: 'Fenn',
-        job: 'sanctifier',
+        job: 'spellblade',
         team: 'player',
         x: 2, y: 9,
         ct: 25,
-        xp: { novice: 120, warden: 340, enchanter: 340, sanctifier: 60 },
+        xp: { novice: 120, spellblade: 60 },
+        supportSkill: null,
+        supportPassive: null,
         appearance: {
             race: 'human', bodyVariant: 2, hairVariant: 4, shirtVariant: 2,
             nameColor: '#ffcc44',
-            armorKey: 'enchanted_tunic', helmetKey: 'mages_circlet', weaponKey: 'staff_of_regrowth', toolKey: null,
+            armorKey: 'leather_vest', helmetKey: 'leather_cap', weaponKey: 'iron_sword', toolKey: 'lantern',
         },
     },
 

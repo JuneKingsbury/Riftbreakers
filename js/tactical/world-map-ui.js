@@ -1,5 +1,6 @@
 import { SHOP_ITEMS, NODES } from './world-map-data.js';
-import { JOB_STATS, ABILITIES, jobLevel, unlockedAbilities, meetsPrerequisites, missingPrerequisites, XP_THRESHOLDS } from './data-registry.js';
+import { JOB_STATS, ABILITIES, jobLevel, unlockedAbilities, meetsPrerequisites, missingPrerequisites, masteryStatBonus, crossJobUnlockedAbilities, XP_THRESHOLDS, allowedEquipTypes, isPlayerJob } from './data-registry.js';
+import { JOB_DATA } from './data/jobs.js';
 import { EQUIPMENT, equipmentStatBonuses } from './data/equipment.js';
 
 const NODE_NAME_MAP = Object.fromEntries(NODES.map(n => [n.id, n.name]));
@@ -708,9 +709,15 @@ export class WorldMapUI {
         // if there is no free copy available (so we always consume inventory first).
         const equippedBy = worldMap.equippedByMap(member.name);
         const optsForSlot = (slotName, curKey) => {
+            const allowedTypes = allowedEquipTypes(member.job, slotName);
+            const jobAllows = (k) => {
+                if (!allowedTypes) return true;
+                return allowedTypes.has(EQUIPMENT[k]?.type);
+            };
+
             // Items with at least one unequipped copy in inventory
             const free = Object.keys(worldMap.inventory)
-                .filter(k => EQUIPMENT[k]?.slot === slotName && worldMap.inventory[k] > 0);
+                .filter(k => EQUIPMENT[k]?.slot === slotName && worldMap.inventory[k] > 0 && jobAllows(k));
             const freeSet = new Set(free);
 
             // Items worn by another party member that have no free copy.
@@ -723,7 +730,8 @@ export class WorldMapUI {
                     k !== curKey &&
                     name !== member.name &&
                     EQUIPMENT[k]?.slot === slotName &&
-                    !freeSet.has(k)
+                    !freeSet.has(k) &&
+                    jobAllows(k)
                 )
                 .map(([k]) => k);
 
@@ -774,8 +782,7 @@ export class WorldMapUI {
         html += `</div>`;
 
         // ---- Job ----
-        const ENEMY_JOBS = ['goblin','orc_captain','shadow_mage'];
-        const allJobs    = Object.keys(JOB_STATS).filter(k => !ENEMY_JOBS.includes(k));
+        const allJobs = Object.keys(JOB_STATS).filter(isPlayerJob);
         const unlockedJobs = allJobs.filter(k => meetsPrerequisites(member.xp, k));
         const lockedJobs   = allJobs.filter(k => !meetsPrerequisites(member.xp, k));
 
@@ -896,6 +903,91 @@ export class WorldMapUI {
             html += `</div>`;
         }
 
+        // ---- Mastery bonuses ----
+        const masteryBonuses = masteryStatBonus(member.xp || {});
+        const masteryEntries = Object.entries(masteryBonuses).filter(([, v]) => v !== 0);
+        if (masteryEntries.length > 0) {
+            const STAT_LABELS = { atk: 'ATK', def: 'DEF', mat: 'MAT', mdf: 'MDF', spd: 'SPD', move: 'MOV', eva: 'EVA', maxHp: 'HP', maxMp: 'MP' };
+            html += `<div style="font-size:10px;color:#fc8;text-transform:uppercase;margin-top:10px;margin-bottom:4px;">Mastery Bonuses</div>`;
+            html += `<div style="display:flex;flex-wrap:wrap;gap:4px 10px;font-size:11px;
+                                  padding:8px;background:#080818;border:1px solid #223;border-radius:4px;">`;
+            for (const [stat, val] of masteryEntries) {
+                html += `<span style="color:#8f8;">+${val} ${STAT_LABELS[stat] || stat}</span>`;
+            }
+            html += `</div>`;
+        }
+
+        // ---- Cross-job skill slots ----
+        const crossAbilities = crossJobUnlockedAbilities(member.xp || {}, member.job);
+
+        // Build reverse map: abilityKey → job display name (first job that provides it, excluding current)
+        const abilityJobName = {};
+        for (const [jobKey, jobDef] of Object.entries(JOB_DATA)) {
+            if (jobKey === member.job) continue;
+            for (const abilityKey of (jobDef.abilities || [])) {
+                if (!(abilityKey in abilityJobName)) abilityJobName[abilityKey] = _jobLabel(jobKey);
+            }
+        }
+
+        const crossActives   = crossAbilities.filter(k => {
+            const ab = ABILITIES[k];
+            return ab && !ab.passive && ab.type !== 'passive';
+        });
+        const crossPassives  = crossAbilities.filter(k => {
+            const ab = ABILITIES[k];
+            return ab && (ab.passive || ab.type === 'passive');
+        });
+
+        html += `<div style="font-size:10px;color:#fc8;text-transform:uppercase;margin-top:10px;margin-bottom:4px;">Cross-Job Skills</div>`;
+        html += `<div style="padding:8px;background:#080818;border:1px solid #223;border-radius:4px;margin-bottom:12px;">`;
+
+        if (crossAbilities.length === 0) {
+            html += `<div style="font-size:11px;color:#445;">Level up other jobs to unlock cross-job skill slots.</div>`;
+        } else {
+            // Support Skill slot (any skill type)
+            html += `<div style="margin-bottom:8px;">`;
+            html += `<div style="font-size:10px;color:#888;margin-bottom:3px;">Support Skill <span style="color:#445;">(any unlocked skill from another job)</span></div>`;
+            html += `<select class="wm-support-skill-select" data-member="${member.name}"
+                              style="width:100%;background:#0d0d20;border:1px solid #447;color:#ccc;
+                                     font-family:'Courier New',monospace;font-size:11px;padding:4px 6px;
+                                     border-radius:3px;">`;
+            html += `<option value="">— none —</option>`;
+            for (const key of crossAbilities) {
+                const ab  = ABILITIES[key];
+                if (!ab) continue;
+                const sel     = member.supportSkill === key ? ' selected' : '';
+                const tag     = (ab.passive || ab.type === 'passive') ? ' [Passive]' : '';
+                const jobName = abilityJobName[key] ? ` (${abilityJobName[key]})` : '';
+                html += `<option value="${key}"${sel}>${ab.name}${tag}${jobName}</option>`;
+            }
+            html += `</select>`;
+            html += `</div>`;
+
+            // Support Passive slot (passives only)
+            html += `<div>`;
+            html += `<div style="font-size:10px;color:#888;margin-bottom:3px;">Support Passive <span style="color:#445;">(passive skills from another job only)</span></div>`;
+            if (crossPassives.length === 0) {
+                html += `<div style="font-size:11px;color:#445;">No passive skills unlocked in other jobs yet.</div>`;
+            } else {
+                html += `<select class="wm-support-passive-select" data-member="${member.name}"
+                                  style="width:100%;background:#0d0d20;border:1px solid #447;color:#ccc;
+                                         font-family:'Courier New',monospace;font-size:11px;padding:4px 6px;
+                                         border-radius:3px;">`;
+                html += `<option value="">— none —</option>`;
+                for (const key of crossPassives) {
+                    const ab  = ABILITIES[key];
+                    if (!ab) continue;
+                    const sel     = member.supportPassive === key ? ' selected' : '';
+                    const jobName = abilityJobName[key] ? ` (${abilityJobName[key]})` : '';
+                    html += `<option value="${key}"${sel}>${ab.name}${jobName}</option>`;
+                }
+                html += `</select>`;
+            }
+            html += `</div>`;
+        }
+
+        html += `</div>`;
+
         // ---- Back button ----
         html += `<button id="wm-party-back" style="${BTN_BASE}margin-top:14px;color:#888;">‹ Back to Party</button>`;
 
@@ -931,7 +1023,18 @@ export class WorldMapUI {
         // Job change handler
         inner.querySelector('.wm-job-select').addEventListener('change', e => {
             member.job = e.target.value;
+            // Clear cross-job slots that may no longer be valid after a job change
+            member.supportSkill   = null;
+            member.supportPassive = null;
             this._showPartyMember(member, worldMap, skinManager);
+        });
+
+        // Cross-job slot handlers
+        inner.querySelector('.wm-support-skill-select')?.addEventListener('change', e => {
+            member.supportSkill = e.target.value || null;
+        });
+        inner.querySelector('.wm-support-passive-select')?.addEventListener('change', e => {
+            member.supportPassive = e.target.value || null;
         });
 
         inner.querySelector('#wm-party-back').addEventListener('click', () => this._modalBack());
@@ -941,6 +1044,45 @@ export class WorldMapUI {
         for (const k of ['atk','def','mat','mdf','spd','move','eva','maxHp','maxMp']) {
             memberStats[k] = (jobStats[k] || 0) + (bonuses[k] || 0);
         }
+
+        // Cross-job select tooltips — show tooltip for currently selected ability on hover
+        const _bindSelectTooltip = (sel) => {
+            if (!sel) return;
+            const showTip = (e) => {
+                const key = sel.value;
+                const ab  = key ? ABILITIES[key] : null;
+                if (!ab) { this._tooltip.style.display = 'none'; return; }
+                this._tooltip.innerHTML = this._abilityTooltipHtml(ab, memberStats);
+                this._tooltip.style.display = 'block';
+                this._positionTooltip(e.clientX, e.clientY);
+            };
+            sel.addEventListener('mouseenter', showTip);
+            sel.addEventListener('mousemove',  (e) => {
+                if (this._tooltip.style.display !== 'none') this._positionTooltip(e.clientX, e.clientY);
+            });
+            sel.addEventListener('mouseleave', () => { this._tooltip.style.display = 'none'; });
+            sel.addEventListener('change',     showTip);
+        };
+        _bindSelectTooltip(inner.querySelector('.wm-support-skill-select'));
+        _bindSelectTooltip(inner.querySelector('.wm-support-passive-select'));
+
+        // Equipment slot tooltips — show stats for the currently selected item
+        inner.querySelectorAll('.wm-equip-select').forEach(sel => {
+            const showTip = (e) => {
+                const key = sel.value;
+                if (!key) { this._tooltip.style.display = 'none'; return; }
+                this._tooltip.innerHTML = this._equipmentTooltipHtml(key);
+                this._tooltip.style.display = 'block';
+                this._positionTooltip(e.clientX, e.clientY);
+            };
+            sel.addEventListener('mouseenter', showTip);
+            sel.addEventListener('mousemove',  (e) => {
+                if (this._tooltip.style.display !== 'none') this._positionTooltip(e.clientX, e.clientY);
+            });
+            sel.addEventListener('mouseleave', () => { this._tooltip.style.display = 'none'; });
+            sel.addEventListener('change',     showTip);
+        });
+
         const unlockedSetForTip = new Set(unlockedAbilities(member.job, member.xp));
         const abilityLevelsForTip = jobData.abilityLevels || {};
         inner.querySelectorAll('.wm-skill-card').forEach(card => {
@@ -984,7 +1126,28 @@ export class WorldMapUI {
             ...Object.keys(equippedByMap),
         ])].filter(k => EQUIPMENT[k]);
 
-        const SLOT_ORDER = ['weapon','armor','helmet','tool'];
+        // Ordered slot → type groups. Each entry: [slotName, typeName, displayLabel]
+        // typeName null means "any type not listed elsewhere in this slot" (catch-all).
+        const GROUPS = [
+            ['weapon', 'blade',        'Blades'],
+            ['weapon', 'heavy_weapon', 'Heavy Weapons'],
+            ['weapon', 'bow',          'Bows'],
+            ['weapon', 'crossbow',     'Crossbows'],
+            ['weapon', 'magic',        'Staves & Wands'],
+            ['armor',  'cloth',        'Cloth Armor'],
+            ['armor',  'light',        'Light Armor'],
+            ['armor',  'medium',       'Medium Armor'],
+            ['armor',  'heavy',        'Heavy Armor'],
+            ['helmet', 'cloth',        'Cloth Helms'],
+            ['helmet', 'light',        'Light Helms'],
+            ['helmet', 'medium',       'Medium Helms'],
+            ['helmet', 'heavy',        'Heavy Helms'],
+            ['tool',   'shield',       'Shields'],
+            ['tool',   'quiver',       'Quivers'],
+            ['tool',   'offhand_weapon','Off-hand Weapons'],
+            ['tool',   'implement',    'Implements'],
+        ];
+        // Section headers printed once per slot (track with a Set)
         const SLOT_LABEL = { weapon: 'Weapons', armor: 'Armor', helmet: 'Helmets', tool: 'Tools / Off-hand' };
 
         let html = `<div style="color:#ffcc44;font-weight:bold;font-size:15px;margin-bottom:12px;">Inventory</div>`;
@@ -992,12 +1155,19 @@ export class WorldMapUI {
         if (allKeys.length === 0) {
             html += `<div style="color:#555;font-size:11px;">Your inventory is empty.</div>`;
         } else {
-            for (const slotName of SLOT_ORDER) {
-                const slotKeys = allKeys.filter(k => EQUIPMENT[k]?.slot === slotName);
-                if (slotKeys.length === 0) continue;
-                html += `<div style="font-size:10px;color:#fc8;text-transform:uppercase;
-                                     margin-bottom:4px;margin-top:10px;">${SLOT_LABEL[slotName]}</div>`;
-                for (const key of slotKeys) {
+            let lastSlot = null;
+            for (const [slotName, typeName, groupLabel] of GROUPS) {
+                const groupKeys = allKeys.filter(k => EQUIPMENT[k]?.slot === slotName && EQUIPMENT[k]?.type === typeName);
+                if (groupKeys.length === 0) continue;
+                // Print the slot header the first time we encounter items in this slot
+                if (slotName !== lastSlot) {
+                    html += `<div style="font-size:11px;color:#fc8;font-weight:bold;text-transform:uppercase;
+                                         margin-bottom:4px;margin-top:${lastSlot ? '14px' : '0'};">${SLOT_LABEL[slotName]}</div>`;
+                    lastSlot = slotName;
+                }
+                html += `<div style="font-size:10px;color:#888;text-transform:uppercase;
+                                     margin-bottom:3px;margin-top:8px;padding-left:2px;">${groupLabel}</div>`;
+                for (const key of groupKeys) {
                     const freeCount  = inv[key] || 0;
                     const wearers    = equippedByMap[key] || [];
                     const eq         = EQUIPMENT[key];
@@ -1019,8 +1189,8 @@ export class WorldMapUI {
                     // Border highlight if there are free copies
                     const borderColor = freeCount > 0 ? '#447' : '#224';
 
-                    html += `<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;
-                                         padding:6px;background:#0d0d20;border:1px solid ${borderColor};border-radius:4px;">
+                    html += `<div class="wm-inv-item-row" data-item="${key}" style="display:flex;align-items:center;gap:8px;margin-bottom:5px;
+                                         padding:6px;background:#0d0d20;border:1px solid ${borderColor};border-radius:4px;cursor:default;">
                         <canvas class="wm-item-icon" data-item="${key}" width="16" height="16"
                                 style="image-rendering:pixelated;flex-shrink:0;"></canvas>
                         <div style="flex:1;min-width:0;">
@@ -1042,6 +1212,19 @@ export class WorldMapUI {
         }
 
         this._openModal(html, null);
+
+        // Item row tooltips
+        this._modal.querySelectorAll('.wm-inv-item-row').forEach(row => {
+            row.addEventListener('mouseenter', (e) => {
+                this._tooltip.innerHTML = this._equipmentTooltipHtml(row.dataset.item);
+                this._tooltip.style.display = 'block';
+                this._positionTooltip(e.clientX, e.clientY);
+            });
+            row.addEventListener('mousemove',  (e) => {
+                if (this._tooltip.style.display !== 'none') this._positionTooltip(e.clientX, e.clientY);
+            });
+            row.addEventListener('mouseleave', () => { this._tooltip.style.display = 'none'; });
+        });
 
         if (skinManager) {
             this._modal.querySelectorAll('.wm-item-icon').forEach(c => {
@@ -1119,6 +1302,24 @@ export class WorldMapUI {
 
     // Builds tooltip HTML for an ability, using memberStats for estimated damage.
     // memberStats should be { atk, mat, ... } already including equipment bonuses.
+    _equipmentTooltipHtml(key) {
+        const eq = EQUIPMENT[key];
+        if (!eq) return '';
+        const STAT_LABELS = { atk: 'ATK', def: 'DEF', mat: 'MAT', mdf: 'MDF', spd: 'SPD', move: 'MOV', eva: 'EVA', maxHp: 'HP', maxMp: 'MP' };
+        const TYPE_COLOR  = { cloth: '#c8a0ff', light: '#adf', medium: '#fc8', heavy: '#f88', blade: '#adf', heavy_weapon: '#f88', magic: '#c8a0ff', bow: '#8fa', tool: '#8fa' };
+        const lines = [];
+        lines.push(`<span style="color:#ffcc44;font-weight:bold;">${_jobLabel(key)}</span>`);
+        const tags = [];
+        if (eq.type) tags.push(`<span style="color:${TYPE_COLOR[eq.type] || '#aaa'};">${_jobLabel(eq.type)}</span>`);
+        tags.push(`<span style="color:#888;">${_jobLabel(eq.slot)}</span>`);
+        lines.push(tags.join(' · '));
+        const stats = Object.entries(STAT_LABELS)
+            .filter(([k]) => eq[k])
+            .map(([k, l]) => `<span style="color:${eq[k] > 0 ? '#8f8' : '#f88'};">${eq[k] > 0 ? '+' : ''}${eq[k]} ${l}</span>`);
+        if (stats.length) lines.push(stats.join('  '));
+        return lines.join('<br>');
+    }
+
     _abilityTooltipHtml(ab, memberStats) {
         const lines = [];
         const typeColor = ab.passive || ab.type === 'passive' ? '#888'

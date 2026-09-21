@@ -180,6 +180,7 @@ class SkinEditor {
         this.showGrid = true;
         this.hoveredPixel = null;
         this.savedSprites = {};
+        this.customSprites = {}; // { categoryId: ['key1', 'key2', ...] }
         this.categoryFilter = 'Buildings';
         this.bodyVariants = 3;
         this.humanBodyVariants = 3;
@@ -494,12 +495,20 @@ class SkinEditor {
                 items.push({ key: 'university_wall', char: '.', color: '#444444', desc: '', category: 'buildings' });
                 items.push({ key: 'abyss_wall', char: '.', color: '#444444', desc: '', category: 'buildings' });
                 items.push({ key: 'kingdom_wall', char: '.', color: '#444444', desc: '', category: 'buildings' });
+                for (const k of (this.customSprites['buildings'] || [])) {
+                    items.push({ key: k, char: '?', color: '#aaaaaa', desc: k, category: 'buildings', isCustom: true });
+                }
+                items.push({ key: '__add_custom__', char: '+', color: '#888888', desc: 'Add custom sprite', category: 'buildings', isAction: true, actionType: 'add-custom' });
                 break;
             case 'Terrain':
                 for (const [key, def] of Object.entries(TERRAIN)) {
                     items.push({ key, char: def.char, color: def.color, desc: key, category: 'terrain' });
                 }
                 items.push({ key: 'grass_autumn', char: '.', color: '#cc8822', desc: 'Grass terrain (autumn)', category: 'terrain' });
+                for (const k of (this.customSprites['terrain'] || [])) {
+                    items.push({ key: k, char: '?', color: '#aaaaaa', desc: k, category: 'terrain', isCustom: true });
+                }
+                items.push({ key: '__add_custom__', char: '+', color: '#888888', desc: 'Add custom sprite', category: 'terrain', isAction: true, actionType: 'add-custom' });
                 break;
             case 'Resources':
                 for (const [key, def] of Object.entries(RESOURCES)) {
@@ -510,6 +519,10 @@ class SkinEditor {
                         }
                     }
                 }
+                for (const k of (this.customSprites['resources'] || [])) {
+                    items.push({ key: k, char: '?', color: '#aaaaaa', desc: k, category: 'resources', isCustom: true });
+                }
+                items.push({ key: '__add_custom__', char: '+', color: '#888888', desc: 'Add custom sprite', category: 'resources', isAction: true, actionType: 'add-custom' });
                 break;
             case 'Entities':
                 for (let i = 1; i <= this.humanBodyVariants; i++) {
@@ -557,6 +570,10 @@ class SkinEditor {
                     items.push({ key, char: '▲', color: def.color || '#ff3333', desc: `Expedition: ${def.name}`, category: 'entities' });
                 }
                 items.push({ key: 'blight_bloom', category: 'entities' });
+                for (const k of (this.customSprites['entities'] || [])) {
+                    items.push({ key: k, char: '?', color: '#aaaaaa', desc: k, category: 'entities', isCustom: true });
+                }
+                items.push({ key: '__add_custom__', char: '+', color: '#888888', desc: 'Add custom sprite', category: 'entities', isAction: true, actionType: 'add-custom' });
                 break;
             case 'Items':
                 for (const [key, def] of Object.entries(WEAPONS)) {
@@ -590,11 +607,19 @@ class SkinEditor {
                 for (const [key, def] of Object.entries(CONSUMABLES)) {
                     items.push({ key, char: def.char || ITEM_CHARS.consumable.char, color: def.charColor || ITEM_CHARS.consumable.color, desc: `Consumable: ${def.name}`, category: 'items' });
                 }
+                for (const k of (this.customSprites['items'] || [])) {
+                    items.push({ key: k, char: '?', color: '#aaaaaa', desc: k, category: 'items', isCustom: true });
+                }
+                items.push({ key: '__add_custom__', char: '+', color: '#888888', desc: 'Add custom sprite', category: 'items', isAction: true, actionType: 'add-custom' });
                 break;
             case 'Materials':
                 for (const item of MATERIAL_ITEMS) {
                     items.push({ key: item.key, char: item.char, color: item.color, desc: item.desc, category: 'materials' });
                 }
+                for (const k of (this.customSprites['materials'] || [])) {
+                    items.push({ key: k, char: '?', color: '#aaaaaa', desc: k, category: 'materials', isCustom: true });
+                }
+                items.push({ key: '__add_custom__', char: '+', color: '#888888', desc: 'Add custom sprite', category: 'materials', isAction: true, actionType: 'add-custom' });
                 break;
             case 'Floors':
                 for (const [key, def] of Object.entries(BUILDINGS)) {
@@ -606,6 +631,10 @@ class SkinEditor {
                 items.push({ key: 'university_floor', char: '.', color: '#444444', desc: '', category: 'floors' });
                 items.push({ key: 'abyss_floor', char: '.', color: '#444444', desc: '', category: 'floors' });
                 items.push({ key: 'kingdom_floor', char: '.', color: '#444444', desc: '', category: 'floors' });
+                for (const k of (this.customSprites['floors'] || [])) {
+                    items.push({ key: k, char: '?', color: '#aaaaaa', desc: k, category: 'floors', isCustom: true });
+                }
+                items.push({ key: '__add_custom__', char: '+', color: '#888888', desc: 'Add custom sprite', category: 'floors', isAction: true, actionType: 'add-custom' });
                 break;
             case 'Farms':
                 items.push({ key: 'farm_empty', char: '=', color: '#8b6b3a', desc: 'Empty farm plot (generic)', category: 'farms' });
@@ -616,21 +645,37 @@ class SkinEditor {
                     items.push({ key: key + '_growing', char: def.char, color: def.color, desc: key + ' (growing)', category: 'farms' });
                     items.push({ key: key + '_ready', char: def.readyChar, color: def.color, desc: key + ' (ready)', category: 'farms' });
                 }
+                for (const k of (this.customSprites['farms'] || [])) {
+                    items.push({ key: k, char: '?', color: '#aaaaaa', desc: k, category: 'farms', isCustom: true });
+                }
+                items.push({ key: '__add_custom__', char: '+', color: '#888888', desc: 'Add custom sprite', category: 'farms', isAction: true, actionType: 'add-custom' });
                 break;
             case 'Effects':
                 for (const e of EFFECT_ITEMS) {
                     items.push({ key: e.key, char: e.char, color: e.color, desc: e.desc, category: 'effects' });
                 }
+                for (const k of (this.customSprites['effects'] || [])) {
+                    items.push({ key: k, char: '?', color: '#aaaaaa', desc: k, category: 'effects', isCustom: true });
+                }
+                items.push({ key: '__add_custom__', char: '+', color: '#888888', desc: 'Add custom sprite', category: 'effects', isAction: true, actionType: 'add-custom' });
                 break;
             case 'Icons':
                 for (const e of ICON_ITEMS) {
                     items.push({ key: e.key, char: e.char, color: e.color, desc: e.desc, category: 'icons' });
                 }
+                for (const k of (this.customSprites['icons'] || [])) {
+                    items.push({ key: k, char: '?', color: '#aaaaaa', desc: k, category: 'icons', isCustom: true });
+                }
+                items.push({ key: '__add_custom__', char: '+', color: '#888888', desc: 'Add custom sprite', category: 'icons', isAction: true, actionType: 'add-custom' });
                 break;
             case 'Overlays':
                 for (const e of OVERLAY_ITEMS) {
                     items.push({ key: e.key, char: e.char, color: e.color, desc: e.desc, category: 'overlays' });
                 }
+                for (const k of (this.customSprites['overlays'] || [])) {
+                    items.push({ key: k, char: '?', color: '#aaaaaa', desc: k, category: 'overlays', isCustom: true });
+                }
+                items.push({ key: '__add_custom__', char: '+', color: '#888888', desc: 'Add custom sprite', category: 'overlays', isAction: true, actionType: 'add-custom' });
                 break;
             case 'Equipment Worn':
                 for (const [key, def] of Object.entries(ARMORS)) {
@@ -649,24 +694,34 @@ class SkinEditor {
                 for (const [key, def] of Object.entries(TOOLS)) {
                     items.push({ key, char: def.char || ITEM_CHARS.tool.char, color: def.charColor || ITEM_CHARS.tool.color, desc: `Worn: ${def.name}`, category: 'equipment_worn' });
                 }
+                for (const k of (this.customSprites['equipment_worn'] || [])) {
+                    items.push({ key: k, char: '?', color: '#aaaaaa', desc: k, category: 'equipment_worn', isCustom: true });
+                }
+                items.push({ key: '__add_custom__', char: '+', color: '#888888', desc: 'Add custom sprite', category: 'equipment_worn', isAction: true, actionType: 'add-custom' });
                 break;
         }
 
         let html = '';
         for (const item of items) {
             if (item.isAction) {
-                html += `<div class="bp-palette-item se-add-variant" data-action="add-variant" data-variant-group="${item.variantGroup || ''}" title="${item.desc}">
-                    <span style="color:${item.color}">${item.char}</span> ${item.desc}
-                </div>`;
+                if (item.actionType === 'add-custom') {
+                    html += `<div class="bp-palette-item se-add-variant" data-action="add-custom" data-category="${item.category}" title="Add a custom sprite to this category">
+                        <span style="color:${item.color}">${item.char}</span> Add custom...
+                    </div>`;
+                } else {
+                    html += `<div class="bp-palette-item se-add-variant" data-action="add-variant" data-variant-group="${item.variantGroup || ''}" title="${item.desc}">
+                        <span style="color:${item.color}">${item.char}</span> ${item.desc}
+                    </div>`;
+                }
                 continue;
             }
             const active = this.activeObject && this.activeObject.key === item.key && this.activeObject.category === item.category ? ' active' : '';
             const spriteKey = `${item.category}:${item.key}`;
             const saved = this.savedSprites[spriteKey];
-            const removeBtn = item.isVariant ? ` <span class="se-remove-variant" data-variant-key="${item.key}" title="Remove variant">✕</span>` : '';
+            const removeBtn = (item.isVariant || item.isCustom) ? ` <span class="se-remove-variant" data-variant-key="${item.key}" data-category="${item.category}" data-is-custom="${item.isCustom ? '1' : ''}" title="Remove">✕</span>` : '';
             const icon = saved
                 ? `<img src="${saved.data}" style="width:16px;height:16px;image-rendering:pixelated;vertical-align:middle;">`
-                : `<span style="color:${item.color}">${item.char}</span>`;
+                : `<span style="color:${item.color || '#aaa'}">${item.char || '?'}</span>`;
             html += `<div class="bp-palette-item${active}" data-key="${item.key}" data-category="${item.category}" title="${item.desc}">
                 ${icon} ${item.key.replace(/_/g, ' ')}${removeBtn}
             </div>`;
@@ -694,6 +749,7 @@ class SkinEditor {
             this.skinName = e.target.value.replace(/[^a-z0-9_-]/gi, '_').toLowerCase();
             e.target.value = this.skinName;
             this.savedSprites = {};
+            this.customSprites = {};
             this._loadSkinData();
             this._refreshSavedList();
             this._buildPalette();
@@ -807,13 +863,21 @@ class SkinEditor {
             const removeBtn = e.target.closest('.se-remove-variant');
             if (removeBtn) {
                 e.stopPropagation();
-                this._removeVariant(removeBtn.dataset.variantKey);
+                if (removeBtn.dataset.isCustom === '1') {
+                    this._removeCustomSprite(removeBtn.dataset.variantKey, removeBtn.dataset.category);
+                } else {
+                    this._removeVariant(removeBtn.dataset.variantKey);
+                }
                 return;
             }
             const item = e.target.closest('.bp-palette-item');
             if (!item) return;
             if (item.dataset.action === 'add-variant') {
                 this._addVariant(item.dataset.variantGroup);
+                return;
+            }
+            if (item.dataset.action === 'add-custom') {
+                this._addCustomSprite(item.dataset.category);
                 return;
             }
             this._selectObject(item.dataset.key, item.dataset.category);
@@ -2710,6 +2774,145 @@ class SkinEditor {
         this._buildPalette();
     }
 
+    _getBuiltinKeysForCategory(category) {
+        const keys = new Set();
+        switch (category) {
+            case 'buildings':
+                for (const [k, def] of Object.entries(BUILDINGS)) { if (def.structureType !== 'floor') keys.add(k); }
+                keys.add('crystal_wall'); keys.add('verdant_wall'); keys.add('university_wall'); keys.add('abyss_wall'); keys.add('kingdom_wall');
+                break;
+            case 'terrain':
+                for (const k of Object.keys(TERRAIN)) keys.add(k);
+                keys.add('grass_autumn');
+                break;
+            case 'resources':
+                for (const [k, def] of Object.entries(RESOURCES)) {
+                    keys.add(k);
+                    for (const s of ['spring', 'summer', 'autumn', 'winter']) { if (def[s + 'Color']) keys.add(k + '_' + s); }
+                }
+                break;
+            case 'entities':
+                for (let i = 1; i <= this.humanBodyVariants; i++) keys.add(`colonist_human_body_${i}`);
+                for (let i = 1; i <= this.nymphBodyVariants; i++) keys.add(`colonist_nymph_body_${i}`);
+                for (let i = 1; i <= this.ferinBodyVariants; i++) keys.add(`colonist_ferin_body_${i}`);
+                for (let i = 1; i <= this.kobalosBodyVariants; i++) keys.add(`colonist_kobalos_body_${i}`);
+                for (let i = 1; i <= this.bufosBodyVariants; i++) keys.add(`colonist_bufos_body_${i}`);
+                for (let i = 1; i <= this.hairVariants; i++) keys.add(`colonist_hair_${i}`);
+                for (let i = 1; i <= this.shirtVariants; i++) keys.add(`colonist_shirt_${i}`);
+                for (const e of ENTITY_SPECIALS) keys.add(e.key);
+                for (const k of Object.keys(ANIMALS)) keys.add(k);
+                for (const k of Object.keys(EXPEDITION_ENEMIES)) keys.add(k);
+                keys.add('blight_bloom');
+                break;
+            case 'items':
+                for (const k of Object.keys(WEAPONS)) { if (k !== 'fists') keys.add(k); }
+                for (const k of Object.keys(ARMORS)) keys.add(k);
+                for (const k of Object.keys(HELMETS)) keys.add(k);
+                for (const k of Object.keys(CLOTHES)) keys.add(k);
+                for (const k of Object.keys(TOOLS)) keys.add(k);
+                for (const k of Object.keys(TRINKETS)) keys.add(k);
+                for (const k of Object.keys(BOOTS)) keys.add(k);
+                for (const k of Object.keys(POTIONS)) keys.add(k);
+                for (const k of Object.keys(SPELL_TOMES)) keys.add(k);
+                for (const k of Object.keys(CONSUMABLES)) keys.add(k);
+                break;
+            case 'materials':
+                for (const item of MATERIAL_ITEMS) keys.add(item.key);
+                break;
+            case 'floors':
+                for (const [k, def] of Object.entries(BUILDINGS)) { if (def.structureType === 'floor') keys.add(k); }
+                keys.add('crystal_floor'); keys.add('verdant_floor'); keys.add('university_floor'); keys.add('abyss_floor'); keys.add('kingdom_floor');
+                break;
+            case 'farms':
+                keys.add('farm_empty'); keys.add('farm_planted'); keys.add('farm_growing'); keys.add('farm_ready');
+                for (const k of Object.keys(CROPS)) { keys.add(k + '_growing'); keys.add(k + '_ready'); }
+                break;
+            case 'effects':
+                for (const e of EFFECT_ITEMS) keys.add(e.key);
+                break;
+            case 'icons':
+                for (const e of ICON_ITEMS) keys.add(e.key);
+                break;
+            case 'overlays':
+                for (const e of OVERLAY_ITEMS) keys.add(e.key);
+                break;
+            case 'equipment_worn':
+                for (const k of Object.keys(ARMORS)) keys.add(k);
+                for (const k of Object.keys(HELMETS)) keys.add(k);
+                for (const k of Object.keys(CLOTHES)) keys.add(k);
+                for (const k of Object.keys(WEAPONS)) { if (k !== 'fists') keys.add(k); }
+                for (const k of Object.keys(TOOLS)) keys.add(k);
+                break;
+        }
+        return keys;
+    }
+
+    _autoDetectCustomSprites() {
+        for (const spriteKey of Object.keys(this.savedSprites)) {
+            const colonIdx = spriteKey.indexOf(':');
+            if (colonIdx < 0) continue;
+            const category = spriteKey.slice(0, colonIdx);
+            const key = spriteKey.slice(colonIdx + 1);
+            const builtins = this._getBuiltinKeysForCategory(category);
+            if (!builtins.has(key)) {
+                if (!this.customSprites[category]) this.customSprites[category] = [];
+                if (!this.customSprites[category].includes(key)) {
+                    this.customSprites[category].push(key);
+                }
+            }
+        }
+    }
+
+    _addCustomSprite(category) {
+        const palette = document.getElementById('se-palette');
+        // Remove any existing inline form
+        palette.querySelector('.se-custom-name-form')?.remove();
+
+        const form = document.createElement('div');
+        form.className = 'se-custom-name-form';
+        form.style.cssText = 'display:flex;gap:4px;padding:4px 2px;';
+        form.innerHTML = `<input type="text" placeholder="sprite_name" maxlength="40" style="flex:1;background:#1a1a2e;color:#ccc;border:1px solid #666;border-radius:3px;padding:2px 4px;font-size:11px;"><button style="font-size:11px;padding:2px 6px;">Add</button><button class="se-custom-cancel" style="font-size:11px;padding:2px 6px;color:#888;">✕</button>`;
+
+        const addBtn = document.getElementById('se-palette').querySelector('.se-add-variant[data-action="add-custom"][data-category="' + category + '"]');
+        if (addBtn) addBtn.after(form); else palette.appendChild(form);
+
+        const input = form.querySelector('input');
+        input.focus();
+
+        const commit = () => {
+            const key = input.value.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_');
+            form.remove();
+            if (!key) return;
+            if (!this.customSprites[category]) this.customSprites[category] = [];
+            if (this.customSprites[category].includes(key)) return;
+            this.customSprites[category].push(key);
+            this._persistSkinData();
+            this._buildPalette();
+            this._selectObject(key, category);
+        };
+
+        form.querySelector('button').addEventListener('click', commit);
+        form.querySelector('.se-custom-cancel').addEventListener('click', () => form.remove());
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); commit(); }
+            if (e.key === 'Escape') { e.preventDefault(); form.remove(); }
+        });
+    }
+
+    _removeCustomSprite(key, category) {
+        if (!this.customSprites[category]) return;
+        this.customSprites[category] = this.customSprites[category].filter(k => k !== key);
+        delete this.savedSprites[`${category}:${key}`];
+        if (this.activeObject && this.activeObject.key === key && this.activeObject.category === category) {
+            this.activeObject = null;
+            this.pixels = new Uint8ClampedArray(this.canvasSize * this.canvasSize * 4);
+            this._updateActiveObjectDisplay();
+        }
+        this._persistSkinData();
+        this._refreshSavedList();
+        this._buildPalette();
+    }
+
     // --- Save/Load ---
     _savePNG() {
         if (!this.activeObject) {
@@ -2765,7 +2968,7 @@ class SkinEditor {
             manifest[category].push(key);
         }
 
-        zip.file('manifest.json', JSON.stringify({ sprites: manifest, bodyVariants: this.bodyVariants, humanBodyVariants: this.humanBodyVariants, nymphBodyVariants: this.nymphBodyVariants, ferinBodyVariants: this.ferinBodyVariants, kobalosBodyVariants: this.kobalosBodyVariants, bufosBodyVariants: this.bufosBodyVariants, hairVariants: this.hairVariants, shirtVariants: this.shirtVariants }, null, 2));
+        zip.file('manifest.json', JSON.stringify({ sprites: manifest, customSprites: this.customSprites, bodyVariants: this.bodyVariants, humanBodyVariants: this.humanBodyVariants, nymphBodyVariants: this.nymphBodyVariants, ferinBodyVariants: this.ferinBodyVariants, kobalosBodyVariants: this.kobalosBodyVariants, bufosBodyVariants: this.bufosBodyVariants, hairVariants: this.hairVariants, shirtVariants: this.shirtVariants }, null, 2));
 
         const blob = await zip.generateAsync({ type: 'blob' });
         const url = URL.createObjectURL(blob);
@@ -2804,6 +3007,7 @@ class SkinEditor {
             this.skinName = name;
             document.getElementById('se-skin-name').value = name;
             this.savedSprites = {};
+            this.customSprites = manifest.customSprites || {};
 
             let count = 0;
             for (const [category, keys] of Object.entries(manifest.sprites || {})) {
@@ -2885,6 +3089,7 @@ class SkinEditor {
                 this.shirtVariants = Math.max(v, this.shirtVariants);
             }
 
+            this._autoDetectCustomSprites();
             this._persistSkinData();
             this._refreshSavedList();
             this._refreshLoadDropdown();
@@ -2935,7 +3140,7 @@ class SkinEditor {
     }
 
     _persistSkinData() {
-        const data = { sprites: this.savedSprites, bodyVariants: this.bodyVariants, hairVariants: this.hairVariants, shirtVariants: this.shirtVariants };
+        const data = { sprites: this.savedSprites, customSprites: this.customSprites, bodyVariants: this.bodyVariants, hairVariants: this.hairVariants, shirtVariants: this.shirtVariants };
         localStorage.setItem(STORAGE_PREFIX + this.skinName, JSON.stringify(data));
     }
 
@@ -2945,6 +3150,7 @@ class SkinEditor {
             try {
                 const parsed = JSON.parse(data);
                 this.savedSprites = parsed.sprites || {};
+                this.customSprites = parsed.customSprites || {};
                 if (typeof parsed.bodyVariants === 'number') this.bodyVariants = parsed.bodyVariants;
                 if (typeof parsed.hairVariants === 'number') this.hairVariants = parsed.hairVariants;
                 if (typeof parsed.shirtVariants === 'number') this.shirtVariants = parsed.shirtVariants;
@@ -2956,6 +3162,7 @@ class SkinEditor {
         this.skinName = name;
         document.getElementById('se-skin-name').value = name;
         this.savedSprites = {};
+        this.customSprites = {};
         this._loadSkinData();
         this._refreshSavedList();
         this._buildPalette();

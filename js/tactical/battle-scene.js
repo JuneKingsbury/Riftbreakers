@@ -52,9 +52,12 @@ function buildUnits(worldMap, scenarioId, playerSpawns, enemySpawns) {
         }
         const unit = createUnitFromCharData({ ...charData, statMods: mergedMods, x: spawnX, y: spawnY });
         // For player units with XP data, restrict abilities to those unlocked at current job level.
+        // Cross-job slots (supportSkill, supportPassive) bypass this filter since their
+        // eligibility was already validated when the player chose them.
         if (charData.xp) {
-            const unlocked = new Set(unlockedAbilities(charData.job, charData.xp));
-            unit.abilities = unit.abilities.filter(k => unlocked.has(k));
+            const unlocked    = new Set(unlockedAbilities(charData.job, charData.xp));
+            const crossSlots  = new Set([charData.supportSkill, charData.supportPassive].filter(Boolean));
+            unit.abilities = unit.abilities.filter(k => unlocked.has(k) || crossSlots.has(k));
         }
         return unit;
     });
@@ -69,10 +72,14 @@ function buildUnits(worldMap, scenarioId, playerSpawns, enemySpawns) {
 }
 
 export class BattleScene {
-    constructor(scenarioId, worldMap, onComplete) {
-        this._scenarioId  = scenarioId;
-        this._worldMap    = worldMap;
-        this._onComplete  = onComplete || null;
+    // opts.mapDef           — pre-selected map definition (from DeployScene); random if omitted
+    // opts.customPlayerSpawns — [{x,y}] array overriding map.playerSpawns order
+    constructor(scenarioId, worldMap, onComplete, opts = {}) {
+        this._scenarioId        = scenarioId;
+        this._worldMap          = worldMap;
+        this._onComplete        = onComplete || null;
+        this._presetMapDef      = opts.mapDef            || null;
+        this._customPlayerSpawns = opts.customPlayerSpawns || null;
         this._battle     = null;
         this._renderer   = null;
         this._ui         = null;
@@ -81,6 +88,7 @@ export class BattleScene {
         this._turnHasActed = false;
         this._enemyTimer   = null;
         this._sm           = null;
+        this._autoUnits    = new Set();
     }
 
     enter(containerEl, skinManager, sceneManager) {
@@ -88,9 +96,10 @@ export class BattleScene {
         this._sm        = sceneManager;
         this._stopped   = false;
 
-        const mapDef = MAP_DATA[Math.floor(Math.random() * MAP_DATA.length)];
+        const mapDef = this._presetMapDef ?? MAP_DATA[Math.floor(Math.random() * MAP_DATA.length)];
         const map    = loadMapData(mapDef);
-        const units  = buildUnits(this._worldMap, this._scenarioId, map.playerSpawns, map.enemySpawns);
+        const playerSpawns = this._customPlayerSpawns ?? map.playerSpawns;
+        const units  = buildUnits(this._worldMap, this._scenarioId, playerSpawns, map.enemySpawns);
 
         this._battle = new TacticalBattle(map, units);
 
@@ -151,6 +160,7 @@ export class BattleScene {
             hasMoved: this._turnHasMoved,
             hasActed: this._turnHasActed,
             rewards: this._pendingRewards,
+            autoUnits: this._autoUnits,
         });
     }
 
@@ -192,6 +202,9 @@ export class BattleScene {
         this._resetTurn();
 
         const firedCharges = this._battle.checkAndFireCharges();
+        // Register any summons created by charged abilities.
+        for (const id of this._battle._pendingSummons) this._autoUnits.add(id);
+        this._battle._pendingSummons = [];
         let chargeMs = 0;
         for (const fc of firedCharges) {
             chargeMs = Math.max(chargeMs, this._playAbilityAnimation(fc.unit, fc.targetX, fc.targetY, fc.ability));
@@ -220,7 +233,7 @@ export class BattleScene {
 
                 if (this._battle.state === STATES.ADVANCE_CT) {
                     this._enemyTimer = setTimeout(() => { if (!this._stopped) this._scheduleNextTurn(); }, 200);
-                } else if (this._battle.state === STATES.ENEMY_TURN) {
+                } else if (this._battle.state === STATES.ENEMY_TURN || (this._battle.state === STATES.PLAYER_TURN && this._autoUnits.has(unit.id))) {
                     this._enemyTimer = setTimeout(() => {
                         if (this._stopped) return;
                         const animMs = runEnemyTurn(unit, this._battle, this._playAbilityAnimation.bind(this));
@@ -252,6 +265,16 @@ export class BattleScene {
 
     _handleAction(action, abilityKey) {
         if (this._battle.state !== STATES.PLAYER_TURN) return;
+        if (action === 'auto') {
+            const unit = this._battle.activeUnit;
+            if (!unit) return;
+            this._autoUnits.add(unit.id);
+            this._battle.logMsg(`${unit.name} is now acting automatically.`);
+            const cost = this._turnHasMoved ? 80 : 60;
+            this._battle.endTurn(cost);
+            this._scheduleNextTurn();
+            return;
+        }
         if (action === 'move') {
             if (!this._turnHasMoved) this._battle.enterMoveMode();
         } else if (action === 'ability') {
@@ -367,6 +390,9 @@ export class BattleScene {
             if (this._battle.commitAbility(tile.x, tile.y)) {
                 this._turnHasActed = true;
                 this._abilityFromSkillMenu = false;
+                // Register any newly summoned player-team units as auto-controlled.
+                for (const id of this._battle._pendingSummons) this._autoUnits.add(id);
+                this._battle._pendingSummons = [];
                 const isCharged = ABILITIES[abilityKey]?.chargeTime > 0;
                 const animMs = (source && !isCharged) ? this._playAbilityAnimation(source, tile.x, tile.y, abilityKey) : 0;
                 const cost = this._turnHasMoved ? 100 : 80;
@@ -394,7 +420,7 @@ export class BattleScene {
             e.preventDefault(); return;
         }
         if (e.key === 'q' || e.key === 'Q') { this._renderer.rotateView(-1); e.preventDefault(); return; }
-        if (e.key === 'e' || e.key === 'E') { this._renderer.rotateView(1);  e.preventDefault(); return; }
+        if (e.key === 'e' || e.key === 'E') { this._renderer.rotateView( 1); e.preventDefault(); return; }
         if (e.key === 'r' || e.key === 'R') { this._battle.rotateAbility(); return; }
         if (e.key === 'Escape') {
             if (this._ui._skillMenuOpen) { this._ui.closeSkillMenu(); return; }
@@ -419,6 +445,9 @@ export class BattleScene {
                 } return;
             }
             if (e.key === 'p' || e.key === 'P') { this._battle.pivotUnit(); return; }
+            if (e.key === 'u' || e.key === 'U') {
+                this._handleAction('auto', null); return;
+            }
             if (e.key === 'w' || e.key === 'W') {
                 if (this._ui._skillMenuOpen) { this._ui.closeSkillMenu(); return; }
                 const cost = this._turnHasMoved ? 80 : 60;
@@ -444,7 +473,7 @@ export class BattleScene {
     _handleKeyup(e) {
         const ARROW_PAN = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down' };
         const panDir = ARROW_PAN[e.key];
-        if (panDir) this._renderer._panKeys[panDir] = false;
+        if (panDir) { this._renderer._panKeys[panDir] = false; return; }
     }
 
     _removeListeners() {

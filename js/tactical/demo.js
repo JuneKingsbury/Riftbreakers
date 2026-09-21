@@ -373,16 +373,8 @@ export function startDemoBattle(containerEl, skinManager, onExit) {
         }
 
         // Camera rotation (always available regardless of battle state)
-        if (e.key === 'q' || e.key === 'Q') {
-            renderer.rotateView(-1);
-            e.preventDefault();
-            return;
-        }
-        if (e.key === 'e' || e.key === 'E') {
-            renderer.rotateView(1);
-            e.preventDefault();
-            return;
-        }
+        if (e.key === 'q' || e.key === 'Q') { renderer.rotateView(-1); e.preventDefault(); return; }
+        if (e.key === 'e' || e.key === 'E') { renderer.rotateView( 1); e.preventDefault(); return; }
 
         // Escape and right-click both close skill submenu first; if not open, cancel action
         if (e.key === 'Escape') {
@@ -438,7 +430,7 @@ export function startDemoBattle(containerEl, skinManager, onExit) {
 
     function onKeyup(e) {
         const panDir = ARROW_PAN[e.key];
-        if (panDir) renderer._panKeys[panDir] = false;
+        if (panDir) { renderer._panKeys[panDir] = false; return; }
     }
 
     renderer.canvas.addEventListener('mousedown', onMouseDown);

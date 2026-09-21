@@ -100,7 +100,7 @@ export class BattleUI {
             position: absolute; top: 6px; left: 8px;
             font-size: 10px; color: #556; pointer-events: none;
         `;
-        el.textContent = '[M]ove  [A]ttack  [D]efend  [P]ivot  [W]ait  [Esc] Cancel  [Arrows] Pan  [Q/E] Rotate  [F] Focus  [Scroll] Zoom';
+        el.textContent = '[M]ove  [A]ttack  [D]efend  [P]ivot  [W]ait  [U] Auto  [Esc] Cancel  [Arrows] Pan  [Q/E] Rotate  [F] Focus  [Scroll] Zoom';
         this._overlay.appendChild(el);
         return el;
     }
@@ -192,7 +192,7 @@ export class BattleUI {
     }
 
     update(battle, onExit, turnFlags) {
-        this._turnFlags = turnFlags || { hasMoved: false, hasActed: false };
+        this._turnFlags = turnFlags || { hasMoved: false, hasActed: false, autoUnits: new Set() };
         this._updateSidebar(battle);
         this._updateActionMenu(battle);
         this._updateLog(battle);
@@ -479,7 +479,7 @@ export class BattleUI {
         const DISABLED = 'opacity:0.4;cursor:not-allowed;';
 
         const skillAbs = unit.abilities.filter(k => k !== 'attack' && ABILITIES[k] && !ABILITIES[k].passive);
-        const { hasMoved, hasActed } = this._turnFlags || {};
+        const { hasMoved, hasActed, autoUnits } = this._turnFlags || {};
 
         if (this._skillMenuOpen) {
             let html = `<div style="color:#c8a0ff;font-size:11px;font-weight:bold;margin-bottom:5px;padding-bottom:4px;border-bottom:1px solid #335;">`;
@@ -516,7 +516,9 @@ export class BattleUI {
                 el.addEventListener('mousedown', e => { e.stopPropagation(); this._skillMenuOpen = false; });
             });
         } else {
-            let html = `<div style="color:#ffcc44;font-size:11px;font-weight:bold;margin-bottom:5px;padding-bottom:4px;border-bottom:1px solid #335;">${unit.name}'s Turn</div>`;
+            const isAuto = autoUnits?.has(unit.id);
+            const autoTag = isAuto ? ` <span style="color:#f8a;font-size:9px;letter-spacing:1px;">[AUTO]</span>` : '';
+            let html = `<div style="color:#ffcc44;font-size:11px;font-weight:bold;margin-bottom:5px;padding-bottom:4px;border-bottom:1px solid #335;">${unit.name}'s Turn${autoTag}</div>`;
 
             html += `<button class="tac-btn" data-action="move" style="${BASE}${hasMoved ? DISABLED : ''}">[M] Move${hasMoved ? ' <span style="color:#555;font-size:10px;">(done)</span>' : ''}</button>`;
 
@@ -536,6 +538,8 @@ export class BattleUI {
 
             const keepCt = hasMoved ? 20 : 40;
             html += `<button class="tac-btn" data-action="wait" style="${BASE.replace('#151528','#1a1008')};color:#fc8;">[W] Wait <span style="color:#a86;font-size:10px;">(keep ${keepCt} CT)</span></button>`;
+
+            html += `<button class="tac-btn" data-action="auto" style="${BASE.replace('#151528','#1a0a18')};color:#f8a;border-color:#744;margin-top:4px;">[U] Auto <span style="color:#a68;font-size:10px;">act automatically</span></button>`;
 
             menu.innerHTML = html;
         }

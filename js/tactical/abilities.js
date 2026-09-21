@@ -161,9 +161,24 @@ export function computeAoeArea(cx, cy, aoe) {
     return result;
 }
 
+// Apply a timed status to a unit, respecting existing timers.
+// If the status is already present, refresh duration if new one is longer.
+function applyTimedStatus(unit, status, duration) {
+    unit.statusTimers = unit.statusTimers || {};
+    const existing = unit.statusTimers[status] ?? 0;
+    if (!unit.status.includes(status)) unit.status.push(status);
+    if (duration > existing) unit.statusTimers[status] = duration;
+}
+
 export function resolveAbility(source, target, ability, map) {
     const ab = ABILITIES[ability];
     if (!ab) return { damage: 0, healing: 0, statusApplied: null };
+
+    // silence: magic abilities cannot be cast by silenced units
+    if (ab.type === 'magic' && source.status.includes('silence')) {
+        faceToward(source, target.x, target.y);
+        return { damage: 0, healing: 0, statusApplied: null, missed: true, silenced: true };
+    }
 
     // --- earth_skin: self DEF buff ---
     if (ability === 'earth_skin') {
@@ -178,7 +193,8 @@ export function resolveAbility(source, target, ability, map) {
     const highGroundBonus = (srcTile && tgtTile && srcTile.elevation > tgtTile.elevation) ? 1.25 : 1.0;
 
     if (ab.isCure) {
-        target.status = [];
+        target.status = target.status.filter(s => s === 'dead' || s === 'unconscious');
+        target.statusTimers = {};
         faceToward(source, target.x, target.y);
         return { damage: 0, healing: 0, statusApplied: null, floatingText: 'Cured!' };
     }
@@ -186,6 +202,11 @@ export function resolveAbility(source, target, ability, map) {
     if (ab.isHeal) {
         const healing = Math.round((getEffectiveStat(source, 'mat') * 2 + 8) * ab.basePower);
         target.hp = Math.min(target.maxHp, target.hp + healing);
+        // wake sleeping unit on heal
+        if (target.status.includes('sleep')) {
+            target.status = target.status.filter(s => s !== 'sleep');
+            delete (target.statusTimers || {})[' sleep'];
+        }
         let revived = false;
         if (isUnconscious(target) && target.hp > 0) {
             target.status = target.status.filter(s => s !== 'unconscious');
@@ -206,9 +227,7 @@ export function resolveAbility(source, target, ability, map) {
         const evaMod = directionEvasionMod(source, target);
         let effectiveEva = ((getEffectiveStat(target, 'eva') || 0) / 100) * evaMod;
         const defBonus = target.status.includes('defend') ? 0.2 : 0;
-        // farsight: +20% evasion while passive active
         if (passiveActive(target, 'farsight')) effectiveEva += 0.20;
-        // seers_vigil: +15% evasion while passive active
         if (passiveActive(target, 'seers_vigil')) effectiveEva += 0.15;
         const finalEva = Math.min(0.9, effectiveEva + defBonus);
         if (Math.random() < finalEva) {
@@ -217,22 +236,35 @@ export function resolveAbility(source, target, ability, map) {
         }
     }
 
+    // reflect: magic spells bounce back to the caster
+    if (ab.type === 'magic' && target.status.includes('reflect') && target.team !== source.team) {
+        faceToward(source, target.x, target.y);
+        return resolveAbility(target, source, ability, map);
+    }
+
     let defMult = target.status.includes('defend') ? 1.5 : 1.0;
 
     let raw;
     if (ab.type === 'physical') {
         raw = Math.max(1, getEffectiveStat(source, 'atk') * 2 - getEffectiveStat(target, 'def') * defMult) * ab.basePower * highGroundBonus;
-        // divine_ward: incoming physical damage reduced 20%
         if (passiveActive(target, 'divine_ward')) raw *= 0.80;
+        // protect status: -25% physical damage
+        if (target.status.includes('protect')) raw *= 0.75;
     } else {
         raw = Math.max(1, getEffectiveStat(source, 'mat') * 2 - getEffectiveStat(target, 'mdf') * defMult) * ab.basePower * highGroundBonus;
-        // mana_surge: outgoing magic damage +15%
         if (passiveActive(source, 'mana_surge')) raw *= 1.15;
-        // seers_vigil: incoming magic damage -10%
         if (passiveActive(target, 'seers_vigil')) raw *= 0.90;
+        // shell status: -25% magic damage
+        if (target.status.includes('shell')) raw *= 0.75;
     }
     const variance = 0.9 + Math.random() * 0.2;
     const damage = Math.round(raw * variance);
+
+    // sleep: woken by any damage
+    if (damage > 0 && target.status.includes('sleep')) {
+        target.status = target.status.filter(s => s !== 'sleep');
+        delete (target.statusTimers || {})['sleep'];
+    }
 
     let killedInstantly = false;
     let newHp = target.hp - damage;
@@ -243,6 +275,13 @@ export function resolveAbility(source, target, ability, map) {
             if (!target.status.includes('dead')) target.status.push('dead');
             killedInstantly = true;
         } else if (!isDead(target)) {
+            // reraise: auto-revive at 1 HP when KO'd
+            if (target.status.includes('reraise')) {
+                target.hp = 1;
+                target.status = target.status.filter(s => s !== 'reraise');
+                delete (target.statusTimers || {})['reraise'];
+                return { damage, healing: 0, statusApplied: null, killedInstantly: false, reraise: true };
+            }
             if (!target.status.includes('unconscious')) target.status.push('unconscious');
             target.deathTimer = 3;
         }
@@ -252,18 +291,28 @@ export function resolveAbility(source, target, ability, map) {
 
     let statusApplied = null;
     if (ab.applyStatus && target.hp > 0 && !isDead(target) && !isUnconscious(target)) {
+        const dur = ab.statusDuration ?? 2;
         if (!target.status.includes(ab.applyStatus)) {
-            target.status.push(ab.applyStatus);
+            applyTimedStatus(target, ab.applyStatus, dur);
+            statusApplied = ab.applyStatus;
+        } else if (dur > (target.statusTimers?.[ab.applyStatus] ?? 0)) {
+            target.statusTimers[ab.applyStatus] = dur;
             statusApplied = ab.applyStatus;
         }
     }
 
-    // Post-status effects
+    // Post-status side-effects
     if (statusApplied === 'enfeebled') {
         target.buffs = target.buffs || [];
         target.buffs.push({ key: 'enfeebled', stat: 'atk', value: -5, duration: 2 });
     }
-    // wyrd_drain: slow duration +1 via SPD debuff on target
+    if (statusApplied === 'frog') {
+        target.buffs = target.buffs || [];
+        target.buffs.push({ key: 'frog_atk', stat: 'atk', value: -Math.round(target.atk * 0.6), duration: null });
+        target.buffs.push({ key: 'frog_mat', stat: 'mat', value: -Math.round(target.mat * 0.6), duration: null });
+        target.buffs.push({ key: 'frog_def', stat: 'def', value: -Math.round(target.def * 0.5), duration: null });
+    }
+    // Remove frog side-effect buffs when frog wears off (handled via statusTimers expiry in battle.js)
     if (ab.applyStatus === 'slow' && statusApplied === 'slow' && passiveActive(source, 'wyrd_drain')) {
         target.buffs = target.buffs || [];
         target.buffs.push({ key: 'wyrd_slow', stat: 'spd', value: -2, duration: 1 });

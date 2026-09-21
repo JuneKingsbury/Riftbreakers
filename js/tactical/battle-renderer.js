@@ -57,20 +57,20 @@ export class BattleRenderer {
         this._panKeys    = { left: false, right: false, up: false, down: false };
         this._autoCenterNext = true;
 
-        this.viewAngle  = 0;  // 0=N, 1=E, 2=S, 3=W
+        this.viewAngle   = 0;  // 0=N, 1=E, 2=S, 3=W
         this._rotateBtns = [];
 
-        // Spin animation state (smooth Q/E rotation)
+        // Spin animation state (used by Q/E and compass buttons via rotateView).
         this._spinActive   = false;
         this._spinT        = 0;
         this._spinDuration = 300;
-        this._spinFrom     = 0;
+        this._spinFrom     = 0;   // viewAngle at spin start
         this._spinDir      = 1;   // +1 CW, -1 CCW
-        this._spinPivotU   = 0;   // virtual U of pivot tile in _spinFrom coords
+        this._spinPivotU   = 0;
         this._spinPivotV   = 0;
-        this._spinPivotSX  = 0;   // screen-pixel X of pivot tile at spin start
+        this._spinPivotSX  = 0;
         this._spinPivotSY  = 0;
-        this._spinQueue    = 0;   // pending delta to apply after current spin
+        this._spinQueue    = 0;   // queued delta to apply after current spin
         this._mapW = 22;
         this._mapH = 16;
 
@@ -146,8 +146,17 @@ export class BattleRenderer {
         const wn = this._fromVirtualAngle(u - 1, v,     W, H, a);
         return { northNeighbor: nn, westNeighbor: wn };
     }
+    // Returns the current visual rotation in step units (float, 1 = 90°).
+    // Used for the compass needle and facing arrows — smoothsteps during spin.
+    _visualAngleSteps() {
+        if (this._spinActive) {
+            const te = this._spinT * this._spinT * (3 - 2 * this._spinT);
+            return this._spinFrom + this._spinDir * te;
+        }
+        return this.viewAngle;
+    }
+
     // Rotate view by delta steps (positive = CW, negative = CCW).
-    // Starts a 300ms spin animation; preserves the world tile at screen center.
     rotateView(delta) {
         if (this._spinActive) {
             const newQ = this._spinQueue + delta;
@@ -160,7 +169,7 @@ export class BattleRenderer {
         const cw = (this.canvas.width - 190) / 2;
         const ch = this.canvas.height / 2;
 
-        // Find the virtual tile at screen center before rotating.
+        // Find the virtual tile at screen center to use as spin pivot.
         const rx = cw - this.camX;
         const ry = ch - this.camY;
         const u0 = rx / hw / 2 + ry / hh / 2;
@@ -169,24 +178,19 @@ export class BattleRenderer {
         const uc = Math.max(0, Math.min(vW - 1, Math.round(u0)));
         const vc = Math.max(0, Math.min(vH - 1, Math.round(v0)));
 
-        // Cancel any in-progress camera lerp so it doesn't fight the spin.
         this._camTargetX = null;
         this._camTargetY = null;
 
-        // Initialize spin state.
         this._spinActive  = true;
         this._spinT       = 0;
         this._spinFrom    = this.viewAngle;
         this._spinDir     = delta > 0 ? 1 : -1;
         this._spinPivotU  = uc;
         this._spinPivotV  = vc;
-        // Capture exact pixel position of the pivot tile at spin start so
-        // tileToScreen can anchor to it regardless of camX/camY drift.
         this._spinPivotSX = (uc - vc) * hw + this.camX;
         this._spinPivotSY = (uc + vc) * hh + this.camY;
         this._spinQueue   = 0;
 
-        // Commit viewAngle immediately so painter sort and hit-testing are correct.
         this.viewAngle = ((this.viewAngle + delta) % 4 + 4) % 4;
     }
 
@@ -196,8 +200,6 @@ export class BattleRenderer {
     }
 
     // Isometric tile-to-screen: returns the N (top) vertex of the diamond.
-    // camX/camY are pixel offsets (not tile offsets).
-    // Applies virtual rotation via _toVirtual before projecting.
     tileToScreen(tx, ty) {
         const ts = this.tileSize;
         const hw = ts / 2;
@@ -211,24 +213,16 @@ export class BattleRenderer {
             };
         }
 
-        // During spin: interpolate linearly between the FROM and TO iso projections.
-        // We use FROM virtual coords (u,v) and the pivot offset (du,dv). The FROM→TO
-        // transform is a shear (not a pure rotation, because hw≠hh), so we blend the
-        // 2×2 projection matrix from I at t=0 to M at t=1. This lands every tile
-        // exactly on its correct position at both ends with no jump.
-        //
-        // For CW (+1):  TO position = hw*(du+dv), hh*(dv-du)
-        // For CCW (-1): TO position = hw*(-du-dv), hh*(du-dv)
-        // Unified: let s = 1-2*te,  A = (1+dir)/2 + (1-dir)/2*s,  B = 1-A
-        //   x = hw*(du*A - dv*B),  y = hh*(du*B + dv*A)
+        // During spin: interpolate tile positions between _spinFrom and destination,
+        // pivoting around _spinPivotSX/SY on screen.
         const pu = this._spinPivotU, pv = this._spinPivotV;
         const { u, v } = this._toVirtualAngle(tx, ty, this._mapW, this._mapH, this._spinFrom);
         const du = u - pu;
         const dv = v - pv;
 
-        const te   = this._spinT * this._spinT * (3 - 2 * this._spinT);
+        const te    = this._spinT * this._spinT * (3 - 2 * this._spinT);
         const alpha = this._spinDir * te * Math.PI / 2;
-        const cosA = Math.cos(alpha), sinA = Math.sin(alpha);
+        const cosA  = Math.cos(alpha), sinA = Math.sin(alpha);
 
         return {
             x: Math.round(hw * (du * (cosA + sinA) - dv * (cosA - sinA)) + this._spinPivotSX),
@@ -497,18 +491,16 @@ export class BattleRenderer {
         if (this._spinActive) {
             this._spinT += dt / this._spinDuration;
             if (this._spinT >= 1) {
-                this._spinT = 1;
-                const mW = this._mapW, mH = this._mapH;
-                const ts2 = this.tileSize, hw2 = ts2 / 2, hh2 = ts2 / 4;
-                const pu = this._spinPivotU, pv = this._spinPivotV;
-
+                this._spinT      = 1;
                 this._spinActive = false;
+                const mW = this._mapW, mH = this._mapH;
+                const hw2 = this.tileSize / 2, hh2 = this.tileSize / 4;
 
-                // Set camX/camY so the pivot tile lands at exactly the same screen
-                // pixel it was at when the spin started (_spinPivotSX/SY), now
-                // expressed in the new viewAngle.
-                const { tx: ptx, ty: pty } = this._fromVirtualAngle(pu, pv, mW, mH, this._spinFrom);
-                const { u: uf, v: vf } = this._toVirtualAngle(ptx, pty, mW, mH, this.viewAngle);
+                // Set camX/camY so the pivot tile stays at exactly _spinPivotSX/SY
+                // in the new viewAngle's coordinate space.
+                const { tx: ptx, ty: pty } = this._fromVirtualAngle(
+                    this._spinPivotU, this._spinPivotV, mW, mH, this._spinFrom);
+                const { u: uf, v: vf } = this._toVirtual(ptx, pty, mW, mH);
                 this.camX = Math.round(this._spinPivotSX - (uf - vf) * hw2);
                 this.camY = Math.round(this._spinPivotSY - (uf + vf) * hh2);
                 this._camTargetX = this.camX;
@@ -607,10 +599,16 @@ export class BattleRenderer {
         // Tiles draw before units on the same diagonal so elevated terrain occludes units behind it.
         const liveUnits = units.filter(u => isAlive(u));
 
-        // During a spin, painter order must use _spinFrom so depth sort matches
-        // the coordinate space tiles are actually drawn in.
-        const sortAngle = this._spinActive ? this._spinFrom : this.viewAngle;
-        const toVSort = (tx, ty) => this._toVirtualAngle(tx, ty, map.width, map.height, sortAngle);
+        // Painter sort uses the live visual angle so depth order matches tileToScreen.
+        const visualSteps = this._visualAngleSteps();
+        const sortBaseInt = (((Math.floor(visualSteps) % 4) + 4) % 4);
+        const sortFrac    = visualSteps - Math.floor(visualSteps);
+        const cosF = Math.cos(sortFrac * Math.PI / 2);
+        const sinF = Math.sin(sortFrac * Math.PI / 2);
+        const toVSort = (tx, ty) => {
+            const { u, v } = this._toVirtualAngle(tx, ty, map.width, map.height, sortBaseInt);
+            return { diag: (u + v) * cosF + (u - v) * sinF };
+        };
 
         const drawList = [];
         for (let ty = 0; ty < map.height; ty++) {
@@ -618,7 +616,7 @@ export class BattleRenderer {
                 const tile = map.tiles[ty * map.width + tx];
                 if (tile) {
                     const vt = toVSort(tx, ty);
-                    drawList.push({ kind: 'tile', tx, ty, tile, diag: vt.u + vt.v, vv: vt.v });
+                    drawList.push({ kind: 'tile', tx, ty, tile, diag: vt.diag });
                 }
             }
         }
@@ -632,12 +630,11 @@ export class BattleRenderer {
             const prevY = unit._prevY != null ? unit._prevY : unit.y;
             const vViz  = toVSort(vizX,  vizY);
             const vPrev = toVSort(prevX, prevY);
-            drawList.push({ kind: 'unit', unit, diag: Math.max(vViz.u + vViz.v, vPrev.u + vPrev.v) });
+            drawList.push({ kind: 'unit', unit, diag: Math.max(vViz.diag, vPrev.diag) });
         }
         drawList.sort((a, b) => {
             if (a.diag !== b.diag) return a.diag - b.diag;
             if (a.kind !== b.kind) return a.kind === 'tile' ? -1 : 1;
-            if (a.kind === 'tile') return a.vv - b.vv;
             return 0;
         });
 
@@ -928,10 +925,18 @@ export class BattleRenderer {
             ctx.fill();
 
             if (useSprites) {
+                // Counter-rotate sprite art to undo the iso shear's implicit rotation.
+                const r = -this._visualAngleSteps() * (Math.PI / 2);
+
                 const img = sm.getSprite('terrain', def.spriteKey) || sm.getSprite('terrain', 'grass');
                 if (img) {
                     ctx.save();
+                    this._diamondPath(ctx, nx, ny, hw, hh);
+                    ctx.clip();
                     ctx.setTransform(hw / ts, hh / ts, -hw / ts, hh / ts, nx, ny);
+                    ctx.translate(ts / 2, ts / 2);
+                    ctx.rotate(r);
+                    ctx.translate(-ts / 2, -ts / 2);
                     ctx.imageSmoothingEnabled = false;
                     ctx.drawImage(img, 0, 0, ts, ts);
                     ctx.restore();
@@ -946,9 +951,11 @@ export class BattleRenderer {
                         const phase  = (now / period) * Math.PI * 2 + (tileKey % 1000) / 1000 * 6.28;
                         const sway   = Math.sin(phase) * amp;
                         ctx.save();
+                        this._diamondPath(ctx, nx, ny, hw, hh);
+                        ctx.clip();
                         ctx.setTransform(hw / ts, hh / ts, -hw / ts, hh / ts, nx, ny);
                         ctx.translate(ts / 2, ts / 2);
-                        ctx.rotate(sway);
+                        ctx.rotate(r + sway);
                         ctx.translate(-ts / 2, -ts / 2);
                         ctx.imageSmoothingEnabled = false;
                         ctx.drawImage(tuft, 0, 0, ts, ts);
@@ -966,7 +973,12 @@ export class BattleRenderer {
                         const alpha   = Math.max(0, Math.min(1, alphaBase + alphaVar * Math.cos(phase)));
                         ctx.save();
                         ctx.globalAlpha = alpha;
+                        this._diamondPath(ctx, nx, ny, hw, hh);
+                        ctx.clip();
                         ctx.setTransform(hw / ts, hh / ts, -hw / ts, hh / ts, nx, ny);
+                        ctx.translate(ts / 2, ts / 2);
+                        ctx.rotate(r);
+                        ctx.translate(-ts / 2, -ts / 2);
                         ctx.imageSmoothingEnabled = false;
                         ctx.drawImage(waves, 0, 0, ts, ts);
                         ctx.restore();
@@ -1229,11 +1241,7 @@ export class BattleRenderer {
             const DIRS_CW = ['north', 'east', 'south', 'west'];
             const FACING_TURN_MS = 150;
 
-            // Resolve the visual facing angle accounting for both a camera spin
-            // and a unit turn, each interpolating along the shortest arc.
-            const visualViewAngle = this._spinActive
-                ? this._spinFrom + this._spinDir * this._spinT * this._spinT * (3 - 2 * this._spinT)
-                : this.viewAngle;
+            const visualViewAngle = this._visualAngleSteps();
 
             const toWorldAngle = (facing) => {
                 // Fractional viewAngle offset rotates the arrow continuously.
@@ -1378,9 +1386,7 @@ export class BattleRenderer {
 
         // Each CW rotation shifts all compass angles by -PI/2 so labels
         // track world direction regardless of view orientation.
-        const rotOffset = this._spinActive
-            ? (this._spinFrom + this._spinDir * (this._spinT * this._spinT * (3 - 2 * this._spinT))) * (-Math.PI / 2)
-            : this.viewAngle * (-Math.PI / 2);
+        const rotOffset = this._visualAngleSteps() * (-Math.PI / 2);
         const DIRS = [
             { label: 'N', baseAngle: -1 * Math.PI / 4, color: '#f66', major: true  },
             { label: 'E', baseAngle:  1 * Math.PI / 4, color: '#ccc', major: false },
@@ -1426,8 +1432,11 @@ export class BattleRenderer {
         ctx.lineWidth   = 1;
         ctx.stroke();
 
-        // Rotate buttons (CCW left, CW right) and center button drawn below compass.
-        const btnY   = cy + r + 14;
+        // Two rows of buttons below compass.
+        // Row 1: snap-90 CCW / snap-90 CW  (click calls rotateView ±1)
+        // Row 2: center button
+        const row1Y  = cy + r + 10;
+        const row2Y  = row1Y + 18;
         const btnH   = 14;
         const btnW   = 20;
         const gap    = 6;
@@ -1436,55 +1445,54 @@ export class BattleRenderer {
         const ctrX   = rightX + btnW + gap;
 
         this._rotateBtns = [
-            { x: leftX,  y: btnY, w: btnW, h: btnH, delta: -1 },
-            { x: rightX, y: btnY, w: btnW, h: btnH, delta:  1 },
+            { x: leftX,  y: row1Y, w: btnW, h: btnH, delta: -1 },
+            { x: rightX, y: row1Y, w: btnW, h: btnH, delta:  1 },
         ];
-        this._centerBtn = { x: ctrX, y: btnY, w: btnH, h: btnH };
-
-        ctx.globalAlpha = 0.85;
-        ctx.fillStyle   = '#446';
-        ctx.strokeStyle = '#88a';
-        ctx.lineWidth   = 1;
+        this._centerBtn = { x: ctrX, y: row2Y, w: btnH, h: btnH };
 
         ctx.font = 'bold 8px "Courier New", monospace';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
 
-        // CCW button: left-pointing triangle with 'q' label
+        // Snap-CCW button (left triangle, labelled '90')
+        ctx.globalAlpha = 0.85;
+        ctx.fillStyle   = '#446';
+        ctx.strokeStyle = '#88a';
+        ctx.lineWidth   = 1;
         ctx.beginPath();
-        ctx.moveTo(leftX,        btnY + btnH / 2);
-        ctx.lineTo(leftX + btnW, btnY);
-        ctx.lineTo(leftX + btnW, btnY + btnH);
+        ctx.moveTo(leftX,        row1Y + btnH / 2);
+        ctx.lineTo(leftX + btnW, row1Y);
+        ctx.lineTo(leftX + btnW, row1Y + btnH);
         ctx.closePath();
         ctx.fill(); ctx.stroke();
         ctx.fillStyle   = '#cce';
         ctx.globalAlpha = 0.9;
-        ctx.fillText('q', leftX + btnW * 0.62, btnY + btnH / 2);
+        ctx.fillText('90', leftX + btnW * 0.65, row1Y + btnH / 2);
 
-        // CW button: right-pointing triangle with 'e' label
+        // Snap-CW button (right triangle, labelled '90')
         ctx.globalAlpha = 0.85;
         ctx.fillStyle   = '#446';
         ctx.strokeStyle = '#88a';
         ctx.beginPath();
-        ctx.moveTo(rightX + btnW, btnY + btnH / 2);
-        ctx.lineTo(rightX,        btnY);
-        ctx.lineTo(rightX,        btnY + btnH);
+        ctx.moveTo(rightX + btnW, row1Y + btnH / 2);
+        ctx.lineTo(rightX,        row1Y);
+        ctx.lineTo(rightX,        row1Y + btnH);
         ctx.closePath();
         ctx.fill(); ctx.stroke();
         ctx.fillStyle   = '#cce';
         ctx.globalAlpha = 0.9;
-        ctx.fillText('e', rightX + btnW * 0.38, btnY + btnH / 2);
+        ctx.fillText('90', rightX + btnW * 0.35, row1Y + btnH / 2);
 
         // Center button: square with 'f' label
         ctx.globalAlpha = 0.85;
         ctx.fillStyle   = '#244';
         ctx.strokeStyle = '#6aa';
         ctx.beginPath();
-        ctx.rect(ctrX, btnY, btnH, btnH);
+        ctx.rect(ctrX, row2Y, btnH, btnH);
         ctx.fill(); ctx.stroke();
         ctx.fillStyle   = '#aef';
         ctx.globalAlpha = 0.9;
-        ctx.fillText('f', ctrX + btnH / 2, btnY + btnH / 2);
+        ctx.fillText('f', ctrX + btnH / 2, row2Y + btnH / 2);
 
         ctx.globalAlpha  = 1;
         ctx.textAlign    = 'left';

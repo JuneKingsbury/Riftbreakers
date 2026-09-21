@@ -1,5 +1,5 @@
 import { computeMoveRange, computeMovePath, computeAttackRange, computeAoeArea, computePatternArea, resolveAbility, ABILITIES } from './abilities.js';
-import { isDead, isAlive, isConscious, isUnconscious, isStunned, faceToward, setFacing } from './units.js';
+import { isDead, isAlive, isConscious, isUnconscious, isStunned, faceToward, setFacing, createUnit } from './units.js';
 import { getTile, applyTerrainEffect } from './battle-map.js';
 import { moveEntity, moveEntityAlongPath } from '../systems/movement-lerp.js';
 
@@ -37,6 +37,8 @@ export class TacticalBattle {
         this.onLogMessage = null;
         this.onStateChange = null;
         this._ctPreSpent = 0;
+        // IDs of player-team summons that should be auto-controlled by the AI.
+        this._pendingSummons = [];
     }
 
     get livingUnits() {
@@ -60,8 +62,9 @@ export class TacticalBattle {
         if (living.length === 0) return null;
         for (;;) {
             for (const u of living) {
-                u.ct += u.spd * CT_TICK_AMOUNT;
-                if (u._charging) u._charging.ct += u.spd * CT_TICK_AMOUNT;
+                const hasteMult = u.status.includes('haste') ? 1.5 : (u.status.includes('slow') ? 0.5 : 1.0);
+                u.ct += u.spd * CT_TICK_AMOUNT * hasteMult;
+                if (u._charging) u._charging.ct += u.spd * CT_TICK_AMOUNT * hasteMult;
             }
             const ready = living.filter(u => u.ct >= CT_ACT_THRESHOLD);
             if (ready.length > 0) {
@@ -77,10 +80,54 @@ export class TacticalBattle {
         // Remove defend status at the start of each turn
         unit.status = unit.status.filter(s => s !== 'defend');
 
-        // regen_aura: heal 5 HP at start of turn while passive active
+        // Consume stun BEFORE timers tick — stun always fires on the very next turn.
+        if (isStunned(unit)) {
+            unit.status = unit.status.filter(s => s !== 'stun');
+            delete (unit.statusTimers || {})['stun'];
+            this.logMsg(`${unit.name} is stunned and loses their turn!`);
+            this.endTurn(15);
+            return;
+        }
+
+        // Tick all status timers; remove any that expire
+        const timers = unit.statusTimers || {};
+        for (const [s, t] of Object.entries(timers)) {
+            timers[s] = t - 1;
+            if (timers[s] <= 0) {
+                delete timers[s];
+                unit.status = unit.status.filter(x => x !== s);
+                this.logMsg(`${unit.name}'s ${s} wore off.`);
+                // frog wears off: remove associated stat debuffs
+                if (s === 'frog') {
+                    unit.buffs = (unit.buffs || []).filter(b => !b.key.startsWith('frog_'));
+                }
+            }
+        }
+        unit.statusTimers = timers;
+
+        // regen_aura passive: heal 5 HP
         if (unit.abilities.includes('regen_aura') && unit.mp > 0) {
             unit.hp = Math.min(unit.maxHp, unit.hp + 5);
             this.logMsg(`${unit.name} regenerates 5 HP from Regen Aura.`);
+        }
+
+        // regen status: heal ~8% max HP
+        if (unit.status.includes('regen')) {
+            const amt = Math.max(1, Math.round(unit.maxHp * 0.08));
+            unit.hp = Math.min(unit.maxHp, unit.hp + amt);
+            this.logMsg(`${unit.name} regenerates ${amt} HP.`);
+        }
+
+        // poison: deal ~6% max HP each turn
+        if (unit.status.includes('poison')) {
+            const dmg = Math.max(1, Math.round(unit.maxHp * 0.06));
+            unit.hp = Math.max(0, unit.hp - dmg);
+            this.logMsg(`${unit.name} takes ${dmg} poison damage!`);
+            this._spawnFloat(unit, `-${dmg}`, '#88ff44');
+            if (unit.hp <= 0) {
+                if (!unit.status.includes('unconscious')) unit.status.push('unconscious');
+                unit.deathTimer = 3;
+            }
         }
 
         // Decrement timed buffs, remove expired
@@ -101,10 +148,34 @@ export class TacticalBattle {
             return;
         }
 
-        if (isStunned(unit)) {
-            unit.status = unit.status.filter(s => s !== 'stun');
-            this.logMsg(`${unit.name} is stunned and loses their turn!`);
+        // sleep: skip turn, status removed by taking damage (see resolveAbility)
+        if (unit.status.includes('sleep')) {
+            this.logMsg(`${unit.name} is asleep!`);
             this.endTurn(15);
+            return;
+        }
+
+        // berserk: forced auto-attack against nearest enemy, no player control
+        if (unit.status.includes('berserk')) {
+            const oppTeam = unit.team === 'enemy' ? 'player' : 'enemy';
+            const foes = this.livingUnits.filter(u => u.team === oppTeam && isConscious(u));
+            if (foes.length > 0) {
+                foes.sort((a, b) =>
+                    (Math.abs(a.x - unit.x) + Math.abs(a.y - unit.y)) -
+                    (Math.abs(b.x - unit.x) + Math.abs(b.y - unit.y))
+                );
+                const tgt = foes[0];
+                this.logMsg(`${unit.name} is berserk and attacks ${tgt.name}!`);
+                this.applyEnemyAbility(unit, 'attack', tgt.x, tgt.y);
+            }
+            this.endTurn(80);
+            return;
+        }
+
+        // charm: unit fights for the other side this turn (treated as enemy turn by AI)
+        if (unit.status.includes('charm')) {
+            this.logMsg(`${unit.name} is charmed!`);
+            this.setState(unit.team === 'player' ? STATES.ENEMY_TURN : STATES.PLAYER_TURN);
             return;
         }
 
@@ -255,6 +326,18 @@ export class TacticalBattle {
         source.ct = Math.max(0, source.ct - actCost);
         this._ctPreSpent += actCost;
 
+        // Summon abilities: place a new creature on the target tile.
+        if (ab.isSummon) {
+            this._resolveSummon(source, ab, tx, ty);
+            this.selectedAbility = null;
+            this.abilityRotation = 0;
+            this.abilityRange = new Set();
+            this.aoePreview = new Set();
+            this.hitPreview = new Set();
+            this.setState(STATES.PLAYER_TURN);
+            return true;
+        }
+
         let affectedTiles;
         if (ab.aoePattern) {
             affectedTiles = computePatternArea(tx, ty, ab.aoePattern, this.abilityRotation);
@@ -295,8 +378,15 @@ export class TacticalBattle {
             if (result.revived) {
                 this.logMsg(`${target.name} is revived!`);
             }
+            if (result.reraise) {
+                this.logMsg(`${target.name} is saved by Reraise!`);
+                this._spawnFloat(target, 'Reraise!', '#ffeeaa');
+            }
             if (result.statusApplied) {
                 this.logMsg(`${target.name} is afflicted with ${result.statusApplied}!`);
+            }
+            if (result.silenced) {
+                this.logMsg(`${source.name} is silenced and cannot cast!`);
             }
             if (result.killedInstantly) {
                 this.logMsg(`${target.name} is slain!`);
@@ -336,6 +426,14 @@ export class TacticalBattle {
             unit._charging = null;
 
             if (ab) {
+                this.logMsg(`${unit.name}'s ${ab.name} fires!`);
+
+                if (ab.isSummon) {
+                    this._resolveSummon(unit, ab, targetX, targetY);
+                    fired.push({ unit, targetX, targetY, ability });
+                    continue;
+                }
+
                 let affectedTiles;
                 if (ab.aoePattern) {
                     affectedTiles = computePatternArea(targetX, targetY, ab.aoePattern, rotation ?? 0);
@@ -350,8 +448,6 @@ export class TacticalBattle {
                     if (ab.targetType === 'enemy' && sameTeam) return false;
                     return affectedTiles.has(`${u.x},${u.y}`);
                 });
-
-                this.logMsg(`${unit.name}'s ${ab.name} fires!`);
 
                 for (const target of targets) {
                     const result = resolveAbility(unit, target, ability, this.map);
@@ -370,6 +466,13 @@ export class TacticalBattle {
                     }
                     if (result.revived) {
                         this.logMsg(`${target.name} is revived!`);
+                    }
+                    if (result.reraise) {
+                        this.logMsg(`${target.name} is saved by Reraise!`);
+                        this._spawnFloat(target, 'Reraise!', '#ffeeaa');
+                    }
+                    if (result.statusApplied) {
+                        this.logMsg(`${target.name} is afflicted with ${result.statusApplied}!`);
                     }
                     if (result.killedInstantly) {
                         this.logMsg(`${target.name} is slain!`);
@@ -405,6 +508,11 @@ export class TacticalBattle {
             unit._charging = { ability: abilityKey, targetX: tx, targetY: ty, ct: 0, needed: ab.chargeTime };
             if (!unit.status.includes('charging')) unit.status.push('charging');
             this.logMsg(`${unit.name} begins channeling ${ab.name}!`);
+            return;
+        }
+
+        if (ab.isSummon) {
+            this._resolveSummon(unit, ab, tx, ty);
             return;
         }
 
@@ -499,6 +607,26 @@ export class TacticalBattle {
             this.moveRange = computeMoveRange(this.activeUnit, this.map, this.livingUnits);
             this.setState(STATES.PLAYER_TURN);
         }
+    }
+
+    // Spawn a summoned creature on (tx, ty) for the given source unit's team.
+    // Returns the new unit, or null if the tile was occupied or impassable.
+    _resolveSummon(source, ab, tx, ty) {
+        const occupied = this.units.some(u => !isDead(u) && u.x === tx && u.y === ty);
+        const tile = getTile(this.map, tx, ty);
+        if (occupied || !tile || !tile.passable) {
+            this.logMsg(`${source.name}'s summon fizzles — no space!`);
+            return null;
+        }
+
+        const summon = createUnit(ab.summonName, ab.summonJob, source.team, tx, ty, { ct: 0 });
+        faceToward(summon, source.x, source.y);
+        this.units.push(summon);
+        this.logMsg(`${source.name} summons a ${ab.summonName}!`);
+
+        // Player-team summons are tracked so battle-scene can add them to _autoUnits.
+        if (source.team === 'player') this._pendingSummons.push(summon.id);
+        return summon;
     }
 
     _checkVictory() {

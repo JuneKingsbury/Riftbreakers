@@ -31,6 +31,11 @@ function buildTable(rawData) {
 export const ABILITIES = buildTable(ABILITY_DATA);
 export const JOB_STATS = buildTable(JOB_DATA);
 
+// Player jobs have a `desc` field; enemy jobs do not.
+export function isPlayerJob(jobKey) {
+    return !!JOB_DATA[jobKey]?.desc;
+}
+
 // XP required to reach each level. Index = level, so XP_THRESHOLDS[2] is the
 // XP needed for level 2. Level 1 is the starting level (0 XP required).
 export const XP_THRESHOLDS = [0, 0, 100, 250, 500, 900, 1400, 2100, 3000];
@@ -60,6 +65,68 @@ export function unlockedAbilities(jobKey, xpMap) {
     const lv = jobLevel(xpMap, jobKey);
     const levels = job.abilityLevels || {};
     return (job.abilities || []).filter(k => (levels[k] ?? 1) <= lv);
+}
+
+// Returns a merged stat-bonus object for every job the character has mastered (Lv.8).
+// Keys are stat names; values are the summed bonuses across all mastered jobs.
+export function masteryStatBonus(xpMap) {
+    const result = {};
+    for (const [jobKey, jobDef] of Object.entries(JOB_DATA)) {
+        if (!jobDef.masteryBonus) continue;
+        if (jobLevel(xpMap, jobKey) < 8) continue;
+        for (const [stat, val] of Object.entries(jobDef.masteryBonus)) {
+            result[stat] = (result[stat] || 0) + val;
+        }
+    }
+    return result;
+}
+
+// Returns all ability keys the character has unlocked in jobs OTHER than currentJob.
+// Used to populate the cross-job skill slot picker.
+export function crossJobUnlockedAbilities(xpMap, currentJob) {
+    const currentJobAbilities = new Set(JOB_DATA[currentJob]?.abilities || []);
+    const result = [];
+    for (const jobKey of Object.keys(JOB_DATA)) {
+        if (jobKey === currentJob) continue;
+        // Only player jobs the character has actually experienced.
+        if (!xpMap[jobKey] || xpMap[jobKey] <= 0) continue;
+        const abilities = unlockedAbilities(jobKey, xpMap);
+        for (const abilityKey of abilities) {
+            if (abilityKey === 'attack') continue;
+            // Skip abilities that are already part of the current job's kit.
+            if (currentJobAbilities.has(abilityKey)) continue;
+            if (!result.includes(abilityKey)) result.push(abilityKey);
+        }
+    }
+    return result;
+}
+
+// Returns the Set of allowed equipment types for a given slot on a job, or null if unrestricted.
+// Tier 2 jobs use the union of both prerequisites' allowed types, plus any equipmentExpansions.
+export function allowedEquipTypes(jobKey, slot) {
+    const job = JOB_DATA[jobKey];
+    if (!job) return null;
+
+    // No allowedEquipment and no prerequisites = unrestricted (Novice, enemy jobs)
+    const prereqs = job.prerequisites || [];
+    if (!job.allowedEquipment && prereqs.length === 0) return null;
+
+    // Tier 1 (or any job with explicit allowedEquipment): use it directly
+    if (job.allowedEquipment) {
+        const types = new Set(job.allowedEquipment[slot] || []);
+        for (const t of (job.equipmentExpansions?.[slot] || [])) types.add(t);
+        return types.size > 0 ? types : null;
+    }
+
+    // Tier 2: union of prerequisites
+    const union = new Set();
+    for (const p of prereqs) {
+        const types = allowedEquipTypes(p.job, slot);
+        if (types === null) return null; // prereq is unrestricted → so is this
+        for (const t of types) union.add(t);
+    }
+    for (const t of (job.equipmentExpansions?.[slot] || [])) union.add(t);
+    return union.size > 0 ? union : null;
 }
 
 // Returns a human-readable string of unmet prerequisites, e.g. "Evoker Lv.3, Warden Lv.3".

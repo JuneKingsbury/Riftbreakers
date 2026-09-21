@@ -494,7 +494,7 @@ export class WorldMapRenderer {
         const spy = Math.round(footY - sh / 2);
 
         const sm  = this.skinManager;
-        const img = sm && sm.isActive ? sm.getSprite('entities', 'knight') : null;
+        const img = sm && sm.isActive ? (sm.getSprite('entities', 'cart') || sm.getSprite('entities', 'knight')) : null;
 
         // Shadow beneath the sprite (on the node surface)
         if (img) {

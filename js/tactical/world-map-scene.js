@@ -2,6 +2,7 @@ import { WorldMap }         from './world-map.js';
 import { WorldMapRenderer } from './world-map-renderer.js';
 import { WorldMapUI }       from './world-map-ui.js';
 import { BattleScene }      from './battle-scene.js';
+import { DeployScene }      from './deploy-scene.js';
 
 export class WorldMapScene {
     constructor() {
@@ -290,8 +291,22 @@ export class WorldMapScene {
     }
 
     _startBattle(scenarioId, onComplete) {
-        const battleScene = new BattleScene(scenarioId, this._worldMap, onComplete || null);
-        this._sm.push(battleScene);
+        const deployScene = new DeployScene(
+            scenarioId,
+            this._worldMap,
+            this._skinManager,
+            this._sm,
+            (mapDef, customPlayerSpawns) => {
+                // DeployScene calls this when the player hits Begin Battle.
+                // Replace the deploy scene with the real battle.
+                const battleScene = new BattleScene(
+                    scenarioId, this._worldMap, onComplete || null,
+                    { mapDef, customPlayerSpawns }
+                );
+                this._sm.replace(battleScene);
+            }
+        );
+        this._sm.push(deployScene);
     }
 
     _handleBattleRewards(rewards) {
