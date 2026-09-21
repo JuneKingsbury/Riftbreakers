@@ -150,6 +150,129 @@ export const NODES = [
     },
 ];
 
+// Each scenario defines rewards and an enemy roster.
+// roster: array of { job, name, ct?, statMods?, appearance? }
+// If roster is absent the battle falls back to the default enemy party.
+export const BATTLE_SCENARIOS = {
+    bandit_ambush: {
+        xpPerMember: 40, gold: 60, items: [],
+        roster: [
+            { job: 'raider',        name: 'Bandit',       ct: 20 },
+            { job: 'raider',        name: 'Bandit',       ct: 50 },
+            { job: 'raider_archer', name: 'Bandit Archer', ct: 5 },
+            { job: 'raider_hexer',  name: 'Bandit Hexer',  ct: 35 },
+        ],
+    },
+    marsh_skirmish: {
+        xpPerMember: 50, gold: 70, items: [],
+        roster: [
+            { job: 'wolf',         name: 'Marsh Wolf',    ct: 20 },
+            { job: 'wolf',         name: 'Marsh Wolf',    ct: 55 },
+            { job: 'spore_walker', name: 'Spore Walker',  ct: 10 },
+            { job: 'shard_spider', name: 'Shard Spider',  ct: 40 },
+        ],
+    },
+    fen_ambush: {
+        xpPerMember: 65, gold: 80, items: ['potion'],
+        roster: [
+            { job: 'spore_walker',  name: 'Fen Walker',    ct: 15 },
+            { job: 'spore_walker',  name: 'Fen Walker',    ct: 50 },
+            { job: 'shard_spider',  name: 'Fen Spider',    ct: 30 },
+            { job: 'spectral_wisp', name: 'Marsh Spirit',  ct: 5  },
+        ],
+    },
+    chapel_defense: {
+        xpPerMember: 75, gold: 90, items: [],
+        roster: [
+            { job: 'shadow_mage',   name: 'Chapel Shade',  ct: 40 },
+            { job: 'spectral_wisp', name: 'Lost Soul',     ct: 10 },
+            { job: 'spectral_wisp', name: 'Lost Soul',     ct: 60 },
+            { job: 'void_walker',   name: 'Void Wraith',   ct: 25 },
+        ],
+    },
+    thornwood_patrol: {
+        xpPerMember: 85, gold: 110, items: [],
+        roster: [
+            { job: 'canopy_stalker', name: 'Thornwood Cat',  ct: 20 },
+            { job: 'thorn_beast',    name: 'Thorn Beast',    ct: 45 },
+            { job: 'boar',           name: 'Thornboar',      ct: 5  },
+            { job: 'raider',         name: 'Poacher',        ct: 35 },
+        ],
+    },
+    ironhollow_depths: {
+        xpPerMember: 110, gold: 150, items: ['hi_potion'],
+        roster: [
+            { job: 'void_stalker',  name: 'Rift Crawler',    ct: 10 },
+            { job: 'void_stalker',  name: 'Rift Crawler',    ct: 50 },
+            { job: 'void_walker',   name: 'Void Walker',     ct: 25 },
+            { job: 'shadow_mage',   name: 'Hollow Mage',     ct: 40 },
+        ],
+    },
+    riftscar_ambush: {
+        xpPerMember: 130, gold: 180, items: [],
+        roster: [
+            { job: 'orc_captain',  name: 'Rift Warden',     ct: 20 },
+            { job: 'void_stalker', name: 'Rift Stalker',    ct: 45 },
+            { job: 'void_walker',  name: 'Rift Walker',     ct: 10 },
+            { job: 'raider_hexer', name: 'Rift Hexer',      ct: 35 },
+        ],
+    },
+    voidspire_assault: {
+        xpPerMember: 200, gold: 300, items: ['void_staff'],
+        roster: [
+            { job: 'orc_captain',   name: 'Citadel Guard',   ct: 20 },
+            { job: 'kingdom_guard', name: 'Citadel Guard',   ct: 50 },
+            { job: 'void_stalker',  name: 'Void Champion',   ct: 5  },
+            { job: 'shadow_mage',   name: 'Void Sorcerer',   ct: 35 },
+        ],
+    },
+    beast_encounter: {
+        xpPerMember: 55, gold: 40, items: [],
+        roster: [
+            { job: 'wolf',  name: 'Wild Wolf',  ct: 10 },
+            { job: 'wolf',  name: 'Wild Wolf',  ct: 45 },
+            { job: 'boar',  name: 'Wild Boar',  ct: 25 },
+            { job: 'boar',  name: 'Wild Boar',  ct: 60 },
+        ],
+    },
+};
+
+export const ROAMING_SPAWN_POOL = [
+    {
+        id_prefix: 'raiders',
+        spriteKey: 'raider_brute',
+        name: 'Raider Band',
+        battleScenarioId: 'bandit_ambush',
+        spawnNodes: ['amber_crossroads', 'goldenwood', 'thornwood_edge', 'eastmere'],
+    },
+    {
+        id_prefix: 'beast',
+        spriteKey: 'shadow_imp',
+        name: 'Wandering Beast',
+        battleScenarioId: 'beast_encounter',
+        spawnNodes: ['marshfield', 'misty_fen', 'thornwood_edge', 'ironhollow'],
+    },
+];
+
+export const PINNED_ENCOUNTER_DATA = [
+    {
+        id: 'chapel_guardian',
+        nodeId: 'ruined_chapel',
+        spriteKey: 'spell_wraith',
+        name: 'Chapel Guardian',
+        battleScenarioId: 'chapel_defense',
+        questId: 'q_chapel_bell',
+    },
+    {
+        id: 'fen_ambushers',
+        nodeId: 'misty_fen',
+        spriteKey: 'shadow_imp',
+        name: 'Fen Ambushers',
+        battleScenarioId: 'fen_ambush',
+        questId: null,
+    },
+];
+
 // cost only — name and stat description are derived from EQUIPMENT in the UI layer
 export const SHOP_ITEMS = [
     // ---- Light gear ----
@@ -198,6 +321,7 @@ export const QUESTS = [
         title: 'The Chapel Bell',
         description: "The Ruined Chapel's bronze bell can be heard tolling at midnight. Silence it.",
         targetNodeId: 'ruined_chapel',
+        battleCompletionId: 'chapel_defense',
         rewardGold: 120,
         rewardItems: ['ether'],
         turnInStory: "The bell rope has been tied to a beam by something with too many fingers. You cut it loose and the bell falls silent for the first time in weeks. As the last echo fades, a cold calm settles over the nave. Whatever was ringing it is gone now, or satisfied. The village elder pays you at dawn without asking what you found.",
@@ -225,6 +349,7 @@ export const QUESTS = [
         title: 'Arms for Eastmere',
         description: 'The Eastmere garrison is desperate for weapons. Escort a supply shipment through Thornwood.',
         targetNodeId: 'thornwood_edge',
+        battleCompletionId: 'thornwood_patrol',
         rewardGold: 150,
         rewardItems: ['iron_sword'],
         turnInStory: "The ambush comes at the second bend, exactly where you expected it. Your party drives the raiders off with fewer injuries than the driver feared. The crates reach Eastmere intact. The garrison captain inspects each blade personally before signing the manifest. He hands you a sword from the shipment on top of your fee. \"Keep it,\" he says. \"You earned it.\"",

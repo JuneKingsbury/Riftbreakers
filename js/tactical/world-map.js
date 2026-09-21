@@ -1,14 +1,32 @@
-import { NODES, QUESTS, EVENTS } from './world-map-data.js';
+import { NODES, QUESTS, EVENTS, BATTLE_SCENARIOS, ROAMING_SPAWN_POOL, PINNED_ENCOUNTER_DATA } from './world-map-data.js';
 import { CHARACTER_DATA } from './data/characters.js';
 
 export class RoamingEnemy {
-    constructor(id, nodeId, spriteKey, name, battleScenarioId) {
+    constructor(id, nodeId, spriteKey, name, battleScenarioId, opts = {}) {
         this.id               = id;
         this.nodeId           = nodeId;
         this.spriteKey        = spriteKey;
         this.name             = name;
         this.battleScenarioId = battleScenarioId;
         this.defeated         = false;
+        this.spawnDay         = opts.spawnDay ?? 1;
+        this.lifespanDays     = opts.lifespanDays ?? 10;
+    }
+
+    isExpired(currentDay) {
+        return currentDay >= this.spawnDay + this.lifespanDays;
+    }
+}
+
+export class PinnedEncounter {
+    constructor(id, nodeId, spriteKey, name, battleScenarioId, opts = {}) {
+        this.id               = id;
+        this.nodeId           = nodeId;
+        this.spriteKey        = spriteKey;
+        this.name             = name;
+        this.battleScenarioId = battleScenarioId;
+        this.defeated         = false;
+        this.questId          = opts.questId ?? null;
     }
 }
 
@@ -50,10 +68,16 @@ export class WorldMap {
 
         this.inventory['stone_spear'] = (this.inventory['stone_spear'] || 0) + 1;
 
-        // Roaming enemies
+        // Roaming enemies (seed with initial raider band)
         this.roamingEnemies = [
-            new RoamingEnemy('raiders', 'amber_crossroads', 'raider_brute', 'Raider Band', 'bandit_ambush'),
+            new RoamingEnemy('raiders_0', 'amber_crossroads', 'raider_brute', 'Raider Band', 'bandit_ambush',
+                { spawnDay: 1, lifespanDays: 10 }),
         ];
+
+        // Pinned encounters (static, node-bound until defeated)
+        this.pinnedEncounters = PINNED_ENCOUNTER_DATA.map(d =>
+            new PinnedEncounter(d.id, d.nodeId, d.spriteKey, d.name, d.battleScenarioId, { questId: d.questId })
+        );
 
         // Discover connections of the starting node
         this._discoverNeighbors(this.currentNodeId);
@@ -159,7 +183,10 @@ export class WorldMap {
         const node = this.currentNode;
         node.visited = true;
         this._discoverNeighbors(nodeId);
-        this._lastEncounters = this._tickRoamingEnemies(fromId, nodeId);
+        const roamEncs   = this._tickRoamingEnemies(fromId, nodeId);
+        const pinnedEncs = this._checkPinnedEncounters(nodeId);
+        // Pinned encounters go first — they're guarding the destination
+        this._lastEncounters = [...pinnedEncs, ...roamEncs];
         return true;
     }
 
@@ -233,7 +260,11 @@ export class WorldMap {
     }
 
     turnInQuest(questId) {
-        const idx = this.activeQuests.findIndex(q => q.id === questId && q.targetNodeId === this.currentNodeId);
+        // Support both location-gated and battle-completed quests
+        const idx = this.activeQuests.findIndex(q =>
+            q.id === questId &&
+            (q.targetNodeId === this.currentNodeId || q._battleCompleted)
+        );
         if (idx === -1) return null;
         const q = this.activeQuests.splice(idx, 1)[0];
         q.completed = true;
@@ -251,22 +282,71 @@ export class WorldMap {
     }
 
     completeBattle(scenarioId, won) {
-        if (won) {
-            this.completedBattles.add(scenarioId);
-            this.currentNode.visited = true;
+        if (!won) return { won: false };
+
+        this.completedBattles.add(scenarioId);
+        this.currentNode.visited = true;
+
+        const rewards = { won: true, xpGained: 0, goldGained: 0, itemsGained: [], questsCompleted: [] };
+        const scenario = BATTLE_SCENARIOS[scenarioId];
+        if (scenario) {
+            const xp = scenario.xpPerMember || 0;
+            rewards.xpGained = xp;
+            for (const member of this.party) {
+                member.xp = member.xp || {};
+                member.xp[member.job] = (member.xp[member.job] || 0) + xp;
+            }
+            rewards.goldGained = scenario.gold || 0;
+            this.gold += rewards.goldGained;
+            rewards.itemsGained = [...(scenario.items || [])];
+            for (const item of rewards.itemsGained) this.addItem(item);
         }
-        return won;
+
+        // Mark any pinned encounter for this scenario as defeated and check quest links
+        for (const pe of this.pinnedEncounters) {
+            if (pe.battleScenarioId === scenarioId && !pe.defeated) {
+                pe.defeated = true;
+                if (pe.questId) {
+                    const q = this.activeQuests.find(q2 => q2.id === pe.questId);
+                    if (q) { q._battleCompleted = true; rewards.questsCompleted.push(q); }
+                }
+            }
+        }
+
+        // Check quests with battleCompletionId matching this scenario
+        for (const q of this.activeQuests) {
+            if (q.battleCompletionId === scenarioId && !q._battleCompleted) {
+                q._battleCompleted = true;
+                if (!rewards.questsCompleted.includes(q)) rewards.questsCompleted.push(q);
+            }
+        }
+
+        return rewards;
     }
 
     rest() {
         this.day++;
-        this._lastEncounters = this._tickRoamingEnemies(null, null);
+        const roamEncs = this._tickRoamingEnemies(null, null);
+        this._lastEncounters = roamEncs;
+    }
+
+    _checkPinnedEncounters(nodeId) {
+        const encounters = [];
+        for (const enc of this.pinnedEncounters) {
+            if (enc.defeated) continue;
+            if (enc.nodeId === nodeId) {
+                encounters.push({ enemy: enc, crossed: false, pinned: true });
+            }
+        }
+        return encounters;
     }
 
     _tickRoamingEnemies(playerFrom, playerTo) {
+        // Remove expired and defeated roamers
+        this.roamingEnemies = this.roamingEnemies.filter(e => !e.defeated && !e.isExpired(this.day));
+
         const encounters = [];
         for (const enemy of this.roamingEnemies) {
-            if (enemy.defeated) continue;
             const prevNodeId = enemy.nodeId;
             const node = this._nodeMap[enemy.nodeId];
             if (node) {
@@ -290,7 +370,38 @@ export class WorldMap {
                 encounters.push({ enemy, crossed: true });
             }
         }
+
+        this._trySpawnRoamers();
         return encounters;
+    }
+
+    _trySpawnRoamers() {
+        for (const template of ROAMING_SPAWN_POOL) {
+            const alreadyExists = this.roamingEnemies.some(
+                e => e.id.startsWith(template.id_prefix)
+            );
+            if (alreadyExists) continue;
+
+            // 20% spawn chance per tick using the LCG
+            this._rand = (this._rand * 1664525 + 1013904223) & 0xffffffff;
+            if (Math.abs(this._rand) % 100 >= 20) continue;
+
+            // Pick from discovered non-current nodes in the spawn list
+            const available = template.spawnNodes.filter(id => {
+                const n = this._nodeMap[id];
+                return n && n.discovered && id !== this.currentNodeId;
+            });
+            if (!available.length) continue;
+
+            this._rand = (this._rand * 1664525 + 1013904223) & 0xffffffff;
+            const nodeId    = available[Math.abs(this._rand) % available.length];
+            const lifespan  = 7 + (Math.abs(this._rand) % 8);
+            const id        = `${template.id_prefix}_${this.day}`;
+            this.roamingEnemies.push(new RoamingEnemy(
+                id, nodeId, template.spriteKey, template.name, template.battleScenarioId,
+                { spawnDay: this.day, lifespanDays: lifespan }
+            ));
+        }
     }
 
     popEncounters() {

@@ -77,6 +77,18 @@ export class TacticalBattle {
         // Remove defend status at the start of each turn
         unit.status = unit.status.filter(s => s !== 'defend');
 
+        // regen_aura: heal 5 HP at start of turn while passive active
+        if (unit.abilities.includes('regen_aura') && unit.mp > 0) {
+            unit.hp = Math.min(unit.maxHp, unit.hp + 5);
+            this.logMsg(`${unit.name} regenerates 5 HP from Regen Aura.`);
+        }
+
+        // Decrement timed buffs, remove expired
+        unit.buffs = (unit.buffs || []).filter(b => {
+            if (b.duration === null) return true;
+            return --b.duration > 0;
+        });
+
         if (isUnconscious(unit)) {
             unit.deathTimer = (unit.deathTimer || 0) - 1;
             if (unit.deathTimer <= 0) {
@@ -124,9 +136,13 @@ export class TacticalBattle {
         this.selectedAbility = abilityKey;
         this.abilityRotation = 0;
         this._lastHoverTile = null;
-        const fromTile = new Set([`${this.activeUnit.x},${this.activeUnit.y}`]);
-        const requiresLos = ab.requiresLos !== false;
-        this.abilityRange = computeAttackRange(fromTile, ab.range, false, requiresLos, this.map);
+        if (ab.range === 0 && ab.targetType === 'self') {
+            this.abilityRange = new Set([`${this.activeUnit.x},${this.activeUnit.y}`]);
+        } else {
+            const fromTile = new Set([`${this.activeUnit.x},${this.activeUnit.y}`]);
+            const requiresLos = ab.requiresLos !== false;
+            this.abilityRange = computeAttackRange(fromTile, ab.range, false, requiresLos, this.map);
+        }
         this.aoePreview = new Set();
         this.hitPreview = new Set();
         this.setState(STATES.SELECT_ABILITY_TARGET);

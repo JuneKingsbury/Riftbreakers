@@ -133,7 +133,7 @@ export class BattleUI {
         return el;
     }
 
-    _abilityDescription(ab, unit) {
+    _abilityDescription(ab, unit, abilityKey) {
         const lines = [];
         const typeColor = ab.type === 'magic' ? '#c8a0ff' : ab.type === 'passive' ? '#888' : '#ffcc88';
         lines.push(`<span style="color:${typeColor};font-weight:bold;">${ab.name}</span>`);
@@ -147,6 +147,19 @@ export class BattleUI {
 
         if (ab.desc) {
             lines.push(`<span style="color:#aaa;">${ab.desc}</span>`);
+        }
+
+        // Passive effect summary
+        const PASSIVE_EFFECTS = {
+            mana_surge:  '<span style="color:#c8a0ff;">Effect: +15% magic damage dealt while MP > 0</span>',
+            regen_aura:  '<span style="color:#8f8;">Effect: Heal 5 HP at the start of each turn while MP > 0</span>',
+            farsight:    '<span style="color:#aaddff;">Effect: +20% evasion vs physical attacks while MP > 0</span>',
+            divine_ward: '<span style="color:#ffeeaa;">Effect: -20% incoming physical damage while MP > 0</span>',
+            seers_vigil: '<span style="color:#aaddff;">Effect: +15% evasion vs physical; -10% incoming magic damage while MP > 0</span>',
+            wyrd_drain:  '<span style="color:#cc44aa;">Effect: Slows inflicted by this unit last 1 extra turn (via SPD debuff)</span>',
+        };
+        if (ab.passive && abilityKey && PASSIVE_EFFECTS[abilityKey]) {
+            lines.push(PASSIVE_EFFECTS[abilityKey]);
         }
 
         const stats = [];
@@ -184,14 +197,14 @@ export class BattleUI {
         this._updateActionMenu(battle);
         this._updateLog(battle);
         this._updateSkillInfo(battle);
-        if (battle.state === STATES.BATTLE_OVER) this._showResult(battle, onExit);
+        if (battle.state === STATES.BATTLE_OVER) this._showResult(battle, onExit, turnFlags);
     }
 
     _updateSkillInfo(battle) {
         const si = this._skillInfo;
         const key = battle.selectedAbility;
         if (battle.state === STATES.SELECT_ABILITY_TARGET && key && ABILITIES[key]) {
-            si.innerHTML = this._abilityDescription(ABILITIES[key], battle.activeUnit);
+            si.innerHTML = this._abilityDescription(ABILITIES[key], battle.activeUnit, key);
             si.style.display = 'block';
         } else {
             si.style.display = 'none';
@@ -549,7 +562,7 @@ export class BattleUI {
             const key = btn.dataset.key;
             if (key && ABILITIES[key]) {
                 btn.addEventListener('mouseenter', e => {
-                    this._tooltip.innerHTML = this._abilityDescription(ABILITIES[key], unit);
+                    this._tooltip.innerHTML = this._abilityDescription(ABILITIES[key], unit, key);
                     this._tooltip.style.display = 'block';
                     this._positionTooltip(e);
                 });
@@ -594,18 +607,42 @@ export class BattleUI {
         ).join('');
     }
 
-    _showResult(battle, onExit) {
+    _showResult(battle, onExit, flags) {
         const r = this._result;
         if (r.style.display === 'flex') return;
         r.style.display = 'flex';
         const won = battle.winner === 'player';
+        const rewards = flags?.rewards;
+
+        let rewardHtml = '';
+        if (won && rewards) {
+            rewardHtml += `<div style="margin-top:10px;border-top:1px solid #335;padding-top:8px;text-align:left;min-width:200px;">`;
+            if (rewards.xpGained > 0) {
+                rewardHtml += `<div style="color:#aaffaa;font-size:12px;">+${rewards.xpGained} XP (all members)</div>`;
+            }
+            if (rewards.goldGained > 0) {
+                rewardHtml += `<div style="color:#ffdd88;font-size:12px;">+${rewards.goldGained} gold</div>`;
+            }
+            for (const item of (rewards.itemsGained || [])) {
+                const name = item.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                rewardHtml += `<div style="color:#88ddff;font-size:12px;">Item: ${name}</div>`;
+            }
+            if (rewards.questsCompleted?.length) {
+                for (const q of rewards.questsCompleted) {
+                    rewardHtml += `<div style="color:#ffcc88;font-size:12px;">Quest updated: ${q.title}</div>`;
+                }
+            }
+            rewardHtml += `</div>`;
+        }
+
         r.innerHTML = `
             <div style="font-size:40px;font-weight:bold;color:${won ? '#ffcc44' : '#f44'};text-shadow:0 0 24px currentColor;letter-spacing:4px;">
                 ${won ? 'VICTORY!' : 'DEFEAT'}
             </div>
             <div style="color:#aaa;font-size:13px;">${won ? 'All enemies defeated.' : 'Your party was wiped out.'}</div>
-            <button id="tac-return-btn" style="margin-top:8px;padding:10px 28px;background:#1a1a30;border:1px solid #557;color:#ccc;font-family:inherit;font-size:14px;cursor:pointer;border-radius:4px;pointer-events:auto;">
-                Return to Menu
+            ${rewardHtml}
+            <button id="tac-return-btn" style="margin-top:12px;padding:10px 28px;background:#1a1a30;border:1px solid #557;color:#ccc;font-family:inherit;font-size:14px;cursor:pointer;border-radius:4px;pointer-events:auto;">
+                Return to Map
             </button>
         `;
         document.getElementById('tac-return-btn')?.addEventListener('click', () => { if (onExit) onExit(); });

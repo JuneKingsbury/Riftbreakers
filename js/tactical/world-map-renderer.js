@@ -115,6 +115,11 @@ export class WorldMapRenderer {
 
     _updateEnemyStates(worldMap, dt) {
         const nodeMap = Object.fromEntries(worldMap.nodes.map(n => [n.id, n]));
+        // Remove states for roamers that have been removed from the roster
+        const liveIds = new Set((worldMap.roamingEnemies || []).map(e => e.id));
+        for (const id of this._enemyStates.keys()) {
+            if (!liveIds.has(id)) this._enemyStates.delete(id);
+        }
         for (const enemy of (worldMap.roamingEnemies || [])) {
             if (enemy.defeated) { this._enemyStates.delete(enemy.id); continue; }
             const target = nodeMap[enemy.nodeId];
@@ -235,6 +240,19 @@ export class WorldMapRenderer {
             const ex = s.nx * W;
             const ey = s.ny * H;
             this._drawEnemyMarker(ctx, ex, ey, enemy, s, alpha, now);
+        }
+
+        // Draw pinned encounters (static markers at their node, offset slightly)
+        for (const enc of (worldMap.pinnedEncounters || [])) {
+            if (enc.defeated) continue;
+            const node = nodeMap[enc.nodeId];
+            if (!node || !node.discovered) continue;
+            const pos = this._toWorld(node.x, node.y);
+            // Offset right of the node so it doesn't overlap the node icon
+            const ex = pos.x + NODE_RADIUS + 6;
+            const ey = pos.y - NODE_RADIUS + 4;
+            const staticState = { isWalking: false, walkPhase: 0, walkDirX: 1 };
+            this._drawEnemyMarker(ctx, ex, ey, enc, staticState, 1.0, now);
         }
 
         // Draw player marker on top of nodes

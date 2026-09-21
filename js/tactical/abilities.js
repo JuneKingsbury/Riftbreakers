@@ -5,6 +5,20 @@ import { ABILITIES } from './data-registry.js';
 // Re-export so callers that import ABILITIES from this module keep working.
 export { ABILITIES };
 
+// Returns the effective value of a stat after applying active buffs/debuffs.
+function getEffectiveStat(unit, stat) {
+    let val = unit[stat];
+    for (const b of (unit.buffs || [])) {
+        if (b.stat === stat) val += b.value;
+    }
+    return val;
+}
+
+// Returns true if a passive ability is active on the unit (in abilities list and has MP).
+function passiveActive(unit, key) {
+    return unit.abilities.includes(key) && unit.mp > 0;
+}
+
 function directionEvasionMod(attacker, target) {
     const dx = attacker.x - target.x;
     const dy = attacker.y - target.y;
@@ -151,6 +165,14 @@ export function resolveAbility(source, target, ability, map) {
     const ab = ABILITIES[ability];
     if (!ab) return { damage: 0, healing: 0, statusApplied: null };
 
+    // --- earth_skin: self DEF buff ---
+    if (ability === 'earth_skin') {
+        source.buffs = source.buffs || [];
+        source.buffs.push({ key: 'earth_skin', stat: 'def', value: 8, duration: 2 });
+        faceToward(source, source.x, source.y);
+        return { damage: 0, healing: 0, statusApplied: null, floatingText: 'DEF UP!' };
+    }
+
     const srcTile = getTile(map, source.x, source.y);
     const tgtTile = getTile(map, target.x, target.y);
     const highGroundBonus = (srcTile && tgtTile && srcTile.elevation > tgtTile.elevation) ? 1.25 : 1.0;
@@ -162,7 +184,7 @@ export function resolveAbility(source, target, ability, map) {
     }
 
     if (ab.isHeal) {
-        const healing = Math.round((source.mat * 2 + 8) * ab.basePower);
+        const healing = Math.round((getEffectiveStat(source, 'mat') * 2 + 8) * ab.basePower);
         target.hp = Math.min(target.maxHp, target.hp + healing);
         let revived = false;
         if (isUnconscious(target) && target.hp > 0) {
@@ -174,9 +196,20 @@ export function resolveAbility(source, target, ability, map) {
     }
 
     if (ab.type === 'physical') {
+        // temporal_slip: next physical attack auto-misses
+        if (target.status.includes('slipped')) {
+            target.status = target.status.filter(s => s !== 'slipped');
+            faceToward(source, target.x, target.y);
+            return { damage: 0, healing: 0, statusApplied: null, missed: true };
+        }
+
         const evaMod = directionEvasionMod(source, target);
-        const effectiveEva = ((target.eva || 0) / 100) * evaMod;
+        let effectiveEva = ((getEffectiveStat(target, 'eva') || 0) / 100) * evaMod;
         const defBonus = target.status.includes('defend') ? 0.2 : 0;
+        // farsight: +20% evasion while passive active
+        if (passiveActive(target, 'farsight')) effectiveEva += 0.20;
+        // seers_vigil: +15% evasion while passive active
+        if (passiveActive(target, 'seers_vigil')) effectiveEva += 0.15;
         const finalEva = Math.min(0.9, effectiveEva + defBonus);
         if (Math.random() < finalEva) {
             faceToward(source, target.x, target.y);
@@ -188,9 +221,15 @@ export function resolveAbility(source, target, ability, map) {
 
     let raw;
     if (ab.type === 'physical') {
-        raw = Math.max(1, source.atk * 2 - target.def * defMult) * ab.basePower * highGroundBonus;
+        raw = Math.max(1, getEffectiveStat(source, 'atk') * 2 - getEffectiveStat(target, 'def') * defMult) * ab.basePower * highGroundBonus;
+        // divine_ward: incoming physical damage reduced 20%
+        if (passiveActive(target, 'divine_ward')) raw *= 0.80;
     } else {
-        raw = Math.max(1, source.mat * 2 - target.mdf * defMult) * ab.basePower * highGroundBonus;
+        raw = Math.max(1, getEffectiveStat(source, 'mat') * 2 - getEffectiveStat(target, 'mdf') * defMult) * ab.basePower * highGroundBonus;
+        // mana_surge: outgoing magic damage +15%
+        if (passiveActive(source, 'mana_surge')) raw *= 1.15;
+        // seers_vigil: incoming magic damage -10%
+        if (passiveActive(target, 'seers_vigil')) raw *= 0.90;
     }
     const variance = 0.9 + Math.random() * 0.2;
     const damage = Math.round(raw * variance);
@@ -217,6 +256,17 @@ export function resolveAbility(source, target, ability, map) {
             target.status.push(ab.applyStatus);
             statusApplied = ab.applyStatus;
         }
+    }
+
+    // Post-status effects
+    if (statusApplied === 'enfeebled') {
+        target.buffs = target.buffs || [];
+        target.buffs.push({ key: 'enfeebled', stat: 'atk', value: -5, duration: 2 });
+    }
+    // wyrd_drain: slow duration +1 via SPD debuff on target
+    if (ab.applyStatus === 'slow' && statusApplied === 'slow' && passiveActive(source, 'wyrd_drain')) {
+        target.buffs = target.buffs || [];
+        target.buffs.push({ key: 'wyrd_slow', stat: 'spd', value: -2, duration: 1 });
     }
 
     faceToward(source, target.x, target.y);

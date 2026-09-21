@@ -114,8 +114,9 @@ export class WorldMapScene {
             this._inEncounter = false;
             // Restore any remaining queued travel after battle result is handled
             this._travelQueue = savedQueue;
-            this._startBattle(enemy.battleScenarioId, (won) => {
+            this._startBattle(enemy.battleScenarioId, (won, rewards) => {
                 if (won) enemy.defeated = true;
+                this._handleBattleRewards(rewards);
                 this._ui._lastSidebarKey = null;
                 this._resolveNextEncounter();
             });
@@ -265,7 +266,10 @@ export class WorldMapScene {
                 break;
             case 'battle': {
                 const scenarioId = wm.currentNode.battleScenarioId;
-                if (scenarioId) this._startBattle(scenarioId);
+                if (scenarioId) this._startBattle(scenarioId, (won, rewards) => {
+                    this._handleBattleRewards(rewards);
+                    this._ui._lastSidebarKey = null;
+                });
                 break;
             }
             case 'party':
@@ -288,5 +292,20 @@ export class WorldMapScene {
     _startBattle(scenarioId, onComplete) {
         const battleScene = new BattleScene(scenarioId, this._worldMap, onComplete || null);
         this._sm.push(battleScene);
+    }
+
+    _handleBattleRewards(rewards) {
+        if (!rewards?.won) return;
+        const wm = this._worldMap;
+        for (const q of (rewards.questsCompleted || [])) {
+            // Turn in quest and notify. turnInQuest handles _battleCompleted quests.
+            const turned = wm.turnInQuest(q.id);
+            if (turned) {
+                this._ui.notify(`Quest complete: "${q.title}" — rewards claimed!`, 5000);
+            } else {
+                // Quest marked completed but may need manual turn-in at node
+                this._ui.notify(`Quest updated: "${q.title}"`, 4000);
+            }
+        }
     }
 }

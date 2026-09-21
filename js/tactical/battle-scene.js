@@ -10,13 +10,28 @@ import { ABILITIES } from './abilities.js';
 import { unlockedAbilities } from './data-registry.js';
 import { CHARACTER_DATA } from './data/characters.js';
 import { equipmentStatBonuses } from './data/equipment.js';
+import { BATTLE_SCENARIOS } from './world-map-data.js';
 
-function buildUnits(worldMap, playerSpawns, enemySpawns) {
-    // Player units come from worldMap.party (live roster) so equipment/appearance
-    // changes on the world map are reflected in battle. Enemies always use CHARACTER_DATA.
-    const partyData  = worldMap?.party ?? CHARACTER_DATA.filter(c => c.team === 'player');
-    const enemyData  = CHARACTER_DATA.filter(c => c.team === 'enemy');
-    const units      = [...partyData, ...enemyData].map((charData) => {
+function buildUnits(worldMap, scenarioId, playerSpawns, enemySpawns) {
+    const partyData = worldMap?.party ?? CHARACTER_DATA.filter(c => c.team === 'player');
+
+    // Use scenario-specific roster if defined; fall back to CHARACTER_DATA enemies.
+    const scenario   = BATTLE_SCENARIOS[scenarioId];
+    const rosterDefs = scenario?.roster;
+    const enemyData  = rosterDefs
+        ? rosterDefs.map((r, i) => ({
+            name:          r.name,
+            job:           r.job,
+            team:          'enemy',
+            x:             20, y: 8,   // overwritten by spawn positions below
+            ct:            r.ct ?? 0,
+            statMods:      r.statMods ?? {},
+            extraAbilities: r.extraAbilities ?? [],
+            appearance:    r.appearance ?? null,
+        }))
+        : CHARACTER_DATA.filter(c => c.team === 'enemy');
+
+    const units = [...partyData, ...enemyData].map((charData) => {
         const equipBonuses = equipmentStatBonuses(charData.appearance);
         const mergedMods   = { ...(charData.statMods || {}), };
         for (const [k, v] of Object.entries(equipBonuses)) {
@@ -43,8 +58,8 @@ function buildUnits(worldMap, playerSpawns, enemySpawns) {
         }
         return unit;
     });
-    const players    = units.filter(u => u.team === 'player');
-    const enemies    = units.filter(u => u.team === 'enemy');
+    const players = units.filter(u => u.team === 'player');
+    const enemies = units.filter(u => u.team === 'enemy');
     const avg = (arr, key) => arr.reduce((s, u) => s + u[key], 0) / arr.length;
     const enemyCx = avg(enemies, 'x'), enemyCy = avg(enemies, 'y');
     const playerCx = avg(players, 'x'), playerCy = avg(players, 'y');
@@ -75,7 +90,7 @@ export class BattleScene {
 
         const mapDef = MAP_DATA[Math.floor(Math.random() * MAP_DATA.length)];
         const map    = loadMapData(mapDef);
-        const units  = buildUnits(this._worldMap, map.playerSpawns, map.enemySpawns);
+        const units  = buildUnits(this._worldMap, this._scenarioId, map.playerSpawns, map.enemySpawns);
 
         this._battle = new TacticalBattle(map, units);
 
@@ -105,6 +120,7 @@ export class BattleScene {
         this._panCam    = { x: 0, y: 0 };
         this._PAN_THRESHOLD = 4;
         this._abilityFromSkillMenu = false;
+        this._pendingRewards = null;
 
         this._scheduleNextTurn();
     }
@@ -124,21 +140,27 @@ export class BattleScene {
     render(now) {
         if (this._stopped) return;
         this._renderer?.render(this._battle, now);
+        // Compute rewards once when battle first ends
+        if (this._battle.state === STATES.BATTLE_OVER && !this._pendingRewards) {
+            const won = this._battle.winner === 'player';
+            this._pendingRewards = this._worldMap
+                ? this._worldMap.completeBattle(this._scenarioId, won)
+                : { won };
+        }
         this._ui?.update(this._battle, () => this._onBattleExit(), {
             hasMoved: this._turnHasMoved,
             hasActed: this._turnHasActed,
+            rewards: this._pendingRewards,
         });
     }
 
     _onBattleExit() {
-        const won = this._battle.winner === 'player';
-        if (this._worldMap) {
-            this._worldMap.completeBattle(this._scenarioId, won);
-        }
-        // BattleUI shows its own VICTORY/DEFEAT modal; when the player closes it
-        // the onExit callback fires (which is this method). Pop back to WorldMap.
+        // Rewards were already computed and applied in render(); just exit.
         this._sm.pop();
-        if (this._onComplete) this._onComplete(won);
+        if (this._onComplete) this._onComplete(
+            this._pendingRewards?.won ?? false,
+            this._pendingRewards
+        );
     }
 
     _resetTurn() {

@@ -32,6 +32,7 @@ export function createUnit(name, job, team, x, y, { statMods = {}, extraAbilitie
         spriteKey: base.spriteKey,
         abilities: [...base.abilities, ...extraAbilities],
         status: [],
+        buffs: [],
         facing: 'south',
         _floats: [],
         appearance,

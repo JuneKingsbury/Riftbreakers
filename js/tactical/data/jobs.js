@@ -68,8 +68,8 @@ export const JOB_DATA = {
         maxHp: 38, maxMp: 44,
         spd: 8, atk: 7, def: 4, mat: 12, mdf: 8,
         move: 3, eva: 13,
-        abilities: ['attack', 'hex', 'mana_surge'],
-        abilityLevels: { attack: 1, hex: 1, mana_surge: 3 },
+        abilities: ['attack', 'hex', 'enfeeble', 'mana_surge'],
+        abilityLevels: { attack: 1, hex: 1, enfeeble: 2, mana_surge: 3 },
         spriteKey: 'spell_wraith',
         char: 'C', color: '#cc88dd',
         schools: ['enchantment'],
@@ -107,8 +107,8 @@ export const JOB_DATA = {
         maxHp: 50, maxMp: 30,
         spd: 8, atk: 11, def: 7, mat: 9, mdf: 7,
         move: 4, eva: 14,
-        abilities: ['attack', 'rock_toss'],
-        abilityLevels: { attack: 1, rock_toss: 2 },
+        abilities: ['attack', 'rock_toss', 'earth_skin'],
+        abilityLevels: { attack: 1, rock_toss: 2, earth_skin: 2 },
         spriteKey: 'void_brute',
         char: 'T', color: '#aa8855',
         schools: ['transmutation'],
@@ -120,8 +120,8 @@ export const JOB_DATA = {
         maxHp: 40, maxMp: 48,
         spd: 7, atk: 6, def: 5, mat: 10, mdf: 11,
         move: 3, eva: 16,
-        abilities: ['attack', 'ward', 'farsight'],
-        abilityLevels: { attack: 1, ward: 1, farsight: 2 },
+        abilities: ['attack', 'ward', 'farsight', 'temporal_slip'],
+        abilityLevels: { attack: 1, ward: 1, farsight: 2, temporal_slip: 3 },
         spriteKey: 'npc_ally',
         char: 'D', color: '#99ccff',
         schools: ['divination'],
@@ -321,5 +321,126 @@ export const JOB_DATA = {
         abilities: ['attack', 'shadow_bolt'],
         spriteKey: 'spell_wraith',
         char: 'S', color: '#84f',
+    },
+
+    // ---- Beast / creature enemies ----
+
+    wolf: {
+        maxHp: 30, maxMp: 0,
+        spd: 13, atk: 10, def: 3, mat: 1, mdf: 3,
+        move: 5, eva: 22,
+        abilities: ['wolf_bite'],
+        spriteKey: 'wolf',
+        char: 'w', color: '#aaaacc',
+    },
+
+    boar: {
+        maxHp: 48, maxMp: 0,
+        spd: 9, atk: 13, def: 6, mat: 1, mdf: 4,
+        move: 4, eva: 10,
+        abilities: ['attack', 'boar_charge'],
+        spriteKey: 'boar',
+        char: 'b', color: '#996644',
+    },
+
+    thorn_beast: {
+        maxHp: 42, maxMp: 28,
+        spd: 7, atk: 7, def: 5, mat: 10, mdf: 7,
+        move: 3, eva: 12,
+        abilities: ['attack', 'thorn_volley'],
+        spriteKey: 'thorn_beast',
+        char: 't', color: '#449922',
+    },
+
+    spore_walker: {
+        maxHp: 38, maxMp: 32,
+        spd: 6, atk: 6, def: 4, mat: 9, mdf: 6,
+        move: 3, eva: 10,
+        abilities: ['attack', 'spore_burst'],
+        spriteKey: 'spore_walker',
+        char: 's', color: '#88bb33',
+    },
+
+    shard_spider: {
+        maxHp: 26, maxMp: 0,
+        spd: 12, atk: 8, def: 3, mat: 1, mdf: 4,
+        move: 5, eva: 20,
+        abilities: ['spider_bite'],
+        spriteKey: 'shard_spider',
+        char: 'x', color: '#aaccff',
+    },
+
+    canopy_stalker: {
+        maxHp: 44, maxMp: 0,
+        spd: 10, atk: 15, def: 5, mat: 1, mdf: 4,
+        move: 5, eva: 16,
+        abilities: ['attack', 'pounce'],
+        spriteKey: 'canopy_stalker',
+        char: 'C', color: '#cc8833',
+    },
+
+    spectral_wisp: {
+        maxHp: 22, maxMp: 40,
+        spd: 9, atk: 3, def: 2, mat: 12, mdf: 12,
+        move: 4, eva: 24,
+        abilities: ['soul_drain'],
+        spriteKey: 'spectral_wisp',
+        char: 'W', color: '#8888ff',
+    },
+
+    void_stalker: {
+        maxHp: 52, maxMp: 0,
+        spd: 8, atk: 14, def: 7, mat: 2, mdf: 8,
+        move: 4, eva: 14,
+        abilities: ['attack', 'void_strike'],
+        spriteKey: 'void_stalker',
+        char: 'V', color: '#6644cc',
+    },
+
+    // ---- Human enemy variants ----
+
+    raider: {
+        maxHp: 40, maxMp: 0,
+        spd: 9, atk: 11, def: 6, mat: 2, mdf: 4,
+        move: 4, eva: 13,
+        abilities: ['attack'],
+        spriteKey: 'raider',
+        char: 'r', color: '#cc6633',
+    },
+
+    raider_archer: {
+        maxHp: 34, maxMp: 0,
+        spd: 10, atk: 10, def: 4, mat: 2, mdf: 4,
+        move: 4, eva: 16,
+        abilities: ['attack', 'long_shot'],
+        spriteKey: 'raider_archer',
+        char: 'a', color: '#cc8833',
+    },
+
+    raider_hexer: {
+        maxHp: 30, maxMp: 36,
+        spd: 8, atk: 5, def: 3, mat: 11, mdf: 7,
+        move: 3, eva: 13,
+        abilities: ['attack', 'hex'],
+        spriteKey: 'raider_hexer',
+        char: 'h', color: '#aa66cc',
+    },
+
+    void_walker: {
+        maxHp: 44, maxMp: 28,
+        spd: 8, atk: 9, def: 5, mat: 11, mdf: 8,
+        move: 3, eva: 13,
+        abilities: ['attack', 'shadow_bolt'],
+        spriteKey: 'void_walker',
+        char: 'v', color: '#6644aa',
+    },
+
+    kingdom_guard: {
+        maxHp: 58, maxMp: 0,
+        spd: 7, atk: 13, def: 11, mat: 2, mdf: 8,
+        move: 3, eva: 9,
+        abilities: ['attack', 'shield_bash'],
+        spriteKey: 'kingdom_guard',
+        char: 'G', color: '#8888cc',
     },
 };

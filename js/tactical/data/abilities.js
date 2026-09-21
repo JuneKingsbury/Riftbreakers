@@ -616,6 +616,61 @@ export const ABILITY_DATA = {
         desc: 'Chokes an area with tangling roots, turning open ground into difficult terrain.',
     },
 
+    // =====================================================================
+    // --- Tier 1 additions ---
+    // =====================================================================
+
+    // Transmuter: self-buff, raises DEF for 2 turns
+    earth_skin: {
+        name: 'Earth Skin',
+        type: 'magic',
+        range: 0,
+        aoe: 0,
+        mpCost: 10,
+        actionCost: 35,
+        targetType: 'self',
+        animType: 'cast',
+        projectileColor: '#886644',
+        chargeTime: 0,
+        desc: 'Transmutes your own skin to stone, raising DEF by 8 for 2 turns.',
+    },
+
+    // Enchanter: ranged ATK debuff
+    enfeeble: {
+        name: 'Enfeeble',
+        type: 'magic',
+        range: 3,
+        aoe: 0,
+        mpCost: 10,
+        actionCost: 42,
+        targetType: 'enemy',
+        basePower: 0.4,
+        element: 'shadow',
+        animType: 'cast',
+        projectileColor: '#aa44cc',
+        chargeTime: 0,
+        applyStatus: 'enfeebled',
+        desc: 'Saps the target\'s fighting spirit, dealing minor damage and reducing their ATK for 2 turns.',
+    },
+
+    // Seer: causes the next physical attack against target to miss
+    temporal_slip: {
+        name: 'Temporal Slip',
+        type: 'magic',
+        range: 3,
+        aoe: 0,
+        mpCost: 14,
+        actionCost: 42,
+        targetType: 'enemy',
+        basePower: 0,
+        element: 'arcane',
+        animType: 'cast',
+        projectileColor: '#aaddff',
+        chargeTime: 0,
+        applyStatus: 'slipped',
+        desc: 'Nudges fate so the next physical attack against this target misses entirely.',
+    },
+
     // --- Enemy abilities ---
     goblin_slash: {
         extends: 'attack',
@@ -634,5 +689,103 @@ export const ABILITY_DATA = {
         element: 'shadow',
         projectileColor: '#aa44ff',
         chargeTime: 40,
+    },
+
+    // =====================================================================
+    // --- Beast / creature enemy abilities ---
+    // =====================================================================
+
+    // Wolf: fast lunge — melee, applies slow (hamstring)
+    wolf_bite: {
+        extends: 'attack',
+        name: 'Bite',
+        actionCost: 30,
+        basePower: 0.95,
+        applyStatus: 'slow',
+        statusDuration: 1,
+    },
+
+    // Boar: charge — melee stun, slightly weaker hit
+    boar_charge: {
+        extends: 'attack',
+        name: 'Charge',
+        actionCost: 40,
+        basePower: 0.85,
+        applyStatus: 'stun',
+        statusDuration: 1,
+    },
+
+    // Thorn beast: ranged thorn volley — nature magic, AoE
+    thorn_volley: {
+        extends: 'fire',
+        name: 'Thorn Volley',
+        range: 3,
+        aoe: 1,
+        requiresLos: true,
+        mpCost: 10,
+        basePower: 0.9,
+        element: 'nature',
+        projectileColor: '#66aa22',
+        chargeTime: 20,
+        applyStatus: 'slow',
+        statusDuration: 1,
+    },
+
+    // Spore walker: spore burst — AoE nature, no LOS (drifting cloud)
+    spore_burst: {
+        extends: 'fire',
+        name: 'Spore Burst',
+        range: 2,
+        aoe: 2,
+        requiresLos: false,
+        mpCost: 12,
+        basePower: 0.75,
+        element: 'nature',
+        projectileColor: '#88cc44',
+        chargeTime: 30,
+        applyStatus: 'slow',
+        statusDuration: 2,
+    },
+
+    // Shard spider: venom bite — physical, inflicts slow
+    spider_bite: {
+        extends: 'attack',
+        name: 'Venom Bite',
+        actionCost: 35,
+        basePower: 0.8,
+        applyStatus: 'slow',
+        statusDuration: 2,
+    },
+
+    // Canopy stalker: pounce — high-damage physical
+    pounce: {
+        extends: 'attack',
+        name: 'Pounce',
+        actionCost: 40,
+        basePower: 1.3,
+    },
+
+    // Spectral wisp: soul drain — magic, drains from distance
+    soul_drain: {
+        extends: 'fire',
+        name: 'Soul Drain',
+        range: 3,
+        aoe: 0,
+        requiresLos: true,
+        mpCost: 8,
+        basePower: 1.0,
+        element: 'shadow',
+        projectileColor: '#8866ff',
+        chargeTime: 0,
+        applyStatus: 'slow',
+        statusDuration: 1,
+    },
+
+    // Void stalker: void strike — high-damage physical melee
+    void_strike: {
+        extends: 'attack',
+        name: 'Void Strike',
+        actionCost: 38,
+        basePower: 1.2,
     },
 };
