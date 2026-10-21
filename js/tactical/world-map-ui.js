@@ -191,6 +191,8 @@ export class WorldMapUI {
 
         // Party + Inventory buttons — always visible
         html += `<button class="wm-btn" data-action="party" style="${BTN_BASE}color:#adf;border-color:#448;">&#9776; Party</button>`;
+        // Battles are fully automatic, so this is where the player directs each character.
+        html += `<button class="wm-btn" data-action="tactics" style="${BTN_BASE}color:#cf9;border-color:#575;">&#x2699; Party Tactics</button>`;
         const invCount = Object.values(worldMap.inventory).reduce((s, n) => s + n, 0);
         html += `<button class="wm-btn" data-action="inventory" style="${BTN_BASE}color:#adf;border-color:#448;">&#x1F392; Inventory <span style="color:#888;font-size:10px;">(${invCount})</span></button>`;
 

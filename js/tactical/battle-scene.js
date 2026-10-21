@@ -4,7 +4,8 @@ import { createUnitFromCharData, faceToward } from './units.js';
 import { TacticalBattle, STATES } from './battle.js';
 import { BattleRenderer } from './battle-renderer.js';
 import { BattleUI } from './battle-ui.js';
-import { runEnemyTurn } from './enemy-ai.js';
+import { runAutoTurn } from './ai/executor.js';
+import { getScriptFor } from './ai/script-store.js';
 import { isEntityMoving } from '../systems/movement-lerp.js';
 import { ABILITIES } from './abilities.js';
 import { unlockedAbilities } from './data-registry.js';
@@ -12,7 +13,9 @@ import { CHARACTER_DATA } from './data/characters.js';
 import { equipmentStatBonuses } from './data/equipment.js';
 import { BATTLE_SCENARIOS } from './world-map-data.js';
 
-function buildUnits(worldMap, scenarioId, playerSpawns, enemySpawns) {
+const SPEEDS = { '1': 1, '2': 2, '3': 4 };
+
+export function buildUnits(worldMap, scenarioId, playerSpawns, enemySpawns) {
     const partyData = worldMap?.party ?? CHARACTER_DATA.filter(c => c.team === 'player');
 
     // Use scenario-specific roster if defined; fall back to CHARACTER_DATA enemies.
@@ -59,6 +62,8 @@ function buildUnits(worldMap, scenarioId, playerSpawns, enemySpawns) {
             const crossSlots  = new Set([charData.supportSkill, charData.supportPassive].filter(Boolean));
             unit.abilities = unit.abilities.filter(k => unlocked.has(k) || crossSlots.has(k));
         }
+        // Player characters fight by their battle script. Enemies keep the scoring AI.
+        if (charData.team === 'player') unit.script = getScriptFor(charData);
         return unit;
     });
     const players = units.filter(u => u.team === 'player');
@@ -74,12 +79,17 @@ function buildUnits(worldMap, scenarioId, playerSpawns, enemySpawns) {
 export class BattleScene {
     // opts.mapDef           — pre-selected map definition (from DeployScene); random if omitted
     // opts.customPlayerSpawns — [{x,y}] array overriding map.playerSpawns order
+    // opts.manualControl    — let the player command their own units by hand. By
+    //                         default every player unit acts from its script.
     constructor(scenarioId, worldMap, onComplete, opts = {}) {
         this._scenarioId        = scenarioId;
         this._worldMap          = worldMap;
         this._onComplete        = onComplete || null;
         this._presetMapDef      = opts.mapDef            || null;
         this._customPlayerSpawns = opts.customPlayerSpawns || null;
+        this._manualControl      = opts.manualControl === true;
+        this._paused             = false;
+        this._speed              = 1;
         this._battle     = null;
         this._renderer   = null;
         this._ui         = null;
@@ -108,9 +118,15 @@ export class BattleScene {
         document.getElementById('game-container')?.classList.add('tactical-mode');
 
         this._renderer = new BattleRenderer(containerEl, skinManager);
-        this._ui       = new BattleUI(containerEl, this._battle, this._renderer);
+        this._ui       = new BattleUI(containerEl, this._battle, this._renderer, { fullAuto: !this._manualControl });
 
         this._ui.setActionHandler((action, key) => this._handleAction(action, key));
+        this._ui.setPlaybackHandler((ctl, value) => this._handlePlayback(ctl, value));
+
+        // Without manual control every player unit is auto-controlled from the start.
+        if (!this._manualControl) {
+            for (const u of units) if (u.team === 'player') this._autoUnits.add(u.id);
+        }
 
         // Input listeners
         this._renderer.canvas.addEventListener('mousedown',    this._onMouseDown   = (e) => this._handleMouseDown(e));
@@ -161,7 +177,8 @@ export class BattleScene {
             hasActed: this._turnHasActed,
             rewards: this._pendingRewards,
             autoUnits: this._autoUnits,
-        });
+            manualControl: this._manualControl,
+        }, { paused: this._paused, speed: this._speed });
     }
 
     _onBattleExit() {
@@ -171,6 +188,26 @@ export class BattleScene {
             this._pendingRewards?.won ?? false,
             this._pendingRewards
         );
+    }
+
+    // Schedules `fn` after `ms` of battle time. Honours speed and pause so the
+    // player, who now only watches, can control the pace.
+    _later(ms, fn) {
+        this._enemyTimer = setTimeout(() => this._whenRunning(fn), ms / this._speed);
+    }
+
+    _whenRunning(fn) {
+        if (this._stopped) return;
+        if (this._paused) {
+            this._enemyTimer = setTimeout(() => this._whenRunning(fn), 100);
+            return;
+        }
+        fn();
+    }
+
+    _handlePlayback(ctl, value) {
+        if (ctl === 'pause') this._paused = !this._paused;
+        else if (ctl === 'speed' && value > 0) this._speed = value;
     }
 
     _resetTurn() {
@@ -231,17 +268,21 @@ export class BattleScene {
                 this._renderer._autoCenterNext = true;
                 this._battle.startTurn(unit);
 
-                if (this._battle.state === STATES.ADVANCE_CT) {
-                    this._enemyTimer = setTimeout(() => { if (!this._stopped) this._scheduleNextTurn(); }, 200);
-                } else if (this._battle.state === STATES.ENEMY_TURN || (this._battle.state === STATES.PLAYER_TURN && this._autoUnits.has(unit.id))) {
-                    this._enemyTimer = setTimeout(() => {
-                        if (this._stopped) return;
-                        const animMs = runEnemyTurn(unit, this._battle, this._playAbilityAnimation.bind(this));
+                const state = this._battle.state;
+                // Without manual control nobody waits for input: a charmed enemy that the
+                // game would normally hand to the player is simply run by the AI.
+                const autoTurn = state === STATES.ENEMY_TURN
+                    || (state === STATES.PLAYER_TURN && (!this._manualControl || this._autoUnits.has(unit.id)));
+                if (state === STATES.ADVANCE_CT) {
+                    this._later(200, () => this._scheduleNextTurn());
+                } else if (autoTurn) {
+                    this._later(600, () => {
+                        const animMs = runAutoTurn(unit, this._battle, this._playAbilityAnimation.bind(this));
                         const wait = typeof animMs === 'number' ? animMs + 150 : 150;
-                        this._enemyTimer = setTimeout(() => {
-                            if (!this._stopped && this._battle.state !== STATES.BATTLE_OVER) this._scheduleNextTurn();
-                        }, wait);
-                    }, 600);
+                        this._later(wait, () => {
+                            if (this._battle.state !== STATES.BATTLE_OVER) this._scheduleNextTurn();
+                        });
+                    });
                 }
             });
         };
@@ -250,7 +291,7 @@ export class BattleScene {
             // Center on the first unit whose charge fired so the player can watch.
             const first = firedCharges[0];
             if (first) this._renderer.centerOn(first.unit.x, first.unit.y, this._battle.map.width, this._battle.map.height);
-            this._enemyTimer = setTimeout(proceed, chargeMs + 800);
+            this._later(chargeMs + 800, proceed);
         } else {
             proceed();
         }
@@ -264,6 +305,7 @@ export class BattleScene {
     }
 
     _handleAction(action, abilityKey) {
+        if (!this._manualControl) return;
         if (this._battle.state !== STATES.PLAYER_TURN) return;
         if (action === 'auto') {
             const unit = this._battle.activeUnit;
@@ -370,6 +412,9 @@ export class BattleScene {
             this._ui.inspectUnit(clicked || null);
         }
 
+        // Scripted battles take no commands from the board, only inspection.
+        if (!this._manualControl) return;
+
         if (state === STATES.SELECT_MOVE) {
             if (this._battle.commitMove(tile.x, tile.y)) {
                 this._turnHasMoved = true;
@@ -427,7 +472,10 @@ export class BattleScene {
             this._cancelTargeting(); return;
         }
 
-        if (this._battle.state === STATES.PLAYER_TURN) {
+        if (e.key === ' ') { this._handlePlayback('pause'); e.preventDefault(); return; }
+        if (!this._manualControl && SPEEDS[e.key]) { this._handlePlayback('speed', SPEEDS[e.key]); return; }
+
+        if (this._manualControl && this._battle.state === STATES.PLAYER_TURN) {
             if (e.key === 'm' || e.key === 'M') { if (!this._turnHasMoved) this._battle.enterMoveMode(); return; }
             if (e.key === 'a' || e.key === 'A') {
                 if (this._ui._skillMenuOpen) { this._ui.closeSkillMenu(); return; }

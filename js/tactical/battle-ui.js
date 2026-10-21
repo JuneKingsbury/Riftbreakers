@@ -1,10 +1,21 @@
 import { STATES } from './battle.js';
 import { ABILITIES } from './abilities.js';
 
+// Rule labels and unit names can come from player-authored scripts.
+function esc(text) {
+    return String(text).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+}
+
+const SPEEDS = [1, 2, 4];
+
 export class BattleUI {
-    constructor(container, battle, renderer) {
+    // opts.fullAuto: every player unit is script-controlled, so show pause/speed
+    // controls and the fired-rule readout instead of manual command hints.
+    constructor(container, battle, renderer, opts = {}) {
         this.battle   = battle;
         this.renderer = renderer;
+        this._fullAuto = !!opts.fullAuto;
+        this._onPlayback = null;
         this._onAction    = null;
         this._skillMenuOpen = false;
         this._sidebarRosterKey = null;
@@ -27,6 +38,7 @@ export class BattleUI {
         this._hint       = this._makeHint();
         this._tooltip    = this._makeTooltip();
         this._skillInfo  = this._makeSkillInfo();
+        this._controls   = this._fullAuto ? this._makeControls() : null;
 
         // Single persistent listener: hide tooltip whenever cursor leaves a tac-btn.
         this._onDocMouseMove = (e) => {
@@ -38,6 +50,52 @@ export class BattleUI {
     }
 
     setActionHandler(fn) { this._onAction = fn; }
+
+    // fn('pause') toggles pause, fn('speed', n) sets the speed multiplier.
+    setPlaybackHandler(fn) { this._onPlayback = fn; }
+
+    // Pause / speed buttons and a readout of the rule the last scripted unit fired.
+    _makeControls() {
+        const el = document.createElement('div');
+        el.style.cssText = `
+            position: absolute; top: 24px; left: 50%; transform: translateX(-50%);
+            display: flex; flex-direction: column; align-items: center; gap: 4px;
+            pointer-events: none;
+        `;
+        el.innerHTML = `
+            <div style="display:flex;gap:4px;pointer-events:auto;">
+                <button data-ctl="pause" style="${this._ctlStyle(false)}">Pause</button>
+                ${SPEEDS.map(s => `<button data-ctl="speed" data-speed="${s}" style="${this._ctlStyle(false)}">${s}x</button>`).join('')}
+            </div>
+            <div data-decision style="font-size:11px;color:#9ab;background:rgba(8,8,20,0.8);padding:2px 8px;border-radius:3px;max-width:520px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
+        `;
+        el.addEventListener('click', (e) => {
+            const btn = e.target.closest('button[data-ctl]');
+            if (!btn || !this._onPlayback) return;
+            if (btn.dataset.ctl === 'pause') this._onPlayback('pause');
+            else this._onPlayback('speed', Number(btn.dataset.speed));
+        });
+        this._overlay.appendChild(el);
+        return el;
+    }
+
+    _ctlStyle(active) {
+        return `padding:3px 9px;background:${active ? '#2a2a55' : '#151528'};border:1px solid ${active ? '#99f' : '#447'};` +
+            'color:#ccc;font-family:inherit;font-size:11px;cursor:pointer;border-radius:3px;';
+    }
+
+    _updateControls(battle, playback) {
+        if (!this._controls) return;
+        const pb = playback || { paused: false, speed: 1 };
+        for (const btn of this._controls.querySelectorAll('button[data-ctl]')) {
+            const active = btn.dataset.ctl === 'pause' ? pb.paused : Number(btn.dataset.speed) === pb.speed;
+            btn.style.cssText = this._ctlStyle(active);
+            if (btn.dataset.ctl === 'pause') btn.textContent = pb.paused ? 'Resume' : 'Pause';
+        }
+        const d = battle.lastDecision;
+        const line = d && d.trace.length ? `${esc(d.name)}: ${d.trace.map(t => esc(t.label)).join(' > ')}` : '';
+        this._controls.querySelector('[data-decision]').innerHTML = line;
+    }
 
     inspectUnit(unit) {
         this._inspectedUnit = unit || null;
@@ -100,7 +158,9 @@ export class BattleUI {
             position: absolute; top: 6px; left: 8px;
             font-size: 10px; color: #556; pointer-events: none;
         `;
-        el.textContent = '[M]ove  [A]ttack  [D]efend  [P]ivot  [W]ait  [U] Auto  [Esc] Cancel  [Arrows] Pan  [Q/E] Rotate  [F] Focus  [Scroll] Zoom';
+        el.textContent = this._fullAuto
+            ? '[Space] Pause  [1/2/3] Speed  [Click] Inspect unit  [Arrows] Pan  [Q/E] Rotate  [F] Focus  [Scroll] Zoom'
+            : '[M]ove  [A]ttack  [D]efend  [P]ivot  [W]ait  [U] Auto  [Esc] Cancel  [Arrows] Pan  [Q/E] Rotate  [F] Focus  [Scroll] Zoom';
         this._overlay.appendChild(el);
         return el;
     }
@@ -191,8 +251,9 @@ export class BattleUI {
         return lines.join('<br>');
     }
 
-    update(battle, onExit, turnFlags) {
+    update(battle, onExit, turnFlags, playback) {
         this._turnFlags = turnFlags || { hasMoved: false, hasActed: false, autoUnits: new Set() };
+        this._updateControls(battle, playback);
         this._updateSidebar(battle);
         this._updateActionMenu(battle);
         this._updateLog(battle);
@@ -468,7 +529,7 @@ export class BattleUI {
     _updateActionMenu(battle) {
         const menu = this._actionMenu;
         const unit = battle.activeUnit;
-        if (battle.state !== STATES.PLAYER_TURN || !unit) {
+        if (battle.state !== STATES.PLAYER_TURN || !unit || this._fullAuto) {
             menu.style.display = 'none';
             this._skillMenuOpen = false;
             return;
@@ -607,7 +668,7 @@ export class BattleUI {
     _updateLog(battle) {
         const lines = battle.log.slice(0, 5);
         this._log.innerHTML = lines.map(l =>
-            `<div style="font-size:11px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${l}</div>`
+            `<div style="font-size:11px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(l)}</div>`
         ).join('');
     }
 

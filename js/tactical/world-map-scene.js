@@ -3,6 +3,7 @@ import { WorldMapRenderer } from './world-map-renderer.js';
 import { WorldMapUI }       from './world-map-ui.js';
 import { BattleScene }      from './battle-scene.js';
 import { DeployScene }      from './deploy-scene.js';
+import { openScriptEditor } from './ai/script-editor.js';
 
 export class WorldMapScene {
     constructor() {
@@ -275,6 +276,13 @@ export class WorldMapScene {
             }
             case 'party':
                 this._ui.showParty(wm, this._skinManager);
+                break;
+            case 'tactics':
+                // Opened on the live party, so class, support-skill and XP changes made
+                // in the Party menu are what the rule editor offers.
+                openScriptEditor(wm.party, {
+                    onSaved: (name) => this._ui.notify(`${name}'s tactics saved.`),
+                });
                 break;
             case 'turnin': {
                 if (!questId) break;

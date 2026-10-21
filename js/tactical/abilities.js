@@ -6,7 +6,7 @@ import { ABILITIES } from './data-registry.js';
 export { ABILITIES };
 
 // Returns the effective value of a stat after applying active buffs/debuffs.
-function getEffectiveStat(unit, stat) {
+export function getEffectiveStat(unit, stat) {
     let val = unit[stat];
     for (const b of (unit.buffs || [])) {
         if (b.stat === stat) val += b.value;
@@ -19,7 +19,7 @@ function passiveActive(unit, key) {
     return unit.abilities.includes(key) && unit.mp > 0;
 }
 
-function directionEvasionMod(attacker, target) {
+export function directionEvasionMod(attacker, target) {
     const dx = attacker.x - target.x;
     const dy = attacker.y - target.y;
     const len = Math.sqrt(dx * dx + dy * dy) || 1;
