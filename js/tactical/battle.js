@@ -1,4 +1,5 @@
 import { computeMoveRange, computeMovePath, computeAttackRange, computeAoeArea, computePatternArea, resolveAbility, ABILITIES } from './abilities.js';
+import { viewState } from './view-state.js';
 import { isDead, isAlive, isConscious, isUnconscious, isStunned, faceToward, setFacing, createUnit } from './units.js';
 import { getTile, applyTerrainEffect } from './battle-map.js';
 import { moveEntity, moveEntityAlongPath } from '../systems/movement-lerp.js';
@@ -21,6 +22,9 @@ export class TacticalBattle {
     constructor(map, units) {
         this.map   = map;
         this.units = units;
+        // Milliseconds a unit takes per tile when walking. The scene lowers this at higher
+        // playback speeds so movement keeps pace with the rest of the battle.
+        this.moveMsPerStep = 180;
         this.state = STATES.ADVANCE_CT;
         this.activeUnit = null;
         this.selectedAbility = null;
@@ -269,9 +273,9 @@ export class TacticalBattle {
         const path = computeMovePath(unit, this.map, this.livingUnits, tx, ty);
         faceToward(unit, tx, ty);
         if (path && path.length > 0) {
-            moveEntityAlongPath(unit, path, 180);
+            moveEntityAlongPath(unit, path, this.moveMsPerStep);
         } else {
-            moveEntity(unit, tx, ty, 180);
+            moveEntity(unit, tx, ty, this.moveMsPerStep);
         }
         this.logMsg(`${unit.name} moved to (${tx}, ${ty}).`);
         // Pre-spend move CT so the bar drops immediately on move.
@@ -660,8 +664,7 @@ export class TacticalBattle {
     }
 
     _spawnFloat(unit, text, color) {
-        unit._floats = unit._floats || [];
-        unit._floats.push({ text, color, age: 0, maxAge: 1200 });
+        viewState(unit).floats.push({ text, color, age: 0, maxAge: 1200 });
     }
 
     getRangeHighlights() {

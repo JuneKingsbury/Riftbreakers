@@ -1,11 +1,13 @@
 import { CONFIG } from '../core/config.js';
+import { viewState } from '../tactical/view-state.js';
+import { setFacing, facingForStep } from '../tactical/units.js';
 
 const MS_PER_STEP = 240;
 
 // Move entity logically to newX/newY immediately; visual lerps one step at a time.
-export function moveEntity(entity, newX, newY, _durationMs) {
+export function moveEntity(entity, newX, newY, durationMs) {
     if (entity.x === newX && entity.y === newY) return;
-    moveEntityAlongPath(entity, [{ x: newX, y: newY }], MS_PER_STEP);
+    moveEntityAlongPath(entity, [{ x: newX, y: newY }], durationMs || MS_PER_STEP);
 }
 
 // path: [{x,y},...] ordered steps not including current position, ending at destination.
@@ -14,36 +16,46 @@ export function moveEntity(entity, newX, newY, _durationMs) {
 export function moveEntityAlongPath(entity, path, msPerStep) {
     if (!path || path.length === 0) return;
     const dest = path[path.length - 1];
+    const vs   = viewState(entity);
 
-    entity._prevX = entity.x;
-    entity._prevY = entity.y;
+    // Facing is a rule input (rear-attack evasion), so the logic layer settles it:
+    // a unit ends a move facing the direction of its last step.
+    if ('facing' in entity) {
+        const last = path.length > 1 ? path[path.length - 2] : entity;
+        const facing = facingForStep(dest.x - last.x, dest.y - last.y);
+        if (facing) setFacing(entity, facing);
+    }
+
+    vs.prevX = entity.x;
+    vs.prevY = entity.y;
 
     entity.x = dest.x;
     entity.y = dest.y;
 
     if (path.length === 1) {
-        entity._vizX = dest.x;
-        entity._vizY = dest.y;
-        entity._moveQueue = [];
+        vs.vizX = dest.x;
+        vs.vizY = dest.y;
+        vs.moveQueue = [];
     } else {
-        entity._vizX = path[0].x;
-        entity._vizY = path[0].y;
-        entity._moveQueue = path.slice(1);
+        vs.vizX = path[0].x;
+        vs.vizY = path[0].y;
+        vs.moveQueue = path.slice(1);
     }
 
-    entity._moveStartTime = performance.now();
-    entity._moveDuration  = msPerStep;
-    entity._msPerStep     = msPerStep;
+    vs.moveStartTime = performance.now();
+    vs.moveDuration  = msPerStep;
+    vs.msPerStep     = msPerStep;
 }
 
 export function teleportEntity(entity, newX, newY) {
-    entity._prevX = null;
-    entity._prevY = null;
-    entity._moveStartTime = 0;
-    entity._moveDuration  = 0;
-    entity._vizX = newX;
-    entity._vizY = newY;
-    entity._moveQueue = [];
+    const vs = viewState(entity);
+    vs.prevX = null;
+    vs.prevY = null;
+    vs.moveStartTime = 0;
+    vs.moveDuration  = 0;
+    vs.vizX = newX;
+    vs.vizY = newY;
+    vs.moveQueue = [];
     entity.x = newX;
     entity.y = newY;
 }
@@ -51,46 +63,48 @@ export function teleportEntity(entity, newX, newY) {
 const _pos = { x: 0, y: 0 };
 
 export function getEntityRenderPos(entity, now) {
-    if (entity._prevX == null || entity._moveDuration <= 0) {
+    const vs = viewState(entity);
+    if (vs.prevX == null || vs.moveDuration <= 0) {
         _pos.x = entity.x;
         _pos.y = entity.y;
         return _pos;
     }
 
-    const elapsed = now - entity._moveStartTime;
+    const elapsed = now - vs.moveStartTime;
 
-    if (elapsed >= entity._moveDuration) {
-        const queue = entity._moveQueue;
+    if (elapsed >= vs.moveDuration) {
+        const queue = vs.moveQueue;
         if (queue && queue.length > 0) {
-            entity._prevX = entity._vizX;
-            entity._prevY = entity._vizY;
+            vs.prevX = vs.vizX;
+            vs.prevY = vs.vizY;
             const next = queue.shift();
-            entity._vizX = next.x;
-            entity._vizY = next.y;
-            entity._moveStartTime = now;
-            _pos.x = entity._prevX;
-            _pos.y = entity._prevY;
+            vs.vizX = next.x;
+            vs.vizY = next.y;
+            vs.moveStartTime = now;
+            _pos.x = vs.prevX;
+            _pos.y = vs.prevY;
             return _pos;
         } else {
-            entity._prevX = null;
-            entity._prevY = null;
+            vs.prevX = null;
+            vs.prevY = null;
             _pos.x = entity.x;
             _pos.y = entity.y;
             return _pos;
         }
     }
 
-    const t     = elapsed / entity._moveDuration;
+    const t     = elapsed / vs.moveDuration;
     const eased = t * (2 - t);
-    const vizX  = entity._vizX != null ? entity._vizX : entity.x;
-    const vizY  = entity._vizY != null ? entity._vizY : entity.y;
-    _pos.x = entity._prevX + (vizX - entity._prevX) * eased;
-    _pos.y = entity._prevY + (vizY - entity._prevY) * eased;
+    const vizX  = vs.vizX != null ? vs.vizX : entity.x;
+    const vizY  = vs.vizY != null ? vs.vizY : entity.y;
+    _pos.x = vs.prevX + (vizX - vs.prevX) * eased;
+    _pos.y = vs.prevY + (vizY - vs.prevY) * eased;
     return _pos;
 }
 
 export function isEntityMoving(entity) {
-    return entity._prevX != null || (entity._moveQueue && entity._moveQueue.length > 0);
+    const vs = viewState(entity);
+    return vs.prevX != null || (vs.moveQueue && vs.moveQueue.length > 0);
 }
 
 export function computeMoveCooldown(terrainCost, moveBonus) {

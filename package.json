@@ -1,0 +1,10 @@
+{
+  "name": "riftbreak",
+  "private": true,
+  "type": "module",
+  "description": "Riftbreak tactics RPG. Native ES modules, no build step.",
+  "scripts": {
+    "test": "node --test \"tests/**/*.test.mjs\"",
+    "serve": "python3 -m http.server 8000"
+  }
+}

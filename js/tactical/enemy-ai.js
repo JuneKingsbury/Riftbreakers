@@ -370,9 +370,9 @@ export function runEnemyTurn(unit, battle, onAbility) {
         faceToward(unit, moveDest.x, moveDest.y);
         const path = computeMovePath(unit, battle.map, battle.livingUnits, moveDest.x, moveDest.y);
         if (path && path.length > 0) {
-            moveEntityAlongPath(unit, path, 180);
+            moveEntityAlongPath(unit, path, battle.moveMsPerStep ?? 180);
         } else {
-            moveEntity(unit, moveDest.x, moveDest.y, 180);
+            moveEntity(unit, moveDest.x, moveDest.y, battle.moveMsPerStep ?? 180);
         }
         battle.logMsg(`${unit.name} moves to (${unit.x}, ${unit.y}).`);
     }

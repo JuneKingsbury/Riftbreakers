@@ -19,15 +19,17 @@ export const COST_DEFEND = 80;
 export const COST_IDLE = 60;
 export const COST_ACTION_DEFAULT = 60;
 
+// Default walk speed. The battle's moveMsPerStep overrides it (the scene scales that with playback speed).
 const MS_PER_STEP = 180;
 
 function doMove(unit, dest, battle) {
+    const stepMs = battle.moveMsPerStep ?? MS_PER_STEP;
     faceToward(unit, dest.x, dest.y);
     const path = computeMovePath(unit, battle.map, battle.livingUnits, dest.x, dest.y);
     if (path && path.length > 0) {
-        moveEntityAlongPath(unit, path, MS_PER_STEP);
+        moveEntityAlongPath(unit, path, stepMs);
     } else {
-        moveEntity(unit, dest.x, dest.y, MS_PER_STEP);
+        moveEntity(unit, dest.x, dest.y, stepMs);
     }
     battle.logMsg(`${unit.name} moves to (${unit.x}, ${unit.y}).`);
 }

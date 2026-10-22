@@ -159,8 +159,8 @@ export class BattleUI {
             font-size: 10px; color: #556; pointer-events: none;
         `;
         el.textContent = this._fullAuto
-            ? '[Space] Pause  [1/2/3] Speed  [Click] Inspect unit  [Arrows] Pan  [Q/E] Rotate  [F] Focus  [Scroll] Zoom'
-            : '[M]ove  [A]ttack  [D]efend  [P]ivot  [W]ait  [U] Auto  [Esc] Cancel  [Arrows] Pan  [Q/E] Rotate  [F] Focus  [Scroll] Zoom';
+            ? '[Space] Pause  [1/2/3] Speed  [Click] Inspect unit  [Arrows] Pan  [Q/E] Rotate  [F] Focus  [V] Free cam  [Scroll] Zoom'
+            : '[M]ove  [A]ttack  [D]efend  [P]ivot  [W]ait  [U] Auto  [Esc] Cancel  [Arrows] Pan  [Q/E] Rotate  [F] Focus  [V] Free cam  [Scroll] Zoom';
         this._overlay.appendChild(el);
         return el;
     }
@@ -359,7 +359,7 @@ export class BattleUI {
             if (!unit) return;
             const el = row.querySelector('.tac-portrait');
             if (!el) return;
-            const sprite = renderer._getCompositeSprite(unit, false, null);
+            const sprite = renderer.unitSprites.get(unit, false, null);
             if (!sprite) return;
             const w = el.offsetWidth  || 28;
             const h = el.offsetHeight || 28;

@@ -7,13 +7,14 @@ export const TILE_TYPES = {
     HIGH:   'high',
 };
 
+// Gameplay properties only. Colors and sprites live in tile-render.js.
 export const TILE_DEFS = {
-    grass:  { char: '.', color: '#4a7c4a', bg: '#1a2e1a', passable: true,  moveCost: 1,  elevation: 0, blocksSight: false, spriteKey: 'grass' },
-    dirt:   { char: ',', color: '#7c6a4a', bg: '#2e2418', passable: true,  moveCost: 1,  elevation: 0, blocksSight: false, spriteKey: 'dirt' },
-    water:  { char: '~', color: '#3a6a9c', bg: '#0a1e3e', passable: false, moveCost: 99, elevation: 0, blocksSight: false, spriteKey: 'water' },
-    wall:   { char: '#', color: '#666677', bg: '#111122', passable: false, moveCost: 99, elevation: 0, blocksSight: true,  spriteKey: 'tall_rock' },
-    rubble: { char: ':', color: '#8a7a5a', bg: '#2a1e10', passable: true,  moveCost: 2,  elevation: 0, blocksSight: false, spriteKey: 'gravel' },
-    high:   { char: '^', color: '#5a9c5a', bg: '#1a3e1a', passable: true,  moveCost: 1,  elevation: 1, blocksSight: false, spriteKey: 'grass' },
+    grass:  { passable: true,  moveCost: 1,  elevation: 0, blocksSight: false },
+    dirt:   { passable: true,  moveCost: 1,  elevation: 0, blocksSight: false },
+    water:  { passable: false, moveCost: 99, elevation: 0, blocksSight: false },
+    wall:   { passable: false, moveCost: 99, elevation: 0, blocksSight: true  },
+    rubble: { passable: true,  moveCost: 2,  elevation: 0, blocksSight: false },
+    high:   { passable: true,  moveCost: 1,  elevation: 1, blocksSight: false },
 };
 
 export function getTileDef(type) {

@@ -1,4 +1,5 @@
 import { JOB_STATS, masteryStatBonus } from './data-registry.js';
+import { viewState } from './view-state.js';
 
 let _nextId = 1;
 
@@ -37,7 +38,6 @@ export function createUnit(name, job, team, x, y, { statMods = {}, extraAbilitie
         statusTimers: {},
         buffs: [],
         facing: 'south',
-        _floats: [],
         appearance,
     };
 }
@@ -62,6 +62,14 @@ export function isAlive(unit) { return !unit.status.includes('dead'); }
 export function isConscious(unit) { return !unit.status.includes('dead') && !unit.status.includes('unconscious'); }
 export function isStunned(unit) { return unit.status.includes('stun'); }
 
+// Cardinal facing for a grid offset, or null for no offset.
+export function facingForStep(dx, dy) {
+    if (dx === 0 && dy === 0) return null;
+    return Math.abs(dx) >= Math.abs(dy)
+        ? (dx > 0 ? 'east' : 'west')
+        : (dy > 0 ? 'south' : 'north');
+}
+
 export function faceToward(unit, tx, ty) {
     const dx = tx - unit.x;
     const dy = ty - unit.y;
@@ -75,7 +83,8 @@ export function faceToward(unit, tx, ty) {
 
 export function setFacing(unit, newFacing) {
     if (unit.facing === newFacing) return;
-    unit._prevFacing     = unit.facing || newFacing;
-    unit._facingChangeAt = performance.now();
-    unit.facing          = newFacing;
+    const vs = viewState(unit);
+    vs.prevFacing     = unit.facing || newFacing;
+    vs.facingChangeAt = performance.now();
+    unit.facing       = newFacing;
 }

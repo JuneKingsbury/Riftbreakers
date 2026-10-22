@@ -9,7 +9,7 @@ import { MAP_DATA } from '../../js/tactical/data/maps.js';
 import { TacticalBattle, STATES } from '../../js/tactical/battle.js';
 import { CHARACTER_DATA } from '../../js/tactical/data/characters.js';
 import { BATTLE_SCENARIOS } from '../../js/tactical/world-map-data.js';
-import { buildUnits } from '../../js/tactical/battle-scene.js';
+import { buildUnits } from '../../js/tactical/build-units.js';
 import { runAutoTurn } from '../../js/tactical/ai/executor.js';
 import { abilitiesForMember } from '../../js/tactical/ai/party.js';
 import { defaultScriptFor } from '../../js/tactical/ai/default-scripts.js';

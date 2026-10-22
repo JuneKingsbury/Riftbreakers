@@ -1,0 +1,44 @@
+<!doctype html>
+<!-- Manual/visual harness for BattleView3D. Serve the repo root (e.g. python3 -m http.server)
+     and open /tests/harness/view3d.html?map=0 . Exposes window.harness for scripted checks. -->
+<html>
+<head>
+<meta charset="utf-8">
+<base href="/">
+<title>BattleView3D harness</title>
+<style>html,body{margin:0;height:100%;background:#000}#c{position:absolute;inset:0}</style>
+</head>
+<body>
+<div id="c"></div>
+<script src="/lib/jszip.min.js"></script>
+<script type="module">
+import { SkinManager } from '/js/ui/skin-manager.js';
+import { BattleView3D } from '/js/tactical/battle-view3d.js';
+import { TacticalBattle } from '/js/tactical/battle.js';
+import { loadMapData } from '/js/tactical/battle-map.js';
+import { MAP_DATA } from '/js/tactical/data/maps.js';
+import { buildUnits } from '/js/tactical/build-units.js';
+
+const params = new URLSearchParams(location.search);
+const sm = new SkinManager();
+if (params.get('skin') !== 'ascii') {
+    await sm.switchSkin('16x16_tiny_world');
+}
+const map = loadMapData(MAP_DATA[Number(params.get('map') || 0)]);
+const units = buildUnits(null, 'none', map.playerSpawns, map.enemySpawns);
+const battle = new TacticalBattle(map, units);
+const first = battle.advanceCT();
+battle.startTurn(first);
+
+const view = new BattleView3D(document.getElementById('c'), sm);
+const hold = { frames: 0 };
+function tick(now) {
+    view.render(battle, now);
+    hold.frames++;
+    requestAnimationFrame(tick);
+}
+requestAnimationFrame(tick);
+window.harness = { view, battle, map, units, sm, hold };
+</script>
+</body>
+</html>

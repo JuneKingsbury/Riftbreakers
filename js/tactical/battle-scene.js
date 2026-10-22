@@ -1,80 +1,16 @@
 import { loadMapData } from './battle-map.js';
 import { MAP_DATA } from './data/maps.js';
-import { createUnitFromCharData, faceToward } from './units.js';
 import { TacticalBattle, STATES } from './battle.js';
-import { BattleRenderer } from './battle-renderer.js';
+import { BattleView3D, showViewError } from './battle-view3d.js';
 import { BattleUI } from './battle-ui.js';
 import { runAutoTurn } from './ai/executor.js';
-import { getScriptFor } from './ai/script-store.js';
 import { isEntityMoving } from '../systems/movement-lerp.js';
 import { ABILITIES } from './abilities.js';
-import { unlockedAbilities } from './data-registry.js';
-import { CHARACTER_DATA } from './data/characters.js';
-import { equipmentStatBonuses } from './data/equipment.js';
-import { BATTLE_SCENARIOS } from './world-map-data.js';
+import { buildUnits } from './build-units.js';
+import { viewState } from './view-state.js';
 
 const SPEEDS = { '1': 1, '2': 2, '3': 4 };
-
-export function buildUnits(worldMap, scenarioId, playerSpawns, enemySpawns) {
-    const partyData = worldMap?.party ?? CHARACTER_DATA.filter(c => c.team === 'player');
-
-    // Use scenario-specific roster if defined; fall back to CHARACTER_DATA enemies.
-    const scenario   = BATTLE_SCENARIOS[scenarioId];
-    const rosterDefs = scenario?.roster;
-    const enemyData  = rosterDefs
-        ? rosterDefs.map((r, i) => ({
-            name:          r.name,
-            job:           r.job,
-            team:          'enemy',
-            x:             20, y: 8,   // overwritten by spawn positions below
-            ct:            r.ct ?? 0,
-            statMods:      r.statMods ?? {},
-            extraAbilities: r.extraAbilities ?? [],
-            appearance:    r.appearance ?? null,
-        }))
-        : CHARACTER_DATA.filter(c => c.team === 'enemy');
-
-    const units = [...partyData, ...enemyData].map((charData) => {
-        const equipBonuses = equipmentStatBonuses(charData.appearance);
-        const mergedMods   = { ...(charData.statMods || {}), };
-        for (const [k, v] of Object.entries(equipBonuses)) {
-            mergedMods[k] = (mergedMods[k] || 0) + v;
-        }
-        // Determine spawn position from map data; fall back to charData position if
-        // there are fewer spawn tiles than units.
-        let spawnX = charData.x;
-        let spawnY = charData.y;
-        if (charData.team === 'player') {
-            const pIdx = partyData.indexOf(charData);
-            const spawn = playerSpawns?.[pIdx];
-            if (spawn) { spawnX = spawn.x; spawnY = spawn.y; }
-        } else {
-            const eIdx = enemyData.indexOf(charData);
-            const spawn = enemySpawns?.[eIdx];
-            if (spawn) { spawnX = spawn.x; spawnY = spawn.y; }
-        }
-        const unit = createUnitFromCharData({ ...charData, statMods: mergedMods, x: spawnX, y: spawnY });
-        // For player units with XP data, restrict abilities to those unlocked at current job level.
-        // Cross-job slots (supportSkill, supportPassive) bypass this filter since their
-        // eligibility was already validated when the player chose them.
-        if (charData.xp) {
-            const unlocked    = new Set(unlockedAbilities(charData.job, charData.xp));
-            const crossSlots  = new Set([charData.supportSkill, charData.supportPassive].filter(Boolean));
-            unit.abilities = unit.abilities.filter(k => unlocked.has(k) || crossSlots.has(k));
-        }
-        // Player characters fight by their battle script. Enemies keep the scoring AI.
-        if (charData.team === 'player') unit.script = getScriptFor(charData);
-        return unit;
-    });
-    const players = units.filter(u => u.team === 'player');
-    const enemies = units.filter(u => u.team === 'enemy');
-    const avg = (arr, key) => arr.reduce((s, u) => s + u[key], 0) / arr.length;
-    const enemyCx = avg(enemies, 'x'), enemyCy = avg(enemies, 'y');
-    const playerCx = avg(players, 'x'), playerCy = avg(players, 'y');
-    players.forEach(u => faceToward(u, enemyCx, enemyCy));
-    enemies.forEach(u => faceToward(u, playerCx, playerCy));
-    return units;
-}
+const BASE_MS_PER_STEP = 180;
 
 export class BattleScene {
     // opts.mapDef           — pre-selected map definition (from DeployScene); random if omitted
@@ -112,12 +48,20 @@ export class BattleScene {
         const units  = buildUnits(this._worldMap, this._scenarioId, playerSpawns, map.enemySpawns);
 
         this._battle = new TacticalBattle(map, units);
+        this._applySpeed();
 
         containerEl.innerHTML = '';
         containerEl.style.position = 'relative';
         document.getElementById('game-container')?.classList.add('tactical-mode');
 
-        this._renderer = new BattleRenderer(containerEl, skinManager);
+        try {
+            this._renderer = new BattleView3D(containerEl, skinManager);
+        } catch (err) {
+            this._stopped = true;
+            showViewError(containerEl, err, () => this._sm.pop());
+            return;
+        }
+        this._renderer.onCenterRequest = () => this._centerOnActiveUnit();
         this._ui       = new BattleUI(containerEl, this._battle, this._renderer, { fullAuto: !this._manualControl });
 
         this._ui.setActionHandler((action, key) => this._handleAction(action, key));
@@ -134,7 +78,7 @@ export class BattleScene {
         this._renderer.canvas.addEventListener('mouseup',      this._onMouseUp     = (e) => this._handleMouseUp(e));
         this._renderer.canvas.addEventListener('click',        this._onCanvasClick = (e) => this._handleCanvasClick(e));
         this._renderer.canvas.addEventListener('contextmenu',  this._onContextMenu = (e) => { e.preventDefault(); if (this._ui._skillMenuOpen) { this._ui.closeSkillMenu(); return; } this._cancelTargeting(); });
-        this._renderer.canvas.addEventListener('wheel',        this._onWheel       = (e) => { e.preventDefault(); const d = e.deltaY > 0 ? -2 : 2; this._renderer.tileSize = Math.max(24, Math.min(80, this._renderer.tileSize + d)); }, { passive: false });
+        this._renderer.canvas.addEventListener('wheel',        this._onWheel       = (e) => { e.preventDefault(); this._renderer.zoomBy(e.deltaY > 0 ? -2 : 2); }, { passive: false });
         document.addEventListener('keydown', this._onKeydown = (e) => this._handleKeydown(e));
         document.addEventListener('keyup',   this._onKeyup   = (e) => this._handleKeyup(e));
 
@@ -142,7 +86,7 @@ export class BattleScene {
         this._panActive = false;
         this._panButton = -1;
         this._panStart  = { x: 0, y: 0 };
-        this._panCam    = { x: 0, y: 0 };
+        this._suppressClick = false;
         this._PAN_THRESHOLD = 4;
         this._abilityFromSkillMenu = false;
         this._pendingRewards = null;
@@ -155,6 +99,7 @@ export class BattleScene {
         clearTimeout(this._enemyTimer);
         this._removeListeners();
         this._ui?.destroy();
+        this._renderer?.dispose();
         document.getElementById('game-container')?.classList.remove('tactical-mode');
         this._container.innerHTML = '';
     }
@@ -207,7 +152,15 @@ export class BattleScene {
 
     _handlePlayback(ctl, value) {
         if (ctl === 'pause') this._paused = !this._paused;
-        else if (ctl === 'speed' && value > 0) this._speed = value;
+        else if (ctl === 'speed' && value > 0) {
+            this._speed = value;
+            this._applySpeed();
+        }
+    }
+
+    // Playback speed also shortens walking, so units do not crawl while everything else races.
+    _applySpeed() {
+        if (this._battle) this._battle.moveMsPerStep = BASE_MS_PER_STEP / this._speed;
     }
 
     _resetTurn() {
@@ -223,15 +176,19 @@ export class BattleScene {
         const rawDx = targetX - source.x;
         const rawDy = targetY - source.y;
         const len = Math.sqrt(rawDx * rawDx + rawDy * rawDy) || 1;
-        source._anim = { type: animType, dx: rawDx / len, dy: rawDy / len, startMs: performance.now(), durationMs: animType === 'slash' ? 280 : 350 };
+        // Durations are written for 1x. The returned wait stays in 1x milliseconds because _later
+        // divides by the speed itself, while the visuals below are shortened to match.
+        const speed      = this._speed;
+        const baseAnimMs = animType === 'slash' ? 280 : 350;
+        viewState(source).anim = { type: animType, dx: rawDx / len, dy: rawDy / len, startMs: performance.now(), durationMs: baseAnimMs / speed };
         if (animType === 'shot' || animType === 'cast') {
             const color      = ab.projectileColor || '#ffffff';
             const projDelay  = animType === 'shot' ? 180 : 200;
             const projFlight = 420;
-            setTimeout(() => { this._renderer.spawnProjectile(source.x, source.y, targetX, targetY, color, projFlight); }, projDelay);
+            setTimeout(() => { if (this._stopped) return; this._renderer.spawnProjectile(source.x, source.y, targetX, targetY, color, projFlight / speed); }, projDelay / speed);
             return projDelay + projFlight;
         }
-        return source._anim.durationMs;
+        return baseAnimMs;
     }
 
     _scheduleNextTurn() {
@@ -265,7 +222,7 @@ export class BattleScene {
                 if (this._stopped || this._battle.state === STATES.BATTLE_OVER) return;
                 const unit = this._battle.advanceCT();
                 if (!unit) return;
-                this._renderer._autoCenterNext = true;
+                this._renderer.requestAutoCenter();
                 this._battle.startTurn(unit);
 
                 const state = this._battle.state;
@@ -290,7 +247,7 @@ export class BattleScene {
         if (chargeMs > 0) {
             // Center on the first unit whose charge fired so the player can watch.
             const first = firedCharges[0];
-            if (first) this._renderer.centerOn(first.unit.x, first.unit.y, this._battle.map.width, this._battle.map.height);
+            if (first) this._renderer.trackAt(first.unit.x, first.unit.y);
             this._later(chargeMs + 800, proceed);
         } else {
             proceed();
@@ -341,13 +298,17 @@ export class BattleScene {
         }
     }
 
+    _centerOnActiveUnit() {
+        const u = this._battle.activeUnit;
+        if (u) this._renderer.centerOn(u.x, u.y);
+    }
+
     _handleMouseDown(e) {
         if (e.button === 0 || e.button === 1) {
             this._panDrag   = true;
             this._panActive = false;
             this._panButton = e.button;
             this._panStart  = { x: e.clientX, y: e.clientY };
-            this._panCam    = { x: this._renderer.camX, y: this._renderer.camY };
             if (e.button === 1) e.preventDefault();
         }
     }
@@ -358,52 +319,40 @@ export class BattleScene {
             const dy = e.clientY - this._panStart.y;
             if (!this._panActive && Math.sqrt(dx * dx + dy * dy) >= this._PAN_THRESHOLD) {
                 this._panActive = true;
+                this._renderer.beginPan();
             }
             if (this._panActive) {
-                this._renderer.camX = this._panCam.x + dx;
-                this._renderer.camY = this._panCam.y + dy;
-                this._renderer._camTargetX = null;
-                this._renderer._camTargetY = null;
-                this._renderer._clampCam(this._battle.map.width, this._battle.map.height);
+                this._renderer.panByPixels(dx, dy);
                 return;
             }
         }
-        const rect = this._renderer.canvas.getBoundingClientRect();
-        const sx   = (e.clientX - rect.left) * (this._renderer.canvas.width  / rect.width);
-        const sy   = (e.clientY - rect.top)  * (this._renderer.canvas.height / rect.height);
-        const tile = this._renderer.screenToTile(sx, sy, this._battle.map, this._battle.units);
+        const tile = this._renderer.pickTile(e.clientX, e.clientY, this._battle.map, this._battle.units);
+        if (!tile) {
+            this._battle.hoverTile = null;
+            // Off the map: drop the stale area-of-effect preview.
+            if (this._battle.state === STATES.SELECT_ABILITY_TARGET) this._battle.hoverAbilityTarget(-1, -1);
+            return;
+        }
         if (this._battle.state === STATES.SELECT_ABILITY_TARGET) this._battle.hoverAbilityTarget(tile.x, tile.y);
         this._battle.hoverTile = `${tile.x},${tile.y}`;
     }
 
     _handleMouseUp(e) {
         if (e.button === this._panButton) {
+            // The browser fires click after mouseup, so remember that this release ended a drag.
+            this._suppressClick = this._panActive;
             this._panDrag   = false;
             this._panActive = false;
+            this._renderer.endPan();
         }
     }
 
     _handleCanvasClick(e) {
+        if (this._suppressClick) { this._suppressClick = false; return; }
         if (this._panActive || e.button !== 0) return;
-        const rect = this._renderer.canvas.getBoundingClientRect();
-        const sx   = (e.clientX - rect.left) * (this._renderer.canvas.width  / rect.width);
-        const sy   = (e.clientY - rect.top)  * (this._renderer.canvas.height / rect.height);
-
-        for (const btn of (this._renderer._rotateBtns || [])) {
-            if (sx >= btn.x && sx <= btn.x + btn.w && sy >= btn.y && sy <= btn.y + btn.h) {
-                this._renderer.rotateView(btn.delta);
-                return;
-            }
-        }
-        const cb = this._renderer._centerBtn;
-        if (cb && sx >= cb.x && sx <= cb.x + cb.w && sy >= cb.y && sy <= cb.y + cb.h) {
-            const u = this._battle.activeUnit;
-            if (u) this._renderer.centerOn(u.x, u.y, this._battle.map.width, this._battle.map.height);
-            return;
-        }
-
         const map  = this._battle.map;
-        const tile = this._renderer.screenToTile(sx, sy, map, this._battle.units);
+        const tile = this._renderer.pickTile(e.clientX, e.clientY, map, this._battle.units);
+        if (!tile) return;
         const state = this._battle.state;
 
         // Idle click: inspect the unit on this tile (or clear if empty ground).
@@ -448,7 +397,7 @@ export class BattleScene {
                     this._battle.endTurn(cost);
                     this._enemyTimer = setTimeout(() => {
                         if (!this._stopped && this._battle.state !== STATES.BATTLE_OVER) this._scheduleNextTurn();
-                    }, animMs + 150);
+                    }, (animMs + 150) / this._speed);
                 }
             }
         }
@@ -457,13 +406,13 @@ export class BattleScene {
     _handleKeydown(e) {
         const ARROW_PAN = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down' };
         const panDir = ARROW_PAN[e.key];
-        if (panDir) { this._renderer._panKeys[panDir] = true; e.preventDefault(); return; }
+        if (panDir) { this._renderer.setPanKey(panDir, true); e.preventDefault(); return; }
 
         if (e.key === 'f' || e.key === 'F') {
-            const u = this._battle.activeUnit;
-            if (u) this._renderer.centerOn(u.x, u.y, this._battle.map.width, this._battle.map.height);
+            this._centerOnActiveUnit();
             e.preventDefault(); return;
         }
+        if (e.key === 'v' || e.key === 'V') { this._renderer.setFreeCamera(!this._renderer.freeCamera); e.preventDefault(); return; }
         if (e.key === 'q' || e.key === 'Q') { this._renderer.rotateView(-1); e.preventDefault(); return; }
         if (e.key === 'e' || e.key === 'E') { this._renderer.rotateView( 1); e.preventDefault(); return; }
         if (e.key === 'r' || e.key === 'R') { this._battle.rotateAbility(); return; }
@@ -521,7 +470,7 @@ export class BattleScene {
     _handleKeyup(e) {
         const ARROW_PAN = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down' };
         const panDir = ARROW_PAN[e.key];
-        if (panDir) { this._renderer._panKeys[panDir] = false; return; }
+        if (panDir) { this._renderer.setPanKey(panDir, false); return; }
     }
 
     _removeListeners() {

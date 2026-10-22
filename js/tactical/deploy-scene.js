@@ -1,7 +1,8 @@
 import { loadMapData } from './battle-map.js';
 import { MAP_DATA } from './data/maps.js';
 import { createUnitFromCharData, faceToward } from './units.js';
-import { BattleRenderer } from './battle-renderer.js';
+import { viewState } from './view-state.js';
+import { BattleView3D, showViewError } from './battle-view3d.js';
 import { STATES } from './battle.js';
 import { CHARACTER_DATA } from './data/characters.js';
 import { BATTLE_SCENARIOS } from './world-map-data.js';
@@ -109,7 +110,6 @@ export class DeployScene {
         this._panActive      = false;
         this._panButton      = -1;
         this._panStart       = { x: 0, y: 0 };
-        this._panCam         = { x: 0, y: 0 };
         this._PAN_THRESHOLD  = 4;
     }
 
@@ -130,17 +130,21 @@ export class DeployScene {
         containerEl.style.position = 'relative';
         document.getElementById('game-container')?.classList.add('tactical-mode');
 
-        this._renderer = new BattleRenderer(containerEl, skinManager);
+        try {
+            this._renderer = new BattleView3D(containerEl, skinManager);
+        } catch (err) {
+            this._stopped = true;
+            showViewError(containerEl, err, () => this._sm.pop());
+            return;
+        }
         this._renderer.tileSize = 40;
+        // The side panel covers the left 220px, so center the map in what is left.
+        this._renderer.setInsets(220, 0);
+        this._renderer.onCenterRequest = () => this._centerOnMap();
+        this._renderer.showFreeCameraButton(false);   // nothing to track while deploying
 
-        // Center on the map's midpoint immediately (no lerp).
-        const mx = Math.floor(map.width  / 2);
-        const my = Math.floor(map.height / 2);
-        this._renderer.centerOn(mx, my, map.width, map.height);
-        this._renderer.camX = this._renderer._camTargetX ?? this._renderer.camX;
-        this._renderer.camY = this._renderer._camTargetY ?? this._renderer.camY;
-        this._renderer._camTargetX = null;
-        this._renderer._camTargetY = null;
+        // Center on the map's midpoint immediately (no glide).
+        this._renderer.snapTo(Math.floor(map.width / 2), Math.floor(map.height / 2));
 
         this._buildOverlay(containerEl);
         this._highlightSpawnTiles();
@@ -151,8 +155,7 @@ export class DeployScene {
         this._renderer.canvas.addEventListener('contextmenu', this._onContextMenu = e => { e.preventDefault(); this._cancelSelect(); });
         this._renderer.canvas.addEventListener('wheel',       this._onWheel       = e => {
             e.preventDefault();
-            const d = e.deltaY > 0 ? -2 : 2;
-            this._renderer.tileSize = Math.max(24, Math.min(80, this._renderer.tileSize + d));
+            this._renderer.zoomBy(e.deltaY > 0 ? -2 : 2);
         }, { passive: false });
         document.addEventListener('keydown', this._onKeydown = e => this._handleKeydown(e));
         document.addEventListener('keyup',   this._onKeyup   = e => this._handleKeyup(e));
@@ -165,6 +168,7 @@ export class DeployScene {
         this._editorUI = null;
         this._overlay?.remove();
         this._overlay = null;
+        this._renderer?.dispose();
         document.getElementById('game-container')?.classList.remove('tactical-mode');
         this._container.innerHTML = '';
     }
@@ -393,7 +397,6 @@ export class DeployScene {
             this._panActive = false;
             this._panButton = e.button;
             this._panStart  = { x: e.clientX, y: e.clientY };
-            this._panCam    = { x: this._renderer.camX, y: this._renderer.camY };
             if (e.button === 1) e.preventDefault();
         }
     }
@@ -404,20 +407,15 @@ export class DeployScene {
             const dy = e.clientY - this._panStart.y;
             if (!this._panActive && Math.sqrt(dx * dx + dy * dy) >= this._PAN_THRESHOLD) {
                 this._panActive = true;
+                this._renderer.beginPan();
             }
             if (this._panActive) {
-                this._renderer.camX = this._panCam.x + dx;
-                this._renderer.camY = this._panCam.y + dy;
-                this._renderer._camTargetX = null;
-                this._renderer._camTargetY = null;
-                this._renderer._clampCam(this._preview.map.width, this._preview.map.height);
+                this._renderer.panByPixels(dx, dy);
                 return;
             }
         }
-        const rect = this._renderer.canvas.getBoundingClientRect();
-        const sx   = (e.clientX - rect.left) * (this._renderer.canvas.width  / rect.width);
-        const sy   = (e.clientY - rect.top)  * (this._renderer.canvas.height / rect.height);
-        const tile = this._renderer.screenToTile(sx, sy, this._preview.map, this._preview.units);
+        const tile = this._renderer.pickTile(e.clientX, e.clientY, this._preview.map, this._preview.units);
+        if (!tile) { this._preview.hoverTile = null; return; }
         this._preview.hoverTile = `${tile.x},${tile.y}`;
     }
 
@@ -426,33 +424,23 @@ export class DeployScene {
         if (e.button === this._panButton) {
             this._panDrag   = false;
             this._panActive = false;
+            this._renderer.endPan();
         }
 
         if (e.button === 0 && !wasDragging) {
-            const rect = this._renderer.canvas.getBoundingClientRect();
-            const sx   = (e.clientX - rect.left) * (this._renderer.canvas.width  / rect.width);
-            const sy   = (e.clientY - rect.top)  * (this._renderer.canvas.height / rect.height);
-            this._handleCanvasTileClick(sx, sy);
+            this._handleCanvasTileClick(e.clientX, e.clientY);
         }
     }
 
-    _handleCanvasTileClick(sx, sy) {
-        // Check rotate / center buttons drawn by the renderer first.
-        for (const btn of (this._renderer._rotateBtns || [])) {
-            if (sx >= btn.x && sx <= btn.x + btn.w && sy >= btn.y && sy <= btn.y + btn.h) {
-                this._renderer.rotateView(btn.delta);
-                return;
-            }
-        }
-        const cb = this._renderer._centerBtn;
-        if (cb && sx >= cb.x && sx <= cb.x + cb.w && sy >= cb.y && sy <= cb.y + cb.h) {
-            const map = this._preview.map;
-            this._renderer.centerOn(Math.floor(map.width / 2), Math.floor(map.height / 2), map.width, map.height);
-            return;
-        }
+    _centerOnMap() {
+        const map = this._preview.map;
+        this._renderer.centerOn(Math.floor(map.width / 2), Math.floor(map.height / 2));
+    }
 
+    _handleCanvasTileClick(clientX, clientY) {
         const map  = this._preview.map;
-        const tile = this._renderer.screenToTile(sx, sy, map, this._preview.units);
+        const tile = this._renderer.pickTile(clientX, clientY, map, this._preview.units);
+        if (!tile) { if (this._selectedUnit !== null) this._cancelSelect(); return; }
 
         if (this._selectedUnit !== null) {
             const tileKey   = `${tile.x},${tile.y}`;
@@ -483,12 +471,11 @@ export class DeployScene {
     _handleKeydown(e) {
         const ARROW_PAN = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down' };
         const panDir = ARROW_PAN[e.key];
-        if (panDir) { this._renderer._panKeys[panDir] = true; e.preventDefault(); return; }
+        if (panDir) { this._renderer.setPanKey(panDir, true); e.preventDefault(); return; }
         if (e.key === 'q' || e.key === 'Q') { this._renderer.rotateView(-1); e.preventDefault(); return; }
         if (e.key === 'e' || e.key === 'E') { this._renderer.rotateView( 1); e.preventDefault(); return; }
         if (e.key === 'f' || e.key === 'F') {
-            const map = this._preview.map;
-            this._renderer.centerOn(Math.floor(map.width / 2), Math.floor(map.height / 2), map.width, map.height);
+            this._centerOnMap();
             e.preventDefault(); return;
         }
         if (e.key === 'Escape')             { this._cancelSelect(); return; }
@@ -498,7 +485,7 @@ export class DeployScene {
     _handleKeyup(e) {
         const ARROW_PAN = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down' };
         const panDir = ARROW_PAN[e.key];
-        if (panDir) { this._renderer._panKeys[panDir] = false; return; }
+        if (panDir) { this._renderer.setPanKey(panDir, false); return; }
     }
 
     _removeListeners() {
@@ -525,8 +512,8 @@ export class DeployScene {
         // Clear the facing-change transition fields so the renderer draws units
         // at their final facing immediately with no turn animation.
         for (const u of units) {
-            u._prevFacing     = null;
-            u._facingChangeAt = null;
+            viewState(u).prevFacing     = null;
+            viewState(u).facingChangeAt = null;
         }
         this._preview.units = units;
     }
