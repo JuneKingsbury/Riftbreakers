@@ -161,6 +161,8 @@ export const BATTLE_SCENARIOS = {
             { job: 'raider',        name: 'Bandit',       ct: 50 },
             { job: 'raider_archer', name: 'Bandit Archer', ct: 5 },
             { job: 'raider_hexer',  name: 'Bandit Hexer',  ct: 35 },
+            { job: 'raider', name: 'Bandit', ct: 65 },
+            { job: 'raider_archer', name: 'Bandit Archer', ct: 25 },
         ],
     },
     marsh_skirmish: {
@@ -170,6 +172,8 @@ export const BATTLE_SCENARIOS = {
             { job: 'wolf',         name: 'Marsh Wolf',    ct: 55 },
             { job: 'spore_walker', name: 'Spore Walker',  ct: 10 },
             { job: 'shard_spider', name: 'Shard Spider',  ct: 40 },
+            { job: 'wolf', name: 'Marsh Wolf', ct: 35 },
+            { job: 'spore_walker', name: 'Spore Walker', ct: 60 },
         ],
     },
     fen_ambush: {
@@ -179,6 +183,8 @@ export const BATTLE_SCENARIOS = {
             { job: 'spore_walker',  name: 'Fen Walker',    ct: 50 },
             { job: 'shard_spider',  name: 'Fen Spider',    ct: 30 },
             { job: 'spectral_wisp', name: 'Marsh Spirit',  ct: 5  },
+            { job: 'shard_spider', name: 'Fen Spider', ct: 55 },
+            { job: 'spectral_wisp', name: 'Marsh Spirit', ct: 40 },
         ],
     },
     chapel_defense: {
@@ -188,6 +194,8 @@ export const BATTLE_SCENARIOS = {
             { job: 'spectral_wisp', name: 'Lost Soul',     ct: 10 },
             { job: 'spectral_wisp', name: 'Lost Soul',     ct: 60 },
             { job: 'void_walker',   name: 'Void Wraith',   ct: 25 },
+            { job: 'spectral_wisp', name: 'Lost Soul', ct: 35 },
+            { job: 'void_walker', name: 'Void Wraith', ct: 5 },
         ],
     },
     thornwood_patrol: {
@@ -197,6 +205,8 @@ export const BATTLE_SCENARIOS = {
             { job: 'thorn_beast',    name: 'Thorn Beast',    ct: 45 },
             { job: 'boar',           name: 'Thornboar',      ct: 5  },
             { job: 'raider',         name: 'Poacher',        ct: 35 },
+            { job: 'canopy_stalker', name: 'Thornwood Cat', ct: 55 },
+            { job: 'thorn_beast', name: 'Thorn Beast', ct: 10 },
         ],
     },
     ironhollow_depths: {
@@ -206,6 +216,8 @@ export const BATTLE_SCENARIOS = {
             { job: 'void_stalker',  name: 'Rift Crawler',    ct: 50 },
             { job: 'void_walker',   name: 'Void Walker',     ct: 25 },
             { job: 'shadow_mage',   name: 'Hollow Mage',     ct: 40 },
+            { job: 'void_stalker', name: 'Rift Crawler', ct: 35 },
+            { job: 'void_walker', name: 'Void Walker', ct: 60 },
         ],
     },
     riftscar_ambush: {
@@ -215,6 +227,8 @@ export const BATTLE_SCENARIOS = {
             { job: 'void_stalker', name: 'Rift Stalker',    ct: 45 },
             { job: 'void_walker',  name: 'Rift Walker',     ct: 10 },
             { job: 'raider_hexer', name: 'Rift Hexer',      ct: 35 },
+            { job: 'void_stalker', name: 'Rift Stalker', ct: 60 },
+            { job: 'raider', name: 'Rift Raider', ct: 25 },
         ],
     },
     voidspire_assault: {
@@ -224,6 +238,8 @@ export const BATTLE_SCENARIOS = {
             { job: 'kingdom_guard', name: 'Citadel Guard',   ct: 50 },
             { job: 'void_stalker',  name: 'Void Champion',   ct: 5  },
             { job: 'shadow_mage',   name: 'Void Sorcerer',   ct: 35 },
+            { job: 'kingdom_guard', name: 'Citadel Guard', ct: 15 },
+            { job: 'shadow_mage', name: 'Void Sorcerer', ct: 55 },
         ],
     },
     beast_encounter: {
@@ -233,6 +249,8 @@ export const BATTLE_SCENARIOS = {
             { job: 'wolf',  name: 'Wild Wolf',  ct: 45 },
             { job: 'boar',  name: 'Wild Boar',  ct: 25 },
             { job: 'boar',  name: 'Wild Boar',  ct: 60 },
+            { job: 'wolf', name: 'Wild Wolf', ct: 30 },
+            { job: 'boar', name: 'Wild Boar', ct: 5 },
         ],
     },
 };

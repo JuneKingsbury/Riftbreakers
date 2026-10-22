@@ -30,6 +30,7 @@ const PAN_SPEED = 6;             // tiles per second at tileSize 48
 const CAMERA_DISTANCE = 60;
 const ROTATE_EASE_MS = 70;
 const FACING_TWEEN_MS = 180;
+const NAME_MIN_TILE_SIZE = 34;   // below this zoom, only the acting unit shows a name
 
 const FACING_DIR = { north: [0, -1], south: [0, 1], east: [1, 0], west: [-1, 0] };
 
@@ -206,10 +207,11 @@ export class BattleView3D {
         this._panning = false;
         this._autoCenterNext = true;
         this.onCenterRequest = null;
-        // Tracking: the camera follows the acting unit and walking units. Free: it does not.
-        this._tracking = true;
-        this._fitPending = false;
-        this._savedTileSize = null;
+        // Free (default): the camera frames the whole map and never moves on its own.
+        // Tracking: it follows the acting unit and walking units.
+        this._tracking = false;
+        this._fitPending = true;
+        this._savedTileSize = DEFAULT_TILE_SIZE;   // zoom to return to when tracking is switched on
         this.onFreeCameraChange = null;
 
         this._lastTime = 0;
@@ -266,6 +268,9 @@ export class BattleView3D {
         this._freeButton?.classList.toggle('active', on);
         this.onFreeCameraChange?.(on);
     }
+
+    /** Re-frames the whole map (the free camera's starting view). */
+    fitToMap() { this._desired = null; this._fitPending = true; }
 
     /** Shows or hides the free camera button (the deploy screen has nothing to track). */
     showFreeCameraButton(visible) {
@@ -1169,11 +1174,11 @@ export class BattleView3D {
             uv.arrow.position.set(pose.x + Math.cos(angle) * 0.42, pose.y + 0.04, pose.z - Math.sin(angle) * 0.42);
             uv.arrow.material.opacity = ko ? 0.4 : 0.95;
 
-            this._updateTag(uv, unit, ko, projected.set(px, py + sh / Math.cos(PITCH) + 0.05, pz), ppu);
+            this._updateTag(uv, unit, ko, projected.set(px, py + sh / Math.cos(PITCH) + 0.05, pz), isActive);
         }
     }
 
-    _updateTag(uv, unit, ko, worldPos, ppu) {
+    _updateTag(uv, unit, ko, worldPos, isActive) {
         const { els, last } = uv;
         const set = (key, val, apply) => { if (last[key] !== val) { last[key] = val; apply(val); } };
         set('name', unit.name, v => { els.name.textContent = v; });
@@ -1202,7 +1207,13 @@ export class BattleView3D {
         const sx = (worldPos.x * 0.5 + 0.5) * this._width;
         const sy = (-worldPos.y * 0.5 + 0.5) * this._height;
         uv.tag.style.opacity = ko ? '0.55' : '1';
-        uv.tag.style.transform = `translate(${Math.round(sx)}px, ${Math.round(sy)}px) translate(-50%, -100%)`;
+        // Zoomed far out, twelve tags would pile up. Shrink them with the zoom and drop the
+        // names (keeping the bars) unless it is the acting unit.
+        const zoomScale = Math.max(0.6, Math.min(1, this._tileSize / DEFAULT_TILE_SIZE));
+        const showName = this._tileSize >= NAME_MIN_TILE_SIZE || isActive;
+        set('showName', showName, v => { els.name.style.display = v ? '' : 'none'; });
+        uv.tag.style.transform = `translate(${Math.round(sx)}px, ${Math.round(sy)}px) translate(-50%, -100%) scale(${zoomScale.toFixed(2)})`;
+        uv.tag.style.transformOrigin = '50% 100%';
     }
 
     // ---- Projectiles and floating text --------------------------------------
@@ -1268,9 +1279,10 @@ export class BattleView3D {
             return b;
         };
         mk('↺', 'Rotate left (Q)',  () => this.rotateView(-1));
-        mk('◎', 'Center (F)',       () => this.onCenterRequest?.());
+        mk('◎', 'Fit whole map / center on unit (F)', () => { if (this._tracking) this.onCenterRequest?.(); else this.fitToMap(); });
         mk('↻', 'Rotate right (E)', () => this.rotateView(1));
-        this._freeButton = mk('⤢', 'Free camera: see the whole map (V)', () => this.setFreeCamera(this._tracking));
+        this._freeButton = mk('⤢', 'Free camera on/off (V). On: whole map, no auto-follow', () => this.setFreeCamera(this._tracking));
+        this._freeButton.classList.toggle('active', !this._tracking);
         this.overlay.appendChild(bar);
         this._compass = bar;
     }

@@ -107,7 +107,7 @@ export class BattleUI {
             position: absolute; top: 0; right: 0; width: 190px; height: 100%;
             background: rgba(8,8,20,0.92); border-left: 1px solid #335;
             padding: 10px 8px; box-sizing: border-box;
-            overflow: hidden; pointer-events: auto;
+            overflow-x: hidden; overflow-y: auto; pointer-events: auto;
         `;
         this._overlay.appendChild(el);
         return el;

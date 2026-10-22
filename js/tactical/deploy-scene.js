@@ -137,14 +137,12 @@ export class DeployScene {
             showViewError(containerEl, err, () => this._sm.pop());
             return;
         }
-        this._renderer.tileSize = 40;
         // The side panel covers the left 220px, so center the map in what is left.
         this._renderer.setInsets(220, 0);
         this._renderer.onCenterRequest = () => this._centerOnMap();
         this._renderer.showFreeCameraButton(false);   // nothing to track while deploying
 
-        // Center on the map's midpoint immediately (no glide).
-        this._renderer.snapTo(Math.floor(map.width / 2), Math.floor(map.height / 2));
+        // The view starts framing the whole map, which is what the deploy screen wants.
 
         this._buildOverlay(containerEl);
         this._highlightSpawnTiles();
@@ -433,8 +431,7 @@ export class DeployScene {
     }
 
     _centerOnMap() {
-        const map = this._preview.map;
-        this._renderer.centerOn(Math.floor(map.width / 2), Math.floor(map.height / 2));
+        this._renderer.fitToMap();
     }
 
     _handleCanvasTileClick(clientX, clientY) {

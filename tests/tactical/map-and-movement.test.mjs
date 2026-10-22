@@ -3,7 +3,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { loadMapData, getTile } from '../../js/tactical/battle-map.js';
+import { loadMapData, getTile, MAX_CLIMB } from '../../js/tactical/battle-map.js';
+import { CHARACTER_DATA } from '../../js/tactical/data/characters.js';
+import { BATTLE_SCENARIOS } from '../../js/tactical/world-map-data.js';
 import { MAP_DATA } from '../../js/tactical/data/maps.js';
 import { createUnit } from '../../js/tactical/units.js';
 import { moveEntityAlongPath } from '../../js/systems/movement-lerp.js';
@@ -103,4 +105,66 @@ test('walking speed follows the battle\'s moveMsPerStep for both manual and scri
     const dest = { x: other.x + 1, y: other.y };
     executeIntent(other, { move: dest, act: { kind: 'wait' } }, battle, null);
     assert.equal(viewState(other).msPerStep, 45);
+});
+
+// Flood fill from a tile using the same rules as computeMoveRange: passable, 4-way, climb limit.
+function reachableFrom(map, start) {
+    const seen = new Set([`${start.x},${start.y}`]);
+    const queue = [start];
+    while (queue.length) {
+        const cur = queue.shift();
+        const curTile = getTile(map, cur.x, cur.y);
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+            const x = cur.x + dx, y = cur.y + dy;
+            const tile = getTile(map, x, y);
+            if (!tile || !tile.passable) continue;
+            if (Math.abs(tile.elevation - curTile.elevation) > MAX_CLIMB) continue;
+            const key = `${x},${y}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            queue.push({ x, y });
+        }
+    }
+    return seen;
+}
+
+test('every map gives each side six spawns and all twelve can walk to each other', () => {
+    for (const [name, def] of everyMap) {
+        const map = loadMapData(def);
+        assert.equal(map.playerSpawns.length, 6, `${name} player spawns`);
+        assert.equal(map.enemySpawns.length, 6, `${name} enemy spawns`);
+        const reach = reachableFrom(map, map.playerSpawns[0]);
+        for (const s of [...map.playerSpawns, ...map.enemySpawns]) {
+            assert.ok(reach.has(`${s.x},${s.y}`), `${name}: spawn (${s.x},${s.y}) is cut off`);
+        }
+    }
+});
+
+test('no map has a sealed-off pocket holding a large share of its walkable ground', () => {
+    for (const [name, def] of everyMap) {
+        const map = loadMapData(def);
+        const walkable = map.tiles.filter(t => t.passable).length;
+        const reach = reachableFrom(map, map.playerSpawns[0]);
+        assert.ok(reach.size / walkable >= 0.9, `${name}: only ${reach.size}/${walkable} walkable tiles reachable`);
+    }
+});
+
+test('maps are much larger than the old ones (all under 400 tiles) and have no stone wall around the outside', () => {
+    for (const [name, def] of everyMap) {
+        assert.ok(def.width * def.height >= 700, `${name} is only ${def.width}x${def.height}`);
+        const map = loadMapData(def);
+        const edge = [];
+        for (let x = 0; x < map.width; x++) edge.push(getTile(map, x, 0), getTile(map, x, map.height - 1));
+        for (let y = 0; y < map.height; y++) edge.push(getTile(map, 0, y), getTile(map, map.width - 1, y));
+        const walls = edge.filter(t => t.type === 'wall').length;
+        assert.ok(walls / edge.length < 0.25, `${name}: ${walls}/${edge.length} edge tiles are wall`);
+    }
+});
+
+test('the default party and every enemy roster field six units a side', () => {
+    assert.equal(CHARACTER_DATA.filter(c => c.team === 'player').length, 6);
+    assert.equal(CHARACTER_DATA.filter(c => c.team === 'enemy').length, 6);
+    for (const [id, sc] of Object.entries(BATTLE_SCENARIOS)) {
+        if (sc.roster) assert.equal(sc.roster.length, 6, `${id} roster`);
+    }
 });

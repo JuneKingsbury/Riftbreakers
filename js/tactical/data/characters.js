@@ -89,6 +89,37 @@ export const CHARACTER_DATA = [
         },
     },
 
+    {
+        name: 'Maren',
+        job: 'seer',
+        team: 'player',
+        x: 2, y: 3,
+        ct: 35,
+        xp: { novice: 120, seer: 60 },
+        supportSkill: null,
+        supportPassive: null,
+        appearance: {
+            race: 'human', bodyVariant: 2, hairVariant: 1, shirtVariant: 2,
+            nameColor: '#44ccdd',
+            armorKey: 'enchanted_tunic', helmetKey: 'scholars_spectacles', weaponKey: 'wooden_wand', toolKey: 'lantern',
+        },
+    },
+    {
+        name: 'Torv',
+        job: 'stoneshaper',
+        team: 'player',
+        x: 3, y: 3,
+        ct: 5,
+        xp: { novice: 120, stoneshaper: 60 },
+        supportSkill: null,
+        supportPassive: null,
+        appearance: {
+            race: 'human', bodyVariant: 1, hairVariant: 4, shirtVariant: 1,
+            nameColor: '#cc8844',
+            armorKey: 'iron_brigandine', helmetKey: 'iron_helmet', weaponKey: 'iron_hammer', toolKey: null,
+        },
+    },
+
     // ---- Enemies ----
     {
         name: 'Grok',
@@ -136,6 +167,30 @@ export const CHARACTER_DATA = [
             race: 'human', bodyVariant: 1, hairVariant: 4, shirtVariant: 1,
             nameColor: '#887722',
             armorKey: 'leather_jacket', helmetKey: null, weaponKey: 'wooden_club', toolKey: null,
+        },
+    },
+    {
+        name: 'Skrit',
+        job: 'goblin',
+        team: 'enemy',
+        x: 16, y: 7,
+        ct: 35,
+        appearance: {
+            race: 'human', bodyVariant: 1, hairVariant: 2, shirtVariant: 1,
+            nameColor: '#668833',
+            armorKey: 'leather_jacket', helmetKey: null, weaponKey: 'void_dagger', toolKey: null,
+        },
+    },
+    {
+        name: 'Dusk',
+        job: 'shadow_mage',
+        team: 'enemy',
+        x: 18, y: 10,
+        ct: 15,
+        appearance: {
+            race: 'human', bodyVariant: 2, hairVariant: 3, shirtVariant: 2,
+            nameColor: '#552288',
+            armorKey: 'cloak_of_shadows', helmetKey: 'void_crown', weaponKey: 'void_staff', toolKey: null,
         },
     },
 ];
