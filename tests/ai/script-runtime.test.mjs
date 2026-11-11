@@ -3,8 +3,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { createUnit } from '../../js/tactical/units.js';
-import { loadMapData, getTile } from '../../js/tactical/battle-map.js';
-import { ABILITIES } from '../../js/tactical/data-registry.js';
+import { getCell, standZ } from '../../js/tactical/battle-map.js';
+import { gridMap } from '../map-fixtures.mjs';
+import { ABILITIES, JOB_STATS } from '../../js/tactical/data-registry.js';
+import { scaledLoadout } from '../../js/tactical/loadout.js';
 import { resolveAbility } from '../../js/tactical/abilities.js';
 import { estimateAbilityEffect } from '../../js/tactical/ai/estimate.js';
 import { runScript } from '../../js/tactical/ai/script-runtime.js';
@@ -17,18 +19,24 @@ import * as store from '../../js/tactical/ai/script-store.js';
 // A flat 16x5 field. `wallAt` puts a sight-blocking wall column on x = wallAt.
 function field(wallAt = null) {
     const rows = [];
-    const elev = [];
     for (let y = 0; y < 5; y++) {
         rows.push(Array.from({ length: 16 }, (_, x) => (x === wallAt ? '#' : '.')).join(''));
-        elev.push('0'.repeat(16));
     }
-    return loadMapData({ width: 16, height: 5, tiles: rows, elevation: elev, playerSpawns: [], enemySpawns: [] });
+    return gridMap(rows);
 }
 const map = field();
 
+// Player-job fixtures know their job's whole skillset (as at Lv.8) but equip no
+// reaction, support or movement ability, so only the rule under test acts.
+function fullKit(job) {
+    return JOB_STATS[job].learnable
+        ? { ...scaledLoadout(job, 8), reaction: null, support: null, movement: null }
+        : null;
+}
+
 function mk(name, job, team, x, y, extra = {}) {
-    assert.ok(getTile(map, x, y)?.passable, `fixture tile ${x},${y} must be passable`);
-    return Object.assign(createUnit(name, job, team, x, y), extra);
+    assert.ok(getCell(map, x, y)?.passable, `fixture tile ${x},${y} must be passable`);
+    return Object.assign(createUnit(name, job, team, x, y, { z: standZ(map, x, y), loadout: fullKit(job) }), extra);
 }
 
 const always = { test: 'always', params: {} };
@@ -415,7 +423,7 @@ test('movement goes around a pond instead of getting stuck against it', () => {
     //   y=3  .  ~  ~  ~  ~  ~  .      foe at (3,4)
     //   y=4  .  .  .  .  .  .  .
     const rows = ['.......', '.~~~~~.', '.~~~~~.', '.......'];
-    const pond = loadMapData({ width: 7, height: 4, tiles: rows, elevation: rows.map(() => '0000000'), playerSpawns: [], enemySpawns: [] });
+    const pond = gridMap(rows);
     const me = createUnit('Me', 'warden', 'player', 3, 0);
     const foe = createUnit('Foe', 'goblin', 'enemy', 3, 3);
     const s = script(rule('go', always, { do: 'move', mode: 'toward', target: enemyNearest }));
@@ -426,11 +434,11 @@ test('movement goes around a pond instead of getting stuck against it', () => {
     // so the unit must head for a side column where the walking route is shorter.
     assert.ok(intent.move.x !== 3, `moved sideways to (${intent.move.x},${intent.move.y})`);
     const field = Q_walk(pond, foe);
-    assert.ok(field.get(`${intent.move.x},${intent.move.y}`) < field.get('3,0'), 'closer by walking distance');
+    assert.ok(field.get(`${intent.move.x},${intent.move.y},0`) < field.get('3,0,0'), 'closer by walking distance');
 });
 
 import { walkCostField } from '../../js/tactical/ai/queries.js';
-function Q_walk(map, target) { return walkCostField(map, target.x, target.y); }
+function Q_walk(map, target) { return walkCostField(map, target); }
 
 import { sideForAbility, scriptUsable } from '../../js/tactical/ai/blocks.js';
 

@@ -1,5 +1,7 @@
 import { SHOP_ITEMS, NODES } from './world-map-data.js';
-import { JOB_STATS, ABILITIES, jobLevel, unlockedAbilities, meetsPrerequisites, missingPrerequisites, masteryStatBonus, crossJobUnlockedAbilities, XP_THRESHOLDS, allowedEquipTypes, isPlayerJob } from './data-registry.js';
+import { JOB_STATS, ABILITIES, jobLevel, meetsPrerequisites, missingPrerequisites, masteryStatBonus, JP_THRESHOLDS, allowedEquipTypes, isPlayerJob } from './data-registry.js';
+import { LOADOUT_SLOTS, abilitySlot, availableJp, isLearned, canLearn, skillsetFor, equippable, sanitizeLoadout, buildLoadout } from './loadout.js';
+import { moveProfile } from './abilities.js';
 import { JOB_DATA } from './data/jobs.js';
 import { EQUIPMENT, equipmentStatBonuses } from './data/equipment.js';
 
@@ -668,22 +670,33 @@ export class WorldMapUI {
                 </div>
             </div>`;
 
-        // ---- Stats (job base + equipment bonuses) ----
+        // ---- Stats (job base + equipment bonuses + equipped Movement ability) ----
         const bonuses = equipmentStatBonuses(a);
+        const moveKey = buildLoadout(member).movement;
+        const moveAb  = ABILITIES[moveKey] || {};
+        const moveProf = moveProfile({ movement: moveKey });
         const stat = (key, base) => {
             const b = bonuses[key] || 0;
-            const total = (base ?? 0) + b;
-            if (b === 0) return `<span style="color:#ccc;">${total}</span>`;
-            const sign = b > 0 ? '+' : '';
-            const col  = b > 0 ? '#8f8' : '#f88';
-            return `<span style="color:#ccc;">${total}</span> <span style="color:${col};font-size:9px;">(${sign}${b})</span>`;
+            const m = key === 'move' ? (moveAb.moveBonus || 0) : 0;
+            const total = (base ?? 0) + b + m;
+            let html = `<span style="color:#ccc;">${total}</span>`;
+            if (b !== 0) {
+                const sign = b > 0 ? '+' : '';
+                const col  = b > 0 ? '#8f8' : '#f88';
+                html += ` <span style="color:${col};font-size:9px;">(${sign}${b})</span>`;
+            }
+            if (m !== 0) html += ` <span style="color:${SLOT_COLORS.movement};font-size:9px;">(+${m} ${moveAb.name})</span>`;
+            return html;
         };
+        const climbBonus = moveProf.climb - moveProfile({}).climb;
+        const climbHtml = `<span style="color:#ccc;">${moveProf.climb === Infinity ? '∞' : moveProf.climb}</span>`
+            + (climbBonus ? ` <span style="color:${SLOT_COLORS.movement};font-size:9px;">(${moveAb.name})</span>` : '');
         const STAT_ROWS = [
             ['HP',  'maxHp', jobStats.maxHp, 'MP',  'maxMp', jobStats.maxMp],
             ['ATK', 'atk',   jobStats.atk,   'DEF', 'def',   jobStats.def],
             ['MAT', 'mat',   jobStats.mat,   'MDF', 'mdf',   jobStats.mdf],
             ['SPD', 'spd',   jobStats.spd,   'MOV', 'move',  jobStats.move],
-            ['EVA', 'eva',   jobStats.eva,   null,  null,    null],
+            ['EVA', 'eva',   jobStats.eva,   'CLIMB', null,  null],
         ];
         html += `<div style="font-size:10px;color:#fc8;text-transform:uppercase;margin-bottom:4px;">Stats</div>`;
         html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:2px 12px;
@@ -692,8 +705,14 @@ export class WorldMapUI {
         for (const [la, ka, va, lb, kb, vb] of STAT_ROWS) {
             html += `<div style="color:#888;">${la}: ${stat(ka, va)}</div>`;
             html += lb
-                ? `<div style="color:#888;">${lb}: ${stat(kb, vb)}</div>`
+                ? `<div style="color:#888;">${lb}: ${kb ? stat(kb, vb) : climbHtml}</div>`
                 : `<div></div>`;
+        }
+        const moveNotes = [];
+        if (moveProf.ignoreTerrainCost) moveNotes.push('every tile costs 1 move');
+        if (moveProf.passThroughUnits)  moveNotes.push('passes through units');
+        if (moveNotes.length) {
+            html += `<div style="grid-column:1 / -1;font-size:10px;color:${SLOT_COLORS.movement};">${moveAb.name}: ${moveNotes.join(', ')}</div>`;
         }
         html += `</div>`;
 
@@ -785,8 +804,8 @@ export class WorldMapUI {
 
         // ---- Job ----
         const allJobs = Object.keys(JOB_STATS).filter(isPlayerJob);
-        const unlockedJobs = allJobs.filter(k => meetsPrerequisites(member.xp, k));
-        const lockedJobs   = allJobs.filter(k => !meetsPrerequisites(member.xp, k));
+        const unlockedJobs = allJobs.filter(k => meetsPrerequisites(member.jp, k));
+        const lockedJobs   = allJobs.filter(k => !meetsPrerequisites(member.jp, k));
 
         html += `<div style="font-size:10px;color:#fc8;text-transform:uppercase;margin-bottom:4px;">Job</div>`;
         html += `<select class="wm-job-select" data-member="${member.name}"
@@ -801,7 +820,7 @@ export class WorldMapUI {
             html += `<option disabled style="color:#444;">─── locked ───</option>`;
             for (const key of lockedJobs) {
                 const sel     = member.job === key ? ' selected' : '';
-                const missing = missingPrerequisites(member.xp, key);
+                const missing = missingPrerequisites(member.jp, key);
                 html += `<option value="${key}"${sel} disabled style="color:#555;">${_jobLabel(key)} — needs: ${missing}</option>`;
             }
         }
@@ -816,7 +835,7 @@ export class WorldMapUI {
         const prereqs = jobData.prerequisites || [];
         if (prereqs.length > 0) {
             const parts = prereqs.map(p => {
-                const have = jobLevel(member.xp, p.job);
+                const have = jobLevel(member.jp, p.job);
                 const met  = have >= p.level;
                 const col  = met ? '#8f8' : '#f88';
                 return `<span style="color:${col};">${_jobLabel(p.job)} Lv.${p.level} (${met ? '✓' : `have ${have}`})</span>`;
@@ -826,87 +845,119 @@ export class WorldMapUI {
 
         // Description
         if (jobData.desc) {
-            html += `<div style="font-size:11px;color:#aaa;line-height:1.6;margin-bottom:8px;">${jobData.desc}</div>`;
+            html += `<div style="font-size:11px;color:#aaa;line-height:1.6;">${jobData.desc}</div>`;
         }
-
-        // Abilities
-        const abilityKeys = jobData.abilities || [];
-        if (abilityKeys.length > 0) {
-            html += `<div style="font-size:10px;color:#fc8;text-transform:uppercase;margin-bottom:5px;">Skills</div>`;
-            const unlockedSet   = new Set(unlockedAbilities(member.job, member.xp));
-            const abilityLevels = jobData.abilityLevels || {};
-
-            for (const key of abilityKeys) {
-                const ab       = ABILITIES[key];
-                if (!ab) continue;
-                const isUnlocked = unlockedSet.has(key);
-                const unlockLv   = abilityLevels[key] ?? 1;
-                const isPassive  = ab.passive || ab.type === 'passive';
-                const typeCol    = !isUnlocked ? '#444'
-                    : isPassive           ? '#88aacc'
-                    : ab.type === 'magic' ? '#cc88ff'
-                    : '#ffaa66';
-                const typeLabel  = isPassive ? 'Passive' : ab.type === 'magic' ? 'Magic' : 'Physical';
-
-                const parts = [];
-                if (isUnlocked) {
-                    if (!isPassive) {
-                        if (ab.mpCost)     parts.push(`${ab.mpCost} MP`);
-                        if (ab.range)      parts.push(`Range ${ab.range}`);
-                        if (ab.aoe)        parts.push(`AoE ${ab.aoe}`);
-                        if (ab.chargeTime) parts.push(`Charge ${ab.chargeTime}`);
-                    } else {
-                        if (ab.passiveMpCost) parts.push(`${ab.passiveMpCost} MP/turn`);
-                    }
-                }
-
-                let powerHint = '';
-                if (isUnlocked && ab.basePower) {
-                    const statKey = ab.type === 'physical' ? 'atk' : 'mat';
-                    const base    = (jobStats[statKey] || 0) + (bonuses[statKey] || 0);
-                    powerHint = `~${Math.round(ab.basePower * base)}`;
-                }
-
-                const namCol   = isUnlocked ? '#ddd' : '#444';
-                const bgCol    = isUnlocked ? '#0a0a1c' : '#080810';
-                const borderCol = isUnlocked ? '#2a2a3a' : '#181820';
-
-                html += `<div class="wm-skill-card" data-ability="${key}"
-                              style="margin-bottom:4px;padding:4px 7px;cursor:default;
-                                     background:${bgCol};border:1px solid ${borderCol};border-radius:3px;
-                                     display:flex;align-items:center;gap:6px;">
-                    <span style="font-size:11px;color:${namCol};font-weight:bold;flex:1;">${ab.name}</span>
-                    ${isUnlocked
-                        ? `<span style="font-size:9px;color:${typeCol};text-transform:uppercase;">${typeLabel}</span>
-                           ${parts.length ? `<span style="font-size:9px;color:#556;">${parts.join(' · ')}</span>` : ''}
-                           ${powerHint ? `<span style="font-size:10px;color:#fc8;min-width:28px;text-align:right;">${powerHint}</span>` : ''}`
-                        : `<span style="font-size:9px;color:#445;">Unlocks Lv.${unlockLv}</span>`
-                    }
-                </div>`;
-            }
-        }
-
         html += `</div>`;
 
-        // ---- XP history ----
-        const xpEntries = Object.entries(member.xp || {}).filter(([, v]) => v > 0);
-        if (xpEntries.length > 0) {
-            html += `<div style="font-size:10px;color:#fc8;text-transform:uppercase;margin-bottom:4px;">Job XP</div>`;
+        // ---- Loadout ----
+        sanitizeLoadout(member);
+        const lo = member.loadout;
+        const SELECT_STYLE = `flex:1;min-width:0;background:#0d0d20;border:1px solid #447;color:#ccc;
+                              font-family:'Courier New',monospace;font-size:11px;padding:3px 5px;border-radius:3px;`;
+        const loadoutRow = (label, color, control) =>
+            `<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+                <span style="font-size:10px;color:${color};text-transform:uppercase;width:72px;flex-shrink:0;">${label}</span>
+                ${control}
+             </div>`;
+        const slotSelect = (slot, options) => {
+            let sel = `<select class="wm-loadout-select" data-slot="${slot}" style="${SELECT_STYLE}">`;
+            sel += `<option value="">— none —</option>`;
+            for (const { value, label } of options) {
+                sel += `<option value="${value}"${lo[slot] === value ? ' selected' : ''}>${label}</option>`;
+            }
+            return sel + `</select>`;
+        };
+        html += `<div style="font-size:10px;color:#fc8;text-transform:uppercase;margin-bottom:4px;">Loadout</div>`;
+        html += `<div style="padding:8px;background:#080818;border:1px solid #223;border-radius:4px;margin-bottom:12px;">`;
+        const primaryCount = skillsetFor(member, member.job).length;
+        html += loadoutRow('Ability 1', SLOT_COLORS.action,
+            `<span style="flex:1;font-size:11px;color:#ddd;">${jobData.skillsetName || '—'}
+                <span style="color:#556;">(${primaryCount} learned)</span></span>`);
+        html += loadoutRow('Ability 2', SLOT_COLORS.action, slotSelect('secondary',
+            equippable(member, 'secondary').map(j => ({
+                value: j,
+                label: `${JOB_DATA[j].skillsetName} (${_jobLabel(j)}, ${skillsetFor(member, j).length})`,
+            }))));
+        for (const slot of LOADOUT_SLOTS) {
+            html += loadoutRow(SLOT_LABELS[slot], SLOT_COLORS[slot], slotSelect(slot,
+                equippable(member, slot).map(k => ({ value: k, label: ABILITIES[k].name }))));
+        }
+        html += `</div>`;
+
+        // ---- Learn abilities ----
+        this._learnJobFor = this._learnJobFor || {};
+        let learnJob = this._learnJobFor[member.name];
+        if (!learnJob || !unlockedJobs.includes(learnJob)) learnJob = member.job;
+        const learnDef = JOB_DATA[learnJob] || {};
+        const learnLv  = jobLevel(member.jp, learnJob);
+        const earned   = (member.jp || {})[learnJob] || 0;
+
+        html += `<div style="font-size:10px;color:#fc8;text-transform:uppercase;margin-bottom:4px;">Learn Abilities</div>`;
+        html += `<div style="padding:8px;background:#080818;border:1px solid #223;border-radius:4px;margin-bottom:12px;">`;
+        html += `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">`;
+        html += `<select class="wm-learn-job-select" style="${SELECT_STYLE}">`;
+        for (const key of unlockedJobs) {
+            html += `<option value="${key}"${key === learnJob ? ' selected' : ''}>${_jobLabel(key)}${key === member.job ? ' (current)' : ''}</option>`;
+        }
+        html += `</select>`;
+        html += `<span style="font-size:10px;color:#888;white-space:nowrap;">Lv.${learnLv} · ${earned} earned · `
+            + `<b style="color:#aaffaa;">${availableJp(member, learnJob)} JP</b></span>`;
+        html += `</div>`;
+
+        for (const [key, cost] of Object.entries(learnDef.learnable || {})) {
+            const ab = ABILITIES[key];
+            if (!ab) continue;
+            const slot    = abilitySlot(key);
+            const learned = isLearned(member, key);
+            const tagCol  = slot === 'action' ? (ab.type === 'magic' ? '#cc88ff' : '#ffaa66') : SLOT_COLORS[slot];
+            const tag     = slot === 'action' ? (ab.type === 'magic' ? 'Magic' : 'Physical') : SLOT_LABELS[slot];
+            const parts   = [];
+            if (slot === 'action') {
+                if (ab.mpCost)     parts.push(`${ab.mpCost} MP`);
+                if (ab.range)      parts.push(`Rng ${ab.range}`);
+                if (ab.aoe)        parts.push(`AoE ${ab.aoe}`);
+                if (ab.chargeTime) parts.push(`Chg ${ab.chargeTime}`);
+            } else if (ab.passiveMpCost) {
+                parts.push(`${ab.passiveMpCost} MP/turn`);
+            }
+            const right = learned
+                ? `<span style="font-size:10px;color:#8f8;min-width:70px;text-align:right;">Learned ✓</span>`
+                : `<button class="wm-learn-btn" data-job="${learnJob}" data-ability="${key}"
+                           ${canLearn(member, learnJob, key) ? '' : 'disabled'}
+                           style="min-width:70px;background:#152015;border:1px solid #474;color:#afa;
+                                  font-family:inherit;font-size:10px;padding:2px 6px;border-radius:3px;
+                                  cursor:pointer;${canLearn(member, learnJob, key) ? '' : 'opacity:0.4;cursor:not-allowed;'}">${cost} JP</button>`;
+            html += `<div class="wm-skill-card" data-ability="${key}"
+                          style="margin-bottom:4px;padding:4px 7px;cursor:default;
+                                 background:#0a0a1c;border:1px solid ${learned ? '#2a3a2a' : '#2a2a3a'};border-radius:3px;
+                                 display:flex;align-items:center;gap:6px;">
+                <span style="font-size:11px;color:${learned ? '#ddd' : '#999'};font-weight:bold;flex:1;">${ab.name}</span>
+                <span style="font-size:9px;color:${tagCol};text-transform:uppercase;">${tag}</span>
+                ${parts.length ? `<span style="font-size:9px;color:#556;">${parts.join(' · ')}</span>` : ''}
+                ${right}
+            </div>`;
+        }
+        html += `</div>`;
+
+        // ---- Job JP ----
+        const jpEntries = Object.entries(member.jp || {}).filter(([, v]) => v > 0);
+        if (jpEntries.length > 0) {
+            html += `<div style="font-size:10px;color:#fc8;text-transform:uppercase;margin-bottom:4px;">Job JP</div>`;
             html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:2px 12px;font-size:11px;
                                   padding:8px;background:#080818;border:1px solid #223;border-radius:4px;">`;
-            for (const [job, xp] of xpEntries) {
+            for (const [job, jp] of jpEntries) {
                 const active = job === member.job;
-                const lv     = jobLevel(member.xp, job);
-                const next   = XP_THRESHOLDS[lv + 1];
-                const prog   = next ? ` — Lv.${lv} (${xp}/${next})` : ` — Lv.${lv} (max)`;
+                const lv     = jobLevel(member.jp, job);
+                const next   = JP_THRESHOLDS[lv + 1];
+                const prog   = next ? `Lv.${lv} (${jp}/${next})` : `Lv.${lv} (max)`;
                 html += `<div style="color:${active ? nameColor : '#888'};">` +
-                    `${_jobLabel(job)}: <span style="color:${active ? '#fff' : '#aaa'};">${xp} xp${prog}</span></div>`;
+                    `${_jobLabel(job)}: <span style="color:${active ? '#fff' : '#aaa'};">${prog} · ${availableJp(member, job)} JP</span></div>`;
             }
             html += `</div>`;
         }
 
         // ---- Mastery bonuses ----
-        const masteryBonuses = masteryStatBonus(member.xp || {});
+        const masteryBonuses = masteryStatBonus(member.jp || {});
         const masteryEntries = Object.entries(masteryBonuses).filter(([, v]) => v !== 0);
         if (masteryEntries.length > 0) {
             const STAT_LABELS = { atk: 'ATK', def: 'DEF', mat: 'MAT', mdf: 'MDF', spd: 'SPD', move: 'MOV', eva: 'EVA', maxHp: 'HP', maxMp: 'MP' };
@@ -918,77 +969,6 @@ export class WorldMapUI {
             }
             html += `</div>`;
         }
-
-        // ---- Cross-job skill slots ----
-        const crossAbilities = crossJobUnlockedAbilities(member.xp || {}, member.job);
-
-        // Build reverse map: abilityKey → job display name (first job that provides it, excluding current)
-        const abilityJobName = {};
-        for (const [jobKey, jobDef] of Object.entries(JOB_DATA)) {
-            if (jobKey === member.job) continue;
-            for (const abilityKey of (jobDef.abilities || [])) {
-                if (!(abilityKey in abilityJobName)) abilityJobName[abilityKey] = _jobLabel(jobKey);
-            }
-        }
-
-        const crossActives   = crossAbilities.filter(k => {
-            const ab = ABILITIES[k];
-            return ab && !ab.passive && ab.type !== 'passive';
-        });
-        const crossPassives  = crossAbilities.filter(k => {
-            const ab = ABILITIES[k];
-            return ab && (ab.passive || ab.type === 'passive');
-        });
-
-        html += `<div style="font-size:10px;color:#fc8;text-transform:uppercase;margin-top:10px;margin-bottom:4px;">Cross-Job Skills</div>`;
-        html += `<div style="padding:8px;background:#080818;border:1px solid #223;border-radius:4px;margin-bottom:12px;">`;
-
-        if (crossAbilities.length === 0) {
-            html += `<div style="font-size:11px;color:#445;">Level up other jobs to unlock cross-job skill slots.</div>`;
-        } else {
-            // Support Skill slot (any skill type)
-            html += `<div style="margin-bottom:8px;">`;
-            html += `<div style="font-size:10px;color:#888;margin-bottom:3px;">Support Skill <span style="color:#445;">(any unlocked skill from another job)</span></div>`;
-            html += `<select class="wm-support-skill-select" data-member="${member.name}"
-                              style="width:100%;background:#0d0d20;border:1px solid #447;color:#ccc;
-                                     font-family:'Courier New',monospace;font-size:11px;padding:4px 6px;
-                                     border-radius:3px;">`;
-            html += `<option value="">— none —</option>`;
-            for (const key of crossAbilities) {
-                const ab  = ABILITIES[key];
-                if (!ab) continue;
-                const sel     = member.supportSkill === key ? ' selected' : '';
-                const tag     = (ab.passive || ab.type === 'passive') ? ' [Passive]' : '';
-                const jobName = abilityJobName[key] ? ` (${abilityJobName[key]})` : '';
-                html += `<option value="${key}"${sel}>${ab.name}${tag}${jobName}</option>`;
-            }
-            html += `</select>`;
-            html += `</div>`;
-
-            // Support Passive slot (passives only)
-            html += `<div>`;
-            html += `<div style="font-size:10px;color:#888;margin-bottom:3px;">Support Passive <span style="color:#445;">(passive skills from another job only)</span></div>`;
-            if (crossPassives.length === 0) {
-                html += `<div style="font-size:11px;color:#445;">No passive skills unlocked in other jobs yet.</div>`;
-            } else {
-                html += `<select class="wm-support-passive-select" data-member="${member.name}"
-                                  style="width:100%;background:#0d0d20;border:1px solid #447;color:#ccc;
-                                         font-family:'Courier New',monospace;font-size:11px;padding:4px 6px;
-                                         border-radius:3px;">`;
-                html += `<option value="">— none —</option>`;
-                for (const key of crossPassives) {
-                    const ab  = ABILITIES[key];
-                    if (!ab) continue;
-                    const sel     = member.supportPassive === key ? ' selected' : '';
-                    const jobName = abilityJobName[key] ? ` (${abilityJobName[key]})` : '';
-                    html += `<option value="${key}"${sel}>${ab.name}${jobName}</option>`;
-                }
-                html += `</select>`;
-            }
-            html += `</div>`;
-        }
-
-        html += `</div>`;
 
         // ---- Back button ----
         html += `<button id="wm-party-back" style="${BTN_BASE}margin-top:14px;color:#888;">‹ Back to Party</button>`;
@@ -1022,21 +1002,35 @@ export class WorldMapUI {
             });
         });
 
-        // Job change handler
+        // Job change handler — drop loadout entries the new job invalidates
         inner.querySelector('.wm-job-select').addEventListener('change', e => {
             member.job = e.target.value;
-            // Clear cross-job slots that may no longer be valid after a job change
-            member.supportSkill   = null;
-            member.supportPassive = null;
+            sanitizeLoadout(member);
             this._showPartyMember(member, worldMap, skinManager);
         });
 
-        // Cross-job slot handlers
-        inner.querySelector('.wm-support-skill-select')?.addEventListener('change', e => {
-            member.supportSkill = e.target.value || null;
+        // Loadout slot handlers
+        inner.querySelectorAll('.wm-loadout-select').forEach(sel => {
+            sel.addEventListener('change', () => {
+                member.loadout[sel.dataset.slot] = sel.value || null;
+                // Re-render so the stats panel reflects the new Movement ability.
+                this._tooltip.style.display = 'none';
+                this._showPartyMember(member, worldMap, skinManager);
+            });
         });
-        inner.querySelector('.wm-support-passive-select')?.addEventListener('change', e => {
-            member.supportPassive = e.target.value || null;
+
+        // Learn panel: switch job, buy abilities
+        inner.querySelector('.wm-learn-job-select').addEventListener('change', e => {
+            this._learnJobFor[member.name] = e.target.value;
+            this._showPartyMember(member, worldMap, skinManager);
+        });
+        inner.querySelectorAll('.wm-learn-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                if (worldMap.learnAbility(member.name, btn.dataset.job, btn.dataset.ability)) {
+                    this._tooltip.style.display = 'none';
+                    this._showPartyMember(member, worldMap, skinManager);
+                }
+            });
         });
 
         inner.querySelector('#wm-party-back').addEventListener('click', () => this._modalBack());
@@ -1047,7 +1041,7 @@ export class WorldMapUI {
             memberStats[k] = (jobStats[k] || 0) + (bonuses[k] || 0);
         }
 
-        // Cross-job select tooltips — show tooltip for currently selected ability on hover
+        // Loadout select tooltips — show tooltip for currently selected ability on hover
         const _bindSelectTooltip = (sel) => {
             if (!sel) return;
             const showTip = (e) => {
@@ -1065,8 +1059,9 @@ export class WorldMapUI {
             sel.addEventListener('mouseleave', () => { this._tooltip.style.display = 'none'; });
             sel.addEventListener('change',     showTip);
         };
-        _bindSelectTooltip(inner.querySelector('.wm-support-skill-select'));
-        _bindSelectTooltip(inner.querySelector('.wm-support-passive-select'));
+        for (const slot of LOADOUT_SLOTS) {
+            _bindSelectTooltip(inner.querySelector(`.wm-loadout-select[data-slot="${slot}"]`));
+        }
 
         // Equipment slot tooltips — show stats for the currently selected item
         inner.querySelectorAll('.wm-equip-select').forEach(sel => {
@@ -1085,17 +1080,10 @@ export class WorldMapUI {
             sel.addEventListener('change',     showTip);
         });
 
-        const unlockedSetForTip = new Set(unlockedAbilities(member.job, member.xp));
-        const abilityLevelsForTip = jobData.abilityLevels || {};
         inner.querySelectorAll('.wm-skill-card').forEach(card => {
             const ab  = ABILITIES[card.dataset.ability];
             if (!ab) return;
-            const isUnlocked = unlockedSetForTip.has(card.dataset.ability);
-            const unlockLv   = abilityLevelsForTip[card.dataset.ability] ?? 1;
-            const tipHtml    = isUnlocked
-                ? this._abilityTooltipHtml(ab, memberStats)
-                : `<span style="color:#888;font-weight:bold;">${ab.name}</span><br>`
-                  + `<span style="color:#445;">Locked — reach ${_jobLabel(member.job)} Lv.${unlockLv} to unlock.</span>`;
+            const tipHtml = this._abilityTooltipHtml(ab, memberStats);
             card.addEventListener('mouseenter', (e) => {
                 this._tooltip.innerHTML = tipHtml;
                 this._tooltip.style.display = 'block';
@@ -1333,7 +1321,8 @@ export class WorldMapUI {
         if (ab.type === 'physical') tags.push('<span style="color:#ffcc88;">Physical</span>');
         if (ab.type === 'magic')    tags.push('<span style="color:#c8a0ff;">Magic</span>');
         if (ab.element)             tags.push(`<span style="color:#88ccff;">${ab.element[0].toUpperCase() + ab.element.slice(1)}</span>`);
-        if (ab.passive)             tags.push('<span style="color:#888;">Passive</span>');
+        const slot = ab.slot ?? 'action';
+        if (slot !== 'action')      tags.push(`<span style="color:${SLOT_COLORS[slot]};">${SLOT_LABELS[slot]}</span>`);
         if (tags.length)            lines.push(tags.join(' · '));
 
         if (ab.desc) {
@@ -1366,6 +1355,23 @@ export class WorldMapUI {
         if (ab.isHeal) lines.push(`<span style="color:#8f8;">Restores HP</span>`);
         if (ab.isCure) lines.push(`<span style="color:#aff;">Removes status effects</span>`);
 
+        if (slot === 'reaction') {
+            const when = `${Math.round((ab.chance ?? 1) * 100)}% when ${TRIGGER_TEXT[ab.trigger] || 'damaged'}`
+                + (ab.adjacentOnly ? ' in melee' : '') + (ab.oncePerBattle ? ' (once per battle)' : '');
+            lines.push(`<span style="color:${SLOT_COLORS.reaction};">Triggers: ${when}</span>`);
+            if (ab.counterWith) lines.push(`Counters with <b>${ABILITIES[ab.counterWith]?.name}</b> (uses its MP and range)`);
+            if (ab.selfCast)    lines.push(`Casts <b>${ABILITIES[ab.selfCast]?.name}</b> on self (uses its MP)`);
+        }
+        if (slot === 'movement') {
+            const fx = [];
+            if (ab.moveBonus)         fx.push(`Move +${ab.moveBonus}`);
+            if (ab.climbBonus)        fx.push(`Climb +${ab.climbBonus}`);
+            if (ab.ignoreClimb)       fx.push('Ignores elevation');
+            if (ab.ignoreTerrainCost) fx.push('Ignores terrain cost');
+            if (ab.passThroughUnits)  fx.push('Passes through units');
+            if (fx.length) lines.push(`<span style="color:${SLOT_COLORS.movement};">${fx.join(' · ')}</span>`);
+        }
+
         return lines.join('<br>');
     }
 }
@@ -1382,3 +1388,15 @@ function _statSummary(eq) {
 function _jobLabel(key) {
     return (key || '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
+
+const SLOT_LABELS = { action: 'Action', reaction: 'Reaction', support: 'Support', movement: 'Movement' };
+const SLOT_COLORS = { action: '#cc88ff', reaction: '#ffd866', support: '#88aacc', movement: '#88dd88' };
+const TRIGGER_TEXT = {
+    physicalHit: 'hit by a physical attack',
+    magicHit:    'hit by magic',
+    anyHit:      'damaged',
+    rangedHit:   'hit from range',
+    lowHp:       'dropped below 30% HP',
+    allyHit:     'an adjacent ally is damaged',
+    statusHit:   'afflicted with a harmful status',
+};

@@ -1,6 +1,6 @@
 <!doctype html>
 <!-- Manual/visual harness for BattleView3D. Serve the repo root (e.g. python3 -m http.server)
-     and open /tests/harness/view3d.html?map=0 . Exposes window.harness for scripted checks. -->
+     and open /tests/harness/view3d.html?map=0 (or ?map=<map id>). Exposes window.harness for scripted checks. -->
 <html>
 <head>
 <meta charset="utf-8">
@@ -16,7 +16,7 @@ import { SkinManager } from '/js/ui/skin-manager.js';
 import { BattleView3D } from '/js/tactical/battle-view3d.js';
 import { TacticalBattle } from '/js/tactical/battle.js';
 import { loadMapData } from '/js/tactical/battle-map.js';
-import { MAP_DATA } from '/js/tactical/data/maps.js';
+import { MAP_DATA } from '/js/tactical/data/maps/index.js';
 import { buildUnits } from '/js/tactical/build-units.js';
 
 const params = new URLSearchParams(location.search);
@@ -24,7 +24,10 @@ const sm = new SkinManager();
 if (params.get('skin') !== 'ascii') {
     await sm.switchSkin('16x16_tiny_world');
 }
-const map = loadMapData(MAP_DATA[Number(params.get('map') || 0)]);
+// ?map= takes an index into MAP_DATA or a map id (the map editor links here by id).
+const mapParam = params.get('map') || '0';
+const mapDef = MAP_DATA.find(d => d.id === mapParam) ?? MAP_DATA[Number(mapParam) || 0];
+const map = loadMapData(mapDef);
 const units = buildUnits(null, 'none', map.playerSpawns, map.enemySpawns);
 const battle = new TacticalBattle(map, units);
 const first = battle.advanceCT();

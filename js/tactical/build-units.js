@@ -1,6 +1,5 @@
 import { createUnitFromCharData, faceToward } from './units.js';
 import { getScriptFor } from './ai/script-store.js';
-import { unlockedAbilities } from './data-registry.js';
 import { CHARACTER_DATA } from './data/characters.js';
 import { equipmentStatBonuses } from './data/equipment.js';
 import { BATTLE_SCENARIOS } from './world-map-data.js';
@@ -22,6 +21,7 @@ export function buildUnits(worldMap, scenarioId, playerSpawns, enemySpawns) {
             team:          'enemy',
             x:             20, y: 8,   // overwritten by spawn positions below
             ct:            r.ct ?? 0,
+            level:         r.level ?? scenario.enemyLevel ?? 1,
             statMods:      r.statMods ?? {},
             extraAbilities: r.extraAbilities ?? [],
             appearance:    r.appearance ?? null,
@@ -38,24 +38,19 @@ export function buildUnits(worldMap, scenarioId, playerSpawns, enemySpawns) {
         // there are fewer spawn tiles than units.
         let spawnX = charData.x;
         let spawnY = charData.y;
+        let spawnZ = null;
         if (charData.team === 'player') {
             const pIdx = partyData.indexOf(charData);
             const spawn = playerSpawns?.[pIdx];
-            if (spawn) { spawnX = spawn.x; spawnY = spawn.y; }
+            if (spawn) { spawnX = spawn.x; spawnY = spawn.y; spawnZ = spawn.z ?? null; }
         } else {
             const eIdx = enemyData.indexOf(charData);
             const spawn = enemySpawns?.[eIdx];
-            if (spawn) { spawnX = spawn.x; spawnY = spawn.y; }
+            if (spawn) { spawnX = spawn.x; spawnY = spawn.y; spawnZ = spawn.z ?? null; }
         }
+        // Party members (entries with JP data) fight with their equipped loadout.
         const unit = createUnitFromCharData({ ...charData, statMods: mergedMods, x: spawnX, y: spawnY });
-        // For player units with XP data, restrict abilities to those unlocked at current job level.
-        // Cross-job slots (supportSkill, supportPassive) bypass this filter since their
-        // eligibility was already validated when the player chose them.
-        if (charData.xp) {
-            const unlocked    = new Set(unlockedAbilities(charData.job, charData.xp));
-            const crossSlots  = new Set([charData.supportSkill, charData.supportPassive].filter(Boolean));
-            unit.abilities = unit.abilities.filter(k => unlocked.has(k) || crossSlots.has(k));
-        }
+        unit.z = spawnZ;   // null: the battle settles it from the map
         // Player characters fight by their battle script. Enemies keep the scoring AI.
         if (charData.team === 'player') unit.script = getScriptFor(charData);
         return unit;

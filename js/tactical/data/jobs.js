@@ -1,8 +1,6 @@
 // Job (class) definitions. The registry in data-registry.js exports the final
-// JOB_STATS table for combat use. Jobs do NOT use `extends` — all stats must be
-// listed explicitly. (Inheritance is intentionally avoided here because
-// data-registry.unlockedAbilities reads JOB_DATA raw to preserve abilityLevels;
-// inheriting abilityLevels via extends would silently lose them.)
+// JOB_STATS table for combat use. Jobs do not use `extends`; every stat is
+// listed explicitly.
 //
 // Fields:
 //   maxHp, maxMp  number  Base HP/MP
@@ -11,11 +9,14 @@
 //   mat, mdf      number  Magic attack / defense
 //   move          number  Movement range in tiles
 //   eva           number  Evasion (0-100, treated as % with direction modifier)
-//   abilities     string[]  Ability keys this job can use (all levels combined)
-//   abilityLevels object  Maps ability key → job level required to unlock it.
-//                         Any key in `abilities` absent here defaults to level 1 (unlocked immediately).
-//                         Every ability key in `abilities` should have an entry here to make
-//                         unlock timing explicit.
+//   skillsetName  string  Player jobs: name of the job's action command (e.g. 'Evocation')
+//   learnable     object  Player jobs: ability key → JP cost to learn it with this job's JP.
+//                         The ability's `slot` decides where it is equipped: action abilities
+//                         form the job's skillset; reaction/support/movement abilities go in
+//                         those loadout slots. Attack is implicit and never learned.
+//                         Each job lists its actions first, then its reaction, support and
+//                         movement abilities. Player jobs share no action abilities.
+//   abilities     string[]  Enemy jobs only: the fixed ability list the unit fights with
 //   spriteKey     string  Key into the skin sprite sheet
 //   char          string  Fallback ASCII character
 //   color         string   Fallback CSS color
@@ -38,8 +39,11 @@ export const JOB_DATA = {
         maxHp: 46, maxMp: 20,
         spd: 8, atk: 9, def: 6, mat: 8, mdf: 6,
         move: 3, eva: 14,
-        abilities: ['attack', 'fire', 'ward'],
-        abilityLevels: { attack: 1, fire: 1, ward: 2 },
+        skillsetName: 'Fundamentals',
+        learnable: {
+            focus: 100, rush: 100, throw_stone: 150, first_aid: 200,
+            brace: 200, jp_boost: 250, move_plus_1: 400,
+        },
         spriteKey: 'npc_ally',
         char: 'N', color: '#cccccc',
         schools: [],
@@ -56,8 +60,11 @@ export const JOB_DATA = {
         maxHp: 36, maxMp: 52,
         spd: 7, atk: 6, def: 3, mat: 15, mdf: 7,
         move: 3, eva: 11,
-        abilities: ['attack', 'fire', 'thunder', 'mana_surge'],
-        abilityLevels: { attack: 1, fire: 1, thunder: 2, mana_surge: 3 },
+        skillsetName: 'Evocation',
+        learnable: {
+            fire: 100, ice: 200, thunder: 200, flare: 500,
+            flame_retort: 300, mana_surge: 400, mana_stride: 300,
+        },
         spriteKey: 'royal_mage',
         char: 'V', color: '#ff8844',
         schools: ['evocation'],
@@ -71,8 +78,11 @@ export const JOB_DATA = {
         maxHp: 46, maxMp: 22,
         spd: 9, atk: 12, def: 6, mat: 6, mdf: 7,
         move: 3, eva: 15,
-        abilities: ['attack', 'hex', 'enfeeble', 'mute'],
-        abilityLevels: { attack: 1, hex: 1, enfeeble: 2, mute: 3 },
+        skillsetName: 'Runeblade',
+        learnable: {
+            hex: 100, sunder: 200, enfeeble: 200, mute: 350, draining_edge: 350,
+            counter: 300, rune_edge: 350, momentum: 400,
+        },
         spriteKey: 'spell_wraith',
         char: 'C', color: '#cc88dd',
         schools: ['enchantment'],
@@ -86,8 +96,11 @@ export const JOB_DATA = {
         maxHp: 44, maxMp: 42,
         spd: 7, atk: 7, def: 7, mat: 10, mdf: 11,
         move: 3, eva: 12,
-        abilities: ['attack', 'ward', 'cure', 'renewing_light', 'stone_aegis', 'arcane_veil'],
-        abilityLevels: { attack: 1, ward: 1, cure: 2, renewing_light: 2, stone_aegis: 3, arcane_veil: 3 },
+        skillsetName: 'Abjuration',
+        learnable: {
+            ward: 100, cure: 200, stone_aegis: 200, arcane_veil: 350,
+            guardian_ward: 300, iron_will: 400, sentinel_step: 350,
+        },
         spriteKey: 'npc_ally',
         char: 'A', color: '#88ccaa',
         schools: ['abjuration'],
@@ -101,8 +114,11 @@ export const JOB_DATA = {
         maxHp: 40, maxMp: 42,
         spd: 9, atk: 8, def: 4, mat: 11, mdf: 7,
         move: 4, eva: 15,
-        abilities: ['attack', 'long_shot', 'mana_surge'],
-        abilityLevels: { attack: 1, long_shot: 1, mana_surge: 2 },
+        skillsetName: 'Runecraft',
+        learnable: {
+            long_shot: 100, pinning_shot: 200, rune_arrow: 200, arrow_rain: 350,
+            return_fire: 350, concentrate: 300, fleet_step: 500,
+        },
         spriteKey: 'crusader_archer',
         char: 'J', color: '#aaccff',
         schools: ['conjuration'],
@@ -116,8 +132,11 @@ export const JOB_DATA = {
         maxHp: 50, maxMp: 30,
         spd: 8, atk: 11, def: 7, mat: 9, mdf: 7,
         move: 4, eva: 14,
-        abilities: ['attack', 'rock_toss', 'earth_skin', 'stone_aegis'],
-        abilityLevels: { attack: 1, rock_toss: 2, earth_skin: 2, stone_aegis: 3 },
+        skillsetName: 'Transmutation',
+        learnable: {
+            rock_toss: 100, earth_skin: 200, stone_fist: 200, calcify: 350,
+            stone_reflex: 250, earthen_footing: 350, stone_stride: 300,
+        },
         spriteKey: 'void_brute',
         char: 'T', color: '#aa8855',
         schools: ['transmutation'],
@@ -131,8 +150,11 @@ export const JOB_DATA = {
         maxHp: 40, maxMp: 48,
         spd: 7, atk: 6, def: 5, mat: 10, mdf: 11,
         move: 3, eva: 16,
-        abilities: ['attack', 'ward', 'farsight', 'temporal_slip', 'dream_veil', 'swift_grace'],
-        abilityLevels: { attack: 1, ward: 1, farsight: 2, temporal_slip: 3, dream_veil: 2, swift_grace: 3 },
+        skillsetName: 'Divination',
+        learnable: {
+            temporal_slip: 100, time_lapse: 200, dream_veil: 200, swift_grace: 350,
+            premonition: 300, farsight: 200, swiftcast: 450, featherstep: 300,
+        },
         spriteKey: 'npc_ally',
         char: 'D', color: '#99ccff',
         schools: ['divination'],
@@ -150,8 +172,11 @@ export const JOB_DATA = {
         maxHp: 52, maxMp: 36,
         spd: 8, atk: 12, def: 7, mat: 12, mdf: 7,
         move: 3, eva: 14,
-        abilities: ['attack', 'arcane_strike', 'force_pulse', 'mana_surge'],
-        abilityLevels: { attack: 1, arcane_strike: 1, force_pulse: 2, mana_surge: 4 },
+        skillsetName: 'Battle Arts',
+        learnable: {
+            arcane_strike: 100, force_pulse: 200, spellbreaker: 350, blade_storm: 500,
+            arcane_rebuke: 400, arcane_weapon: 500, force_leap: 400,
+        },
         spriteKey: 'royal_mage',
         char: 'B', color: '#aa88ff',
         schools: ['evocation', 'enchantment'],
@@ -167,8 +192,11 @@ export const JOB_DATA = {
         maxHp: 62, maxMp: 28,
         spd: 7, atk: 13, def: 12, mat: 10, mdf: 12,
         move: 3, eva: 12,
-        abilities: ['attack', 'smite', 'heal', 'divine_ward', 'renewing_light', 'last_rites'],
-        abilityLevels: { attack: 1, smite: 1, heal: 2, renewing_light: 2, divine_ward: 4, last_rites: 3 },
+        skillsetName: 'Holy Arts',
+        learnable: {
+            smite: 100, heal: 200, consecrate: 350, last_rites: 350,
+            martyr: 450, retribution: 500, divine_ward: 500, hallowed_step: 400,
+        },
         spriteKey: 'knight',
         char: 'P', color: '#ffee88',
         schools: ['evocation', 'abjuration'],
@@ -185,8 +213,11 @@ export const JOB_DATA = {
         maxHp: 34, maxMp: 56,
         spd: 8, atk: 5, def: 3, mat: 16, mdf: 8,
         move: 4, eva: 16,
-        abilities: ['attack', 'rift_bolt', 'void_burst', 'mana_surge', 'mirror_ward'],
-        abilityLevels: { attack: 1, rift_bolt: 1, void_burst: 2, mana_surge: 4, mirror_ward: 3 },
+        skillsetName: 'Riftcraft',
+        learnable: {
+            rift_bolt: 100, void_burst: 200, gravity_well: 350, mirror_ward: 350,
+            phase_shift: 400, void_siphon: 300, spell_pierce: 500, blink: 700,
+        },
         spriteKey: 'spell_wraith',
         char: 'R', color: '#55aaff',
         schools: ['evocation', 'conjuration'],
@@ -202,8 +233,11 @@ export const JOB_DATA = {
         maxHp: 56, maxMp: 32,
         spd: 6, atk: 10, def: 9, mat: 13, mdf: 8,
         move: 3, eva: 10,
-        abilities: ['attack', 'tremor', 'stone_spike', 'stone_wall', 'stone_aegis'],
-        abilityLevels: { attack: 1, tremor: 1, stone_spike: 3, stone_wall: 2, stone_aegis: 2 },
+        skillsetName: 'Geomancy',
+        learnable: {
+            tremor: 100, stone_wall: 200, stone_spike: 350, landslide: 500,
+            aftershock: 300, seismic_power: 400, quake_step: 400,
+        },
         spriteKey: 'void_brute',
         char: 'E', color: '#aa7744',
         schools: ['evocation', 'transmutation'],
@@ -219,8 +253,11 @@ export const JOB_DATA = {
         maxHp: 44, maxMp: 52,
         spd: 7, atk: 6, def: 8, mat: 11, mdf: 13,
         move: 3, eva: 12,
-        abilities: ['attack', 'holy_bind', 'radiant_heal', 'cure', 'stone_aegis', 'arcane_veil'],
-        abilityLevels: { attack: 1, holy_bind: 1, radiant_heal: 2, stone_aegis: 2, arcane_veil: 3, cure: 4 },
+        skillsetName: 'Sanctity',
+        learnable: {
+            holy_bind: 100, radiant_heal: 200, purify: 350, holy_chains: 500,
+            purifying_light: 350, benediction: 450, pilgrim_step: 350,
+        },
         spriteKey: 'npc_ally',
         char: 'H', color: '#ffeeaa',
         schools: ['enchantment', 'abjuration'],
@@ -236,8 +273,11 @@ export const JOB_DATA = {
         maxHp: 38, maxMp: 50,
         spd: 8, atk: 6, def: 4, mat: 14, mdf: 9,
         move: 4, eva: 16,
-        abilities: ['attack', 'spirit_lash', 'haunting', 'mana_surge', 'mute', 'dream_veil', 'bind_will', 'call_wisp'],
-        abilityLevels: { attack: 1, spirit_lash: 1, haunting: 3, mute: 2, dream_veil: 2, call_wisp: 2, bind_will: 3, mana_surge: 4 },
+        skillsetName: 'Spiritbinding',
+        learnable: {
+            spirit_lash: 100, call_wisp: 200, soul_siphon: 200, haunting: 350, bind_will: 350,
+            spirit_hush: 350, spirit_pact: 400, ghost_step: 400,
+        },
         spriteKey: 'shadow_imp',
         char: 'X', color: '#aaccff',
         schools: ['enchantment', 'conjuration'],
@@ -253,8 +293,12 @@ export const JOB_DATA = {
         maxHp: 40, maxMp: 46,
         spd: 7, atk: 6, def: 5, mat: 13, mdf: 10,
         move: 4, eva: 14,
-        abilities: ['attack', 'verdant_lash', 'spore_cloud', 'root_field', 'regen_aura', 'toxic_spores', 'primal_rage', 'hexform', 'call_thorn_beast'],
-        abilityLevels: { attack: 1, verdant_lash: 1, spore_cloud: 2, toxic_spores: 2, root_field: 3, primal_rage: 3, call_thorn_beast: 3, regen_aura: 4, hexform: 4 },
+        skillsetName: 'Worldsong',
+        learnable: {
+            verdant_lash: 100, spore_cloud: 200, toxic_spores: 200, root_field: 350,
+            call_thorn_beast: 350, hexform: 500,
+            thorn_hide: 350, regen_aura: 500, take_root: 300,
+        },
         spriteKey: 'npc_ally',
         char: 'W', color: '#66dd22',
         schools: ['enchantment', 'transmutation'],
@@ -270,8 +314,11 @@ export const JOB_DATA = {
         maxHp: 36, maxMp: 54,
         spd: 8, atk: 5, def: 4, mat: 14, mdf: 10,
         move: 4, eva: 15,
-        abilities: ['attack', 'doom_hex', 'fate_seal', 'wyrd_drain', 'mute', 'swift_grace', 'hexform'],
-        abilityLevels: { attack: 1, doom_hex: 1, fate_seal: 2, mute: 2, swift_grace: 3, hexform: 3, wyrd_drain: 4 },
+        skillsetName: 'Fateweaving',
+        learnable: {
+            doom_hex: 100, fate_seal: 200, unravel: 350, death_sentence: 500,
+            karmic_rebound: 350, wyrd_drain: 400, omen_step: 350,
+        },
         spriteKey: 'spell_wraith',
         char: 'F', color: '#cc44aa',
         schools: ['enchantment', 'divination'],
@@ -287,8 +334,11 @@ export const JOB_DATA = {
         maxHp: 42, maxMp: 52,
         spd: 7, atk: 6, def: 6, mat: 12, mdf: 12,
         move: 3, eva: 14,
-        abilities: ['attack', 'foresight_heal', 'renewing_light', 'aegis_ward', 'arcane_veil', 'last_rites', 'mirror_ward', 'seers_vigil'],
-        abilityLevels: { attack: 1, foresight_heal: 1, renewing_light: 1, arcane_veil: 2, last_rites: 2, mirror_ward: 3, aegis_ward: 3, seers_vigil: 4 },
+        skillsetName: 'Providence',
+        learnable: {
+            foresight_heal: 100, renewing_light: 100, aegis_ward: 350, mass_foresight: 500,
+            second_sight: 400, providence: 500, restorative_step: 300,
+        },
         spriteKey: 'npc_ally',
         char: 'L', color: '#aaddff',
         schools: ['abjuration', 'divination'],
@@ -304,8 +354,11 @@ export const JOB_DATA = {
         maxHp: 48, maxMp: 36,
         spd: 9, atk: 13, def: 6, mat: 10, mdf: 7,
         move: 4, eva: 18,
-        abilities: ['attack', 'wild_surge', 'venom_strike', 'toxic_spores', 'primal_rage', 'savage_howl', 'call_wolf', 'call_boar'],
-        abilityLevels: { attack: 1, wild_surge: 1, venom_strike: 2, toxic_spores: 2, primal_rage: 3, savage_howl: 3, call_wolf: 2, call_boar: 4 },
+        skillsetName: 'Beastcalling',
+        learnable: {
+            wild_surge: 100, venom_strike: 200, call_wolf: 200, savage_howl: 350, primal_rage: 350, call_boar: 500,
+            feral_counter: 450, call_of_the_pack: 500, bloodlust: 400, move_plus_2: 600,
+        },
         spriteKey: 'shadow_imp',
         char: 'C', color: '#cc8833',
         schools: ['conjuration', 'transmutation'],

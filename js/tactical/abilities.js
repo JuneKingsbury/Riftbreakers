@@ -1,4 +1,4 @@
-import { getTile, hasLineOfSight, MAX_CLIMB } from './battle-map.js';
+import { hasLineOfSight, MAX_CLIMB, settleZ, unitCell, stepNeighbors, columnCells, cellsNear, posKey, parseKey } from './battle-map.js';
 import { faceToward, isUnconscious, isDead } from './units.js';
 import { ABILITIES } from './data-registry.js';
 
@@ -14,9 +14,68 @@ export function getEffectiveStat(unit, stat) {
     return val;
 }
 
-// Returns true if a passive ability is active on the unit (in abilities list and has MP).
-function passiveActive(unit, key) {
-    return unit.abilities.includes(key) && unit.mp > 0;
+// The unit's equipped support ability, or null. Supports with an MP upkeep
+// switch off while the unit is out of MP.
+export function supportOf(unit) {
+    const ab = ABILITIES[unit?.support];
+    if (!ab) return null;
+    return (ab.passiveMpCost > 0 && unit.mp <= 0) ? null : ab;
+}
+
+// Returns true if this support ability is equipped and active on the unit.
+export function passiveActive(unit, key) {
+    return unit.support === key && !!supportOf(unit);
+}
+
+export const NEGATIVE_STATUSES = ['poison', 'slow', 'silence', 'sleep', 'stun', 'berserk', 'charm', 'frog', 'enfeebled', 'doom'];
+export const POSITIVE_STATUSES = ['haste', 'protect', 'shell', 'regen', 'reflect', 'reraise', 'slipped'];
+
+// Inflict a timed status, honouring the target's immunities and the source's
+// duration bonus, and apply its stat side effects. If already present, the
+// longer duration wins. Returns true if the status was applied or refreshed.
+export function inflictStatus(target, status, duration, source = null) {
+    if (supportOf(target)?.statusImmune?.includes(status)) return false;
+    const dur = duration + (supportOf(source)?.statusDurationBonus ?? 0);
+    target.statusTimers = target.statusTimers || {};
+    const fresh = !target.status.includes(status);
+    if (!fresh && dur <= (target.statusTimers[status] ?? 0)) return false;
+    if (fresh) target.status.push(status);
+    target.statusTimers[status] = dur;
+    if (fresh && status === 'enfeebled') {
+        target.buffs = target.buffs || [];
+        target.buffs.push({ key: 'enfeebled', stat: 'atk', value: -5, duration: dur });
+    }
+    if (fresh && status === 'frog') {
+        target.buffs = target.buffs || [];
+        target.buffs.push({ key: 'frog_atk', stat: 'atk', value: -Math.round(target.atk * 0.6), duration: null });
+        target.buffs.push({ key: 'frog_mat', stat: 'mat', value: -Math.round(target.mat * 0.6), duration: null });
+        target.buffs.push({ key: 'frog_def', stat: 'def', value: -Math.round(target.def * 0.5), duration: null });
+    }
+    return true;
+}
+
+// Remove every harmful status (and frog's stat penalties). Returns the removed statuses.
+export function cleanseStatuses(unit) {
+    const removed = unit.status.filter(s => NEGATIVE_STATUSES.includes(s));
+    unit.status = unit.status.filter(s => !NEGATIVE_STATUSES.includes(s));
+    for (const s of removed) delete (unit.statusTimers || {})[s];
+    if (removed.includes('frog')) unit.buffs = (unit.buffs || []).filter(b => !b.key.startsWith('frog_'));
+    return removed;
+}
+
+function applyBuffs(target, ab, abKey) {
+    target.buffs = target.buffs || [];
+    for (const b of ab.buffs) target.buffs.push({ key: abKey, ...b });
+}
+
+// Movement-slot effects for pathfinding. moveBonus is already folded into unit.move.
+export function moveProfile(unit) {
+    const ab = ABILITIES[unit.movement] || {};
+    return {
+        climb:            ab.ignoreClimb ? Infinity : MAX_CLIMB + (ab.climbBonus || 0),
+        ignoreTerrainCost: !!ab.ignoreTerrainCost,
+        passThroughUnits:  !!ab.passThroughUnits,
+    };
 }
 
 export function directionEvasionMod(attacker, target) {
@@ -32,78 +91,72 @@ export function directionEvasionMod(attacker, target) {
     return 0.0;
 }
 
+// Movement works on cells (battle-map.js): keys are "x,y,z" and steps carry z, so a unit
+// under a bridge and one on top of it are in different places.
 export function computeMoveRange(unit, map, allUnits) {
-    // Block tiles occupied by living units (including unconscious ones, who still occupy space).
-    const blocked = new Set(allUnits.filter(u => u !== unit && !isDead(u)).map(u => `${u.x},${u.y}`));
+    settleZ(map, [unit, ...allUnits]);
+    // Block cells occupied by living units (including unconscious ones, who still occupy space).
+    const blocked = new Set(allUnits.filter(u => u !== unit && !isDead(u)).map(posKey));
+    const prof = moveProfile(unit);
     const reachable = new Set();
-    const queue = [{ x: unit.x, y: unit.y, budget: unit.move }];
-    const visited = new Map();
-    visited.set(`${unit.x},${unit.y}`, unit.move);
+    const start = unitCell(map, unit);
+    if (!start) return reachable;
+    const startKey = posKey(start);
+    const queue = [{ cell: start, budget: unit.move }];
+    const visited = new Map([[startKey, unit.move]]);
 
     while (queue.length > 0) {
-        const { x, y, budget } = queue.shift();
-        if (!(x === unit.x && y === unit.y)) reachable.add(`${x},${y}`);
+        const { cell, budget } = queue.shift();
+        const here = posKey(cell);
+        // Pass-through movers can cross occupied tiles but never stop on them.
+        if (here !== startKey && !blocked.has(here)) reachable.add(here);
 
-        const neighbors = [
-            { x: x - 1, y },
-            { x: x + 1, y },
-            { x, y: y - 1 },
-            { x, y: y + 1 },
-        ];
-        const curTile = getTile(map, x, y);
-        for (const n of neighbors) {
-            const tile = getTile(map, n.x, n.y);
-            if (!tile || !tile.passable) continue;
-            if (blocked.has(`${n.x},${n.y}`)) continue;
-            if (Math.abs((tile.elevation ?? 0) - (curTile?.elevation ?? 0)) > MAX_CLIMB) continue;
-            const remaining = budget - tile.moveCost;
+        for (const n of stepNeighbors(map, cell, prof.climb)) {
+            const key = posKey(n);
+            if (!prof.passThroughUnits && blocked.has(key)) continue;
+            const remaining = budget - (prof.ignoreTerrainCost ? 1 : n.moveCost);
             if (remaining < 0) continue;
-            const key = `${n.x},${n.y}`;
             if ((visited.get(key) ?? -1) >= remaining) continue;
             visited.set(key, remaining);
-            queue.push({ x: n.x, y: n.y, budget: remaining });
+            queue.push({ cell: n, budget: remaining });
         }
     }
     return reachable;
 }
 
-// Returns an ordered array of {x,y} steps from unit's current position to (destX,destY),
+// Returns an ordered array of {x,y,z} steps from unit's current position to the destination,
 // not including the start tile. Uses BFS with parent pointers to reconstruct the path.
+// destZ picks the level in that column; left out, the first level reached is used.
 // Returns null if the destination is not reachable within move budget.
-export function computeMovePath(unit, map, allUnits, destX, destY) {
-    const blocked = new Set(allUnits.filter(u => u !== unit && !isDead(u)).map(u => `${u.x},${u.y}`));
-    const parent  = new Map();
-    const queue   = [{ x: unit.x, y: unit.y, budget: unit.move }];
-    const visited = new Map();
-    const startKey = `${unit.x},${unit.y}`;
-    visited.set(startKey, unit.move);
-    parent.set(startKey, null);
+export function computeMovePath(unit, map, allUnits, destX, destY, destZ = null) {
+    settleZ(map, [unit, ...allUnits]);
+    const blocked = new Set(allUnits.filter(u => u !== unit && !isDead(u)).map(posKey));
+    const prof    = moveProfile(unit);
+    const start   = unitCell(map, unit);
+    if (!start) return null;
+    const startKey = posKey(start);
+    const parent  = new Map([[startKey, null]]);
+    const cellOf  = new Map([[startKey, start]]);
+    const queue   = [{ cell: start, budget: unit.move }];
+    const visited = new Map([[startKey, unit.move]]);
 
-    const destKey = `${destX},${destY}`;
-    let found = false;
+    const isDest = c => c.x === destX && c.y === destY && (destZ === null || destZ === undefined || c.z === destZ);
+    let found = null;
 
     outer: while (queue.length > 0) {
-        const { x, y, budget } = queue.shift();
-        const curTile = getTile(map, x, y);
-        const neighbors = [
-            { x: x - 1, y },
-            { x: x + 1, y },
-            { x, y: y - 1 },
-            { x, y: y + 1 },
-        ];
-        for (const n of neighbors) {
-            const tile = getTile(map, n.x, n.y);
-            if (!tile || !tile.passable) continue;
-            if (blocked.has(`${n.x},${n.y}`)) continue;
-            if (Math.abs((tile.elevation ?? 0) - (curTile?.elevation ?? 0)) > MAX_CLIMB) continue;
-            const remaining = budget - tile.moveCost;
+        const { cell, budget } = queue.shift();
+        const here = posKey(cell);
+        for (const n of stepNeighbors(map, cell, prof.climb)) {
+            const key = posKey(n);
+            if (blocked.has(key) && (isDest(n) || !prof.passThroughUnits)) continue;
+            const remaining = budget - (prof.ignoreTerrainCost ? 1 : n.moveCost);
             if (remaining < 0) continue;
-            const key = `${n.x},${n.y}`;
             if ((visited.get(key) ?? -1) >= remaining) continue;
             visited.set(key, remaining);
-            parent.set(key, `${x},${y}`);
-            if (key === destKey) { found = true; break outer; }
-            queue.push({ x: n.x, y: n.y, budget: remaining });
+            parent.set(key, here);
+            cellOf.set(key, n);
+            if (isDest(n)) { found = key; break outer; }
+            queue.push({ cell: n, budget: remaining });
         }
     }
 
@@ -111,33 +164,38 @@ export function computeMovePath(unit, map, allUnits, destX, destY) {
 
     // Trace back from dest to start.
     const steps = [];
-    let cur = destKey;
+    let cur = found;
     while (cur && cur !== startKey) {
-        const [cx, cy] = cur.split(',').map(Number);
-        steps.unshift({ x: cx, y: cy });
+        const c = cellOf.get(cur);
+        steps.unshift({ x: c.x, y: c.y, z: c.z });
         cur = parent.get(cur);
     }
     return steps;
 }
 
-export function computeAttackRange(fromTiles, range, includeStart = false, requiresLos = false, map = null) {
+// Cells within Manhattan range of any of the origin cells (keys), every level of each column.
+export function computeAttackRange(fromTiles, range, includeStart = false, requiresLos = false, map) {
     const result = new Set();
     for (const key of fromTiles) {
-        const [ox, oy] = key.split(',').map(Number);
+        const origin = parseKey(key);
+        if (includeStart) result.add(key);
         for (let dx = -range; dx <= range; dx++) {
             for (let dy = -range; dy <= range; dy++) {
-                if (!includeStart && dx === 0 && dy === 0) continue;
+                if (dx === 0 && dy === 0) continue;
                 if (Math.abs(dx) + Math.abs(dy) > range) continue;
-                if (requiresLos && map && !hasLineOfSight(map, ox, oy, ox + dx, oy + dy)) continue;
-                result.add(`${ox + dx},${oy + dy}`);
+                for (const c of columnCells(map, origin.x + dx, origin.y + dy)) {
+                    if (requiresLos && !hasLineOfSight(map, origin, c)) continue;
+                    result.add(posKey(c));
+                }
             }
         }
     }
     return result;
 }
 
-export function computePatternArea(cx, cy, pattern, rotation) {
-    const result = new Set();
+// Cells hit by a shaped pattern around a centre cell ({x,y,z}), rotated in quarter turns.
+export function computePatternArea(map, center, pattern, rotation) {
+    const columns = [];
     for (const [dx, dy] of pattern) {
         let rx, ry;
         switch (rotation % 4) {
@@ -146,28 +204,20 @@ export function computePatternArea(cx, cy, pattern, rotation) {
             case 3:  rx = -dy; ry =  dx; break;
             default: rx =  dx; ry =  dy; break;
         }
-        result.add(`${cx + rx},${cy + ry}`);
+        columns.push([center.x + rx, center.y + ry]);
     }
-    return result;
+    return cellsNear(map, columns, center.z);
 }
 
-export function computeAoeArea(cx, cy, aoe) {
-    const result = new Set();
+// Cells within a Manhattan radius of a centre cell ({x,y,z}) and near its height.
+export function computeAoeArea(map, center, aoe) {
+    const columns = [];
     for (let dx = -aoe; dx <= aoe; dx++) {
         for (let dy = -aoe; dy <= aoe; dy++) {
-            if (Math.abs(dx) + Math.abs(dy) <= aoe) result.add(`${cx + dx},${cy + dy}`);
+            if (Math.abs(dx) + Math.abs(dy) <= aoe) columns.push([center.x + dx, center.y + dy]);
         }
     }
-    return result;
-}
-
-// Apply a timed status to a unit, respecting existing timers.
-// If the status is already present, refresh duration if new one is longer.
-function applyTimedStatus(unit, status, duration) {
-    unit.statusTimers = unit.statusTimers || {};
-    const existing = unit.statusTimers[status] ?? 0;
-    if (!unit.status.includes(status)) unit.status.push(status);
-    if (duration > existing) unit.statusTimers[status] = duration;
+    return cellsNear(map, columns, center.z);
 }
 
 export function resolveAbility(source, target, ability, map) {
@@ -180,17 +230,20 @@ export function resolveAbility(source, target, ability, map) {
         return { damage: 0, healing: 0, statusApplied: null, missed: true, silenced: true };
     }
 
-    // --- earth_skin: self DEF buff ---
-    if (ability === 'earth_skin') {
-        source.buffs = source.buffs || [];
-        source.buffs.push({ key: 'earth_skin', stat: 'def', value: 8, duration: 2 });
-        faceToward(source, source.x, source.y);
-        return { damage: 0, healing: 0, statusApplied: null, floatingText: 'DEF UP!' };
+    const srcSup = supportOf(source);
+    const tgtSup = supportOf(target);
+
+    // Buff-only abilities (Focus, Earth Skin): apply the stat changes and stop.
+    if (ab.buffs && !ab.basePower && !ab.isHeal && !ab.applyStatus) {
+        applyBuffs(target, ab, ability);
+        faceToward(source, target.x, target.y);
+        return { damage: 0, healing: 0, statusApplied: null, floatingText: ab.floatText ?? null };
     }
 
-    const srcTile = getTile(map, source.x, source.y);
-    const tgtTile = getTile(map, target.x, target.y);
-    const highGroundBonus = (srcTile && tgtTile && srcTile.elevation > tgtTile.elevation) ? 1.25 : 1.0;
+    // High ground: +25% normally; Earthen Footing raises its own bonus and
+    // denies the bonus to anyone attacking it from above.
+    let highGroundBonus = 1.0;
+    if ((source.z ?? 0) > (target.z ?? 0) && !tgtSup?.highGroundMult) highGroundBonus = srcSup?.highGroundMult ?? 1.25;
 
     if (ab.isCure) {
         target.status = target.status.filter(s => s === 'dead' || s === 'unconscious');
@@ -200,7 +253,7 @@ export function resolveAbility(source, target, ability, map) {
     }
 
     if (ab.isHeal) {
-        const healing = Math.round((getEffectiveStat(source, 'mat') * 2 + 8) * ab.basePower);
+        const healing = Math.round((getEffectiveStat(source, 'mat') * 2 + 8) * ab.basePower * (srcSup?.healMult ?? 1));
         target.hp = Math.min(target.maxHp, target.hp + healing);
         // wake sleeping unit on heal
         if (target.status.includes('sleep')) {
@@ -216,6 +269,14 @@ export function resolveAbility(source, target, ability, map) {
         return { damage: 0, healing, statusApplied: null, revived };
     }
 
+    if (ab.isDispel) {
+        target.status = target.status.filter(s => !POSITIVE_STATUSES.includes(s));
+        for (const s of POSITIVE_STATUSES) delete (target.statusTimers || {})[s];
+        target.buffs = (target.buffs || []).filter(b => b.value < 0);
+        faceToward(source, target.x, target.y);
+        return { damage: 0, healing: 0, statusApplied: null, floatingText: 'Dispelled!' };
+    }
+
     if (ab.type === 'physical') {
         // temporal_slip: next physical attack auto-misses
         if (target.status.includes('slipped')) {
@@ -227,9 +288,8 @@ export function resolveAbility(source, target, ability, map) {
         const evaMod = directionEvasionMod(source, target);
         let effectiveEva = ((getEffectiveStat(target, 'eva') || 0) / 100) * evaMod;
         const defBonus = target.status.includes('defend') ? 0.2 : 0;
-        if (passiveActive(target, 'farsight')) effectiveEva += 0.20;
-        if (passiveActive(target, 'seers_vigil')) effectiveEva += 0.15;
-        const finalEva = Math.min(0.9, effectiveEva + defBonus);
+        effectiveEva += tgtSup?.evaBonus ?? 0;
+        const finalEva = srcSup?.ignoreEvasion ? 0 : Math.min(0.9, effectiveEva + defBonus);
         if (Math.random() < finalEva) {
             faceToward(source, target.x, target.y);
             return { damage: 0, healing: 0, statusApplied: null, missed: true };
@@ -245,18 +305,23 @@ export function resolveAbility(source, target, ability, map) {
     let defMult = target.status.includes('defend') ? 1.5 : 1.0;
 
     let raw;
-    if (ab.type === 'physical') {
-        raw = Math.max(1, getEffectiveStat(source, 'atk') * 2 - getEffectiveStat(target, 'def') * defMult) * ab.basePower * highGroundBonus;
-        if (passiveActive(target, 'divine_ward')) raw *= 0.80;
+    const kind = ab.type === 'physical' ? 'physical' : 'magic';
+    if (kind === 'physical') {
+        const atk = getEffectiveStat(source, 'atk') + (srcSup?.matToPhysical ?? 0) * getEffectiveStat(source, 'mat');
+        raw = Math.max(1, atk * 2 - getEffectiveStat(target, 'def') * defMult) * ab.basePower * highGroundBonus;
         // protect status: -25% physical damage
         if (target.status.includes('protect')) raw *= 0.75;
     } else {
-        raw = Math.max(1, getEffectiveStat(source, 'mat') * 2 - getEffectiveStat(target, 'mdf') * defMult) * ab.basePower * highGroundBonus;
-        if (passiveActive(source, 'mana_surge')) raw *= 1.15;
-        if (passiveActive(target, 'seers_vigil')) raw *= 0.90;
+        const mdf = getEffectiveStat(target, 'mdf') * (1 - (srcSup?.mdfPierce ?? 0));
+        raw = Math.max(1, getEffectiveStat(source, 'mat') * 2 - mdf * defMult) * ab.basePower * highGroundBonus;
         // shell status: -25% magic damage
         if (target.status.includes('shell')) raw *= 0.75;
     }
+    raw *= srcSup?.dmgDealt?.[kind] ?? 1;
+    if (source.hp < source.maxHp * 0.5) raw *= srcSup?.lowHpDmgDealt?.[kind] ?? 1;
+    if (ab.aoe > 0 || ab.aoePattern) raw *= srcSup?.aoeDmgMult ?? 1;
+    raw *= tgtSup?.dmgTaken?.[kind] ?? 1;
+    raw *= source._momentumMult ?? 1;
     const variance = 0.9 + Math.random() * 0.2;
     const damage = Math.round(raw * variance);
 
@@ -274,6 +339,11 @@ export function resolveAbility(source, target, ability, map) {
             target.status = target.status.filter(s => s !== 'unconscious');
             if (!target.status.includes('dead')) target.status.push('dead');
             killedInstantly = true;
+        } else if (!isDead(target) && tgtSup?.surviveLethal && !target._providenceUsed) {
+            // Providence: once per battle, a killing blow leaves the unit at 1 HP.
+            target.hp = 1;
+            target._providenceUsed = true;
+            return { damage, healing: 0, statusApplied: null, killedInstantly: false, providence: true };
         } else if (!isDead(target)) {
             // reraise: auto-revive at 1 HP when KO'd
             if (target.status.includes('reraise')) {
@@ -289,35 +359,25 @@ export function resolveAbility(source, target, ability, map) {
         target.hp = newHp;
     }
 
+    const standing = target.hp > 0 && !isDead(target) && !isUnconscious(target);
     let statusApplied = null;
-    if (ab.applyStatus && target.hp > 0 && !isDead(target) && !isUnconscious(target)) {
-        const dur = ab.statusDuration ?? 2;
-        if (!target.status.includes(ab.applyStatus)) {
-            applyTimedStatus(target, ab.applyStatus, dur);
-            statusApplied = ab.applyStatus;
-        } else if (dur > (target.statusTimers?.[ab.applyStatus] ?? 0)) {
-            target.statusTimers[ab.applyStatus] = dur;
-            statusApplied = ab.applyStatus;
-        }
+    if (ab.applyStatus && standing && inflictStatus(target, ab.applyStatus, ab.statusDuration ?? 2, source)) {
+        statusApplied = ab.applyStatus;
     }
+    // Rune Edge and similar: physical hits may carry a status.
+    const proc = srcSup?.attackProc;
+    if (proc && kind === 'physical' && damage > 0 && standing && !statusApplied && Math.random() < proc.chance
+        && inflictStatus(target, proc.status, proc.duration, source)) {
+        statusApplied = proc.status;
+    }
+    if (ab.buffs && standing) applyBuffs(target, ab, ability);
 
-    // Post-status side-effects
-    if (statusApplied === 'enfeebled') {
-        target.buffs = target.buffs || [];
-        target.buffs.push({ key: 'enfeebled', stat: 'atk', value: -5, duration: 2 });
-    }
-    if (statusApplied === 'frog') {
-        target.buffs = target.buffs || [];
-        target.buffs.push({ key: 'frog_atk', stat: 'atk', value: -Math.round(target.atk * 0.6), duration: null });
-        target.buffs.push({ key: 'frog_mat', stat: 'mat', value: -Math.round(target.mat * 0.6), duration: null });
-        target.buffs.push({ key: 'frog_def', stat: 'def', value: -Math.round(target.def * 0.5), duration: null });
-    }
-    // Remove frog side-effect buffs when frog wears off (handled via statusTimers expiry in battle.js)
-    if (ab.applyStatus === 'slow' && statusApplied === 'slow' && passiveActive(source, 'wyrd_drain')) {
-        target.buffs = target.buffs || [];
-        target.buffs.push({ key: 'wyrd_slow', stat: 'spd', value: -2, duration: 1 });
+    let drained = 0;
+    if (ab.drainFrac && damage > 0 && source.hp > 0) {
+        drained = Math.min(source.maxHp - source.hp, Math.round(damage * ab.drainFrac));
+        source.hp += drained;
     }
 
     faceToward(source, target.x, target.y);
-    return { damage, healing: 0, statusApplied, killedInstantly };
+    return { damage, healing: 0, statusApplied, killedInstantly, drained };
 }

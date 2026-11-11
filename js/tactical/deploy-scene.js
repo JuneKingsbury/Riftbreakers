@@ -1,5 +1,5 @@
-import { loadMapData } from './battle-map.js';
-import { MAP_DATA } from './data/maps.js';
+import { loadMapData, posKey } from './battle-map.js';
+import { MAP_DATA } from './data/maps/index.js';
 import { createUnitFromCharData, faceToward } from './units.js';
 import { viewState } from './view-state.js';
 import { BattleView3D, showViewError } from './battle-view3d.js';
@@ -7,7 +7,6 @@ import { STATES } from './battle.js';
 import { CHARACTER_DATA } from './data/characters.js';
 import { BATTLE_SCENARIOS } from './world-map-data.js';
 import { equipmentStatBonuses } from './data/equipment.js';
-import { unlockedAbilities } from './data-registry.js';
 import { WorldMapUI } from './world-map-ui.js';
 
 // Minimal battle-like object the renderer can consume without running the CT engine.
@@ -41,6 +40,7 @@ function buildPreviewUnits(worldMap, scenarioId, playerSpawns, enemySpawns) {
         ? rosterDefs.map(r => ({
             name: r.name, job: r.job, team: 'enemy',
             x: 20, y: 8, ct: r.ct ?? 0,
+            level: r.level ?? scenario.enemyLevel ?? 1,
             statMods: r.statMods ?? {},
             extraAbilities: r.extraAbilities ?? [],
             appearance: r.appearance ?? null,
@@ -53,22 +53,18 @@ function buildPreviewUnits(worldMap, scenarioId, playerSpawns, enemySpawns) {
         for (const [k, v] of Object.entries(equipBonuses)) {
             mergedMods[k] = (mergedMods[k] || 0) + v;
         }
-        let spawnX = charData.x, spawnY = charData.y;
+        let spawnX = charData.x, spawnY = charData.y, spawnZ = null;
         if (charData.team === 'player') {
             const idx = partyData.indexOf(charData);
             const sp  = playerSpawns?.[idx];
-            if (sp) { spawnX = sp.x; spawnY = sp.y; }
+            if (sp) { spawnX = sp.x; spawnY = sp.y; spawnZ = sp.z ?? null; }
         } else {
             const idx = enemyData.indexOf(charData);
             const sp  = enemySpawns?.[idx];
-            if (sp) { spawnX = sp.x; spawnY = sp.y; }
+            if (sp) { spawnX = sp.x; spawnY = sp.y; spawnZ = sp.z ?? null; }
         }
         const unit = createUnitFromCharData({ ...charData, statMods: mergedMods, x: spawnX, y: spawnY });
-        if (charData.xp) {
-            const unlocked   = new Set(unlockedAbilities(charData.job, charData.xp));
-            const crossSlots = new Set([charData.supportSkill, charData.supportPassive].filter(Boolean));
-            unit.abilities   = unit.abilities.filter(k => unlocked.has(k) || crossSlots.has(k));
-        }
+        unit.z = spawnZ;
         return unit;
     });
 
@@ -328,7 +324,7 @@ export class DeployScene {
     }
 
     _highlightSpawnTiles() {
-        this._preview.moveRange = new Set(this._playerSpawns.map(s => `${s.x},${s.y}`));
+        this._preview.moveRange = new Set(this._playerSpawns.map(posKey));
         this._preview.hoverTile = null;
     }
 
@@ -414,7 +410,7 @@ export class DeployScene {
         }
         const tile = this._renderer.pickTile(e.clientX, e.clientY, this._preview.map, this._preview.units);
         if (!tile) { this._preview.hoverTile = null; return; }
-        this._preview.hoverTile = `${tile.x},${tile.y}`;
+        this._preview.hoverTile = posKey(tile);
     }
 
     _handleMouseUp(e) {
@@ -440,8 +436,8 @@ export class DeployScene {
         if (!tile) { if (this._selectedUnit !== null) this._cancelSelect(); return; }
 
         if (this._selectedUnit !== null) {
-            const tileKey   = `${tile.x},${tile.y}`;
-            const targetIdx = this._playerSpawns.findIndex(s => `${s.x},${s.y}` === tileKey);
+            const tileKey   = posKey(tile);
+            const targetIdx = this._playerSpawns.findIndex(s => posKey(s) === tileKey);
             if (targetIdx !== -1) {
                 if (targetIdx !== this._selectedUnit) {
                     // Swap the two spawn positions.
@@ -461,7 +457,7 @@ export class DeployScene {
         }
 
         // No selection: clicking a spawn tile selects the party member there.
-        const idx = this._playerSpawns.findIndex(s => s.x === tile.x && s.y === tile.y);
+        const idx = this._playerSpawns.findIndex(s => posKey(s) === posKey(tile));
         if (idx !== -1) this._toggleSelectUnit(idx);
     }
 

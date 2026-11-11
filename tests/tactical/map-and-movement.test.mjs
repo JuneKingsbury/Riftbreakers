@@ -3,10 +3,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { loadMapData, getTile, MAX_CLIMB } from '../../js/tactical/battle-map.js';
+import { loadMapData, getCell, topCell, validateMap, reachableFrom, posKey } from '../../js/tactical/battle-map.js';
 import { CHARACTER_DATA } from '../../js/tactical/data/characters.js';
 import { BATTLE_SCENARIOS } from '../../js/tactical/world-map-data.js';
-import { MAP_DATA } from '../../js/tactical/data/maps.js';
+import { MAP_DATA } from '../../js/tactical/data/maps/index.js';
 import { createUnit } from '../../js/tactical/units.js';
 import { moveEntityAlongPath } from '../../js/systems/movement-lerp.js';
 import { viewState } from '../../js/tactical/view-state.js';
@@ -19,14 +19,12 @@ const MAP_DEF = MAP_DATA[0];
 
 const everyMap = MAP_DATA.map(def => [def.id, def]);
 
-test('every map has a tile and elevation row for each grid row, each as wide as the map', () => {
+test('every map file loads and passes the shared map checks', () => {
     for (const [name, def] of everyMap) {
-        assert.equal(def.tiles.length, def.height, `${name} tile rows`);
-        assert.equal(def.elevation.length, def.height, `${name} elevation rows`);
-        for (let y = 0; y < def.height; y++) {
-            assert.equal(def.tiles[y].length, def.width, `${name} tile row ${y}`);
-            assert.equal(def.elevation[y].length, def.width, `${name} elevation row ${y}`);
-        }
+        const map = loadMapData(def);
+        assert.equal(map.columns.length, def.width * def.depth, `${name} columns`);
+        const { errors } = validateMap(map);
+        assert.deepEqual(errors, [], `${name} map errors`);
     }
 });
 
@@ -35,20 +33,12 @@ test('spawn points sit on passable tiles inside the map and never overlap', () =
         const map = loadMapData(def);
         const seen = new Set();
         for (const s of [...map.playerSpawns, ...map.enemySpawns]) {
-            const tile = getTile(map, s.x, s.y);
-            assert.ok(tile, `${name} spawn (${s.x},${s.y}) is on the map`);
-            assert.ok(tile.passable, `${name} spawn (${s.x},${s.y}) is passable`);
-            const key = `${s.x},${s.y}`;
+            const tile = getCell(map, s.x, s.y, s.z);
+            assert.ok(tile, `${name} spawn (${s.x},${s.y},${s.z}) is on the map`);
+            assert.ok(tile.passable, `${name} spawn (${s.x},${s.y},${s.z}) is passable`);
+            const key = posKey(s);
             assert.ok(!seen.has(key), `${name} spawn ${key} is unique`);
             seen.add(key);
-        }
-    }
-});
-
-test('terrain heights stay within the 0-3 range the renderers support', () => {
-    for (const [name, def] of everyMap) {
-        for (const t of loadMapData(def).tiles) {
-            assert.ok(t.elevation >= 0 && t.elevation <= 3, `${name} elevation ${t.elevation}`);
         }
     }
 });
@@ -75,12 +65,12 @@ test('walk animation data is kept off the unit', () => {
     assert.equal(viewState(unit).moveQueue.length, 1);
 });
 
-test('terrain height rises with elevation and walls stand taller than level ground', () => {
+test('terrain height comes from the block level only, never the material', () => {
     // Independent literals on purpose: a changed constant should fail here.
-    assert.equal(terrainTopY({ type: 'grass', elevation: 0 }), 0);
-    assert.ok(Math.abs(terrainTopY({ type: 'high', elevation: 2 }) - 1.1) < 1e-9);
-    assert.ok(terrainTopY({ type: 'wall', elevation: 0 }) > terrainTopY({ type: 'high', elevation: 1 }));
-    assert.ok(terrainTopY({ type: 'water', elevation: 0 }) < 0);
+    assert.equal(terrainTopY({ type: 'grass', z: 0 }), 0);
+    assert.ok(Math.abs(terrainTopY({ type: 'grass', z: 2 }) - 1.1) < 1e-9);
+    assert.equal(terrainTopY({ type: 'wall', z: 1 }), terrainTopY({ type: 'grass', z: 1 }));
+    assert.ok(terrainTopY({ type: 'water', z: 0 }) < 0, 'water surface sits a little low (cosmetic)');
     assert.equal(terrainTopY(null), 0);
 });
 
@@ -95,9 +85,9 @@ test('walking speed follows the battle\'s moveMsPerStep for both manual and scri
     while (unit.team !== 'player') { battle.startTurn(unit); battle.endTurn(60); unit = battle.advanceCT(); }
     battle.startTurn(unit);
     battle.enterMoveMode();
-    const [tx, ty] = [...battle.moveRange].map(k => k.split(',').map(Number))
+    const [tx, ty, tz] = [...battle.moveRange].map(k => k.split(',').map(Number))
         .find(([x, y]) => Math.abs(x - unit.x) + Math.abs(y - unit.y) >= 2);
-    assert.ok(battle.commitMove(tx, ty));
+    assert.ok(battle.commitMove(tx, ty, tz));
     assert.equal(viewState(unit).msPerStep, 45);
 
     // Scripted/AI move through the executor.
@@ -107,27 +97,6 @@ test('walking speed follows the battle\'s moveMsPerStep for both manual and scri
     assert.equal(viewState(other).msPerStep, 45);
 });
 
-// Flood fill from a tile using the same rules as computeMoveRange: passable, 4-way, climb limit.
-function reachableFrom(map, start) {
-    const seen = new Set([`${start.x},${start.y}`]);
-    const queue = [start];
-    while (queue.length) {
-        const cur = queue.shift();
-        const curTile = getTile(map, cur.x, cur.y);
-        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-            const x = cur.x + dx, y = cur.y + dy;
-            const tile = getTile(map, x, y);
-            if (!tile || !tile.passable) continue;
-            if (Math.abs(tile.elevation - curTile.elevation) > MAX_CLIMB) continue;
-            const key = `${x},${y}`;
-            if (seen.has(key)) continue;
-            seen.add(key);
-            queue.push({ x, y });
-        }
-    }
-    return seen;
-}
-
 test('every map gives each side six spawns and all twelve can walk to each other', () => {
     for (const [name, def] of everyMap) {
         const map = loadMapData(def);
@@ -135,7 +104,7 @@ test('every map gives each side six spawns and all twelve can walk to each other
         assert.equal(map.enemySpawns.length, 6, `${name} enemy spawns`);
         const reach = reachableFrom(map, map.playerSpawns[0]);
         for (const s of [...map.playerSpawns, ...map.enemySpawns]) {
-            assert.ok(reach.has(`${s.x},${s.y}`), `${name}: spawn (${s.x},${s.y}) is cut off`);
+            assert.ok(reach.has(posKey(s)), `${name}: spawn (${s.x},${s.y},${s.z}) is cut off`);
         }
     }
 });
@@ -143,7 +112,7 @@ test('every map gives each side six spawns and all twelve can walk to each other
 test('no map has a sealed-off pocket holding a large share of its walkable ground', () => {
     for (const [name, def] of everyMap) {
         const map = loadMapData(def);
-        const walkable = map.tiles.filter(t => t.passable).length;
+        const walkable = map.cells.filter(t => t.passable).length;
         const reach = reachableFrom(map, map.playerSpawns[0]);
         assert.ok(reach.size / walkable >= 0.9, `${name}: only ${reach.size}/${walkable} walkable tiles reachable`);
     }
@@ -151,11 +120,11 @@ test('no map has a sealed-off pocket holding a large share of its walkable groun
 
 test('maps are much larger than the old ones (all under 400 tiles) and have no stone wall around the outside', () => {
     for (const [name, def] of everyMap) {
-        assert.ok(def.width * def.height >= 700, `${name} is only ${def.width}x${def.height}`);
+        assert.ok(def.width * def.depth >= 700, `${name} is only ${def.width}x${def.depth}`);
         const map = loadMapData(def);
         const edge = [];
-        for (let x = 0; x < map.width; x++) edge.push(getTile(map, x, 0), getTile(map, x, map.height - 1));
-        for (let y = 0; y < map.height; y++) edge.push(getTile(map, 0, y), getTile(map, map.width - 1, y));
+        for (let x = 0; x < map.width; x++) edge.push(topCell(map, x, 0), topCell(map, x, map.height - 1));
+        for (let y = 0; y < map.height; y++) edge.push(topCell(map, 0, y), topCell(map, map.width - 1, y));
         const walls = edge.filter(t => t.type === 'wall').length;
         assert.ok(walls / edge.length < 0.25, `${name}: ${walls}/${edge.length} edge tiles are wall`);
     }

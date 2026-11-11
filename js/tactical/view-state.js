@@ -9,8 +9,8 @@ export function viewState(entity) {
     let vs = _states.get(entity);
     if (!vs) {
         vs = {
-            prevX: null, prevY: null,
-            vizX: null, vizY: null,
+            prevX: null, prevY: null, prevZ: null,
+            vizX: null, vizY: null, vizZ: null,
             moveQueue: [],
             moveStartTime: 0, moveDuration: 0, msPerStep: 0,
             prevFacing: null, facingChangeAt: null,

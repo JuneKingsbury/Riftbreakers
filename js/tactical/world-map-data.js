@@ -151,11 +151,16 @@ export const NODES = [
 ];
 
 // Each scenario defines rewards and an enemy roster.
-// roster: array of { job, name, ct?, statMods?, appearance? }
+// enemyLevel: job level (1-8) for roster entries that use a player job. They know
+//             only what a player could have learned by that level (see
+//             loadout.scaledLoadout), so harder encounters bring stronger spells.
+// roster: array of { job, name, ct?, level?, statMods?, appearance? }
+//         level overrides enemyLevel for that one unit (e.g. a boss).
 // If roster is absent the battle falls back to the default enemy party.
 export const BATTLE_SCENARIOS = {
     bandit_ambush: {
-        xpPerMember: 40, gold: 60, items: [],
+        enemyLevel: 1,
+        jpPerMember: 40, gold: 60, items: [],
         roster: [
             { job: 'raider',        name: 'Bandit',       ct: 20 },
             { job: 'raider',        name: 'Bandit',       ct: 50 },
@@ -166,7 +171,8 @@ export const BATTLE_SCENARIOS = {
         ],
     },
     marsh_skirmish: {
-        xpPerMember: 50, gold: 70, items: [],
+        enemyLevel: 1,
+        jpPerMember: 50, gold: 70, items: [],
         roster: [
             { job: 'wolf',         name: 'Marsh Wolf',    ct: 20 },
             { job: 'wolf',         name: 'Marsh Wolf',    ct: 55 },
@@ -177,7 +183,8 @@ export const BATTLE_SCENARIOS = {
         ],
     },
     fen_ambush: {
-        xpPerMember: 65, gold: 80, items: ['potion'],
+        enemyLevel: 2,
+        jpPerMember: 65, gold: 80, items: ['potion'],
         roster: [
             { job: 'spore_walker',  name: 'Fen Walker',    ct: 15 },
             { job: 'spore_walker',  name: 'Fen Walker',    ct: 50 },
@@ -188,7 +195,8 @@ export const BATTLE_SCENARIOS = {
         ],
     },
     chapel_defense: {
-        xpPerMember: 75, gold: 90, items: [],
+        enemyLevel: 2,
+        jpPerMember: 75, gold: 90, items: [],
         roster: [
             { job: 'shadow_mage',   name: 'Chapel Shade',  ct: 40 },
             { job: 'spectral_wisp', name: 'Lost Soul',     ct: 10 },
@@ -199,7 +207,8 @@ export const BATTLE_SCENARIOS = {
         ],
     },
     thornwood_patrol: {
-        xpPerMember: 85, gold: 110, items: [],
+        enemyLevel: 3,
+        jpPerMember: 85, gold: 110, items: [],
         roster: [
             { job: 'canopy_stalker', name: 'Thornwood Cat',  ct: 20 },
             { job: 'thorn_beast',    name: 'Thorn Beast',    ct: 45 },
@@ -210,7 +219,8 @@ export const BATTLE_SCENARIOS = {
         ],
     },
     ironhollow_depths: {
-        xpPerMember: 110, gold: 150, items: ['hi_potion'],
+        enemyLevel: 4,
+        jpPerMember: 110, gold: 150, items: ['hi_potion'],
         roster: [
             { job: 'void_stalker',  name: 'Rift Crawler',    ct: 10 },
             { job: 'void_stalker',  name: 'Rift Crawler',    ct: 50 },
@@ -221,7 +231,8 @@ export const BATTLE_SCENARIOS = {
         ],
     },
     riftscar_ambush: {
-        xpPerMember: 130, gold: 180, items: [],
+        enemyLevel: 5,
+        jpPerMember: 130, gold: 180, items: [],
         roster: [
             { job: 'orc_captain',  name: 'Rift Warden',     ct: 20 },
             { job: 'void_stalker', name: 'Rift Stalker',    ct: 45 },
@@ -232,7 +243,8 @@ export const BATTLE_SCENARIOS = {
         ],
     },
     voidspire_assault: {
-        xpPerMember: 200, gold: 300, items: ['void_staff'],
+        enemyLevel: 6,
+        jpPerMember: 200, gold: 300, items: ['void_staff'],
         roster: [
             { job: 'orc_captain',   name: 'Citadel Guard',   ct: 20 },
             { job: 'kingdom_guard', name: 'Citadel Guard',   ct: 50 },
@@ -243,7 +255,8 @@ export const BATTLE_SCENARIOS = {
         ],
     },
     beast_encounter: {
-        xpPerMember: 55, gold: 40, items: [],
+        enemyLevel: 1,
+        jpPerMember: 55, gold: 40, items: [],
         roster: [
             { job: 'wolf',  name: 'Wild Wolf',  ct: 10 },
             { job: 'wolf',  name: 'Wild Wolf',  ct: 45 },

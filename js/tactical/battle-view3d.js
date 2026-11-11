@@ -1,6 +1,7 @@
 import * as THREE from '../../lib/three/three.module.js';
-import { getTile } from './battle-map.js';
-import { getTileRender, terrainTopY, SLAB_BOTTOM } from './tile-render.js';
+import { getCell, topCell, standZ } from './battle-map.js';
+import { terrainTopY, blockTopY, SLAB_BOTTOM } from './tile-render.js';
+import { QuadBatch, buildTerrainMesh, updateTerrainFx, terrainSignature, decodeOwner, cellForBlock } from './terrain-mesh.js';
 import { STATES } from './battle.js';
 import { ABILITIES } from './abilities.js';
 import { getEntityRenderPos, isEntityMoving } from '../systems/movement-lerp.js';
@@ -9,7 +10,7 @@ import { viewState } from './view-state.js';
 import { UnitSprites } from './unit-sprites.js';
 
 /**
- * Real-3D battle view: terrain is built from the map's tile types and elevations,
+ * Real-3D battle view: terrain is built from the map's blocks (see terrain-mesh.js),
  * characters are upright billboard sprites, and the camera orbits in 90 degree steps
  * at a fixed pitch. One tile is one world unit. World X is the tile column, world Z is
  * the tile row, and world Y is height.
@@ -33,24 +34,6 @@ const FACING_TWEEN_MS = 180;
 const NAME_MIN_TILE_SIZE = 34;   // below this zoom, only the acting unit shows a name
 
 const FACING_DIR = { north: [0, -1], south: [0, 1], east: [1, 0], west: [-1, 0] };
-
-// Per-face shade baked into terrain vertex colors.
-const SHADE_TOP = 1.0;
-const SHADE_SOUTH = 0.82;
-const SHADE_EAST  = 0.72;
-const SHADE_NORTH = 0.58;
-const SHADE_WEST  = 0.5;
-
-// Animated terrain overlays, matching the old 2D renderer's timing.
-const GRASS_SWAY_PERIOD_MS = 2500;
-const GRASS_SWAY_AMPLITUDE = 0.022;   // radians
-const WATER_PERIOD_MS = 2200;
-const WATER_ALPHA_BASE = 0.72;
-const WATER_ALPHA_VARIATION = 0.22;
-const WATER_PHASE_BUCKETS = 4;        // one InstancedMesh opacity per bucket, so tiles ripple out of step
-const TERRAIN_FX_LIFT = 0.004;        // keeps overlays just above the tile top
-
-const TYPE_INDEX = { grass: 1, dirt: 2, water: 3, wall: 4, rubble: 5, high: 6 };
 
 // Highlight appearance, grouped by opacity because each instanced mesh has one opacity.
 const HIGHLIGHTS = {
@@ -90,39 +73,6 @@ function ensureStyle() {
     el.id = STYLE_ID;
     el.textContent = CSS;
     document.head.appendChild(el);
-}
-
-// Accumulates quads into one BufferGeometry. owners[i] is the tile index of quad i, so
-// a raycast hit (faceIndex >> 1) maps straight back to a tile.
-class QuadBatch {
-    constructor() { this.pos = []; this.uv = []; this.col = []; this.idx = []; this.owners = []; }
-
-    quad(a, b, c, d, color, owner, uvs = [[0, 1], [0, 0], [1, 0], [1, 1]]) {
-        const base = this.pos.length / 3;
-        for (const v of [a, b, c, d]) this.pos.push(v[0], v[1], v[2]);
-        for (const t of uvs) this.uv.push(t[0], t[1]);
-        for (let i = 0; i < 4; i++) this.col.push(color[0], color[1], color[2]);
-        this.idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
-        this.owners.push(owner);
-    }
-
-    get empty() { return this.owners.length === 0; }
-
-    toGeometry() {
-        const g = new THREE.BufferGeometry();
-        g.setAttribute('position', new THREE.Float32BufferAttribute(this.pos, 3));
-        g.setAttribute('uv', new THREE.Float32BufferAttribute(this.uv, 2));
-        g.setAttribute('color', new THREE.Float32BufferAttribute(this.col, 3));
-        g.setIndex(this.idx);
-        g.computeBoundingSphere();
-        g.computeBoundingBox();
-        return g;
-    }
-}
-
-function shadeColor(hex, shade, tint = [1, 1, 1]) {
-    const c = new THREE.Color(hex);
-    return [c.r * shade * tint[0], c.g * shade * tint[1], c.b * shade * tint[2]];
 }
 
 function makeGlowTexture() {
@@ -219,7 +169,7 @@ export class BattleView3D {
 
         this._map = null;
         this._terrainSig = null;
-        this._terrain = null;          // {group, tops: [{mesh, owners}], sides: {mesh, owners}}
+        this._terrain = null;          // from buildTerrainMesh: {group, pickMeshes, fx, dispose}
         this._textures = new WeakMap();
         this._ownedTextures = new Set();
         this._paddingCache = new WeakMap();
@@ -361,7 +311,7 @@ export class BattleView3D {
         const unitHit = this._ray.intersectObjects(sprites, false)
             .find(h => h.uv && h.uv.x > 0.2 && h.uv.x < 0.8 && h.uv.y < 0.7);
 
-        const meshes = this._terrain ? [...this._terrain.tops.map(t => t.mesh), this._terrain.sides.mesh] : [];
+        const meshes = this._terrain ? this._terrain.pickMeshes : [];
         const terrainHit = this._ray.intersectObjects(meshes, false)[0];
 
         // Walkable terrain clearly nearer the camera than the unit (a plateau in front of it)
@@ -370,34 +320,39 @@ export class BattleView3D {
         const NEAR_TOLERANCE = 0.4;
         let terrainTile = null;
         if (terrainHit && map) {
-            const index = terrainHit.object.userData.owners[terrainHit.faceIndex >> 1];
-            terrainTile = index === undefined ? null : map.tiles[index];
+            const id = terrainHit.object.userData.owners[terrainHit.faceIndex >> 1];
+            if (id !== undefined) {
+                const b = decodeOwner(map, id);
+                terrainTile = cellForBlock(map, b.x, b.y, b.z);
+            }
         }
         const terrainBlocksUnit = terrainHit && terrainTile && terrainTile.passable
             && unitHit && unitHit.distance > terrainHit.distance + NEAR_TOLERANCE;
         if (unitHit && !terrainBlocksUnit) {
             const unit = byObject.get(unitHit.object);
-            return { x: unit.x, y: unit.y };
+            return { x: unit.x, y: unit.y, z: unit.z };
         }
-        if (terrainHit) {
-            const owners = terrainHit.object.userData.owners;
-            const tileIndex = owners[terrainHit.faceIndex >> 1];
-            if (tileIndex !== undefined && map) {
-                return { x: tileIndex % map.width, y: Math.floor(tileIndex / map.width) };
-            }
-        }
+        if (terrainTile) return { x: terrainTile.x, y: terrainTile.y, z: terrainTile.z };
         return null;
     }
 
     // ---- Effects -------------------------------------------------------------
 
-    spawnProjectile(sx, sy, tx, ty, color, durationMs) {
+    /**
+     * Fires a glowing projectile between two positions ({x, y, z}). A missing z means the
+     * standing cell of that column nearest the other end's level.
+     */
+    spawnProjectile(from, to, color, durationMs) {
+        const map = this._map;
+        const sz = from.z ?? (map ? standZ(map, from.x, from.y, to.z ?? null) : 0);
+        const tz = to.z ?? (map ? standZ(map, to.x, to.y, sz) : 0);
+        const ends = { sx: from.x, sy: from.y, sz, tx: to.x, ty: to.y, tz };
         const mat = new THREE.SpriteMaterial({ map: this._glowTexture, color: new THREE.Color(color), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
         const sprite = new THREE.Sprite(mat);
         sprite.scale.set(0.5, 0.5, 1);
         sprite.renderOrder = 20;
         this.scene.add(sprite);
-        this._projectiles.push({ sx, sy, tx, ty, sprite, startMs: performance.now(), durationMs: durationMs || 500 });
+        this._projectiles.push({ ...ends, sprite, startMs: performance.now(), durationMs: durationMs || 500 });
     }
 
     // ---- Frame ---------------------------------------------------------------
@@ -419,7 +374,7 @@ export class BattleView3D {
         this._syncUnits(units);
 
         this._updateCamera(battle, dt, now);
-        this._updateTerrainFx(now);
+        updateTerrainFx(this._terrain?.fx, now);
         this._updateHighlights(battle);
         this._updateUnits(units, activeUnit, map, dt, now);
         this._updateProjectiles(map, now);
@@ -523,7 +478,7 @@ export class BattleView3D {
         // Ease toward the tile's top height so the framing follows terrain. The free camera
         // keeps a fixed height instead, so panning over hills does not bob the view.
         if (this._tracking) {
-            const groundY = terrainTopY(getTile(map, Math.round(this._target.x), Math.round(this._target.z)));
+            const groundY = terrainTopY(topCell(map, Math.round(this._target.x), Math.round(this._target.z)));
             this._target.y += (groundY - this._target.y) * Math.min(1, dt / 120);
         }
 
@@ -550,7 +505,7 @@ export class BattleView3D {
         this._fitPending = false;
         if (!map) return;
         let maxTop = 0;
-        for (const t of map.tiles) maxTop = Math.max(maxTop, terrainTopY(t));
+        for (const c of map.cells) maxTop = Math.max(maxTop, blockTopY(c.z));
         const { right, up } = this._groundBasis();
         const sinP = Math.sin(PITCH), cosP = Math.cos(PITCH);
         let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
@@ -610,19 +565,13 @@ export class BattleView3D {
 
     // ---- Terrain -------------------------------------------------------------
 
-    _signature(map) {
-        let h = map.width * 131 + map.height;
-        for (const t of map.tiles) h = (h * 31 + (TYPE_INDEX[t.type] || 0) * 7 + (t.elevation || 0)) | 0;
-        return h;
-    }
-
     _syncTerrain(map) {
         // Include the skin so terrain textures appear if the skin finishes loading after entry.
         const sm = this.skinManager;
-        const sig = `${this._signature(map)}:${sm && sm.isActive ? sm.activeSkin : ''}`;
+        const sig = `${terrainSignature(map)}:${sm && sm.isActive ? sm.activeSkin : ''}`;
         if (this._terrain && this._terrainSig === sig && this._terrain.map === map) return;
         this._clearTerrain();
-        this._terrain = this._buildTerrain(map);
+        this._terrain = buildTerrainMesh(map, this.skinManager, image => this._textureFor(image));
         this._terrain.map = map;
         this._terrainSig = sig;
         this.scene.add(this._terrain.group);
@@ -631,15 +580,7 @@ export class BattleView3D {
     _clearTerrain() {
         if (!this._terrain) return;
         this.scene.remove(this._terrain.group);
-        for (const t of this._terrain.tops) { t.mesh.geometry.dispose(); t.mesh.material.dispose(); }
-        this._terrain.sides.mesh.geometry.dispose();
-        this._terrain.sides.mesh.material.dispose();
-        const fx = this._terrain.fx;
-        if (fx) {
-            const meshes = [fx.grass, ...fx.water.map(w => w.mesh)].filter(Boolean);
-            for (const mesh of meshes) { mesh.material.dispose(); mesh.dispose(); }
-            fx.geometry.dispose();
-        }
+        this._terrain.dispose();
         this._terrain = null;
     }
 
@@ -656,152 +597,6 @@ export class BattleView3D {
             this._ownedTextures.add(tex);
         }
         return tex;
-    }
-
-    _buildTerrain(map) {
-        const W = map.width, H = map.height;
-        const topsByType = new Map();   // type -> QuadBatch
-        const sides = new QuadBatch();
-        const grassTiles = [];          // tiles that get the swaying tuft overlay
-        const waterTiles = [];          // tiles that get the wave overlay
-
-        const topAt = (x, y) => {
-            const t = getTile(map, x, y);
-            return t ? terrainTopY(t) : SLAB_BOTTOM;
-        };
-
-        for (let y = 0; y < H; y++) {
-            for (let x = 0; x < W; x++) {
-                const tile = map.tiles[y * W + x];
-                if (!tile) continue;
-                const index = y * W + x;
-                const top = terrainTopY(tile);
-                const x0 = x - 0.5, x1 = x + 0.5, z0 = y - 0.5, z1 = y + 0.5;
-
-                // Soft shadow from taller terrain to the south (light comes from the south).
-                let shadow = 0;
-                for (let k = 1; k <= 5; k++) {
-                    const south = getTile(map, x, y + k);
-                    const len = south ? (south.elevation || 0) - (tile.elevation || 0) : 0;
-                    if (len >= k) shadow = Math.max(shadow, Math.min(0.58, 0.38 * (1 - (k - 1) / len)));
-                }
-                const dim = 1 - shadow * 0.9;
-                const topColor = [SHADE_TOP * dim, SHADE_TOP * dim, SHADE_TOP * (1 - shadow * 0.6)];
-
-                let batch = topsByType.get(tile.type);
-                if (!batch) { batch = new QuadBatch(); topsByType.set(tile.type, batch); }
-                batch.quad([x0, top, z0], [x0, top, z1], [x1, top, z1], [x1, top, z0], topColor, index);
-
-                if (tile.type === 'grass' || tile.type === 'high') grassTiles.push({ x, z: y, top, index, topColor });
-                else if (tile.type === 'water') waterTiles.push({ x, z: y, top, index, topColor });
-
-                const sideHex = getTileRender(tile.type).side;
-                const face = (nTop, shade, a, b) => {
-                    if (nTop >= top - 1e-4) return;
-                    const c = shadeColor(sideHex, shade);
-                    sides.quad([a[0], top, a[1]], [b[0], top, b[1]], [b[0], nTop, b[1]], [a[0], nTop, a[1]], c, index);
-                };
-                face(topAt(x + 1, y), SHADE_EAST,  [x1, z1], [x1, z0]);
-                face(topAt(x - 1, y), SHADE_WEST,  [x0, z0], [x0, z1]);
-                face(topAt(x, y + 1), SHADE_SOUTH, [x0, z1], [x1, z1]);
-                face(topAt(x, y - 1), SHADE_NORTH, [x1, z0], [x0, z0]);
-            }
-        }
-
-        const group = new THREE.Group();
-        const tops = [];
-        const sm = this.skinManager;
-        for (const [type, batch] of topsByType) {
-            const def = getTileRender(type);
-            const image = sm && sm.isActive ? (sm.getSprite('terrain', def.spriteKey) || sm.getSprite('terrain', 'grass')) : null;
-            const mat = new THREE.MeshBasicMaterial({
-                vertexColors: true,
-                map: image ? this._textureFor(image) : null,
-                color: image ? 0xffffff : new THREE.Color(def.color),
-            });
-            const mesh = new THREE.Mesh(batch.toGeometry(), mat);
-            mesh.userData.owners = batch.owners;
-            group.add(mesh);
-            tops.push({ mesh });
-        }
-        const sideMesh = new THREE.Mesh(
-            sides.toGeometry(),
-            new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide })
-        );
-        sideMesh.userData.owners = sides.owners;
-        group.add(sideMesh);
-        const fx = this._buildTerrainFx(group, grassTiles, waterTiles);
-        return { group, tops, sides: { mesh: sideMesh }, fx };
-    }
-
-    // Overlay quads for the skin's animated grass and water sprites. Only built when the
-    // skin supplies the sprites, so ascii mode and skins without them simply skip it.
-    _buildTerrainFx(group, grassTiles, waterTiles) {
-        const sm = this.skinManager;
-        if (!sm || !sm.isActive) return null;
-        const tuft  = sm.getSprite('effects', 'grass_tuft');
-        const waves = sm.getSprite('effects', 'water_waves');
-        const quad = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
-        const fx = { geometry: quad, grass: null, grassTiles, water: [], waterTiles: [] };
-
-        const makeMesh = (image, tiles) => {
-            const mat = new THREE.MeshBasicMaterial({
-                map: this._textureFor(image), transparent: true, depthWrite: false,
-                polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1,
-            });
-            const mesh = new THREE.InstancedMesh(quad, mat, Math.max(1, tiles.length));
-            mesh.count = tiles.length;
-            mesh.frustumCulled = false;
-            mesh.renderOrder = 2;
-            const color = new THREE.Color();
-            tiles.forEach((t, i) => mesh.setColorAt(i, color.setRGB(t.topColor[0], t.topColor[1], t.topColor[2])));
-            group.add(mesh);
-            return mesh;
-        };
-
-        if (tuft && grassTiles.length) {
-            fx.grass = makeMesh(tuft, grassTiles);
-            this._tmpMatrix = this._tmpMatrix || new THREE.Matrix4();
-        }
-        if (waves && waterTiles.length) {
-            // Split the water tiles by phase so each bucket can have its own opacity.
-            const buckets = Array.from({ length: WATER_PHASE_BUCKETS }, () => []);
-            for (const t of waterTiles) {
-                const phase = (t.index % 1000) / 1000;
-                buckets[Math.min(WATER_PHASE_BUCKETS - 1, Math.floor(phase * WATER_PHASE_BUCKETS))].push(t);
-            }
-            buckets.forEach((tiles, b) => {
-                if (!tiles.length) return;
-                const mesh = makeMesh(waves, tiles);
-                const m = new THREE.Matrix4();
-                tiles.forEach((t, i) => mesh.setMatrixAt(i, m.makeTranslation(t.x, t.top + TERRAIN_FX_LIFT, t.z)));
-                mesh.instanceMatrix.needsUpdate = true;
-                fx.water.push({ mesh, phase: ((b + 0.5) / WATER_PHASE_BUCKETS) * Math.PI * 2 });
-            });
-        }
-        return fx;
-    }
-
-    _updateTerrainFx(now) {
-        const fx = this._terrain && this._terrain.fx;
-        if (!fx) return;
-        if (fx.grass) {
-            const m = this._tmpMatrix, q = this._tmpQuat || (this._tmpQuat = new THREE.Quaternion());
-            const pos = this._tmpPos || (this._tmpPos = new THREE.Vector3());
-            const scl = this._tmpScl || (this._tmpScl = new THREE.Vector3(1, 1, 1));
-            const up = this._upAxis || (this._upAxis = new THREE.Vector3(0, 1, 0));
-            const t = (now / GRASS_SWAY_PERIOD_MS) * Math.PI * 2;
-            fx.grassTiles.forEach((tile, i) => {
-                const sway = Math.sin(t + ((tile.index % 1000) / 1000) * 6.28) * GRASS_SWAY_AMPLITUDE;
-                q.setFromAxisAngle(up, sway);
-                fx.grass.setMatrixAt(i, m.compose(pos.set(tile.x, tile.top + TERRAIN_FX_LIFT, tile.z), q, scl));
-            });
-            fx.grass.instanceMatrix.needsUpdate = true;
-        }
-        for (const w of fx.water) {
-            const a = WATER_ALPHA_BASE + WATER_ALPHA_VARIATION * Math.cos((now / WATER_PERIOD_MS) * Math.PI * 2 + w.phase);
-            w.mesh.material.opacity = Math.max(0, Math.min(1, a));
-        }
     }
 
     // ---- Highlights ----------------------------------------------------------
@@ -850,34 +645,33 @@ export class BattleView3D {
         const limit = this._hlBorder.instanceMatrix.count;
         let hash = this._terrainSig === null ? 0 : String(this._terrainSig).length;
 
-        for (let y = 0; y < map.height; y++) {
-            for (let x = 0; x < map.width; x++) {
-                const key = `${x},${y}`;
-                let kind = null;
-                if (hit && hit.has(key)) kind = 'hit';
-                else if (aoe.has(key)) kind = 'aoe';
-                else if (ability.has(key)) kind = 'ability';
-                else if (showHover && key === hoverKey) kind = 'hover';
-                else if (move.has(key)) kind = 'move';
-                if (!kind) continue;
+        for (const cell of map.cells) {
+            const { x, y } = cell;
+            const key = `${x},${y},${cell.z}`;
+            let kind = null;
+            if (hit && hit.has(key)) kind = 'hit';
+            else if (aoe.has(key)) kind = 'aoe';
+            else if (ability.has(key)) kind = 'ability';
+            else if (showHover && key === hoverKey) kind = 'hover';
+            else if (move.has(key)) kind = 'move';
+            if (!kind) continue;
 
-                const style = HIGHLIGHTS[kind];
-                // Cheap fingerprint of which tile has which highlight, to skip needless GPU uploads.
-                hash = (hash * 31 + (y * map.width + x) * 8 + KIND_INDEX[kind]) | 0;
+            const style = HIGHLIGHTS[kind];
+            // Cheap fingerprint of which tile has which highlight, to skip needless GPU uploads.
+            hash = (hash * 31 + cell.index * 8 + KIND_INDEX[kind]) | 0;
 
-                const ty = terrainTopY(map.tiles[y * map.width + x]) + 0.02;
-                m.makeTranslation(x, ty, y);
+            const ty = terrainTopY(cell) + 0.02;
+            m.makeTranslation(x, ty, y);
 
-                const fill = this._hlFills[style.level];
-                const fi = counts[style.level];
-                if (fi < limit && borders < limit) {
-                    fill.setMatrixAt(fi, m);
-                    fill.setColorAt(fi, color.set(style.color));
-                    counts[style.level]++;
-                    this._hlBorder.setMatrixAt(borders, m);
-                    this._hlBorder.setColorAt(borders, color.set(style.border));
-                    borders++;
-                }
+            const fill = this._hlFills[style.level];
+            const fi = counts[style.level];
+            if (fi < limit && borders < limit) {
+                fill.setMatrixAt(fi, m);
+                fill.setColorAt(fi, color.set(style.color));
+                counts[style.level]++;
+                this._hlBorder.setMatrixAt(borders, m);
+                this._hlBorder.setColorAt(borders, color.set(style.border));
+                borders++;
             }
         }
         // Re-upload the instance buffers only when the highlighted set (or terrain) changed.
@@ -1034,11 +828,14 @@ export class BattleView3D {
         const vs = viewState(unit);
         const rp = getEntityRenderPos(unit, now);
         const x = rp.x, z = rp.y;
-        const destTile = getTile(map, vs.vizX != null ? vs.vizX : unit.x, vs.vizY != null ? vs.vizY : unit.y);
-        let y = terrainTopY(destTile);
+        const cellY = (x, y, z) => {
+            const c = getCell(map, x, y, z);
+            return c ? terrainTopY(c) : blockTopY(z ?? 0);
+        };
+        let y = vs.vizX != null ? cellY(vs.vizX, vs.vizY, vs.vizZ ?? unit.z) : cellY(unit.x, unit.y, unit.z);
         let hop = 0;
         if (isEntityMoving(unit) && vs.prevX != null) {
-            const srcY = terrainTopY(getTile(map, vs.prevX, vs.prevY));
+            const srcY = cellY(vs.prevX, vs.prevY, vs.prevZ ?? unit.z);
             const moveT = Math.min(1, (now - vs.moveStartTime) / (vs.moveDuration || 1));
             const eased = moveT * (2 - moveT);
             const diff = y - srcY;
@@ -1230,7 +1027,7 @@ export class BattleView3D {
             }
             const x = p.sx + (p.tx - p.sx) * t;
             const z = p.sy + (p.ty - p.sy) * t;
-            const y0 = terrainTopY(getTile(map, p.sx, p.sy)), y1 = terrainTopY(getTile(map, p.tx, p.ty));
+            const y0 = blockTopY(p.sz), y1 = blockTopY(p.tz);
             const y = y0 + (y1 - y0) * t + 0.55 + Math.sin(t * Math.PI) * 0.15;
             p.sprite.position.set(x, y, z);
             p.sprite.material.opacity = t < 0.1 ? t * 10 : t > 0.85 ? (1 - t) / 0.15 : 1;
@@ -1242,7 +1039,7 @@ export class BattleView3D {
         for (const unit of units) {
             const floats = viewState(unit).floats;
             if (floats.length === 0) continue;
-            const top = terrainTopY(getTile(map, unit.x, unit.y)) + SPRITE_HEIGHT + 0.25;
+            const top = terrainTopY(getCell(map, unit.x, unit.y, unit.z)) + SPRITE_HEIGHT + 0.25;
             for (let i = floats.length - 1; i >= 0; i--) {
                 const f = floats[i];
                 f.age += dt;

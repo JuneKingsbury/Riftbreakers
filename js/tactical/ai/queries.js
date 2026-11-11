@@ -3,7 +3,7 @@
 // non-dead units (battle.livingUnits), `map` is the battle map.
 import { computeMoveRange, computeAttackRange, computeAoeArea } from '../abilities.js';
 import { ABILITIES } from '../data-registry.js';
-import { hasLineOfSight, getTile, MAX_CLIMB } from '../battle-map.js';
+import { hasLineOfSight, unitCell, stepNeighbors, posKey, parseKey, cellKey } from '../battle-map.js';
 import { isConscious, isAlive } from '../units.js';
 
 export function distance(a, b) {
@@ -89,17 +89,18 @@ export function usableAbilities(unit, filter = () => true) {
 export function inAbilityRange(from, target, abilityKey, map = null) {
     const ab = ABILITIES[abilityKey];
     if (!ab) return false;
-    if (ab.targetType === 'self') return from.x === target.x && from.y === target.y;
+    if (ab.targetType === 'self') return from.x === target.x && from.y === target.y && from.z === target.z;
     const d = distance(from, target);
     if (d > ab.range) return false;
     if (d === 0) return ab.targetType === 'ally';
-    if (map && ab.requiresLos !== false && !hasLineOfSight(map, from.x, from.y, target.x, target.y)) return false;
+    if (map && ab.requiresLos !== false && !hasLineOfSight(map, from, target)) return false;
     return true;
 }
 
-// Tiles the unit can stand on this turn, including where it already is.
+// Cells ("x,y,z" keys) the unit can stand on this turn, including where it already is.
 export function reachableTiles(unit, map, units) {
-    return new Set([`${unit.x},${unit.y}`, ...computeMoveRange(unit, map, units)]);
+    const range = computeMoveRange(unit, map, units);   // settles unit.z first
+    return new Set([posKey(unit), ...range]);
 }
 
 // Reachable tiles from which `target` is inside the ability's range.
@@ -108,23 +109,22 @@ export function tilesToUseFrom(unit, target, abilityKey, map, units) {
     const result = new Set();
     if (!ab) return result;
     for (const key of reachableTiles(unit, map, units)) {
-        const [x, y] = key.split(',').map(Number);
-        if (inAbilityRange({ x, y }, target, abilityKey, map)) result.add(key);
+        if (inAbilityRange(parseKey(key), target, abilityKey, map)) result.add(key);
     }
     return result;
 }
 
-// Units an AoE ability centred on (cx, cy) would affect, using the same team
+// Units an AoE ability centred on `center` ({x,y,z}) would affect, using the same team
 // filter as TacticalBattle.applyEnemyAbility.
-export function unitsAffected(caster, abilityKey, cx, cy, units) {
+export function unitsAffected(caster, abilityKey, center, units, map) {
     const ab = ABILITIES[abilityKey];
     if (!ab) return [];
-    const tiles = ab.aoe > 0 ? computeAoeArea(cx, cy, ab.aoe) : new Set([`${cx},${cy}`]);
+    const tiles = ab.aoe > 0 ? computeAoeArea(map, center, ab.aoe) : new Set([posKey(center)]);
     return units.filter(u => {
         const sameTeam = u.team === caster.team;
         if (ab.targetType === 'ally' && !sameTeam) return false;
         if (ab.targetType === 'enemy' && sameTeam) return false;
-        return tiles.has(`${u.x},${u.y}`);
+        return tiles.has(posKey(u));
     });
 }
 
@@ -140,30 +140,26 @@ function threatRange(unit) {
     return range;
 }
 
-// Walking cost from every tile to (gx, gy) over passable terrain, honouring each
-// tile's moveCost and the climb limit but ignoring units (they move). Straight-line
+// Walking cost from every cell to `goal` ({x,y,z}) over passable terrain, honouring each
+// cell's moveCost and the climb limit but ignoring units (they move). Straight-line
 // distance gets units stuck behind ponds and cliffs, since the way round starts by
-// moving away. Returns Map<"x,y", cost>, and tiles with no route are absent.
-export function walkCostField(map, gx, gy) {
-    const cost = new Map([[`${gx},${gy}`, 0]]);
-    let open = [{ x: gx, y: gy, c: 0 }];
+// moving away. Returns Map<"x,y,z", cost>, and cells with no route are absent.
+export function walkCostField(map, goal) {
+    const start = unitCell(map, goal);
+    if (!start) return new Map();
+    const cost = new Map([[posKey(start), 0]]);
+    let open = [{ cell: start, c: 0 }];
     while (open.length > 0) {
         open.sort((a, b) => a.c - b.c);
         const cur = open.shift();
-        if (cur.c > cost.get(`${cur.x},${cur.y}`)) continue;
-        const curTile = getTile(map, cur.x, cur.y);
-        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-            const nx = cur.x + dx;
-            const ny = cur.y + dy;
-            const tile = getTile(map, nx, ny);
-            if (!tile || !tile.passable) continue;
-            if (Math.abs((tile.elevation ?? 0) - (curTile?.elevation ?? 0)) > MAX_CLIMB) continue;
-            // Walking from (nx, ny) to the goal next steps onto cur, so cur's move cost applies.
-            const c = cur.c + (curTile?.moveCost ?? 1);
-            const key = `${nx},${ny}`;
+        if (cur.c > cost.get(posKey(cur.cell))) continue;
+        for (const n of stepNeighbors(map, cur.cell)) {
+            // Walking from n to the goal next steps onto cur, so cur's move cost applies.
+            const c = cur.c + (cur.cell.moveCost ?? 1);
+            const key = posKey(n);
             if (c < (cost.get(key) ?? Infinity)) {
                 cost.set(key, c);
-                open.push({ x: nx, y: ny, c });
+                open.push({ cell: n, c });
             }
         }
     }
@@ -173,12 +169,12 @@ export function walkCostField(map, gx, gy) {
 // Tiles `enemy` could hit on its next turn: everywhere it can walk, widened by
 // its attack reach. Movement is computed with the current unit positions.
 export function threatTiles(enemy, map, units) {
-    return computeAttackRange(reachableTiles(enemy, map, units), threatRange(enemy), true);
+    return computeAttackRange(reachableTiles(enemy, map, units), threatRange(enemy), true, false, map);
 }
 
-// Whether any conscious enemy of `unit` could hit tile (x, y) next turn.
-export function isThreatenedAt(unit, x, y, map, units) {
-    const key = `${x},${y}`;
+// Whether any conscious enemy of `unit` could hit cell (x, y, z) next turn.
+export function isThreatenedAt(unit, x, y, z, map, units) {
+    const key = cellKey(x, y, z);
     return enemiesOf(unit, units).some(e => threatTiles(e, map, units).has(key));
 }
 

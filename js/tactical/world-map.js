@@ -1,7 +1,8 @@
 import { NODES, QUESTS, EVENTS, BATTLE_SCENARIOS, ROAMING_SPAWN_POOL, PINNED_ENCOUNTER_DATA } from './world-map-data.js';
 import { CHARACTER_DATA } from './data/characters.js';
 import { EQUIPMENT } from './data/equipment.js';
-import { allowedEquipTypes } from './data-registry.js';
+import { allowedEquipTypes, meetsPrerequisites } from './data-registry.js';
+import { learnAbility, JP_SPILLOVER } from './loadout.js';
 
 export class RoamingEnemy {
     constructor(id, nodeId, spriteKey, name, battleScenarioId, opts = {}) {
@@ -53,7 +54,10 @@ export class WorldMap {
             .map(c => ({
                 ...c,
                 appearance: c.appearance ? { ...c.appearance } : null,
-                xp: c.xp ? { ...c.xp } : {},
+                jp:      { ...(c.jp || {}) },
+                jpSpent: { ...(c.jpSpent || {}) },
+                learned: [...(c.learned || [])],
+                loadout: { ...(c.loadout || {}) },
             }));
 
         // Inventory: { itemKey: count }. Seeded with one copy of each item
@@ -297,21 +301,46 @@ export class WorldMap {
         return ef;
     }
 
-    completeBattle(scenarioId, won) {
-        if (!won) return { won: false };
+    // Spend a member's JP in `job` to learn `abilityKey`. Returns success.
+    learnAbility(memberName, job, abilityKey) {
+        const member = this.party.find(m => m.name === memberName);
+        return !!member && learnAbility(member, job, abilityKey);
+    }
+
+    // jpEarned: { memberName: { jobKey: jp } } earned per action in battle (see
+    // TacticalBattle). Action JP is kept even on defeat; each member also shares
+    // JP_SPILLOVER of it in that job if they could take that job. Victory adds the
+    // scenario's jpPerMember bonus to every member's current job.
+    completeBattle(scenarioId, won, jpEarned = {}) {
+        const jpGained = {};
+        const grant = (member, job, amt) => {
+            if (amt <= 0) return;
+            member.jp[job] = (member.jp[job] || 0) + amt;
+            jpGained[member.name] = (jpGained[member.name] || 0) + amt;
+        };
+        for (const member of this.party) member.jp = member.jp || {};
+        for (const [name, byJob] of Object.entries(jpEarned)) {
+            const actor = this.party.find(m => m.name === name);
+            if (!actor) continue;
+            for (const [job, amt] of Object.entries(byJob)) {
+                grant(actor, job, amt);
+                for (const other of this.party) {
+                    if (other === actor || !meetsPrerequisites(other.jp, job)) continue;
+                    grant(other, job, Math.floor(amt * JP_SPILLOVER));
+                }
+            }
+        }
+        if (!won) return { won: false, jpGained };
 
         this.completedBattles.add(scenarioId);
         this.currentNode.visited = true;
 
-        const rewards = { won: true, xpGained: 0, goldGained: 0, itemsGained: [], questsCompleted: [] };
+        const rewards = { won: true, jpGained, jpBonus: 0, goldGained: 0, itemsGained: [], questsCompleted: [] };
         const scenario = BATTLE_SCENARIOS[scenarioId];
         if (scenario) {
-            const xp = scenario.xpPerMember || 0;
-            rewards.xpGained = xp;
-            for (const member of this.party) {
-                member.xp = member.xp || {};
-                member.xp[member.job] = (member.xp[member.job] || 0) + xp;
-            }
+            const bonus = scenario.jpPerMember || 0;
+            rewards.jpBonus = bonus;
+            for (const member of this.party) grant(member, member.job, bonus);
             rewards.goldGained = scenario.gold || 0;
             this.gold += rewards.goldGained;
             rewards.itemsGained = [...(scenario.items || [])];

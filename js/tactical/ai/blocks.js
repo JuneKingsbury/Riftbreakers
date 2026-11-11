@@ -4,7 +4,7 @@
 //
 // A condition is { test, params } or { op: 'and'|'or'|'not', args: [...] }.
 // Label templates use {param} placeholders, which the editor renders as inputs.
-import { getTile } from '../battle-map.js';
+import { unitCell } from '../battle-map.js';
 import { ABILITIES } from '../data-registry.js';
 import * as Q from './queries.js';
 
@@ -21,7 +21,7 @@ export function compare(op, a, b) {
     }
 }
 
-export const TILE_TYPES = ['grass', 'dirt', 'water', 'wall', 'rubble', 'high'];
+export const TILE_TYPES = ['grass', 'dirt', 'water', 'wall', 'rubble'];
 
 // Statuses a script may reference: the ones the engine uses plus any an ability can inflict.
 export const STATUS_OPTIONS = [...new Set([
@@ -101,12 +101,12 @@ export const CONDITIONS = {
         test: (p, ctx) => Q.hasBuff(ctx.self, p.ability) || Q.hasStatus(ctx.self, p.ability),
     },
     standing_on: {
-        group: 'Self', label: 'I am standing on {tile}', params: [{ name: 'tile', type: 'tile', default: 'high' }],
-        test: (p, ctx) => getTile(ctx.map, ctx.self.x, ctx.self.y)?.type === p.tile,
+        group: 'Self', label: 'I am standing on {tile}', params: [{ name: 'tile', type: 'tile', default: 'grass' }],
+        test: (p, ctx) => unitCell(ctx.map, ctx.self)?.type === p.tile,
     },
     self_threatened: {
         group: 'Self', label: 'An enemy could hit me next turn', params: [],
-        test: (p, ctx) => Q.isThreatenedAt(ctx.self, ctx.self.x, ctx.self.y, ctx.map, ctx.units),
+        test: (p, ctx) => Q.isThreatenedAt(ctx.self, ctx.self.x, ctx.self.y, ctx.self.z, ctx.map, ctx.units),
     },
 
     enemy_exists: {
@@ -183,12 +183,12 @@ export const CONDITIONS = {
     },
     self_above_target: {
         group: 'Target', label: 'I am on higher ground than the target', needsTarget: true, params: [],
-        test: (p, ctx) => (getTile(ctx.map, ctx.self.x, ctx.self.y)?.elevation ?? 0) > (getTile(ctx.map, ctx.target.x, ctx.target.y)?.elevation ?? 0),
+        test: (p, ctx) => (ctx.self.z ?? 0) > (ctx.target.z ?? 0),
     },
     aoe_hit_count: {
         group: 'Target', label: '{ability} centred on target hits {cmp} {value} units', needsTarget: true,
         params: [{ name: 'ability', type: 'ability', default: 'fire' }, { name: 'cmp', type: 'cmp', default: '>=' }, { name: 'value', type: 'number', default: 2 }],
-        test: (p, ctx) => compare(p.cmp, Q.unitsAffected(ctx.self, p.ability, ctx.target.x, ctx.target.y, ctx.units).length, p.value),
+        test: (p, ctx) => compare(p.cmp, Q.unitsAffected(ctx.self, p.ability, ctx.target, ctx.units, ctx.map).length, p.value),
     },
 };
 

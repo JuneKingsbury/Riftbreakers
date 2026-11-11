@@ -114,6 +114,12 @@ document.addEventListener('DOMContentLoaded', () => {
             launchSkinEditor();
         });
     });
+    document.getElementById('start-map-editor')?.addEventListener('click', () => {
+        closeModals();
+        import('../editor/map-editor.js').then(({ launchMapEditor }) => {
+            launchMapEditor(skinManager);
+        });
+    });
 
     // --- New Game → world map ---
     const gameEl = document.createElement('div');

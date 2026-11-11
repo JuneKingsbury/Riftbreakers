@@ -1,8 +1,8 @@
-import { loadMapData } from './battle-map.js';
-import { MAP_DATA } from './data/maps.js';
+import { loadMapData, posKey } from './battle-map.js';
+import { MAP_DATA } from './data/maps/index.js';
 import { TacticalBattle, STATES } from './battle.js';
 import { BattleView3D, showViewError } from './battle-view3d.js';
-import { BattleUI } from './battle-ui.js';
+import { BattleUI, unitSkillsets, SKILLSET_KEYS } from './battle-ui.js';
 import { runAutoTurn } from './ai/executor.js';
 import { isEntityMoving } from '../systems/movement-lerp.js';
 import { ABILITIES } from './abilities.js';
@@ -88,7 +88,7 @@ export class BattleScene {
         this._panStart  = { x: 0, y: 0 };
         this._suppressClick = false;
         this._PAN_THRESHOLD = 4;
-        this._abilityFromSkillMenu = false;
+        this._abilityFromSkillMenu = null;
         this._pendingRewards = null;
 
         this._scheduleNextTurn();
@@ -114,7 +114,7 @@ export class BattleScene {
         if (this._battle.state === STATES.BATTLE_OVER && !this._pendingRewards) {
             const won = this._battle.winner === 'player';
             this._pendingRewards = this._worldMap
-                ? this._worldMap.completeBattle(this._scenarioId, won)
+                ? this._worldMap.completeBattle(this._scenarioId, won, this._battle.jpEarned)
                 : { won };
         }
         this._ui?.update(this._battle, () => this._onBattleExit(), {
@@ -166,10 +166,10 @@ export class BattleScene {
     _resetTurn() {
         this._turnHasMoved = false;
         this._turnHasActed = false;
-        this._abilityFromSkillMenu = false;
+        this._abilityFromSkillMenu = null;
     }
 
-    _playAbilityAnimation(source, targetX, targetY, abilityKey) {
+    _playAbilityAnimation(source, targetX, targetY, abilityKey, targetZ = null) {
         const ab = ABILITIES[abilityKey];
         if (!ab) return 0;
         const animType = ab.animType || 'slash';
@@ -185,7 +185,7 @@ export class BattleScene {
             const color      = ab.projectileColor || '#ffffff';
             const projDelay  = animType === 'shot' ? 180 : 200;
             const projFlight = 420;
-            setTimeout(() => { if (this._stopped) return; this._renderer.spawnProjectile(source.x, source.y, targetX, targetY, color, projFlight / speed); }, projDelay / speed);
+            setTimeout(() => { if (this._stopped) return; this._renderer.spawnProjectile(source, { x: targetX, y: targetY, z: targetZ }, color, projFlight / speed); }, projDelay / speed);
             return projDelay + projFlight;
         }
         return baseAnimMs;
@@ -255,10 +255,11 @@ export class BattleScene {
     }
 
     _cancelTargeting() {
+        // Index of the skillset menu the ability was picked from, or null.
         const fromMenu = this._abilityFromSkillMenu;
-        this._abilityFromSkillMenu = false;
+        this._abilityFromSkillMenu = null;
         this._battle.cancelAction();
-        if (fromMenu) this._ui._skillMenuOpen = true;
+        if (fromMenu !== null && fromMenu !== undefined) this._ui.openSkillMenu(fromMenu);
     }
 
     _handleAction(action, abilityKey) {
@@ -278,7 +279,7 @@ export class BattleScene {
             if (!this._turnHasMoved) this._battle.enterMoveMode();
         } else if (action === 'ability') {
             if (!this._turnHasActed) {
-                this._abilityFromSkillMenu = true;
+                this._abilityFromSkillMenu = this._ui._openSkillset;
                 this._battle.enterAbilityMode(abilityKey);
                 const ab = ABILITIES[abilityKey];
                 if (ab?.aoePattern) this._battle.logMsg(`${ab.name} ready — press R to rotate.`);
@@ -333,8 +334,8 @@ export class BattleScene {
             if (this._battle.state === STATES.SELECT_ABILITY_TARGET) this._battle.hoverAbilityTarget(-1, -1);
             return;
         }
-        if (this._battle.state === STATES.SELECT_ABILITY_TARGET) this._battle.hoverAbilityTarget(tile.x, tile.y);
-        this._battle.hoverTile = `${tile.x},${tile.y}`;
+        if (this._battle.state === STATES.SELECT_ABILITY_TARGET) this._battle.hoverAbilityTarget(tile.x, tile.y, tile.z);
+        this._battle.hoverTile = posKey(tile);
     }
 
     _handleMouseUp(e) {
@@ -357,7 +358,7 @@ export class BattleScene {
 
         // Idle click: inspect the unit on this tile (or clear if empty ground).
         if (state === STATES.PLAYER_TURN || state === STATES.ADVANCE_CT || state === STATES.ENEMY_TURN) {
-            const clicked = this._battle.units.find(u => u.x === tile.x && u.y === tile.y && !u.status.includes('dead'));
+            const clicked = this._battle.units.find(u => posKey(u) === posKey(tile) && !u.status.includes('dead'));
             this._ui.inspectUnit(clicked || null);
         }
 
@@ -365,15 +366,14 @@ export class BattleScene {
         if (!this._manualControl) return;
 
         if (state === STATES.SELECT_MOVE) {
-            if (this._battle.commitMove(tile.x, tile.y)) {
+            if (this._battle.commitMove(tile.x, tile.y, tile.z)) {
                 this._turnHasMoved = true;
                 this._battle.moveRange = new Set();
             }
         } else if (state === STATES.PLAYER_TURN && !this._turnHasMoved) {
-            const key = `${tile.x},${tile.y}`;
-            if (this._battle.moveRange.has(key)) {
+            if (this._battle.moveRange.has(posKey(tile))) {
                 this._battle.enterMoveMode();
-                if (this._battle.commitMove(tile.x, tile.y)) {
+                if (this._battle.commitMove(tile.x, tile.y, tile.z)) {
                     this._turnHasMoved = true;
                     this._battle.moveRange = new Set();
                 }
@@ -381,14 +381,14 @@ export class BattleScene {
         } else if (state === STATES.SELECT_ABILITY_TARGET) {
             const abilityKey = this._battle.selectedAbility;
             const source     = this._battle.activeUnit;
-            if (this._battle.commitAbility(tile.x, tile.y)) {
+            if (this._battle.commitAbility(tile.x, tile.y, tile.z)) {
                 this._turnHasActed = true;
-                this._abilityFromSkillMenu = false;
+                this._abilityFromSkillMenu = null;
                 // Register any newly summoned player-team units as auto-controlled.
                 for (const id of this._battle._pendingSummons) this._autoUnits.add(id);
                 this._battle._pendingSummons = [];
                 const isCharged = ABILITIES[abilityKey]?.chargeTime > 0;
-                const animMs = (source && !isCharged) ? this._playAbilityAnimation(source, tile.x, tile.y, abilityKey) : 0;
+                const animMs = (source && !isCharged) ? this._playAbilityAnimation(source, tile.x, tile.y, abilityKey, tile.z) : 0;
                 const cost = this._turnHasMoved ? 100 : 80;
                 if (isCharged) {
                     this._battle.endTurn(cost);
@@ -430,9 +430,11 @@ export class BattleScene {
                 if (this._ui._skillMenuOpen) { this._ui.closeSkillMenu(); return; }
                 if (!this._turnHasActed) this._battle.enterAbilityMode('attack'); return;
             }
-            if (e.key === 's' || e.key === 'S') {
-                if (!this._turnHasActed && !this._ui._skillMenuOpen) { this._ui._skillMenuOpen = true; return; }
+            const setIdx = SKILLSET_KEYS.indexOf(e.key.toUpperCase());
+            if (setIdx >= 0) {
+                const sets = unitSkillsets(this._battle.activeUnit);
                 if (this._ui._skillMenuOpen) { this._ui.closeSkillMenu(); return; }
+                if (!this._turnHasActed && sets[setIdx]) { this._ui.openSkillMenu(setIdx); return; }
             }
             if (e.key === 'd' || e.key === 'D') {
                 if (!this._turnHasActed) {
@@ -454,11 +456,12 @@ export class BattleScene {
             const digit = parseInt(e.key, 10);
             if (!isNaN(digit) && digit >= 1 && this._ui._skillMenuOpen && !this._turnHasActed) {
                 const unit = this._battle.activeUnit;
-                const skillAbs = unit?.abilities.filter(k => k !== 'attack' && ABILITIES[k] && !ABILITIES[k].passive) || [];
+                const openIdx = this._ui._openSkillset;
+                const skillAbs = unit ? (unitSkillsets(unit)[openIdx]?.abilities ?? []) : [];
                 const chosen = skillAbs[digit - 1];
                 if (chosen) {
                     this._ui.closeSkillMenu();
-                    this._abilityFromSkillMenu = true;
+                    this._abilityFromSkillMenu = openIdx;
                     this._battle.enterAbilityMode(chosen);
                     if (ABILITIES[chosen]?.aoePattern) this._battle.logMsg(`${ABILITIES[chosen].name} ready — press R to rotate.`);
                 }

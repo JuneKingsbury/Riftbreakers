@@ -73,7 +73,7 @@ function setPath(obj, path, value) {
 }
 
 export class ScriptEditor {
-    // characters: the live party (worldMap.party): { name, job, xp, extraAbilities, supportSkill, supportPassive }.
+    // characters: the live party (worldMap.party): { name, job, jp, learned, loadout, ... } (see loadout.js).
     constructor(characters, { onSaved } = {}) {
         this._chars = characters;
         this._onSaved = onSaved || null;

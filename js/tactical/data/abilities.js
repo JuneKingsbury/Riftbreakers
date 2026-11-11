@@ -5,6 +5,8 @@
 // Fields:
 //   name          string   Display name
 //   type          'physical'|'magic'|'passive'
+//   slot          'action'|'reaction'|'support'|'movement'  Loadout slot the ability
+//                 is equipped into. Absent = 'action' (part of a job's skillset).
 //
 // Inheritance note: to suppress an inherited field (e.g. applyStatus from a parent),
 // set it explicitly to null in the child. Omitting the field leaves the parent's value.
@@ -28,6 +30,65 @@
 //                          Defaults to true when absent. Set to false for lobbed/indirect
 //                          spells (e.g. AoE fire dropped from the sky).
 //   desc          string   Tooltip description
+//
+// Reaction fields (slot: 'reaction'). Fired by reactions.js after the owner is hit:
+//   trigger       'physicalHit'|'magicHit'|'anyHit'|'rangedHit'|'lowHp'
+//   chance        number   0-1 proc chance
+//   adjacentOnly  bool     Only when the attacker is adjacent
+//   oncePerBattle bool     Fires at most once per battle
+//   counterWith   string   Ability used against the attacker (needs MP and range)
+//   selfCast      string   Ability cast on the owner (needs MP)
+//   selfStatus    string   Status applied to the owner
+//   selfBuff      object   { stat, value, duration } buff applied to the owner
+//   mpRestoreFrac number   Restore this fraction of the damage taken as MP
+//
+// More action fields:
+//   buffs         Array<{stat,value,duration}>  Stat buffs/debuffs put on each target
+//   floatText     string   Floating text shown when a buff-only ability lands
+//   drainFrac     number   Source heals this fraction of the damage dealt
+//   isDispel      bool     Strips positive statuses and buffs from the target
+//
+// More reaction fields:
+//   trigger 'allyHit'      An adjacent ally of the owner was damaged
+//   trigger 'statusHit'    The owner was afflicted with a negative status
+//   allyCast      string   Ability cast on the ally that was hit (allyHit)
+//   shareDamageFrac number Owner takes this share of the ally's damage instead (allyHit)
+//   attackerStatus { status, duration }  Status inflicted on the attacker
+//   thornsFrac    number   Attacker takes this fraction of the damage dealt
+//   phaseAway     number   Owner teleports up to this many tiles away from the attacker
+//   summon        { job, name }  Creature summoned next to the owner
+//   cleanseSelf   bool     Removes the owner's negative statuses
+//
+// Support fields (slot: 'support'), read through abilities.js supportOf():
+//   dmgDealt / dmgTaken    { physical?, magic? }  Damage multipliers
+//   lowHpDmgDealt          { physical?, magic? }  Multiplier while below 50% HP
+//   evaBonus      number   Added evasion vs physical attacks
+//   ignoreEvasion bool     Physical attacks ignore target evasion
+//   highGroundMult number  Replaces the 1.25 high-ground damage bonus; also negates it against you
+//   matToPhysical number   Fraction of MAT added to ATK for physical damage
+//   mdfPierce     number   Fraction of target MDF ignored by your magic
+//   aoeDmgMult    number   Damage multiplier for area abilities
+//   healMult      number   Healing multiplier
+//   attackProc    { status, chance, duration }  Physical hits may inflict a status
+//   statusImmune  string[] Statuses that cannot be inflicted on you
+//   statusDurationBonus number  Extra turns on statuses you inflict
+//   surviveLethal bool     Once per battle, a killing blow leaves you at 1 HP
+//   chargeMult    number   Charge time multiplier (battle.js)
+//   jpMult        number   JP earned multiplier (battle.js)
+//   turnRegenHp   number   HP healed at the start of each turn (battle.js)
+//   summonBoost   number   Summons gain this fraction to HP, ATK and MAT (battle.js)
+//
+// Movement fields (slot: 'movement'), read by abilities.js moveProfile():
+//   moveBonus, climbBonus  number  Extra move range / climbable elevation
+//   ignoreClimb       bool  No elevation limit
+//   ignoreTerrainCost bool  Every step costs 1
+//   passThroughUnits  bool  Can walk through (but not stop on) occupied tiles
+// Movement effects applied by battle.js afterMove() / endTurn():
+//   onMove        { hpPct?, mpPct?, cleanse?, alliesHealPct?, alliesBuff?, enemiesStatus?, enemiesCt? }
+//                 After moving: heal/restore self, cleanse self, heal or buff adjacent
+//                 allies (and self), inflict a status on / delay adjacent enemies.
+//   momentumPct   number  +damage per tile moved this turn (max 5 tiles)
+//   rootedHealPct number  Heal this fraction of max HP when ending a turn without moving
 
 export const ABILITY_DATA = {
     attack: {
@@ -145,6 +206,7 @@ export const ABILITY_DATA = {
     mana_surge: {
         name: 'Mana Surge',
         type: 'passive',
+        slot: 'support',
         passive: true,
         passiveMpCost: 2,
         range: 0,
@@ -152,7 +214,8 @@ export const ABILITY_DATA = {
         mpCost: 0,
         actionCost: 0,
         targetType: 'self',
-        desc: 'Passively drains MP each turn, enhancing magic.',
+        dmgDealt: { magic: 1.15 },
+        desc: 'Channels a constant trickle of MP into your spells: +15% magic damage dealt. Drains 2 MP per turn.',
         chargeTime: 0,
     },
 
@@ -160,7 +223,9 @@ export const ABILITY_DATA = {
         extends: 'mana_surge',
         name: 'Regen Aura',
         passiveMpCost: 1,
-        desc: 'Passively drains MP each turn to maintain a healing aura.',
+        dmgDealt: null,
+        turnRegenHp: 5,
+        desc: 'Living growth knits your wounds: heal 5 HP at the start of each turn. Drains 1 MP per turn.',
     },
 
     // =====================================================================
@@ -226,7 +291,9 @@ export const ABILITY_DATA = {
         extends: 'mana_surge',
         name: 'Farsight',
         passiveMpCost: 1,
-        desc: 'Maintains a light divinatory trance, reading the immediate future to improve reaction to incoming attacks.',
+        dmgDealt: null,
+        evaBonus: 0.2,
+        desc: 'A light divinatory trance reads the next few heartbeats: +20% evasion against physical attacks. Drains 1 MP per turn.',
     },
 
     // =====================================================================
@@ -286,7 +353,9 @@ export const ABILITY_DATA = {
         extends: 'mana_surge',
         name: 'Divine Ward',
         passiveMpCost: 1,
-        desc: 'Maintains a constant abjuration barrier, absorbing a portion of each incoming blow.',
+        dmgDealt: null,
+        dmgTaken: { physical: 0.8 },
+        desc: 'A constant barrier of holy force: -20% physical damage taken. Drains 1 MP per turn.',
     },
 
     // =====================================================================
@@ -509,7 +578,9 @@ export const ABILITY_DATA = {
         extends: 'mana_surge',
         name: 'Wyrd Drain',
         passiveMpCost: 2,
-        desc: 'Continuously reads the threads of fate, draining magical energy to fuel curses and hexes.',
+        dmgDealt: null,
+        statusDurationBonus: 1,
+        desc: 'Tightens the threads of fate around your victims: every status you inflict lasts 1 extra turn. Drains 2 MP per turn.',
     },
 
     // =====================================================================
@@ -540,12 +611,6 @@ export const ABILITY_DATA = {
         desc: 'Purges all afflictions and seals the target in a brief protective ward, seen moments in advance.',
     },
 
-    seers_vigil: {
-        extends: 'mana_surge',
-        name: 'Seer\'s Vigil',
-        passiveMpCost: 1,
-        desc: 'Maintains a constant prescient awareness, sensing threats a fraction of a second before they land.',
-    },
 
     // =====================================================================
     // --- Beastcaller (Conjuration + Transmutation) ---
@@ -593,7 +658,7 @@ export const ABILITY_DATA = {
         mpCost: 20,
         actionCost: 55,
         targetType: 'tile',
-        terrainEffect: { setType: 'wall', setElevation: 2, affectTiles: 'passable' },
+        terrainEffect: { setType: 'wall', raise: 2, affectTiles: 'passable' },
         animType: 'cast',
         projectileColor: '#886644',
         chargeTime: 45,
@@ -632,6 +697,8 @@ export const ABILITY_DATA = {
         animType: 'cast',
         projectileColor: '#886644',
         chargeTime: 0,
+        buffs: [{ stat: 'def', value: 8, duration: 2 }],
+        floatText: 'DEF UP!',
         desc: 'Transmutes your own skin to stone, raising DEF by 8 for 2 turns.',
     },
 
@@ -913,6 +980,644 @@ export const ABILITY_DATA = {
         applyStatus: 'regen',
         statusDuration: 4,
         desc: 'Blesses an ally with divine healing energy that restores HP each turn.',
+    },
+
+    // =====================================================================
+    // --- Reaction abilities (slot: 'reaction') ---
+    // =====================================================================
+
+    brace: {
+        name: 'Brace',
+        type: 'passive', slot: 'reaction',
+        range: 0, aoe: 0, mpCost: 0, actionCost: 0, targetType: 'self', chargeTime: 0,
+        trigger: 'anyHit', chance: 0.4,
+        selfStatus: 'defend',
+        desc: 'When struck, may set your feet and take a defensive stance until your next turn.',
+    },
+
+    flame_retort: {
+        extends: 'brace',
+        name: 'Flame Retort',
+        trigger: 'magicHit', chance: 0.3,
+        selfStatus: null,
+        counterWith: 'fire',
+        desc: 'When hit by magic, may answer with a Fire spell at the caster if they are in range.',
+    },
+
+    counter: {
+        extends: 'brace',
+        name: 'Counter',
+        trigger: 'physicalHit', chance: 0.5, adjacentOnly: true,
+        selfStatus: null,
+        counterWith: 'attack',
+        desc: 'When struck in melee, may strike the attacker back.',
+    },
+
+
+    return_fire: {
+        extends: 'brace',
+        name: 'Return Fire',
+        trigger: 'rangedHit', chance: 0.4,
+        selfStatus: null,
+        counterWith: 'long_shot',
+        desc: 'When hit from range, may loose a Long Shot back at the attacker.',
+    },
+
+    stone_reflex: {
+        extends: 'brace',
+        name: 'Stone Reflex',
+        trigger: 'physicalHit', chance: 0.5,
+        selfStatus: null,
+        selfBuff: { stat: 'def', value: 6, duration: 2 },
+        desc: 'When struck physically, may harden your skin, raising DEF by 6 for 2 turns.',
+    },
+
+    void_siphon: {
+        extends: 'brace',
+        name: 'Void Siphon',
+        trigger: 'magicHit', chance: 0.6,
+        selfStatus: null,
+        mpRestoreFrac: 0.5,
+        desc: 'When hit by magic, may pull the spell into the void, restoring MP equal to half the damage taken.',
+    },
+
+    retribution: {
+        extends: 'brace',
+        name: 'Retribution',
+        trigger: 'anyHit', chance: 0.3,
+        selfStatus: null,
+        counterWith: 'smite',
+        desc: 'When struck, may answer with an instant Smite against an adjacent attacker.',
+    },
+
+    feral_counter: {
+        extends: 'counter',
+        name: 'Feral Counter',
+        counterWith: 'wild_surge',
+        desc: 'When struck in melee, may lash back with a Wild Surge.',
+    },
+
+    second_sight: {
+        extends: 'brace',
+        name: 'Second Sight',
+        trigger: 'lowHp', chance: 1, oncePerBattle: true,
+        selfStatus: null,
+        selfCast: 'renewing_light',
+        desc: 'The first time a blow drops you below 30% HP, you foresee it and cast Renewing Light on yourself.',
+    },
+
+    // =====================================================================
+    // --- Movement abilities (slot: 'movement') ---
+    // =====================================================================
+
+    move_plus_1: {
+        name: 'Move +1',
+        type: 'passive', slot: 'movement',
+        range: 0, aoe: 0, mpCost: 0, actionCost: 0, targetType: 'self', chargeTime: 0,
+        moveBonus: 1,
+        desc: 'Increases movement range by 1.',
+    },
+
+    move_plus_2: {
+        extends: 'move_plus_1',
+        name: 'Beast Lope',
+        moveBonus: 2,
+        desc: 'Run on all fours like the beasts you call: movement range +2.',
+    },
+
+    fleet_step: {
+        extends: 'move_plus_1',
+        name: 'Fleet Step',
+        moveBonus: 1, climbBonus: 1,
+        desc: 'Increases movement range by 1 and lets you climb 1 extra level of elevation.',
+    },
+
+    stone_stride: {
+        extends: 'move_plus_1',
+        name: 'Stone Stride',
+        moveBonus: 0, ignoreTerrainCost: true,
+        desc: 'Earth parts beneath your feet: every tile costs only 1 movement.',
+    },
+
+    featherstep: {
+        extends: 'move_plus_1',
+        name: 'Levitate',
+        moveBonus: 0, climbBonus: 2,
+        desc: 'Drift a hand\'s breadth above the ground, rising over ledges: climb 2 extra levels of elevation.',
+    },
+
+    blink: {
+        extends: 'move_plus_1',
+        name: 'Blink',
+        moveBonus: 1, ignoreClimb: true, passThroughUnits: true, ignoreTerrainCost: true,
+        desc: 'Fold space with every step: +1 movement, ignores elevation and terrain, and passes through other units.',
+    },
+
+    // =====================================================================
+    // --- Job ability expansion: actions ---
+    // =====================================================================
+
+    // Novice (Fundamentals)
+    focus: {
+        name: 'Focus',
+        type: 'physical',
+        range: 0, aoe: 0, mpCost: 0, actionCost: 30,
+        targetType: 'self', animType: 'cast', projectileColor: '#ffeeaa', chargeTime: 0,
+        buffs: [{ stat: 'atk', value: 3, duration: 3 }, { stat: 'mat', value: 3, duration: 3 }],
+        floatText: 'Focus!',
+        desc: 'Steady your breath and remember your training: ATK and MAT +3 for 3 turns.',
+    },
+    rush: {
+        extends: 'attack',
+        name: 'Rush',
+        actionCost: 40,
+        basePower: 1.15,
+        desc: 'A headlong shoulder-charge that hits a little harder than a normal attack.',
+    },
+    throw_stone: {
+        name: 'Throw Stone',
+        type: 'physical',
+        range: 3, aoe: 0, mpCost: 0, actionCost: 35,
+        targetType: 'enemy', basePower: 0.6, animType: 'shot', projectileColor: '#998877', chargeTime: 0,
+        desc: 'Pick up a rock and throw it. Weak, but it reaches.',
+    },
+    first_aid: {
+        name: 'First Aid',
+        type: 'physical',
+        range: 1, aoe: 0, mpCost: 0, actionCost: 40,
+        targetType: 'ally', basePower: 0.6, isHeal: true, animType: 'cast', projectileColor: '#ccffcc', chargeTime: 0,
+        desc: 'Bind a wound with field dressings. Heals an adjacent ally (or yourself) without MP.',
+    },
+
+    // Evoker (Evocation)
+    flare: {
+        extends: 'fire',
+        name: 'Flare',
+        range: 4, aoe: 0,
+        requiresLos: true,
+        mpCost: 26, actionCost: 60,
+        basePower: 1.9,
+        element: 'arcane',
+        projectileColor: '#ffffff',
+        chargeTime: 55,
+        desc: 'The pinnacle of evocation: a single point of white-hot force that annihilates one target.',
+    },
+
+    // Spellblade (Runeblade)
+    sunder: {
+        extends: 'attack',
+        name: 'Sunder',
+        actionCost: 40,
+        basePower: 0.8,
+        buffs: [{ stat: 'def', value: -5, duration: 2 }],
+        desc: 'A rune-etched cut that splits armour: deals damage and lowers the target\'s DEF by 5 for 2 turns.',
+    },
+    draining_edge: {
+        extends: 'attack',
+        name: 'Draining Edge',
+        actionCost: 45,
+        basePower: 0.9,
+        drainFrac: 0.5,
+        desc: 'The rune on your blade drinks deep: heal yourself for half the damage dealt.',
+    },
+
+    // Runebow (Runecraft)
+    pinning_shot: {
+        extends: 'long_shot',
+        name: 'Pinning Shot',
+        range: 4,
+        basePower: 0.7,
+        applyStatus: 'slow', statusDuration: 2,
+        desc: 'An arrow aimed at the legs, pinning the target and slowing them for 2 turns.',
+    },
+    rune_arrow: {
+        name: 'Rune Arrow',
+        type: 'magic',
+        range: 5, aoe: 0, mpCost: 10, actionCost: 45,
+        targetType: 'enemy', basePower: 1.0, element: 'arcane',
+        animType: 'shot', projectileColor: '#aaccff', chargeTime: 0,
+        desc: 'A conjured arrow inscribed with a rune of force. Magic damage at long range.',
+    },
+    arrow_rain: {
+        extends: 'long_shot',
+        name: 'Arrow Rain',
+        range: 4, aoe: 1,
+        requiresLos: false,
+        actionCost: 50,
+        basePower: 0.65,
+        chargeTime: 25,
+        desc: 'Loose a volley high into the air that falls across an area.',
+    },
+
+    // Stoneshaper (Transmutation)
+    stone_fist: {
+        extends: 'attack',
+        name: 'Stone Fist',
+        actionCost: 45,
+        basePower: 1.35,
+        desc: 'Transmute your fist to granite mid-swing for a crushing blow.',
+    },
+    calcify: {
+        name: 'Calcify',
+        type: 'magic',
+        range: 2, aoe: 0, mpCost: 12, actionCost: 45,
+        targetType: 'enemy', basePower: 0.3, element: 'earth',
+        animType: 'cast', projectileColor: '#bbaa88', chargeTime: 0,
+        applyStatus: 'stun', statusDuration: 1,
+        desc: 'Turns the target\'s joints briefly to stone, stunning them.',
+    },
+
+    // Seer (Divination)
+    time_lapse: {
+        name: 'Time Lapse',
+        type: 'magic',
+        range: 4, aoe: 0, mpCost: 10, actionCost: 42,
+        targetType: 'enemy', basePower: 0, element: 'arcane',
+        animType: 'cast', projectileColor: '#ccddff', chargeTime: 0,
+        applyStatus: 'slow', statusDuration: 3,
+        desc: 'Thickens the flow of time around the target, slowing them for 3 turns.',
+    },
+
+    // Battlemage (Battle Arts)
+    spellbreaker: {
+        extends: 'attack',
+        name: 'Spellbreaker',
+        actionCost: 42,
+        basePower: 0.9,
+        applyStatus: 'silence', statusDuration: 2,
+        desc: 'A strike to the throat wrapped in anti-magic, silencing the target for 2 turns.',
+    },
+    blade_storm: {
+        extends: 'attack',
+        name: 'Blade Storm',
+        aoe: 1,
+        actionCost: 55,
+        basePower: 0.75,
+        desc: 'A whirling, spell-driven sweep that strikes the target and everything beside it.',
+    },
+
+    // Paladin (Holy Arts)
+    consecrate: {
+        name: 'Consecrate',
+        type: 'magic',
+        range: 2, aoe: 1, requiresLos: false, mpCost: 18, actionCost: 50,
+        targetType: 'enemy', basePower: 0.8, element: 'holy',
+        animType: 'cast', projectileColor: '#fff4bb', chargeTime: 30,
+        desc: 'Hallows the ground in a burst of light that sears every foe standing on it.',
+    },
+
+    // Riftcaller (Riftcraft)
+    gravity_well: {
+        extends: 'rift_bolt',
+        name: 'Gravity Well',
+        range: 4, aoe: 1,
+        requiresLos: false,
+        mpCost: 18, actionCost: 50,
+        basePower: 0.6,
+        projectileColor: '#3344aa',
+        chargeTime: 30,
+        applyStatus: 'slow', statusDuration: 2,
+        desc: 'Collapses a pocket of space into crushing weight, damaging and slowing everything inside.',
+    },
+
+    // Earthshaker (Geomancy)
+    landslide: {
+        extends: 'tremor',
+        name: 'Landslide',
+        range: 3, aoe: 2,
+        mpCost: 26, actionCost: 60,
+        basePower: 1.0,
+        chargeTime: 60,
+        applyStatus: null,
+        desc: 'Brings a hillside down on a wide area. Slow to call, devastating when it lands.',
+    },
+
+    // Sanctifier (Sanctity)
+    purify: {
+        extends: 'cure',
+        name: 'Purify',
+        range: 3, aoe: 1,
+        mpCost: 16, actionCost: 45,
+        projectileColor: '#ffffdd',
+        desc: 'A cleansing prayer that removes all afflictions from every ally in the area.',
+    },
+    holy_chains: {
+        extends: 'holy_bind',
+        name: 'Holy Chains',
+        aoe: 1,
+        mpCost: 22, actionCost: 50,
+        chargeTime: 40,
+        desc: 'Chains of light lash out across an area, binding every foe caught in them.',
+    },
+
+    // Spiritbinder (Spiritbinding)
+    soul_siphon: {
+        extends: 'spirit_lash',
+        name: 'Soul Siphon',
+        mpCost: 12,
+        basePower: 0.9,
+        applyStatus: null,
+        drainFrac: 0.5,
+        projectileColor: '#99aaee',
+        desc: 'A bound spirit tears a sliver of life from the target and carries it back to you.',
+    },
+
+    // Fatebinder (Fateweaving)
+    unravel: {
+        name: 'Unravel',
+        type: 'magic',
+        range: 3, aoe: 0, mpCost: 12, actionCost: 42,
+        targetType: 'enemy', basePower: 0, element: 'shadow',
+        animType: 'cast', projectileColor: '#dd66bb', chargeTime: 0,
+        isDispel: true,
+        desc: 'Pulls loose every thread of good fortune on the target, stripping its buffs and protective statuses.',
+    },
+    death_sentence: {
+        name: 'Death Sentence',
+        type: 'magic',
+        range: 3, aoe: 0, mpCost: 24, actionCost: 50,
+        targetType: 'enemy', basePower: 0, element: 'shadow',
+        animType: 'cast', projectileColor: '#660033', chargeTime: 30,
+        applyStatus: 'doom', statusDuration: 3,
+        desc: 'Seals the target\'s fate. When the count of 3 turns runs out they fall, unless the doom is cured first.',
+    },
+
+    // Lifeseer (Providence)
+    mass_foresight: {
+        extends: 'heal',
+        name: 'Mass Foresight',
+        aoe: 1,
+        mpCost: 24, actionCost: 50,
+        basePower: 0.8,
+        chargeTime: 30,
+        projectileColor: '#bbddff',
+        desc: 'Foresees the wounds of everyone nearby and mends them together.',
+    },
+
+    // =====================================================================
+    // --- Job ability expansion: reactions ---
+    // =====================================================================
+
+    premonition: {
+        extends: 'brace',
+        name: 'Premonition',
+        trigger: 'anyHit', chance: 0.5,
+        selfStatus: 'slipped',
+        desc: 'After being hit, may glimpse the next blow coming: the next physical attack against you misses.',
+    },
+    guardian_ward: {
+        extends: 'brace',
+        name: 'Guardian Ward',
+        trigger: 'allyHit', chance: 0.4,
+        selfStatus: null,
+        allyCast: 'ward',
+        desc: 'When an adjacent ally is hurt, may cast Ward on them (uses your MP).',
+    },
+    martyr: {
+        extends: 'brace',
+        name: 'Martyr',
+        trigger: 'allyHit', chance: 0.5,
+        selfStatus: null,
+        shareDamageFrac: 0.5,
+        desc: 'When an adjacent ally is hurt, may take half of that wound onto yourself (never below 1 HP).',
+    },
+    arcane_rebuke: {
+        extends: 'counter',
+        name: 'Arcane Rebuke',
+        chance: 0.45,
+        counterWith: 'arcane_strike',
+        desc: 'When struck in melee, may answer with an Arcane Strike that slows the attacker.',
+    },
+    phase_shift: {
+        extends: 'brace',
+        name: 'Phase Shift',
+        trigger: 'anyHit', chance: 0.4,
+        selfStatus: null,
+        phaseAway: 3,
+        desc: 'When hit, may slip through a rift and reappear up to 3 tiles away from the attacker.',
+    },
+    aftershock: {
+        extends: 'counter',
+        name: 'Aftershock',
+        counterWith: null,
+        attackerStatus: { status: 'slow', duration: 2 },
+        desc: 'When struck in melee, may send a tremor back through the attacker\'s feet, slowing them.',
+    },
+    purifying_light: {
+        extends: 'brace',
+        name: 'Purifying Light',
+        trigger: 'statusHit', chance: 0.6,
+        selfStatus: null,
+        cleanseSelf: true,
+        desc: 'When afflicted with a harmful status, may burn it away with holy light.',
+    },
+    spirit_hush: {
+        extends: 'brace',
+        name: 'Spirit Hush',
+        trigger: 'magicHit', chance: 0.4,
+        selfStatus: null,
+        attackerStatus: { status: 'silence', duration: 2 },
+        desc: 'When hit by magic, a guardian spirit may clamp a hand over the caster\'s mouth, silencing them.',
+    },
+    thorn_hide: {
+        extends: 'counter',
+        name: 'Thorn Hide',
+        chance: 1,
+        counterWith: null,
+        thornsFrac: 0.3,
+        desc: 'Bark and thorn cover your skin: melee attackers take 30% of the damage they deal.',
+    },
+    karmic_rebound: {
+        extends: 'brace',
+        name: 'Karmic Rebound',
+        trigger: 'anyHit', chance: 0.4,
+        selfStatus: null,
+        attackerStatus: { status: 'enfeebled', duration: 2 },
+        desc: 'Harm done to you may come back around: the attacker is enfeebled (ATK -5) for 2 turns.',
+    },
+    call_of_the_pack: {
+        extends: 'brace',
+        name: 'Call of the Pack',
+        trigger: 'lowHp', chance: 1, oncePerBattle: true,
+        selfStatus: null,
+        summon: { job: 'wolf', name: 'Wolf' },
+        desc: 'The first time you drop below 30% HP, a wolf answers your howl and appears beside you.',
+    },
+
+    // =====================================================================
+    // --- Job ability expansion: supports ---
+    // =====================================================================
+
+    jp_boost: {
+        extends: 'mana_surge',
+        name: 'JP Boost',
+        passiveMpCost: 0, dmgDealt: null,
+        jpMult: 1.5,
+        desc: 'Learn from every swing: earn 50% more JP from actions.',
+    },
+    rune_edge: {
+        extends: 'mana_surge',
+        name: 'Rune Edge',
+        passiveMpCost: 0, dmgDealt: null,
+        attackProc: { status: 'slow', chance: 0.35, duration: 1 },
+        desc: 'A binding rune on your weapon: physical hits have a 35% chance to slow the target.',
+    },
+    iron_will: {
+        extends: 'mana_surge',
+        name: 'Iron Will',
+        passiveMpCost: 0, dmgDealt: null,
+        statusImmune: ['stun', 'sleep', 'charm', 'berserk'],
+        desc: 'An unbreakable mind: immune to stun, sleep, charm and berserk.',
+    },
+    concentrate: {
+        extends: 'mana_surge',
+        name: 'Concentrate',
+        passiveMpCost: 0, dmgDealt: null,
+        ignoreEvasion: true,
+        desc: 'Breathe, aim, release: your physical attacks ignore the target\'s evasion.',
+    },
+    earthen_footing: {
+        extends: 'mana_surge',
+        name: 'Earthen Footing',
+        passiveMpCost: 0, dmgDealt: null,
+        highGroundMult: 1.5,
+        desc: 'The earth answers you: attacking from higher ground deals +50% (instead of +25%), and enemies above you get no height bonus.',
+    },
+    swiftcast: {
+        extends: 'mana_surge',
+        name: 'Swiftcast',
+        passiveMpCost: 0, dmgDealt: null,
+        chargeMult: 0.5,
+        desc: 'Skip ahead to the moment the spell completes: charge times are halved.',
+    },
+    arcane_weapon: {
+        extends: 'mana_surge',
+        name: 'Arcane Weapon',
+        passiveMpCost: 1, dmgDealt: null,
+        matToPhysical: 0.5,
+        desc: 'Sheathe your weapon in magic: half your MAT is added to ATK for physical damage. Drains 1 MP per turn.',
+    },
+    spell_pierce: {
+        extends: 'mana_surge',
+        name: 'Spell Pierce',
+        passiveMpCost: 1, dmgDealt: null,
+        mdfPierce: 0.5,
+        desc: 'Your spells arrive from just outside reality: they ignore half the target\'s MDF. Drains 1 MP per turn.',
+    },
+    seismic_power: {
+        extends: 'mana_surge',
+        name: 'Seismic Power',
+        passiveMpCost: 0, dmgDealt: null,
+        aoeDmgMult: 1.25,
+        desc: 'Every blow shakes the ground: area abilities deal +25% damage.',
+    },
+    benediction: {
+        extends: 'mana_surge',
+        name: 'Benediction',
+        passiveMpCost: 0, dmgDealt: null,
+        healMult: 1.3,
+        desc: 'Your prayers carry further grace: healing is 30% stronger.',
+    },
+    spirit_pact: {
+        extends: 'mana_surge',
+        name: 'Spirit Pact',
+        passiveMpCost: 0, dmgDealt: null,
+        summonBoost: 0.3,
+        desc: 'Creatures you summon are bound with your own strength: +30% HP, ATK and MAT.',
+    },
+    providence: {
+        extends: 'mana_surge',
+        name: 'Providence',
+        passiveMpCost: 0, dmgDealt: null,
+        surviveLethal: true,
+        desc: 'You have already seen this ending and refused it: once per battle, a killing blow leaves you at 1 HP.',
+    },
+    bloodlust: {
+        extends: 'mana_surge',
+        name: 'Bloodlust',
+        passiveMpCost: 0, dmgDealt: null,
+        lowHpDmgDealt: { physical: 1.3 },
+        desc: 'Wounds only make the beast angrier: +30% physical damage while below 50% HP.',
+    },
+
+    // =====================================================================
+    // --- Job ability expansion: movement ---
+    // =====================================================================
+
+    mana_stride: {
+        extends: 'move_plus_1',
+        name: 'Mana Stride',
+        moveBonus: 0,
+        onMove: { mpPct: 0.1 },
+        desc: 'Draw ambient mana from the ground you cross: restore 10% MP after moving.',
+    },
+    momentum: {
+        extends: 'move_plus_1',
+        name: 'Momentum',
+        moveBonus: 0,
+        momentumPct: 0.06,
+        desc: 'Every step builds power: +6% damage per tile moved this turn (up to +30%).',
+    },
+    sentinel_step: {
+        extends: 'move_plus_1',
+        name: 'Sentinel Step',
+        moveBonus: 0,
+        onMove: { alliesBuff: { stat: 'def', value: 4, duration: 1 } },
+        desc: 'Take up a guarding position: after moving, you and adjacent allies gain DEF +4 until your next turn.',
+    },
+    force_leap: {
+        extends: 'move_plus_1',
+        name: 'Force Leap',
+        moveBonus: 0, climbBonus: 3,
+        desc: 'A spell-propelled jump: climb 3 extra levels of elevation.',
+    },
+    hallowed_step: {
+        extends: 'move_plus_1',
+        name: 'Hallowed Step',
+        moveBonus: 0,
+        onMove: { alliesHealPct: 0.08 },
+        desc: 'Where you walk the ground is blessed: after moving, you and adjacent allies heal 8% of max HP.',
+    },
+    quake_step: {
+        extends: 'move_plus_1',
+        name: 'Quake Step',
+        moveBonus: 0,
+        onMove: { enemiesStatus: { status: 'slow', duration: 1 } },
+        desc: 'Stamp the earth as you arrive: adjacent enemies are slowed for a turn.',
+    },
+    pilgrim_step: {
+        extends: 'move_plus_1',
+        name: 'Pilgrim\'s Step',
+        moveBonus: 0,
+        onMove: { cleanse: true },
+        desc: 'Walking the path purifies the walker: moving removes your harmful statuses.',
+    },
+    ghost_step: {
+        extends: 'move_plus_1',
+        name: 'Ghost Step',
+        moveBonus: 1, passThroughUnits: true,
+        desc: 'Walk half in the spirit world: +1 movement and pass through other units.',
+    },
+    take_root: {
+        extends: 'move_plus_1',
+        name: 'Take Root',
+        moveBonus: 0,
+        rootedHealPct: 0.1,
+        desc: 'Stand your ground and draw strength from the soil: heal 10% of max HP at the end of any turn you don\'t move.',
+    },
+    omen_step: {
+        extends: 'move_plus_1',
+        name: 'Omen Step',
+        moveBonus: 0,
+        onMove: { enemiesCt: -15 },
+        desc: 'Your arrival is an ill omen: adjacent enemies lose 15 CT, delaying their next turn.',
+    },
+    restorative_step: {
+        extends: 'move_plus_1',
+        name: 'Restorative Step',
+        moveBonus: 0,
+        onMove: { hpPct: 0.08 },
+        desc: 'You walk where the wound will not be: heal 8% of max HP after moving.',
     },
 
     // --- Enemy abilities ---

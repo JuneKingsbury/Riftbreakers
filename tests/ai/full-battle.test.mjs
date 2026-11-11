@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { loadMapData } from '../../js/tactical/battle-map.js';
-import { MAP_DATA } from '../../js/tactical/data/maps.js';
+import { MAP_DATA } from '../../js/tactical/data/maps/index.js';
 import { TacticalBattle, STATES } from '../../js/tactical/battle.js';
 import { CHARACTER_DATA } from '../../js/tactical/data/characters.js';
 import { BATTLE_SCENARIOS } from '../../js/tactical/world-map-data.js';
@@ -50,18 +50,23 @@ test('a party member\'s ability list matches the unit BattleScene builds', () =>
     }
 });
 
-test('class and support-skill changes from the Party menu flow into the unit and its script', () => {
-    const party = players().map(c => ({ ...c, xp: { ...c.xp }, appearance: c.appearance ? { ...c.appearance } : null }));
+test('class and secondary-skillset changes from the Party menu flow into the unit and its script', () => {
+    const party = players().map(c => ({
+        ...c, jp: { ...c.jp }, learned: [...c.learned], loadout: { ...c.loadout },
+        appearance: c.appearance ? { ...c.appearance } : null,
+    }));
     const aldric = party.find(m => m.name === 'Aldric');
     aldric.job = 'evoker';                 // class change
-    aldric.xp.evoker = 400;                // enough job levels to unlock abilities
-    aldric.supportSkill = 'heal';          // cross-job slot
+    aldric.jp.evoker = 400;
+    aldric.learned.push('fire', 'heal');   // heal isn't in Warden's skillset: never usable
+    aldric.loadout.secondary = 'warden';   // Abjuration in Ability slot 2
     const map = loadMapData(MAP_DATA[0]);
     const unit = buildUnits({ party }, 'none', map.playerSpawns, map.enemySpawns).find(u => u.name === 'Aldric');
 
     assert.equal(unit.job, 'evoker');
     assert.deepEqual(abilitiesForMember(aldric), unit.abilities);
-    assert.ok(unit.abilities.includes('heal'), 'support skill is available to the script');
+    assert.deepEqual(unit.abilities, ['attack', 'fire', 'ward']);
+    assert.deepEqual(unit.skillsets.map(s => s.name), ['Evocation', 'Abjuration']);
     assert.deepEqual(unit.script, defaultScriptFor('evoker'), 'default script follows the new class');
 });
 
@@ -91,7 +96,7 @@ test('no two units ever share a tile at the end of a battle', () => {
     const { battle } = playBattle(MAP_DATA[0], Object.keys(BATTLE_SCENARIOS)[0]);
     const seen = new Set();
     for (const u of battle.livingUnits) {
-        const key = `${u.x},${u.y}`;
+        const key = `${u.x},${u.y},${u.z}`;
         assert.ok(!seen.has(key), `two units on ${key}`);
         seen.add(key);
     }

@@ -7,7 +7,7 @@
 // are scanned in order. A rule fires when its condition holds and its action is
 // feasible. A free action fires and scanning continues from the next rule (with
 // the unit at its new tile). An ending action fires and stops the scan.
-import { getTile } from '../battle-map.js';
+import { columnCells, settleZ, posKey, parseKey } from '../battle-map.js';
 import { ABILITIES } from '../data-registry.js';
 import { isConscious, isDead, faceToward } from '../units.js';
 import { estimateAbilityEffect } from './estimate.js';
@@ -21,15 +21,6 @@ const DEFAULT_TARGET = { side: 'enemy', pick: 'nearest' };
 // Charged spells land later on whoever is on the tile, so rate them lower.
 const CHARGE_PENALTY = 0.6;
 const KILL_BONUS = 1000;
-
-function elevationAt(map, x, y) {
-    return getTile(map, x, y)?.elevation ?? 0;
-}
-
-function parseKey(key) {
-    const [x, y] = key.split(',').map(Number);
-    return { x, y };
-}
 
 function passesFilter(f, cand, ctx) {
     switch (f.kind) {
@@ -147,7 +138,7 @@ function scoreAbility(key, choice, target, ctx) {
     const ab = ABILITIES[key];
     const { damage, healing } = estimateAbilityEffect(ctx.self, target, key, ctx.map);
     const amount = choice === 'best_heal' ? healing : damage;
-    const hits = Math.max(1, Q.unitsAffected(ctx.self, key, target.x, target.y, ctx.units).length);
+    const hits = Math.max(1, Q.unitsAffected(ctx.self, key, target, ctx.units, ctx.map).length);
     let score = amount * hits;
     if (choice === 'best_damage' && damage >= target.hp) score += KILL_BONUS;
     if (ab.chargeTime > 0) score *= CHARGE_PENALTY;
@@ -160,7 +151,7 @@ function planSummon(key, ctx) {
     const ab = ABILITIES[key];
     const foe = Q.nearest(ctx.self, Q.enemiesOf(ctx.self, ctx.units));
     if (!foe) return null;
-    const occupied = new Set(ctx.units.filter(u => !isDead(u)).map(u => `${u.x},${u.y}`));
+    const occupied = new Set(ctx.units.filter(u => !isDead(u)).map(posKey));
     const reach = ab.range ?? 2;
     let best = null;
     let bestDist = Infinity;
@@ -169,12 +160,14 @@ function planSummon(key, ctx) {
             if (Math.abs(dx) + Math.abs(dy) > reach || (dx === 0 && dy === 0)) continue;
             const x = ctx.self.x + dx;
             const y = ctx.self.y + dy;
-            if (occupied.has(`${x},${y}`) || !getTile(ctx.map, x, y)?.passable) continue;
-            const d = Math.abs(x - foe.x) + Math.abs(y - foe.y);
-            if (d < bestDist) { best = { x, y }; bestDist = d; }
+            for (const cell of columnCells(ctx.map, x, y)) {
+                if (!cell.passable || occupied.has(posKey(cell))) continue;
+                const d = Math.abs(x - foe.x) + Math.abs(y - foe.y) + Math.abs(cell.z - ctx.self.z) * 0.1;
+                if (d < bestDist) { best = cell; bestDist = d; }
+            }
         }
     }
-    return best && { kind: 'ability', ability: key, dest: null, x: best.x, y: best.y, target: null };
+    return best && { kind: 'ability', ability: key, dest: null, x: best.x, y: best.y, z: best.z, target: null };
 }
 
 // Plans { kind: 'ability', ... } or, when the target can't be reached this
@@ -206,7 +199,7 @@ function planAbility(action, target, ctx) {
     }
 
     if (best) {
-        return { kind: 'ability', ability: best.key, dest: best.dest, x: target.x, y: target.y, target };
+        return { kind: 'ability', ability: best.key, dest: best.dest, x: target.x, y: target.y, z: target.z, target };
     }
     if (approach && !ctx.hasMoved) return planMove({ mode: 'toward' }, target, ctx, true);
     return null;
@@ -217,7 +210,7 @@ function planMove(action, target, ctx, approach = false) {
     const mode = action.mode ?? 'toward';
     const here = ctx.self;
     const tiles = [...Q.reachableTiles(here, ctx.map, ctx.units)].map(parseKey);
-    const hereElev = elevationAt(ctx.map, here.x, here.y);
+    const hereElev = here.z ?? 0;
     let best = null;
     let bestScore = Infinity;
     let hereScore;
@@ -229,15 +222,15 @@ function planMove(action, target, ctx, approach = false) {
     if (mode === 'high_ground') {
         hereScore = -hereElev * 1000;
         for (const t of tiles) {
-            consider(t, -elevationAt(ctx.map, t.x, t.y) * 1000 + (target ? Q.distance(t, target) : Q.distance(t, here)));
+            consider(t, -t.z * 1000 + (target ? Q.distance(t, target) : Q.distance(t, here)));
         }
-        if (elevationAt(ctx.map, best?.x, best?.y) <= hereElev) return null;
+        if (!best || best.z <= hereElev) return null;
     } else {
         if (!target) return null;
         const wanted = action.range ?? 3;
         // Walking distance (not straight-line) so a pond or cliff in the way doesn't trap the unit.
-        const field = Q.walkCostField(ctx.map, target.x, target.y);
-        const walk = t => field.get(`${t.x},${t.y}`) ?? 1000 + Q.distance(t, target);
+        const field = Q.walkCostField(ctx.map, target);
+        const walk = t => field.get(posKey(t)) ?? 1000 + Q.distance(t, target);
         const score = {
             toward:     walk,
             away:       t => -walk(t),
@@ -249,7 +242,7 @@ function planMove(action, target, ctx, approach = false) {
         // Strictly better than staying put, otherwise the move would be a no-op.
         if (!best || bestScore / 1000 >= hereScore) return null;
     }
-    if (!best || (best.x === here.x && best.y === here.y)) return null;
+    if (!best || posKey(best) === posKey(here)) return null;
     return { kind: 'move', dest: best, approach };
 }
 
@@ -285,22 +278,23 @@ export function describeAction(action) {
     }
 }
 
-function withPosition(unit, x, y, facing) {
-    return { ...unit, x, y, facing };
+function withPosition(unit, x, y, z, facing) {
+    return { ...unit, x, y, z, facing };
 }
 
 // Runs a script for `unit` and returns the intent:
-//   { move: {x,y}|null, pivot: facing|null, act: ability|defend|wait|null, trace: [...] }
+//   { move: {x,y,z}|null, pivot: facing|null, act: ability|defend|wait|null, trace: [...] }
 // `units` is the list of non-dead units, `map` the battle map.
 export function runScript(script, unit, units, map) {
     const intent = { move: null, pivot: null, act: null, trace: [] };
+    settleZ(map, units);
     const rules = (script?.rules ?? []).slice(0, MAX_RULES);
 
     let self = unit;
     let list = units;
     let hasMoved = false;
-    const moveSelf = (x, y, facing) => {
-        self = withPosition(unit, x, y, facing);
+    const moveSelf = (x, y, z, facing) => {
+        self = withPosition(unit, x, y, z, facing);
         list = units.map(u => (u === unit ? self : u));
     };
 
@@ -322,9 +316,9 @@ export function runScript(script, unit, units, map) {
         };
 
         if (plan.kind === 'move') {
-            intent.move = { x: plan.dest.x, y: plan.dest.y };
+            intent.move = { x: plan.dest.x, y: plan.dest.y, z: plan.dest.z };
             hasMoved = true;
-            moveSelf(plan.dest.x, plan.dest.y, self.facing);
+            moveSelf(plan.dest.x, plan.dest.y, plan.dest.z, self.facing);
             intent.trace.push(entry);
             continue;
         }
@@ -338,11 +332,11 @@ export function runScript(script, unit, units, map) {
 
         if (plan.kind === 'ability') {
             if (plan.dest && !hasMoved) {
-                intent.move = { x: plan.dest.x, y: plan.dest.y };
+                intent.move = { x: plan.dest.x, y: plan.dest.y, z: plan.dest.z };
                 hasMoved = true;
             }
             intent.act = {
-                kind: 'ability', ability: plan.ability, x: plan.x, y: plan.y,
+                kind: 'ability', ability: plan.ability, x: plan.x, y: plan.y, z: plan.z,
                 targetId: plan.target?.id ?? null, targetName: plan.target?.name ?? null,
             };
         } else {

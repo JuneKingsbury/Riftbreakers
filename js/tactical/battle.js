@@ -1,8 +1,10 @@
-import { computeMoveRange, computeMovePath, computeAttackRange, computeAoeArea, computePatternArea, resolveAbility, ABILITIES } from './abilities.js';
+import { computeMoveRange, computeMovePath, computeAttackRange, computeAoeArea, computePatternArea, resolveAbility, ABILITIES, supportOf, inflictStatus, cleanseStatuses } from './abilities.js';
 import { viewState } from './view-state.js';
 import { isDead, isAlive, isConscious, isUnconscious, isStunned, faceToward, setFacing, createUnit } from './units.js';
-import { getTile, applyTerrainEffect } from './battle-map.js';
+import { getCell, applyTerrainEffect, settleZ, posKey, parseKey, cellKey } from './battle-map.js';
 import { moveEntity, moveEntityAlongPath } from '../systems/movement-lerp.js';
+import { tryReaction, tryAllyReactions } from './reactions.js';
+import { jpPerAction } from './loadout.js';
 
 export const STATES = {
     ADVANCE_CT:            'ADVANCE_CT',
@@ -22,6 +24,7 @@ export class TacticalBattle {
     constructor(map, units) {
         this.map   = map;
         this.units = units;
+        settleZ(map, units);
         // Milliseconds a unit takes per tile when walking. The scene lowers this at higher
         // playback speeds so movement keeps pace with the rest of the battle.
         this.moveMsPerStep = 180;
@@ -43,6 +46,125 @@ export class TacticalBattle {
         this._ctPreSpent = 0;
         // IDs of player-team summons that should be auto-controlled by the AI.
         this._pendingSummons = [];
+        // JP earned per action by party members: { memberName: { jobKey: jp } }.
+        this.jpEarned = {};
+    }
+
+    // Party members earn JP in their current job for every action they commit.
+    _awardJp(unit) {
+        if (!unit.jpEligible) return;
+        const byJob = this.jpEarned[unit.name] = this.jpEarned[unit.name] || {};
+        const jp = Math.round(jpPerAction(unit.jobLv ?? 1) * (supportOf(unit)?.jpMult ?? 1));
+        byJob[unit.job] = (byJob[unit.job] || 0) + jp;
+    }
+
+    // Charge time after the caster's support (Swiftcast halves it).
+    _chargeTime(unit, ab) {
+        return Math.round(ab.chargeTime * (supportOf(unit)?.chargeMult ?? 1));
+    }
+
+    _adjacent(unit, filter) {
+        return this.livingUnits.filter(u => u !== unit && isConscious(u) && filter(u)
+            && Math.abs(u.x - unit.x) + Math.abs(u.y - unit.y) === 1);
+    }
+
+    // Called after any unit finishes a move (player, script or enemy AI) with the
+    // path it walked. Applies the equipped Movement ability's after-move effects.
+    afterMove(unit, path) {
+        const tiles = path?.length ?? 0;
+        if (tiles === 0) return;
+        unit._movedThisTurn = true;
+        const mv = ABILITIES[unit.movement];
+        if (!mv) return;
+        if (mv.momentumPct) unit._momentumMult = 1 + Math.min(5, tiles) * mv.momentumPct;
+        const fx = mv.onMove;
+        if (!fx) return;
+        const heal = (u, pct) => {
+            const amt = Math.min(u.maxHp - u.hp, Math.max(1, Math.round(u.maxHp * pct)));
+            if (amt <= 0) return;
+            u.hp += amt;
+            this._spawnFloat(u, `+${amt}`, '#8f8');
+        };
+        if (fx.hpPct) heal(unit, fx.hpPct);
+        if (fx.mpPct) {
+            const amt = Math.min(unit.maxMp - unit.mp, Math.max(1, Math.round(unit.maxMp * fx.mpPct)));
+            if (amt > 0) { unit.mp += amt; this._spawnFloat(unit, `+${amt} MP`, '#88aaff'); }
+        }
+        if (fx.cleanse && cleanseStatuses(unit).length) this.logMsg(`${unit.name} walks off their afflictions.`);
+        const allies = [unit, ...this._adjacent(unit, u => u.team === unit.team)];
+        if (fx.alliesHealPct) for (const a of allies) heal(a, fx.alliesHealPct);
+        if (fx.alliesBuff) {
+            for (const a of allies) {
+                a.buffs = a.buffs || [];
+                a.buffs.push({ key: unit.movement, ...fx.alliesBuff });
+            }
+        }
+        const foes = this._adjacent(unit, u => u.team !== unit.team);
+        if (fx.enemiesStatus) {
+            for (const f of foes) {
+                if (inflictStatus(f, fx.enemiesStatus.status, fx.enemiesStatus.duration, unit)) {
+                    this.logMsg(`${f.name} is afflicted with ${fx.enemiesStatus.status}!`);
+                }
+            }
+        }
+        if (fx.enemiesCt) {
+            for (const f of foes) {
+                f.ct = Math.max(0, f.ct + fx.enemiesCt);
+                this._spawnFloat(f, `${fx.enemiesCt} CT`, '#cc88cc');
+            }
+        }
+        if (foes.length || fx.alliesHealPct || fx.alliesBuff) this.logMsg(`${unit.name}'s ${mv.name} takes effect.`);
+    }
+
+    // Log and float one resolved hit, then give the target a chance to react.
+    _applyResult(source, target, abKey, result, { isReaction = false } = {}) {
+        if (result.silenced) {
+            this.logMsg(`${source.name} is silenced and cannot cast!`);
+            return;
+        }
+        if (result.missed) {
+            this.logMsg(`${source.name} missed ${target.name}!`);
+            this._spawnFloat(target, 'Miss!', '#aaa');
+            return;
+        }
+        if (result.damage > 0) {
+            const highGround = (source.z ?? 0) > (target.z ?? 0);
+            const suffix = highGround ? ' (high gnd!)' : '';
+            this.logMsg(`${source.name} hits ${target.name} for ${result.damage} dmg${suffix}.`);
+            this._spawnFloat(target, `-${result.damage}`, '#f88');
+        }
+        if (result.healing > 0) {
+            this.logMsg(`${source.name} heals ${target.name} for ${result.healing} HP.`);
+            this._spawnFloat(target, `+${result.healing}`, '#8f8');
+        }
+        if (result.floatingText) this._spawnFloat(target, result.floatingText, '#ccf');
+        if (result.drained > 0) {
+            this.logMsg(`${source.name} drains ${result.drained} HP.`);
+            this._spawnFloat(source, `+${result.drained}`, '#8f8');
+        }
+        if (result.revived) {
+            this.logMsg(`${target.name} is revived!`);
+        }
+        if (result.providence) {
+            this.logMsg(`${target.name} refuses this fate and survives at 1 HP!`);
+            this._spawnFloat(target, 'Providence!', '#ffeeaa');
+        }
+        if (result.reraise) {
+            this.logMsg(`${target.name} is saved by Reraise!`);
+            this._spawnFloat(target, 'Reraise!', '#ffeeaa');
+        }
+        if (result.statusApplied) {
+            this.logMsg(`${target.name} is afflicted with ${result.statusApplied}!`);
+        }
+        if (result.killedInstantly) {
+            this.logMsg(`${target.name} is slain!`);
+        } else if (isUnconscious(target)) {
+            this.logMsg(`${target.name} is knocked unconscious!`);
+        }
+        if (!isReaction) {
+            tryReaction(this, target, source, abKey, result);
+            tryAllyReactions(this, target, source, abKey, result);
+        }
     }
 
     get livingUnits() {
@@ -80,6 +202,8 @@ export class TacticalBattle {
 
     startTurn(unit) {
         this.activeUnit = unit;
+        unit._movedThisTurn = false;
+        unit._momentumMult = null;
 
         // Remove defend status at the start of each turn
         unit.status = unit.status.filter(s => s !== 'defend');
@@ -105,14 +229,24 @@ export class TacticalBattle {
                 if (s === 'frog') {
                     unit.buffs = (unit.buffs || []).filter(b => !b.key.startsWith('frog_'));
                 }
+                // doom runs out: the unit falls
+                if (s === 'doom' && unit.hp > 0) {
+                    unit.hp = 0;
+                    if (!unit.status.includes('unconscious')) unit.status.push('unconscious');
+                    unit.deathTimer = 3;
+                    this.logMsg(`${unit.name}'s doom comes to pass!`);
+                    this._spawnFloat(unit, 'Doom', '#c06');
+                    this._checkVictory();
+                }
             }
         }
         unit.statusTimers = timers;
 
-        // regen_aura passive: heal 5 HP
-        if (unit.abilities.includes('regen_aura') && unit.mp > 0) {
-            unit.hp = Math.min(unit.maxHp, unit.hp + 5);
-            this.logMsg(`${unit.name} regenerates 5 HP from Regen Aura.`);
+        // Support start-of-turn healing (Regen Aura)
+        const regenHp = supportOf(unit)?.turnRegenHp;
+        if (regenHp && unit.hp > 0) {
+            unit.hp = Math.min(unit.maxHp, unit.hp + regenHp);
+            this.logMsg(`${unit.name} regenerates ${regenHp} HP from ${ABILITIES[unit.support].name}.`);
         }
 
         // regen status: heal ~8% max HP
@@ -170,7 +304,7 @@ export class TacticalBattle {
                 );
                 const tgt = foes[0];
                 this.logMsg(`${unit.name} is berserk and attacks ${tgt.name}!`);
-                this.applyEnemyAbility(unit, 'attack', tgt.x, tgt.y);
+                this.applyEnemyAbility(unit, 'attack', tgt.x, tgt.y, tgt.z);
             }
             this.endTurn(80);
             return;
@@ -212,9 +346,9 @@ export class TacticalBattle {
         this.abilityRotation = 0;
         this._lastHoverTile = null;
         if (ab.range === 0 && ab.targetType === 'self') {
-            this.abilityRange = new Set([`${this.activeUnit.x},${this.activeUnit.y}`]);
+            this.abilityRange = new Set([posKey(this.activeUnit)]);
         } else {
-            const fromTile = new Set([`${this.activeUnit.x},${this.activeUnit.y}`]);
+            const fromTile = new Set([posKey(this.activeUnit)]);
             const requiresLos = ab.requiresLos !== false;
             this.abilityRange = computeAttackRange(fromTile, ab.range, false, requiresLos, this.map);
         }
@@ -223,18 +357,46 @@ export class TacticalBattle {
         this.setState(STATES.SELECT_ABILITY_TARGET);
     }
 
+    // Which level of column (tx, ty) a click or hover means: tz when given, else the level
+    // in `keys` (a range set) nearest the active unit, else the column's standing cell.
+    _resolveZ(keys, tx, ty, tz) {
+        if (tz !== null && tz !== undefined) return tz;
+        const near = this.activeUnit?.z ?? 0;
+        let best = null;
+        for (const key of keys) {
+            const p = parseKey(key);
+            if (p.x !== tx || p.y !== ty) continue;
+            if (best === null || Math.abs(p.z - near) < Math.abs(best - near)) best = p.z;
+        }
+        return best ?? getCell(this.map, tx, ty)?.z ?? 0;
+    }
+
+    // Cells an ability centred on (tx, ty, tz) touches.
+    _affectedCells(ab, tx, ty, tz, rotation) {
+        const center = { x: tx, y: ty, z: tz };
+        if (ab.aoePattern) return computePatternArea(this.map, center, ab.aoePattern, rotation ?? 0);
+        if (ab.aoe > 0) return computeAoeArea(this.map, center, ab.aoe);
+        return new Set([posKey(center)]);
+    }
+
+    // Reshape the terrain of affected cells. Cells with someone standing on them are left
+    // alone so nobody ends up inside a raised block.
+    _applyTerrain(ab, affectedTiles) {
+        const occupied = new Set(this.units.filter(u => !isDead(u)).map(posKey));
+        for (const key of affectedTiles) {
+            if (ab.terrainEffect.raise && occupied.has(key)) continue;
+            const p = parseKey(key);
+            applyTerrainEffect(this.map, getCell(this.map, p.x, p.y, p.z), ab.terrainEffect);
+        }
+    }
+
     // Update AoE preview when hovering a target tile
-    hoverAbilityTarget(tx, ty) {
+    hoverAbilityTarget(tx, ty, tz = null) {
         if (this.state !== STATES.SELECT_ABILITY_TARGET) return;
         const ab = ABILITIES[this.selectedAbility];
-        this._lastHoverTile = { x: tx, y: ty };
-        if (ab?.aoePattern) {
-            this.aoePreview = computePatternArea(tx, ty, ab.aoePattern, this.abilityRotation);
-        } else if (ab?.aoe > 0) {
-            this.aoePreview = computeAoeArea(tx, ty, ab.aoe);
-        } else {
-            this.aoePreview = new Set([`${tx},${ty}`]);
-        }
+        tz = this._resolveZ(this.abilityRange, tx, ty, tz);
+        this._lastHoverTile = { x: tx, y: ty, z: tz };
+        this.aoePreview = ab ? this._affectedCells(ab, tx, ty, tz, this.abilityRotation) : new Set([cellKey(tx, ty, tz)]);
 
         // Tile-targeting abilities don't highlight character hits.
         if (ab?.targetType === 'tile') { this.hitPreview = new Set(); return; }
@@ -244,7 +406,7 @@ export class TacticalBattle {
         this.hitPreview = new Set();
         for (const key of this.aoePreview) {
             const hit = this.livingUnits.some(u => {
-                if (`${u.x},${u.y}` !== key) return false;
+                if (posKey(u) !== key) return false;
                 const sameTeam = u.team === source.team;
                 if (ab.targetType === 'ally'  && !sameTeam) return false;
                 if (ab.targetType === 'enemy' &&  sameTeam) return false;
@@ -260,24 +422,26 @@ export class TacticalBattle {
         if (!ab?.aoePattern) return;
         this.abilityRotation = (this.abilityRotation + 1) % 4;
         if (this._lastHoverTile) {
-            this.hoverAbilityTarget(this._lastHoverTile.x, this._lastHoverTile.y);
+            this.hoverAbilityTarget(this._lastHoverTile.x, this._lastHoverTile.y, this._lastHoverTile.z);
         }
     }
 
     // Player commits a move
-    commitMove(tx, ty) {
+    commitMove(tx, ty, tz = null) {
         if (this.state !== STATES.SELECT_MOVE) return false;
-        const key = `${tx},${ty}`;
+        tz = this._resolveZ(this.moveRange, tx, ty, tz);
+        const key = cellKey(tx, ty, tz);
         if (!this.moveRange.has(key)) return false;
         const unit = this.activeUnit;
-        const path = computeMovePath(unit, this.map, this.livingUnits, tx, ty);
+        const path = computeMovePath(unit, this.map, this.livingUnits, tx, ty, tz);
         faceToward(unit, tx, ty);
         if (path && path.length > 0) {
             moveEntityAlongPath(unit, path, this.moveMsPerStep);
         } else {
-            moveEntity(unit, tx, ty, this.moveMsPerStep);
+            moveEntity(unit, tx, ty, this.moveMsPerStep, tz);
         }
         this.logMsg(`${unit.name} moved to (${tx}, ${ty}).`);
+        this.afterMove(unit, path);
         // Pre-spend move CT so the bar drops immediately on move.
         const moveCost = 20;
         unit.ct = Math.max(0, unit.ct - moveCost);
@@ -289,13 +453,15 @@ export class TacticalBattle {
     }
 
     // Player commits an ability on a tile
-    commitAbility(tx, ty) {
+    commitAbility(tx, ty, tz = null) {
         if (this.state !== STATES.SELECT_ABILITY_TARGET) return false;
         const ab = ABILITIES[this.selectedAbility];
         if (!ab) return false;
-        if (!this.abilityRange.has(`${tx},${ty}`)) return false;
+        tz = this._resolveZ(this.abilityRange, tx, ty, tz);
+        if (!this.abilityRange.has(cellKey(tx, ty, tz))) return false;
 
         const source = this.activeUnit;
+        this._awardJp(source);
 
         if (ab.chargeTime && ab.chargeTime > 0) {
             source.mp = Math.max(0, source.mp - ab.mpCost);
@@ -309,8 +475,9 @@ export class TacticalBattle {
                 rotation: this.abilityRotation,
                 targetX: tx,
                 targetY: ty,
+                targetZ: tz,
                 ct: 0,
-                needed: ab.chargeTime,
+                needed: this._chargeTime(source, ab),
             };
             if (!source.status.includes('charging')) source.status.push('charging');
             this.logMsg(`${source.name} begins channeling ${ab.name}!`);
@@ -332,7 +499,7 @@ export class TacticalBattle {
 
         // Summon abilities: place a new creature on the target tile.
         if (ab.isSummon) {
-            this._resolveSummon(source, ab, tx, ty);
+            this._resolveSummon(source, ab, tx, ty, tz);
             this.selectedAbility = null;
             this.abilityRotation = 0;
             this.abilityRange = new Set();
@@ -342,20 +509,13 @@ export class TacticalBattle {
             return true;
         }
 
-        let affectedTiles;
-        if (ab.aoePattern) {
-            affectedTiles = computePatternArea(tx, ty, ab.aoePattern, this.abilityRotation);
-        } else if (ab.aoe > 0) {
-            affectedTiles = computeAoeArea(tx, ty, ab.aoe);
-        } else {
-            affectedTiles = new Set([`${tx},${ty}`]);
-        }
+        const affectedTiles = this._affectedCells(ab, tx, ty, tz, this.abilityRotation);
 
         const targets = this.livingUnits.filter(u => {
             const sameTeam = u.team === source.team;
             if (ab.targetType === 'ally' && !sameTeam) return false;
             if (ab.targetType === 'enemy' && sameTeam) return false;
-            return affectedTiles.has(`${u.x},${u.y}`);
+            return affectedTiles.has(posKey(u));
         });
 
         if (targets.length === 0 && !ab.isHeal && !ab.isCure && ab.targetType !== 'tile') {
@@ -364,46 +524,11 @@ export class TacticalBattle {
 
         for (const target of targets) {
             const result = resolveAbility(source, target, this.selectedAbility, this.map);
-            if (result.missed) {
-                this.logMsg(`${source.name} missed ${target.name}!`);
-                this._spawnFloat(target, 'Miss!', '#aaa');
-                continue;
-            }
-            if (result.damage > 0) {
-                const highGround = getTile(this.map, source.x, source.y)?.elevation > getTile(this.map, target.x, target.y)?.elevation;
-                const suffix = highGround ? ' (high gnd!)' : '';
-                this.logMsg(`${source.name} hits ${target.name} for ${result.damage} dmg${suffix}.`);
-                this._spawnFloat(target, `-${result.damage}`, '#f88');
-            }
-            if (result.healing > 0) {
-                this.logMsg(`${source.name} heals ${target.name} for ${result.healing} HP.`);
-                this._spawnFloat(target, `+${result.healing}`, '#8f8');
-            }
-            if (result.revived) {
-                this.logMsg(`${target.name} is revived!`);
-            }
-            if (result.reraise) {
-                this.logMsg(`${target.name} is saved by Reraise!`);
-                this._spawnFloat(target, 'Reraise!', '#ffeeaa');
-            }
-            if (result.statusApplied) {
-                this.logMsg(`${target.name} is afflicted with ${result.statusApplied}!`);
-            }
-            if (result.silenced) {
-                this.logMsg(`${source.name} is silenced and cannot cast!`);
-            }
-            if (result.killedInstantly) {
-                this.logMsg(`${target.name} is slain!`);
-            } else if (isUnconscious(target)) {
-                this.logMsg(`${target.name} is knocked unconscious!`);
-            }
+            this._applyResult(source, target, this.selectedAbility, result);
         }
 
         if (ab.terrainEffect) {
-            for (const key of affectedTiles) {
-                const [ax, ay] = key.split(',').map(Number);
-                applyTerrainEffect(this.map, ax, ay, ab.terrainEffect);
-            }
+            this._applyTerrain(ab, affectedTiles);
             this.logMsg(`${source.name} reshapes the terrain!`);
         }
 
@@ -425,6 +550,7 @@ export class TacticalBattle {
             if (unit._charging.ct < unit._charging.needed) continue;
 
             const { ability, rotation, targetX, targetY } = unit._charging;
+            const targetZ = unit._charging.targetZ ?? getCell(this.map, targetX, targetY)?.z ?? 0;
             const ab = ABILITIES[ability];
             unit.status = unit.status.filter(s => s !== 'charging');
             unit._charging = null;
@@ -433,63 +559,26 @@ export class TacticalBattle {
                 this.logMsg(`${unit.name}'s ${ab.name} fires!`);
 
                 if (ab.isSummon) {
-                    this._resolveSummon(unit, ab, targetX, targetY);
+                    this._resolveSummon(unit, ab, targetX, targetY, targetZ);
                     fired.push({ unit, targetX, targetY, ability });
                     continue;
                 }
 
-                let affectedTiles;
-                if (ab.aoePattern) {
-                    affectedTiles = computePatternArea(targetX, targetY, ab.aoePattern, rotation ?? 0);
-                } else if (ab.aoe > 0) {
-                    affectedTiles = computeAoeArea(targetX, targetY, ab.aoe);
-                } else {
-                    affectedTiles = new Set([`${targetX},${targetY}`]);
-                }
+                const affectedTiles = this._affectedCells(ab, targetX, targetY, targetZ, rotation);
                 const targets = this.livingUnits.filter(u => {
                     const sameTeam = u.team === unit.team;
                     if (ab.targetType === 'ally' && !sameTeam) return false;
                     if (ab.targetType === 'enemy' && sameTeam) return false;
-                    return affectedTiles.has(`${u.x},${u.y}`);
+                    return affectedTiles.has(posKey(u));
                 });
 
                 for (const target of targets) {
                     const result = resolveAbility(unit, target, ability, this.map);
-                    if (result.missed) {
-                        this.logMsg(`${unit.name} missed ${target.name}!`);
-                        this._spawnFloat(target, 'Miss!', '#aaa');
-                        continue;
-                    }
-                    if (result.damage > 0) {
-                        this.logMsg(`${unit.name} hits ${target.name} for ${result.damage} dmg.`);
-                        this._spawnFloat(target, `-${result.damage}`, '#f88');
-                    }
-                    if (result.healing > 0) {
-                        this.logMsg(`${unit.name} heals ${target.name} for ${result.healing} HP.`);
-                        this._spawnFloat(target, `+${result.healing}`, '#8f8');
-                    }
-                    if (result.revived) {
-                        this.logMsg(`${target.name} is revived!`);
-                    }
-                    if (result.reraise) {
-                        this.logMsg(`${target.name} is saved by Reraise!`);
-                        this._spawnFloat(target, 'Reraise!', '#ffeeaa');
-                    }
-                    if (result.statusApplied) {
-                        this.logMsg(`${target.name} is afflicted with ${result.statusApplied}!`);
-                    }
-                    if (result.killedInstantly) {
-                        this.logMsg(`${target.name} is slain!`);
-                    } else if (isUnconscious(target)) {
-                        this.logMsg(`${target.name} is knocked unconscious!`);
-                    }
+                    this._applyResult(unit, target, ability, result);
                 }
 
                 if (ab.terrainEffect) {
-                    for (const key of affectedTiles) {
-                        const [ax, ay] = key.split(',').map(Number);
-                        applyTerrainEffect(this.map, ax, ay, ab.terrainEffect);
-                    }
+                    this._applyTerrain(ab, affectedTiles);
                     this.logMsg(`${unit.name} reshapes the terrain!`);
                 }
             }
@@ -502,53 +591,38 @@ export class TacticalBattle {
     }
 
     // Apply an ability directly for enemy AI, bypassing the player-input state guards.
-    applyEnemyAbility(unit, abilityKey, tx, ty) {
+    // tz is the target's level; left out, the column's standing cell.
+    applyEnemyAbility(unit, abilityKey, tx, ty, tz = null) {
         const ab = ABILITIES[abilityKey];
         if (!ab || ab.passive) return;
+        if (tz === null || tz === undefined) tz = getCell(this.map, tx, ty)?.z ?? 0;
 
+        this._awardJp(unit);
         unit.mp = Math.max(0, unit.mp - ab.mpCost);
 
         if (ab.chargeTime && ab.chargeTime > 0) {
-            unit._charging = { ability: abilityKey, targetX: tx, targetY: ty, ct: 0, needed: ab.chargeTime };
+            unit._charging = { ability: abilityKey, targetX: tx, targetY: ty, targetZ: tz, ct: 0, needed: this._chargeTime(unit, ab) };
             if (!unit.status.includes('charging')) unit.status.push('charging');
             this.logMsg(`${unit.name} begins channeling ${ab.name}!`);
             return;
         }
 
         if (ab.isSummon) {
-            this._resolveSummon(unit, ab, tx, ty);
+            this._resolveSummon(unit, ab, tx, ty, tz);
             return;
         }
 
-        const affectedTiles = ab.aoe > 0 ? computeAoeArea(tx, ty, ab.aoe) : new Set([`${tx},${ty}`]);
+        const affectedTiles = ab.aoe > 0 ? computeAoeArea(this.map, { x: tx, y: ty, z: tz }, ab.aoe) : new Set([cellKey(tx, ty, tz)]);
         const targets = this.livingUnits.filter(u => {
             const sameTeam = u.team === unit.team;
             if (ab.targetType === 'ally' && !sameTeam) return false;
             if (ab.targetType === 'enemy' && sameTeam) return false;
-            return affectedTiles.has(`${u.x},${u.y}`);
+            return affectedTiles.has(posKey(u));
         });
 
         for (const target of targets) {
             const result = resolveAbility(unit, target, abilityKey, this.map);
-            if (result.missed) {
-                this.logMsg(`${unit.name} missed ${target.name}!`);
-                this._spawnFloat(target, 'Miss!', '#aaa');
-                continue;
-            }
-            if (result.damage > 0) {
-                this.logMsg(`${unit.name} hits ${target.name} for ${result.damage} dmg.`);
-                this._spawnFloat(target, `-${result.damage}`, '#f88');
-            }
-            if (result.healing > 0) {
-                this.logMsg(`${unit.name} heals ${target.name} for ${result.healing} HP.`);
-                this._spawnFloat(target, `+${result.healing}`, '#8f8');
-            }
-            if (result.revived) this.logMsg(`${target.name} is revived!`);
-            if (result.killedInstantly) {
-                this.logMsg(`${target.name} is slain!`);
-            } else if (isUnconscious(target)) {
-                this.logMsg(`${target.name} is knocked unconscious!`);
-            }
+            this._applyResult(unit, target, abilityKey, result);
         }
 
         this._checkVictory();
@@ -580,12 +654,20 @@ export class TacticalBattle {
             this.activeUnit.ct -= remaining;
             if (this.activeUnit.ct < 0) this.activeUnit.ct = 0;
 
-            // Passive MP drain
-            for (const key of this.activeUnit.abilities) {
-                const ab = ABILITIES[key];
-                if (ab && ab.passive && ab.passiveMpCost > 0) {
-                    this.activeUnit.mp = Math.max(0, this.activeUnit.mp - ab.passiveMpCost);
-                }
+            // Equipped support ability MP drain
+            const support = ABILITIES[this.activeUnit.support];
+            if (support?.passiveMpCost > 0) {
+                this.activeUnit.mp = Math.max(0, this.activeUnit.mp - support.passiveMpCost);
+            }
+
+            // Take Root: heal at the end of a turn spent standing still
+            const rooted = ABILITIES[this.activeUnit.movement]?.rootedHealPct;
+            const u = this.activeUnit;
+            if (rooted && !u._movedThisTurn && isConscious(u) && u.hp < u.maxHp) {
+                const amt = Math.min(u.maxHp - u.hp, Math.max(1, Math.round(u.maxHp * rooted)));
+                u.hp += amt;
+                this.logMsg(`${u.name} draws ${amt} HP from the soil.`);
+                this._spawnFloat(u, `+${amt}`, '#8f8');
             }
         }
         this.activeUnit = null;
@@ -613,17 +695,23 @@ export class TacticalBattle {
         }
     }
 
-    // Spawn a summoned creature on (tx, ty) for the given source unit's team.
+    // Spawn a summoned creature on (tx, ty, tz) for the given source unit's team.
     // Returns the new unit, or null if the tile was occupied or impassable.
-    _resolveSummon(source, ab, tx, ty) {
-        const occupied = this.units.some(u => !isDead(u) && u.x === tx && u.y === ty);
-        const tile = getTile(this.map, tx, ty);
+    _resolveSummon(source, ab, tx, ty, tz = null) {
+        const tile = getCell(this.map, tx, ty, tz);
+        const occupied = tile && this.units.some(u => !isDead(u) && posKey(u) === posKey(tile));
         if (occupied || !tile || !tile.passable) {
             this.logMsg(`${source.name}'s summon fizzles — no space!`);
             return null;
         }
 
-        const summon = createUnit(ab.summonName, ab.summonJob, source.team, tx, ty, { ct: 0 });
+        const summon = createUnit(ab.summonName, ab.summonJob, source.team, tx, ty, { ct: 0, z: tile.z });
+        // Spirit Pact: the summoner's support strengthens the creature.
+        const boost = supportOf(source)?.summonBoost;
+        if (boost) {
+            for (const k of ['maxHp', 'atk', 'mat']) summon[k] = Math.round(summon[k] * (1 + boost));
+            summon.hp = summon.maxHp;
+        }
         faceToward(summon, source.x, source.y);
         this.units.push(summon);
         this.logMsg(`${source.name} summons a ${ab.summonName}!`);

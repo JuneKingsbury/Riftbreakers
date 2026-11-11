@@ -25,13 +25,14 @@ const MS_PER_STEP = 180;
 function doMove(unit, dest, battle) {
     const stepMs = battle.moveMsPerStep ?? MS_PER_STEP;
     faceToward(unit, dest.x, dest.y);
-    const path = computeMovePath(unit, battle.map, battle.livingUnits, dest.x, dest.y);
+    const path = computeMovePath(unit, battle.map, battle.livingUnits, dest.x, dest.y, dest.z);
     if (path && path.length > 0) {
         moveEntityAlongPath(unit, path, stepMs);
     } else {
-        moveEntity(unit, dest.x, dest.y, stepMs);
+        moveEntity(unit, dest.x, dest.y, stepMs, dest.z ?? unit.z);
     }
     battle.logMsg(`${unit.name} moves to (${unit.x}, ${unit.y}).`);
+    battle.afterMove?.(unit, path);
 }
 
 // Executes an intent from runScript. onAbility(source, tx, ty, key) may play an
@@ -56,7 +57,7 @@ export function executeIntent(unit, intent, battle, onAbility) {
         if (valid) {
             faceToward(unit, act.x, act.y);
             if (onAbility && !(ab.chargeTime > 0)) animMs = onAbility(unit, act.x, act.y, act.ability) || 0;
-            battle.applyEnemyAbility(unit, act.ability, act.x, act.y);
+            battle.applyEnemyAbility(unit, act.ability, act.x, act.y, act.z);
             unit._lastTargetId = act.targetId;
             cost = Math.max(COST_ACTION_MIN, ab.actionCost ?? COST_ACTION_DEFAULT);
         } else {

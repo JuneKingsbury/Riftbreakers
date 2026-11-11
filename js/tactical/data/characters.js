@@ -6,13 +6,14 @@
 //   team       'player'|'enemy'
 //   x, y       number   Starting tile position
 //   ct         number   Starting charge-time offset (staggers initiative)
-//   xp         object   Map of job key → XP earned, e.g. { novice: 120, evoker: 340 }.
-//                       Drives job levels, ability unlocking, and prerequisite checks.
-//                       Omit a job key (or leave its XP at 0) to treat it as level 1.
+//   jp         object   Map of job key → total JP earned, e.g. { novice: 250, evoker: 100 }.
+//                       Drives job levels and prerequisite checks; never decreases.
+//   jpSpent    object   Map of job key → JP spent learning that job's abilities.
+//   learned    string[] Ability keys learned with JP (in any job).
+//   loadout    object   { secondary, reaction, support, movement } — see loadout.js.
+//                       The current job's skillset is always the first ability slot.
 //   statMods   object   Per-stat overrides applied on top of the job's base stats
 //   extraAbilities string[] Additional abilities beyond what the job provides
-//   supportSkill   string|null  Cross-job skill slot: one unlocked ability from any other job
-//   supportPassive string|null  Cross-job passive slot: one unlocked passive from any other job
 //   appearance object   Optional visual description for sprite compositing:
 //     race         'human'|'nymph'|'ferin'|'kobalos'|'bufos'
 //     bodyVariant  number  1-based index, wraps to available count
@@ -34,9 +35,10 @@ export const CHARACTER_DATA = [
         team: 'player',
         x: 3, y: 8,
         ct: 40,
-        xp: { novice: 120, warden: 60 },
-        supportSkill: null,
-        supportPassive: null,
+        jp: { novice: 250, warden: 100 },
+        jpSpent: {},
+        learned: ['ward'],
+        loadout: { secondary: null, reaction: null, support: null, movement: null },
         appearance: {
             race: 'human', bodyVariant: 1, hairVariant: 1, shirtVariant: 1,
             nameColor: '#4488ff',
@@ -49,9 +51,10 @@ export const CHARACTER_DATA = [
         team: 'player',
         x: 2, y: 6,
         ct: 10,
-        xp: { novice: 120, evoker: 60 },
-        supportSkill: null,
-        supportPassive: null,
+        jp: { novice: 250, evoker: 100 },
+        jpSpent: {},
+        learned: ['fire'],
+        loadout: { secondary: null, reaction: null, support: null, movement: null },
         appearance: {
             race: 'human', bodyVariant: 2, hairVariant: 3, shirtVariant: 2,
             nameColor: '#cc44ff',
@@ -64,9 +67,10 @@ export const CHARACTER_DATA = [
         team: 'player',
         x: 3, y: 11,
         ct: 55,
-        xp: { novice: 120, runebow: 60 },
-        supportSkill: null,
-        supportPassive: null,
+        jp: { novice: 250, runebow: 100 },
+        jpSpent: {},
+        learned: ['long_shot'],
+        loadout: { secondary: null, reaction: null, support: null, movement: null },
         appearance: {
             race: 'human', bodyVariant: 1, hairVariant: 2, shirtVariant: 1,
             nameColor: '#44cc66',
@@ -79,9 +83,10 @@ export const CHARACTER_DATA = [
         team: 'player',
         x: 2, y: 9,
         ct: 25,
-        xp: { novice: 120, spellblade: 60 },
-        supportSkill: null,
-        supportPassive: null,
+        jp: { novice: 250, spellblade: 100 },
+        jpSpent: {},
+        learned: ['hex'],
+        loadout: { secondary: null, reaction: null, support: null, movement: null },
         appearance: {
             race: 'human', bodyVariant: 2, hairVariant: 4, shirtVariant: 2,
             nameColor: '#ffcc44',
@@ -95,9 +100,10 @@ export const CHARACTER_DATA = [
         team: 'player',
         x: 2, y: 3,
         ct: 35,
-        xp: { novice: 120, seer: 60 },
-        supportSkill: null,
-        supportPassive: null,
+        jp: { novice: 250, seer: 100 },
+        jpSpent: {},
+        learned: ['temporal_slip'],
+        loadout: { secondary: null, reaction: null, support: null, movement: null },
         appearance: {
             race: 'human', bodyVariant: 2, hairVariant: 1, shirtVariant: 2,
             nameColor: '#44ccdd',
@@ -110,9 +116,10 @@ export const CHARACTER_DATA = [
         team: 'player',
         x: 3, y: 3,
         ct: 5,
-        xp: { novice: 120, stoneshaper: 60 },
-        supportSkill: null,
-        supportPassive: null,
+        jp: { novice: 250, stoneshaper: 100 },
+        jpSpent: {},
+        learned: ['rock_toss'],
+        loadout: { secondary: null, reaction: null, support: null, movement: null },
         appearance: {
             race: 'human', bodyVariant: 1, hairVariant: 4, shirtVariant: 1,
             nameColor: '#cc8844',

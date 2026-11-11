@@ -1,7 +1,7 @@
 import { computeMoveRange, computeMovePath, computeAoeArea, ABILITIES } from './abilities.js';
 import { isDead, isConscious, isUnconscious, faceToward } from './units.js';
 import { moveEntity, moveEntityAlongPath } from '../systems/movement-lerp.js';
-import { hasLineOfSight, getTile } from './battle-map.js';
+import { hasLineOfSight, columnCells, posKey, parseKey } from './battle-map.js';
 
 // ─── Internal helpers ────────────────────────────────────────────────────────
 
@@ -46,11 +46,8 @@ function attackAngleDot(fx, fy, target) {
 }
 
 // Score bonus for firing from elevated tiles, penalty from low ground.
-function elevationBonus(fx, fy, tx, ty, map) {
-    const from = getTile(map, fx, fy);
-    const to   = getTile(map, tx, ty);
-    if (!from || !to) return 0;
-    const diff = (from.elevation ?? 0) - (to.elevation ?? 0);
+function elevationBonus(from, to) {
+    const diff = (from.z ?? 0) - (to.z ?? 0);
     return diff > 0 ? 0.25 : (diff < 0 ? -0.10 : 0);
 }
 
@@ -68,10 +65,10 @@ function safetyPenalty(fx, fy, unit, living) {
 }
 
 // Count how many opponents are inside the AoE centered on the target tile.
-function countAoeHits(ab, targetX, targetY, opponents) {
+function countAoeHits(ab, target, opponents, map) {
     if (!ab.aoe) return 1;
-    const area = computeAoeArea(targetX, targetY, ab.aoe);
-    return Math.max(1, opponents.filter(o => isConscious(o) && area.has(`${o.x},${o.y}`)).length);
+    const area = computeAoeArea(map, target, ab.aoe);
+    return Math.max(1, opponents.filter(o => isConscious(o) && area.has(posKey(o))).length);
 }
 
 // ─── Fire-tile enumeration ────────────────────────────────────────────────────
@@ -83,31 +80,32 @@ function getFireTiles(unit, abilityKey, moveRange, battle, targetUnit) {
     if (!ab) return [];
 
     // Self-targeted abilities are always cast from current position.
-    if (ab.targetType === 'self') return [{ x: unit.x, y: unit.y }];
+    if (ab.targetType === 'self') return [{ x: unit.x, y: unit.y, z: unit.z }];
 
     const requiresLos   = ab.requiresLos !== false;
     const range         = ab.range;
     const isAllyTarget  = ab.targetType === 'ally';
-    const allFromTiles  = [`${unit.x},${unit.y}`, ...moveRange];
+    const allFromTiles  = [posKey(unit), ...moveRange];
     const fireTiles     = [];
 
     for (const key of allFromTiles) {
-        const [fx, fy] = key.split(',').map(Number);
-        const dist = Math.abs(fx - targetUnit.x) + Math.abs(fy - targetUnit.y);
+        const from = parseKey(key);
+        const dist = Math.abs(from.x - targetUnit.x) + Math.abs(from.y - targetUnit.y);
         if (dist > range) continue;
         // Enemy-targeting abilities can't fire from the target's own tile.
         if (!isAllyTarget && dist === 0) continue;
-        if (requiresLos && !hasLineOfSight(battle.map, fx, fy, targetUnit.x, targetUnit.y)) continue;
-        fireTiles.push({ x: fx, y: fy });
+        if (requiresLos && !hasLineOfSight(battle.map, from, targetUnit)) continue;
+        fireTiles.push(from);
     }
     return fireTiles;
 }
 
 // ─── Action scoring ───────────────────────────────────────────────────────────
 
-// Returns a numeric score for executing abilityKey on targetUnit from fire tile (fx, fy).
+// Returns a numeric score for executing abilityKey on targetUnit from fire tile `from` ({x,y,z}).
 // Higher is better. Returns -Infinity for illegal/useless actions.
-function scoreAction(unit, abilityKey, targetUnit, fx, fy, battle, opponents) {
+function scoreAction(unit, abilityKey, targetUnit, from, battle, opponents) {
+    const fx = from.x, fy = from.y;
     const ab = ABILITIES[abilityKey];
     if (!ab) return -Infinity;
 
@@ -163,7 +161,7 @@ function scoreAction(unit, abilityKey, targetUnit, fx, fy, battle, opponents) {
     if (hpRatio < 0.35) score *= 1.4;
 
     // AoE clustering: score scales with number of opponents hit.
-    const hits = countAoeHits(ab, targetUnit.x, targetUnit.y, opponents);
+    const hits = countAoeHits(ab, targetUnit, opponents, battle.map);
     if (hits > 1) score *= (0.7 + 0.3 * hits); // 2 = ×1.3, 3 = ×1.6, 4 = ×1.9
 
     // Healer / support priority: eliminating the enemy healer is critical.
@@ -205,7 +203,7 @@ function scoreAction(unit, abilityKey, targetUnit, fx, fy, battle, opponents) {
     score *= (1 + Math.max(-0.15, angleBonus));
 
     // High-ground bonus / low-ground penalty.
-    score *= (1 + elevationBonus(fx, fy, targetUnit.x, targetUnit.y, battle.map));
+    score *= (1 + elevationBonus(from, targetUnit));
 
     // Safety: penalise exposing a ranged unit to melee.
     score *= (1 - Math.min(0.5, safetyPenalty(fx, fy, unit, battle.livingUnits)));
@@ -276,7 +274,7 @@ export function runEnemyTurn(unit, battle, onAbility) {
             const allyCount = living.filter(u => u.team === unit.team && isConscious(u)).length;
             if (allyCount >= opponents.length + 2) continue; // already have enough allies
 
-            const occupied = new Set(living.filter(u => !isDead(u)).map(u => `${u.x},${u.y}`));
+            const occupied = new Set(living.filter(u => !isDead(u)).map(posKey));
             const summonRange = ab.range ?? 2;
             let bestTile = null;
             let bestDist = Infinity;
@@ -291,11 +289,12 @@ export function runEnemyTurn(unit, battle, onAbility) {
                     if (Math.abs(dx) + Math.abs(dy) > summonRange) continue;
                     const sx = unit.x + dx, sy = unit.y + dy;
                     if (sx === unit.x && sy === unit.y) continue;
-                    if (occupied.has(`${sx},${sy}`)) continue;
-                    const tile = getTile(battle.map, sx, sy);
-                    if (!tile || !tile.passable) continue;
-                    const distToEnemy = Math.abs(sx - primary.x) + Math.abs(sy - primary.y);
-                    if (distToEnemy < bestDist) { bestDist = distToEnemy; bestTile = { x: sx, y: sy }; }
+                    for (const tile of columnCells(battle.map, sx, sy)) {
+                        if (!tile.passable || occupied.has(posKey(tile))) continue;
+                        const distToEnemy = Math.abs(sx - primary.x) + Math.abs(sy - primary.y)
+                            + Math.abs(tile.z - unit.z) * 0.1;
+                        if (distToEnemy < bestDist) { bestDist = distToEnemy; bestTile = { x: sx, y: sy, z: tile.z }; }
+                    }
                 }
             }
             if (!bestTile) continue;
@@ -305,7 +304,7 @@ export function runEnemyTurn(unit, battle, onAbility) {
                 bestScore    = score;
                 bestAbKey    = abilityKey;
                 bestTarget   = null;
-                bestFireTile = { x: unit.x, y: unit.y }; // caster doesn't need to move
+                bestFireTile = { x: unit.x, y: unit.y, z: unit.z }; // caster doesn't need to move
                 bestSummonTile = bestTile;
             }
             continue;
@@ -327,11 +326,7 @@ export function runEnemyTurn(unit, battle, onAbility) {
         for (const targetUnit of candidateTargets) {
             const fireTiles = getFireTiles(unit, abilityKey, moveRange, battle, targetUnit);
             for (const fireTile of fireTiles) {
-                const score = scoreAction(
-                    unit, abilityKey, targetUnit,
-                    fireTile.x, fireTile.y,
-                    battle, opponents
-                );
+                const score = scoreAction(unit, abilityKey, targetUnit, fireTile, battle, opponents);
                 if (score > bestScore) {
                     bestScore    = score;
                     bestAbKey    = abilityKey;
@@ -355,46 +350,48 @@ export function runEnemyTurn(unit, battle, onAbility) {
 
         let closestDist = Infinity;
         for (const key of moveRange) {
-            const [mx, my] = key.split(',').map(Number);
-            const d = Math.abs(mx - primary.x) + Math.abs(my - primary.y);
-            if (d < closestDist) { closestDist = d; moveDest = { x: mx, y: my }; }
+            const m = parseKey(key);
+            const d = Math.abs(m.x - primary.x) + Math.abs(m.y - primary.y);
+            if (d < closestDist) { closestDist = d; moveDest = m; }
         }
-        if (!moveDest) moveDest = { x: unit.x, y: unit.y };
+        if (!moveDest) moveDest = { x: unit.x, y: unit.y, z: unit.z };
     }
 
     // ── Execute movement ─────────────────────────────────────────────────────
-    const originX = unit.x, originY = unit.y;
-    const willMove = moveDest.x !== unit.x || moveDest.y !== unit.y;
+    const originKey = posKey(unit);
+    const willMove = posKey(moveDest) !== originKey;
 
     if (willMove) {
         faceToward(unit, moveDest.x, moveDest.y);
-        const path = computeMovePath(unit, battle.map, battle.livingUnits, moveDest.x, moveDest.y);
+        const path = computeMovePath(unit, battle.map, battle.livingUnits, moveDest.x, moveDest.y, moveDest.z);
         if (path && path.length > 0) {
             moveEntityAlongPath(unit, path, battle.moveMsPerStep ?? 180);
         } else {
-            moveEntity(unit, moveDest.x, moveDest.y, battle.moveMsPerStep ?? 180);
+            moveEntity(unit, moveDest.x, moveDest.y, battle.moveMsPerStep ?? 180, moveDest.z);
         }
         battle.logMsg(`${unit.name} moves to (${unit.x}, ${unit.y}).`);
+        battle.afterMove?.(unit, path);
     }
 
     // ── Execute action ───────────────────────────────────────────────────────
-    const didMove = unit.x !== originX || unit.y !== originY;
+    const didMove = posKey(unit) !== originKey;
     let animMs = 0;
     let didAct = false;
 
     if (bestAbKey && ABILITIES[bestAbKey]?.isSummon && bestSummonTile) {
         if (onAbility) animMs = onAbility(unit, bestSummonTile.x, bestSummonTile.y, bestAbKey) || 0;
-        battle.applyEnemyAbility(unit, bestAbKey, bestSummonTile.x, bestSummonTile.y);
+        battle.applyEnemyAbility(unit, bestAbKey, bestSummonTile.x, bestSummonTile.y, bestSummonTile.z);
         didAct = true;
     } else if (bestAbKey && bestTarget) {
         const ab          = ABILITIES[bestAbKey];
         const isSelf      = ab.targetType === 'self';
         const isAllyAb    = ab.isHeal || ab.isCure;
-        const tgtX        = isSelf ? unit.x : bestTarget.x;
-        const tgtY        = isSelf ? unit.y : bestTarget.y;
+        const tgt         = isSelf ? unit : bestTarget;
+        const tgtX        = tgt.x;
+        const tgtY        = tgt.y;
         const dist        = Math.abs(unit.x - tgtX) + Math.abs(unit.y - tgtY);
         const requiresLos = ab.requiresLos !== false;
-        const losOk       = !requiresLos || hasLineOfSight(battle.map, unit.x, unit.y, tgtX, tgtY);
+        const losOk       = !requiresLos || hasLineOfSight(battle.map, unit, tgt);
 
         // Allow dist=0 for ally/self targeting (healing self, earth_skin, etc.).
         const distOk = (isSelf || isAllyAb) ? (dist <= ab.range) : (dist > 0 && dist <= ab.range);
@@ -402,7 +399,7 @@ export function runEnemyTurn(unit, battle, onAbility) {
 
         if (canAct) {
             if (onAbility) animMs = onAbility(unit, tgtX, tgtY, bestAbKey) || 0;
-            battle.applyEnemyAbility(unit, bestAbKey, tgtX, tgtY);
+            battle.applyEnemyAbility(unit, bestAbKey, tgtX, tgtY, tgt.z);
             didAct = true;
         } else {
             battle.logMsg(`${unit.name} waits.`);

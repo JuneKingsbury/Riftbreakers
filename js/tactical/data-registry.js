@@ -36,66 +36,38 @@ export function isPlayerJob(jobKey) {
     return !!JOB_DATA[jobKey]?.desc;
 }
 
-// XP required to reach each level. Index = level, so XP_THRESHOLDS[2] is the
-// XP needed for level 2. Level 1 is the starting level (0 XP required).
-export const XP_THRESHOLDS = [0, 0, 100, 250, 500, 900, 1400, 2100, 3000];
+// Total JP that must be earned in a job to reach each level. Index = level, so
+// JP_THRESHOLDS[2] is the JP needed for level 2. Level 1 is the starting level.
+// Spending JP on abilities never lowers a job's level.
+export const JP_THRESHOLDS = [0, 0, 200, 400, 700, 1100, 1600, 2200, 3000];
 
 // Returns the level (1-based) a character has reached in a given job.
-export function jobLevel(xpMap, jobKey) {
-    const xp = (xpMap || {})[jobKey] || 0;
+// jpMap: { jobKey: totalJpEarned }.
+export function jobLevel(jpMap, jobKey) {
+    const jp = (jpMap || {})[jobKey] || 0;
     let level = 1;
-    for (let l = XP_THRESHOLDS.length - 1; l >= 2; l--) {
-        if (xp >= XP_THRESHOLDS[l]) { level = l; break; }
+    for (let l = JP_THRESHOLDS.length - 1; l >= 2; l--) {
+        if (jp >= JP_THRESHOLDS[l]) { level = l; break; }
     }
     return level;
 }
 
-// Returns true if the character's xpMap satisfies all prerequisites for jobKey.
-export function meetsPrerequisites(xpMap, jobKey) {
+// Returns true if the character's jpMap satisfies all prerequisites for jobKey.
+export function meetsPrerequisites(jpMap, jobKey) {
     const prereqs = JOB_DATA[jobKey]?.prerequisites;
     if (!prereqs || prereqs.length === 0) return true;
-    return prereqs.every(p => jobLevel(xpMap, p.job) >= p.level);
-}
-
-// Returns the subset of a job's abilities that are unlocked at the character's current job level.
-// Uses JOB_DATA (raw) so abilityLevels is never lost to inheritance resolution.
-export function unlockedAbilities(jobKey, xpMap) {
-    const job = JOB_DATA[jobKey];
-    if (!job) return [];
-    const lv = jobLevel(xpMap, jobKey);
-    const levels = job.abilityLevels || {};
-    return (job.abilities || []).filter(k => (levels[k] ?? 1) <= lv);
+    return prereqs.every(p => jobLevel(jpMap, p.job) >= p.level);
 }
 
 // Returns a merged stat-bonus object for every job the character has mastered (Lv.8).
 // Keys are stat names; values are the summed bonuses across all mastered jobs.
-export function masteryStatBonus(xpMap) {
+export function masteryStatBonus(jpMap) {
     const result = {};
     for (const [jobKey, jobDef] of Object.entries(JOB_DATA)) {
         if (!jobDef.masteryBonus) continue;
-        if (jobLevel(xpMap, jobKey) < 8) continue;
+        if (jobLevel(jpMap, jobKey) < 8) continue;
         for (const [stat, val] of Object.entries(jobDef.masteryBonus)) {
             result[stat] = (result[stat] || 0) + val;
-        }
-    }
-    return result;
-}
-
-// Returns all ability keys the character has unlocked in jobs OTHER than currentJob.
-// Used to populate the cross-job skill slot picker.
-export function crossJobUnlockedAbilities(xpMap, currentJob) {
-    const currentJobAbilities = new Set(JOB_DATA[currentJob]?.abilities || []);
-    const result = [];
-    for (const jobKey of Object.keys(JOB_DATA)) {
-        if (jobKey === currentJob) continue;
-        // Only player jobs the character has actually experienced.
-        if (!xpMap[jobKey] || xpMap[jobKey] <= 0) continue;
-        const abilities = unlockedAbilities(jobKey, xpMap);
-        for (const abilityKey of abilities) {
-            if (abilityKey === 'attack') continue;
-            // Skip abilities that are already part of the current job's kit.
-            if (currentJobAbilities.has(abilityKey)) continue;
-            if (!result.includes(abilityKey)) result.push(abilityKey);
         }
     }
     return result;
@@ -130,10 +102,10 @@ export function allowedEquipTypes(jobKey, slot) {
 }
 
 // Returns a human-readable string of unmet prerequisites, e.g. "Evoker Lv.3, Warden Lv.3".
-export function missingPrerequisites(xpMap, jobKey) {
+export function missingPrerequisites(jpMap, jobKey) {
     const prereqs = JOB_DATA[jobKey]?.prerequisites || [];
     return prereqs
-        .filter(p => jobLevel(xpMap, p.job) < p.level)
+        .filter(p => jobLevel(jpMap, p.job) < p.level)
         .map(p => {
             const label = p.job.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
             return `${label} Lv.${p.level}`;

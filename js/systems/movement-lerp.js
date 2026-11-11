@@ -4,14 +4,15 @@ import { setFacing, facingForStep } from '../tactical/units.js';
 
 const MS_PER_STEP = 240;
 
-// Move entity logically to newX/newY immediately; visual lerps one step at a time.
-export function moveEntity(entity, newX, newY, durationMs) {
-    if (entity.x === newX && entity.y === newY) return;
-    moveEntityAlongPath(entity, [{ x: newX, y: newY }], durationMs || MS_PER_STEP);
+// Move entity logically to newX/newY/newZ immediately; visual lerps one step at a time.
+// newZ is the elevation of the destination cell (see battle-map.js).
+export function moveEntity(entity, newX, newY, durationMs, newZ = entity.z) {
+    if (entity.x === newX && entity.y === newY && entity.z === newZ) return;
+    moveEntityAlongPath(entity, [{ x: newX, y: newY, z: newZ }], durationMs || MS_PER_STEP);
 }
 
-// path: [{x,y},...] ordered steps not including current position, ending at destination.
-// Game logic: entity.x/y set to destination immediately.
+// path: [{x,y,z},...] ordered steps not including current position, ending at destination.
+// Game logic: entity.x/y/z set to destination immediately.
 // Visual: lerps through each step sequentially at msPerStep ms each.
 export function moveEntityAlongPath(entity, path, msPerStep) {
     if (!path || path.length === 0) return;
@@ -28,17 +29,21 @@ export function moveEntityAlongPath(entity, path, msPerStep) {
 
     vs.prevX = entity.x;
     vs.prevY = entity.y;
+    vs.prevZ = entity.z;
 
     entity.x = dest.x;
     entity.y = dest.y;
+    entity.z = dest.z;
 
     if (path.length === 1) {
         vs.vizX = dest.x;
         vs.vizY = dest.y;
+        vs.vizZ = dest.z;
         vs.moveQueue = [];
     } else {
         vs.vizX = path[0].x;
         vs.vizY = path[0].y;
+        vs.vizZ = path[0].z;
         vs.moveQueue = path.slice(1);
     }
 
@@ -47,17 +52,20 @@ export function moveEntityAlongPath(entity, path, msPerStep) {
     vs.msPerStep     = msPerStep;
 }
 
-export function teleportEntity(entity, newX, newY) {
+export function teleportEntity(entity, newX, newY, newZ = entity.z) {
     const vs = viewState(entity);
     vs.prevX = null;
     vs.prevY = null;
+    vs.prevZ = null;
     vs.moveStartTime = 0;
     vs.moveDuration  = 0;
     vs.vizX = newX;
     vs.vizY = newY;
+    vs.vizZ = newZ;
     vs.moveQueue = [];
     entity.x = newX;
     entity.y = newY;
+    entity.z = newZ;
 }
 
 const _pos = { x: 0, y: 0 };
@@ -77,9 +85,11 @@ export function getEntityRenderPos(entity, now) {
         if (queue && queue.length > 0) {
             vs.prevX = vs.vizX;
             vs.prevY = vs.vizY;
+            vs.prevZ = vs.vizZ;
             const next = queue.shift();
             vs.vizX = next.x;
             vs.vizY = next.y;
+            vs.vizZ = next.z;
             vs.moveStartTime = now;
             _pos.x = vs.prevX;
             _pos.y = vs.prevY;

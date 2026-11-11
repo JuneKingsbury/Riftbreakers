@@ -3,7 +3,6 @@
 // without randomness or side effects. It deliberately ignores the long tail
 // (passives like divine_ward, reflect, reraise), so treat it as a ranking
 // heuristic and never as a promise of the exact damage dealt.
-import { getTile } from '../battle-map.js';
 import { ABILITIES } from '../data-registry.js';
 import { getEffectiveStat, directionEvasionMod } from '../abilities.js';
 
@@ -18,9 +17,7 @@ export function estimateAbilityEffect(source, target, abilityKey, map) {
     }
     if (ab.targetType === 'self') return { damage: 0, healing: 0 };
 
-    const srcTile = getTile(map, source.x, source.y);
-    const tgtTile = getTile(map, target.x, target.y);
-    const highGround = (srcTile && tgtTile && srcTile.elevation > tgtTile.elevation) ? 1.25 : 1.0;
+    const highGround = (source.z ?? 0) > (target.z ?? 0) ? 1.25 : 1.0;
     const defMult = target.status.includes('defend') ? 1.5 : 1.0;
 
     let raw;

@@ -6,6 +6,19 @@ function esc(text) {
     return String(text).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 }
 
+// Hotkey label for each skillset command, in menu order.
+export const SKILLSET_KEYS = ['S', 'X'];
+
+// The unit's action commands. Party members carry their loadout's skillsets;
+// anyone else (e.g. a charmed enemy) gets one list of every usable skill.
+export function unitSkillsets(unit) {
+    const sets = unit.skillsets ?? [{
+        name: 'Skills',
+        abilities: unit.abilities.filter(k => k !== 'attack' && ABILITIES[k] && !ABILITIES[k].passive),
+    }];
+    return sets.filter(s => s.abilities.length > 0);
+}
+
 const SPEEDS = [1, 2, 4];
 
 export class BattleUI {
@@ -17,7 +30,7 @@ export class BattleUI {
         this._fullAuto = !!opts.fullAuto;
         this._onPlayback = null;
         this._onAction    = null;
-        this._skillMenuOpen = false;
+        this._openSkillset = null;   // index into unitSkillsets(unit), or null
         this._sidebarRosterKey = null;
 
         // Mount everything inside a full-screen overlay that sits on top of the
@@ -209,18 +222,6 @@ export class BattleUI {
             lines.push(`<span style="color:#aaa;">${ab.desc}</span>`);
         }
 
-        // Passive effect summary
-        const PASSIVE_EFFECTS = {
-            mana_surge:  '<span style="color:#c8a0ff;">Effect: +15% magic damage dealt while MP > 0</span>',
-            regen_aura:  '<span style="color:#8f8;">Effect: Heal 5 HP at the start of each turn while MP > 0</span>',
-            farsight:    '<span style="color:#aaddff;">Effect: +20% evasion vs physical attacks while MP > 0</span>',
-            divine_ward: '<span style="color:#ffeeaa;">Effect: -20% incoming physical damage while MP > 0</span>',
-            seers_vigil: '<span style="color:#aaddff;">Effect: +15% evasion vs physical; -10% incoming magic damage while MP > 0</span>',
-            wyrd_drain:  '<span style="color:#cc44aa;">Effect: Slows inflicted by this unit last 1 extra turn (via SPD debuff)</span>',
-        };
-        if (ab.passive && abilityKey && PASSIVE_EFFECTS[abilityKey]) {
-            lines.push(PASSIVE_EFFECTS[abilityKey]);
-        }
 
         const stats = [];
         if (ab.range > 0)    stats.push(`Range: <b>${ab.range}</b>`);
@@ -522,16 +523,16 @@ export class BattleUI {
         panel.innerHTML = html;
     }
 
-    closeSkillMenu() {
-        this._skillMenuOpen = false;
-    }
+    get _skillMenuOpen() { return this._openSkillset !== null; }
+    openSkillMenu(idx = 0) { this._openSkillset = idx; }
+    closeSkillMenu() { this._openSkillset = null; }
 
     _updateActionMenu(battle) {
         const menu = this._actionMenu;
         const unit = battle.activeUnit;
         if (battle.state !== STATES.PLAYER_TURN || !unit || this._fullAuto) {
             menu.style.display = 'none';
-            this._skillMenuOpen = false;
+            this._openSkillset = null;
             return;
         }
         menu.style.display = 'block';
@@ -539,12 +540,14 @@ export class BattleUI {
         const BASE = 'display:block;width:100%;padding:5px 8px;margin-bottom:3px;background:#151528;border:1px solid #447;color:#ccc;font-family:inherit;font-size:12px;cursor:pointer;text-align:left;border-radius:3px;';
         const DISABLED = 'opacity:0.4;cursor:not-allowed;';
 
-        const skillAbs = unit.abilities.filter(k => k !== 'attack' && ABILITIES[k] && !ABILITIES[k].passive);
+        const skillsets = unitSkillsets(unit);
         const { hasMoved, hasActed, autoUnits } = this._turnFlags || {};
 
-        if (this._skillMenuOpen) {
+        if (this._skillMenuOpen && skillsets[this._openSkillset]) {
+            const skillset = skillsets[this._openSkillset];
+            const skillAbs = skillset.abilities;
             let html = `<div style="color:#c8a0ff;font-size:11px;font-weight:bold;margin-bottom:5px;padding-bottom:4px;border-bottom:1px solid #335;">`;
-            html += `<span class="tac-back" style="cursor:pointer;color:#888;margin-right:6px;">&lt; Back</span>Skills</div>`;
+            html += `<span class="tac-back" style="cursor:pointer;color:#888;margin-right:6px;">&lt; Back</span>${esc(skillset.name)}</div>`;
 
             if (skillAbs.length === 0) {
                 html += `<div style="font-size:11px;color:#666;padding:4px 0;">No skills available.</div>`;
@@ -559,13 +562,12 @@ export class BattleUI {
                 html += `<button class="tac-btn" data-action="ability" data-key="${k}" style="${BASE}${dis}"><span style="color:#888;font-size:10px;">[${i + 1}] </span>${ab.name}${mp}${rng}${ct}</button>`;
             });
 
-            // Show passive abilities as non-clickable info
-            const passiveAbs = unit.abilities.filter(k => ABILITIES[k]?.passive);
-            if (passiveAbs.length > 0) {
+            // Equipped reaction / support / movement as non-clickable info
+            const slotted = ['reaction', 'support', 'movement'].filter(slot => ABILITIES[unit[slot]]);
+            if (slotted.length > 0) {
                 html += `<div style="font-size:10px;color:#666;margin-top:4px;padding-top:4px;border-top:1px solid #223;">`;
-                for (const k of passiveAbs) {
-                    const ab = ABILITIES[k];
-                    html += `<div style="padding:2px 0;">${ab.name} <span style="color:#555;">(passive)</span></div>`;
+                for (const slot of slotted) {
+                    html += `<div style="padding:2px 0;">${ABILITIES[unit[slot]].name} <span style="color:#555;">(${slot})</span></div>`;
                 }
                 html += `</div>`;
             }
@@ -574,7 +576,7 @@ export class BattleUI {
 
             menu.innerHTML = html;
             menu.querySelectorAll('.tac-back, .tac-back-btn').forEach(el => {
-                el.addEventListener('mousedown', e => { e.stopPropagation(); this._skillMenuOpen = false; });
+                el.addEventListener('mousedown', e => { e.stopPropagation(); this.closeSkillMenu(); });
             });
         } else {
             const isAuto = autoUnits?.has(unit.id);
@@ -587,11 +589,11 @@ export class BattleUI {
                 html += `<button class="tac-btn" data-action="ability" data-key="attack" style="${BASE}${hasActed ? DISABLED : ''}">[A] Attack</button>`;
             }
 
-            if (skillAbs.length > 0) {
-                const anyAffordable = skillAbs.some(k => unit.mp >= ABILITIES[k].mpCost);
+            skillsets.forEach((set, i) => {
+                const anyAffordable = set.abilities.some(k => unit.mp >= ABILITIES[k].mpCost);
                 const dis = (!anyAffordable || hasActed) ? DISABLED : '';
-                html += `<button class="tac-btn" data-action="skills" style="${BASE}${dis}">[S] Skills ></button>`;
-            }
+                html += `<button class="tac-btn" data-action="skills" data-skillset="${i}" style="${BASE}${dis}">[${SKILLSET_KEYS[i]}] ${esc(set.name)} ></button>`;
+            });
 
             html += `<button class="tac-btn" data-action="defend" style="${BASE.replace('#151528','#0a1a2a')};color:#7bf;border-color:#36a;${hasActed ? DISABLED : ''}">[D] Defend</button>`;
 
@@ -619,7 +621,7 @@ export class BattleUI {
                 this._hideTooltip();
                 if (btn.style.cursor === 'not-allowed') return;
                 const action = btn.dataset.action;
-                if (action === 'skills') { this._skillMenuOpen = true; return; }
+                if (action === 'skills') { this.openSkillMenu(Number(btn.dataset.skillset) || 0); return; }
                 if (this._onAction) this._onAction(action, btn.dataset.key);
             });
 
@@ -680,10 +682,14 @@ export class BattleUI {
         const rewards = flags?.rewards;
 
         let rewardHtml = '';
-        if (won && rewards) {
+        const jpEntries = Object.entries(rewards?.jpGained || {}).filter(([, v]) => v > 0);
+        if (rewards && (won || jpEntries.length)) {
             rewardHtml += `<div style="margin-top:10px;border-top:1px solid #335;padding-top:8px;text-align:left;min-width:200px;">`;
-            if (rewards.xpGained > 0) {
-                rewardHtml += `<div style="color:#aaffaa;font-size:12px;">+${rewards.xpGained} XP (all members)</div>`;
+            for (const [name, jp] of jpEntries) {
+                rewardHtml += `<div style="color:#aaffaa;font-size:12px;">${esc(name)}: +${jp} JP</div>`;
+            }
+            if (rewards.jpBonus > 0) {
+                rewardHtml += `<div style="color:#668866;font-size:10px;">(includes +${rewards.jpBonus} victory bonus each)</div>`;
             }
             if (rewards.goldGained > 0) {
                 rewardHtml += `<div style="color:#ffdd88;font-size:12px;">+${rewards.goldGained} gold</div>`;
