@@ -121,10 +121,10 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // --- New Game → world map ---
+    // --- Runs ---
     const gameEl = document.createElement('div');
     gameEl.id = 'game-container';
-    // position:fixed keeps it fullscreen. startWorldMap overwrites position to
+    // position:fixed keeps it fullscreen. Starting a run overwrites position to
     // 'relative', so we also set explicit width/height so the canvas children
     // that use width:100%/height:100% always resolve to the viewport size.
     gameEl.style.cssText = `position:fixed;inset:0;width:${window.innerWidth}px;height:${window.innerHeight}px;background:#000;z-index:100;display:none;`;
@@ -134,17 +134,36 @@ document.addEventListener('DOMContentLoaded', () => {
         gameEl.style.height = window.innerHeight + 'px';
     });
 
-    document.getElementById('demo-battle')?.addEventListener('click', () => {
-        import('../tactical/demo.js').then(({ startWorldMap }) => {
-            startScreen.style.display = 'none';
-            gameEl.style.display = 'block';
+    const continueBtn = document.getElementById('continue-run');
+    const showGame = () => {
+        startScreen.style.display = 'none';
+        gameEl.style.display = 'block';
+    };
+    const backToTitle = () => {
+        gameEl.style.display = 'none';
+        gameEl.innerHTML = '';
+        startScreen.style.display = '';
+        refreshContinue();
+    };
+    const refreshContinue = () => {
+        import('../run/start.js').then(({ hasSavedRun }) => { continueBtn.disabled = !hasSavedRun(); });
+    };
+    refreshContinue();
+
+    document.getElementById('new-run')?.addEventListener('click', () => {
+        import('../run/start.js').then(({ newRun }) => {
+            newRun(gameEl, skinManager, { onStart: showGame, onExit: backToTitle });
+        });
+    });
+    continueBtn?.addEventListener('click', () => {
+        import('../run/start.js').then(({ continueRun }) => {
+            showGame();
             requestAnimationFrame(() => {
-                startWorldMap(gameEl, skinManager, () => {
-                    gameEl.style.display = 'none';
-                    gameEl.innerHTML = '';
-                    startScreen.style.display = '';
-                });
+                if (!continueRun(gameEl, skinManager, backToTitle)) backToTitle();
             });
         });
+    });
+    document.getElementById('start-unlocks')?.addEventListener('click', () => {
+        import('../run/start.js').then(({ showUnlocks }) => showUnlocks());
     });
 });

@@ -1,13 +1,12 @@
 import { loadMapData, posKey } from './battle-map.js';
 import { MAP_DATA } from './data/maps/index.js';
-import { createUnitFromCharData, faceToward } from './units.js';
 import { viewState } from './view-state.js';
 import { BattleView3D, showViewError } from './battle-view3d.js';
 import { STATES } from './battle.js';
 import { CHARACTER_DATA } from './data/characters.js';
-import { BATTLE_SCENARIOS } from './world-map-data.js';
-import { equipmentStatBonuses } from './data/equipment.js';
-import { WorldMapUI } from './world-map-ui.js';
+import { buildUnits, encounterEnemies } from './build-units.js';
+import { Modal } from '../run/ui-kit.js';
+import { PartyMenu } from '../run/party-menu.js';
 
 // Minimal battle-like object the renderer can consume without running the CT engine.
 class DeployPreview {
@@ -32,52 +31,6 @@ class DeployPreview {
     }
 }
 
-function buildPreviewUnits(worldMap, scenarioId, playerSpawns, enemySpawns) {
-    const partyData  = worldMap?.party ?? CHARACTER_DATA.filter(c => c.team === 'player');
-    const scenario   = BATTLE_SCENARIOS[scenarioId];
-    const rosterDefs = scenario?.roster;
-    const enemyData  = rosterDefs
-        ? rosterDefs.map(r => ({
-            name: r.name, job: r.job, team: 'enemy',
-            x: 20, y: 8, ct: r.ct ?? 0,
-            level: r.level ?? scenario.enemyLevel ?? 1,
-            statMods: r.statMods ?? {},
-            extraAbilities: r.extraAbilities ?? [],
-            appearance: r.appearance ?? null,
-        }))
-        : CHARACTER_DATA.filter(c => c.team === 'enemy');
-
-    const units = [...partyData, ...enemyData].map(charData => {
-        const equipBonuses = equipmentStatBonuses(charData.appearance);
-        const mergedMods   = { ...(charData.statMods || {}) };
-        for (const [k, v] of Object.entries(equipBonuses)) {
-            mergedMods[k] = (mergedMods[k] || 0) + v;
-        }
-        let spawnX = charData.x, spawnY = charData.y, spawnZ = null;
-        if (charData.team === 'player') {
-            const idx = partyData.indexOf(charData);
-            const sp  = playerSpawns?.[idx];
-            if (sp) { spawnX = sp.x; spawnY = sp.y; spawnZ = sp.z ?? null; }
-        } else {
-            const idx = enemyData.indexOf(charData);
-            const sp  = enemySpawns?.[idx];
-            if (sp) { spawnX = sp.x; spawnY = sp.y; spawnZ = sp.z ?? null; }
-        }
-        const unit = createUnitFromCharData({ ...charData, statMods: mergedMods, x: spawnX, y: spawnY });
-        unit.z = spawnZ;
-        return unit;
-    });
-
-    const players  = units.filter(u => u.team === 'player');
-    const enemies  = units.filter(u => u.team === 'enemy');
-    const avg      = (arr, key) => arr.reduce((s, u) => s + u[key], 0) / (arr.length || 1);
-    const enemyCx  = avg(enemies, 'x'), enemyCy = avg(enemies, 'y');
-    const playerCx = avg(players, 'x'), playerCy = avg(players, 'y');
-    players.forEach(u => faceToward(u, enemyCx, enemyCy));
-    enemies.forEach(u => faceToward(u, playerCx, playerCy));
-    return units;
-}
-
 const BTN = `
     display:block; width:100%; padding:6px 10px; margin-bottom:5px;
     background:#151528; border:1px solid #447; color:#ccc;
@@ -86,9 +39,11 @@ const BTN = `
 `;
 
 export class DeployScene {
-    constructor(scenarioId, worldMap, skinManager, sceneManager, onLaunch) {
-        this._scenarioId  = scenarioId;
-        this._worldMap    = worldMap;
+    // encounter: the fight (see run/data/encounters.js), or null for the default enemies.
+    // run: the RunState whose party deploys, or null (harnesses use the default party).
+    constructor(encounter, run, skinManager, sceneManager, onLaunch) {
+        this._encounter   = encounter;
+        this._run         = run;
         this._skinManager = skinManager;
         this._sm          = sceneManager;
         this._onLaunch    = onLaunch;  // (mapDef, customPlayerSpawns) => void
@@ -114,12 +69,20 @@ export class DeployScene {
         this._sm         = sceneManager;
         this._stopped    = false;
 
-        this._mapDef = MAP_DATA[Math.floor(Math.random() * MAP_DATA.length)];
+        // The encounter keeps the map it was first shown on, so backing out of
+        // deployment doesn't reroll the battlefield.
+        const enc = this._encounter;
+        this._mapDef = MAP_DATA.find(m => m.id === (enc?.map ?? enc?.mapId))
+            ?? MAP_DATA[Math.floor(Math.random() * MAP_DATA.length)];
+        if (enc && !enc.map) {
+            enc.mapId = this._mapDef.id;
+            this._run?.save();
+        }
         const map    = loadMapData(this._mapDef);
 
         this._playerSpawns = map.playerSpawns.map(s => ({ ...s }));
 
-        const units = buildPreviewUnits(this._worldMap, this._scenarioId, this._playerSpawns, map.enemySpawns);
+        const units = this._buildPreviewUnits(map);
         this._preview = new DeployPreview(map, units);
 
         containerEl.innerHTML = '';
@@ -194,8 +157,8 @@ export class DeployScene {
     _rebuildOverlay() {
         const el = this._overlay;
         if (!el) return;
-        const party    = this._worldMap?.party ?? CHARACTER_DATA.filter(c => c.team === 'player');
-        const scenario = BATTLE_SCENARIOS[this._scenarioId];
+        const party    = this._party();
+        const roster   = this._encounter?.roster ?? encounterEnemies(null);
 
         let html = `
             <div style="color:#ffcc44;font-weight:bold;font-size:14px;margin-bottom:2px;">Deploy Party</div>
@@ -205,10 +168,10 @@ export class DeployScene {
         `;
 
         // Enemy summary
-        if (scenario?.roster?.length) {
+        if (roster.length) {
             html += `<div style="color:#fc8;font-size:10px;text-transform:uppercase;margin-bottom:5px;">Enemy Forces</div>`;
             const counts = {};
-            for (const r of scenario.roster) {
+            for (const r of roster) {
                 const label = (r.name || r.job || '?').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
                 counts[label] = (counts[label] || 0) + 1;
             }
@@ -245,12 +208,12 @@ export class DeployScene {
                         </div>
                         <div style="font-size:10px;color:#666;">${jobLabel}</div>
                     </div>
-                    <button class="deploy-edit-btn" data-idx="${i}"
+                    ${this._run ? `<button class="deploy-edit-btn" data-idx="${i}"
                             style="padding:3px 7px;font-family:inherit;font-size:10px;
                                    background:#0d1220;border:1px solid #447;color:#9cf;
                                    cursor:pointer;border-radius:3px;flex-shrink:0;white-space:nowrap;">
                         Edit
-                    </button>
+                    </button>` : ''}
                 </div>`;
         }
 
@@ -330,54 +293,37 @@ export class DeployScene {
 
     // ---- Party member editor -------------------------------------------------
 
-    _openMemberEditor(idx) {
-        const wm = this._worldMap;
-        if (!wm) return;
-        const member = wm.party[idx];
-        if (!member) return;
-
-        // Clean up any previous editor.
-        if (this._editorUI) { this._editorUI.destroy(); this._editorUI = null; }
-
-        const ui = new WorldMapUI(document.body);
-        this._editorUI = ui;
-        ui.setActionHandler(() => {});
-
-        // Hide the sidebar — we only want the modal for party editing.
-        if (ui._sidebar) ui._sidebar.style.display = 'none';
-
-        // Show party list first, then drill into this member.
-        ui.showParty(wm, this._skinManager);
-        ui._showPartyMember(member, wm, this._skinManager);
-
-        // When the player presses "‹ Back to Party" inside the member editor,
-        // go back to the party list. Closing the party list exits the editor.
-        ui._modalBackFn = () => {
-            ui.showParty(wm, this._skinManager);
-            // Override: closing the party list should exit the editor entirely.
-            ui._modalBackFn = () => this._closeEditor();
-        };
-
-        // Intercept the close button on the party list level.
-        const origBack = ui._modalBack.bind(ui);
-        ui._modalBack = () => {
-            if (!ui._modalDismissible) return;
-            if (ui._modalBackFn) {
-                const fn = ui._modalBackFn;
-                ui._modalBackFn = null;
-                fn();
-            } else {
-                this._closeEditor();
-            }
-        };
+    _party() {
+        return this._run?.party ?? CHARACTER_DATA.filter(c => c.team === 'player');
     }
 
-    _closeEditor() {
+    _buildPreviewUnits(map) {
+        return buildUnits({ party: this._run?.party, encounter: this._encounter, relics: this._run?.relics },
+            this._playerSpawns, map.enemySpawns);
+    }
+
+    _openMemberEditor(idx) {
+        const run = this._run;
+        const member = run?.party[idx];
+        if (!member) return;
+        this._closeEditor(false);
+        const modal = new Modal(300);
+        this._editorUI = modal;
+        const menu = new PartyMenu(modal, run, this._skinManager, {
+            onChange: () => run.save(),
+            onClose: () => this._closeEditor(),
+        });
+        menu.showMember(member.name);
+    }
+
+    _closeEditor(refresh = true) {
         if (this._editorUI) {
-            this._editorUI.destroy();
+            const modal = this._editorUI;
             this._editorUI = null;
+            modal.destroy();
         }
-        // Refresh preview units in case jobs/equipment changed.
+        if (!refresh) return;
+        // Refresh preview units in case skills or equipment changed.
         this._refreshPreviewUnits();
         this._rebuildOverlay();
         this._highlightSpawnTiles();
@@ -462,6 +408,7 @@ export class DeployScene {
     }
 
     _handleKeydown(e) {
+        if (this._editorUI) return;   // the member editor has the keyboard
         const ARROW_PAN = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down' };
         const panDir = ARROW_PAN[e.key];
         if (panDir) { this._renderer.setPanKey(panDir, true); e.preventDefault(); return; }
@@ -497,11 +444,7 @@ export class DeployScene {
     // ---- Preview refresh -----------------------------------------------------
 
     _refreshPreviewUnits() {
-        const map   = this._preview.map;
-        const units = buildPreviewUnits(
-            this._worldMap, this._scenarioId,
-            this._playerSpawns, map.enemySpawns
-        );
+        const units = this._buildPreviewUnits(this._preview.map);
         // Clear the facing-change transition fields so the renderer draws units
         // at their final facing immediately with no turn animation.
         for (const u of units) {
@@ -514,7 +457,7 @@ export class DeployScene {
     // ---- Launch --------------------------------------------------------------
 
     _launchBattle() {
-        if (this._editorUI) { this._editorUI.destroy(); this._editorUI = null; }
+        this._closeEditor(false);
         if (this._onLaunch) this._onLaunch(this._mapDef, this._playerSpawns);
     }
 }

@@ -29,6 +29,57 @@ function buildTable(rawData) {
 }
 
 export const ABILITIES = buildTable(ABILITY_DATA);
+
+// ---- Skill ranks ----
+// Learned action skills and reactions can be upgraded to rank II and III with skill
+// points. Each rank is its own ability entry, keyed `<key>@<rank>` (e.g. 'fire@2'),
+// so the battle engine needs nothing special: a unit simply carries the ranked key.
+// Per rank: +20% power, -15% MP cost, +10% reaction chance, +25% buff/debuff size,
+// and rank III adds a turn to any status it inflicts.
+export const MAX_RANK = 3;
+const RANK_NUMERAL = ['', 'I', 'II', 'III'];
+
+export function baseKey(key) {
+    return typeof key === 'string' ? key.split('@')[0] : key;
+}
+
+export function rankOf(key) {
+    return Number(String(key).split('@')[1] || 1);
+}
+
+export function rankedKey(key, rank = 1) {
+    return rank > 1 ? `${baseKey(key)}@${rank}` : baseKey(key);
+}
+
+// Can this ability be upgraded? Actions and reactions can; supports and movement can't.
+export function isUpgradeable(key) {
+    const ab = ABILITIES[baseKey(key)];
+    return !!ab && ['action', 'reaction'].includes(ab.slot ?? 'action') && key !== 'attack';
+}
+
+function rankedEntry(ab, rank) {
+    const step = rank - 1;
+    const out = { ...ab, name: `${ab.name} ${RANK_NUMERAL[rank]}`, rank };
+    if (ab.basePower) out.basePower = Math.round(ab.basePower * (1 + 0.2 * step) * 100) / 100;
+    if (ab.mpCost) out.mpCost = Math.max(1, Math.round(ab.mpCost * (1 - 0.15 * step)));
+    if (ab.chance != null) out.chance = Math.min(1, ab.chance + 0.1 * step);
+    if (ab.applyStatus && ab.statusDuration && rank === MAX_RANK) out.statusDuration = ab.statusDuration + 1;
+    if (ab.buffs) out.buffs = ab.buffs.map(b => ({ ...b, value: Math.round(b.value * (1 + 0.25 * step)) || b.value }));
+    return out;
+}
+
+for (const [key, ab] of Object.entries({ ...ABILITIES })) {
+    if (!isUpgradeable(key)) continue;
+    for (let r = 2; r <= MAX_RANK; r++) ABILITIES[rankedKey(key, r)] = rankedEntry(ab, r);
+}
+
+// The key a unit actually carries for an ability, whatever its rank (or null if it lacks it).
+export function ownKey(unit, key) {
+    if (!key || !unit?.abilities) return null;
+    if (unit.abilities.includes(key)) return key;
+    const base = baseKey(key);
+    return unit.abilities.find(k => baseKey(k) === base) ?? null;
+}
 export const JOB_STATS = buildTable(JOB_DATA);
 
 // Player jobs have a `desc` field; enemy jobs do not.
@@ -36,79 +87,38 @@ export function isPlayerJob(jobKey) {
     return !!JOB_DATA[jobKey]?.desc;
 }
 
-// Total JP that must be earned in a job to reach each level. Index = level, so
-// JP_THRESHOLDS[2] is the JP needed for level 2. Level 1 is the starting level.
-// Spending JP on abilities never lowers a job's level.
-export const JP_THRESHOLDS = [0, 0, 200, 400, 700, 1100, 1600, 2200, 3000];
-
-// Returns the level (1-based) a character has reached in a given job.
-// jpMap: { jobKey: totalJpEarned }.
-export function jobLevel(jpMap, jobKey) {
-    const jp = (jpMap || {})[jobKey] || 0;
-    let level = 1;
-    for (let l = JP_THRESHOLDS.length - 1; l >= 2; l--) {
-        if (jp >= JP_THRESHOLDS[l]) { level = l; break; }
-    }
-    return level;
+// Player jobs of a tier (1 = starting roles, 2 = promotions), in JOB_DATA order.
+export function jobsOfTier(tier) {
+    return Object.keys(JOB_DATA).filter(j => JOB_DATA[j].tier === tier);
 }
 
-// Returns true if the character's jpMap satisfies all prerequisites for jobKey.
-export function meetsPrerequisites(jpMap, jobKey) {
-    const prereqs = JOB_DATA[jobKey]?.prerequisites;
-    if (!prereqs || prereqs.length === 0) return true;
-    return prereqs.every(p => jobLevel(jpMap, p.job) >= p.level);
-}
-
-// Returns a merged stat-bonus object for every job the character has mastered (Lv.8).
-// Keys are stat names; values are the summed bonuses across all mastered jobs.
-export function masteryStatBonus(jpMap) {
-    const result = {};
-    for (const [jobKey, jobDef] of Object.entries(JOB_DATA)) {
-        if (!jobDef.masteryBonus) continue;
-        if (jobLevel(jpMap, jobKey) < 8) continue;
-        for (const [stat, val] of Object.entries(jobDef.masteryBonus)) {
-            result[stat] = (result[stat] || 0) + val;
-        }
-    }
-    return result;
+// Tier 2 job → the Tier 1 jobs that promote into it.
+export const PROMOTES_FROM = {};
+for (const [key, job] of Object.entries(JOB_DATA)) {
+    for (const t2 of job.promotions || []) (PROMOTES_FROM[t2] = PROMOTES_FROM[t2] || []).push(key);
 }
 
 // Returns the Set of allowed equipment types for a given slot on a job, or null if unrestricted.
-// Tier 2 jobs use the union of both prerequisites' allowed types, plus any equipmentExpansions.
-export function allowedEquipTypes(jobKey, slot) {
+// A Tier 2 job keeps the types of the Tier 1 job it was promoted from (`origin`), or the union of
+// every Tier 1 job that promotes into it when no origin is given, plus its equipmentExpansions.
+export function allowedEquipTypes(jobKey, slot, origin = null) {
     const job = JOB_DATA[jobKey];
     if (!job) return null;
 
-    // No allowedEquipment and no prerequisites = unrestricted (Novice, enemy jobs)
-    const prereqs = job.prerequisites || [];
-    if (!job.allowedEquipment && prereqs.length === 0) return null;
-
-    // Tier 1 (or any job with explicit allowedEquipment): use it directly
     if (job.allowedEquipment) {
         const types = new Set(job.allowedEquipment[slot] || []);
         for (const t of (job.equipmentExpansions?.[slot] || [])) types.add(t);
         return types.size > 0 ? types : null;
     }
 
-    // Tier 2: union of prerequisites
+    const parents = origin ? [origin] : (PROMOTES_FROM[jobKey] || []);
+    if (parents.length === 0) return null;   // Novice and enemy jobs are unrestricted
     const union = new Set();
-    for (const p of prereqs) {
-        const types = allowedEquipTypes(p.job, slot);
-        if (types === null) return null; // prereq is unrestricted → so is this
+    for (const p of parents) {
+        const types = allowedEquipTypes(p, slot);
+        if (types === null) return null;
         for (const t of types) union.add(t);
     }
     for (const t of (job.equipmentExpansions?.[slot] || [])) union.add(t);
     return union.size > 0 ? union : null;
-}
-
-// Returns a human-readable string of unmet prerequisites, e.g. "Evoker Lv.3, Warden Lv.3".
-export function missingPrerequisites(jpMap, jobKey) {
-    const prereqs = JOB_DATA[jobKey]?.prerequisites || [];
-    return prereqs
-        .filter(p => jobLevel(jpMap, p.job) < p.level)
-        .map(p => {
-            const label = p.job.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-            return `${label} Lv.${p.level}`;
-        })
-        .join(', ');
 }

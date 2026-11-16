@@ -2,7 +2,7 @@
 // unit or the battle, and nothing animates. `units` is always the list of
 // non-dead units (battle.livingUnits), `map` is the battle map.
 import { computeMoveRange, computeAttackRange, computeAoeArea } from '../abilities.js';
-import { ABILITIES } from '../data-registry.js';
+import { ABILITIES, baseKey, ownKey } from '../data-registry.js';
 import { hasLineOfSight, unitCell, stepNeighbors, posKey, parseKey, cellKey } from '../battle-map.js';
 import { isConscious, isAlive } from '../units.js';
 
@@ -34,9 +34,13 @@ export function hasStatus(unit, status) {
 }
 
 // Whether a timed buff or debuff from this ability is currently on the unit.
+// Buffs are keyed by the ability that applied them, at any rank.
 export function hasBuff(unit, abilityKey) {
-    return (unit.buffs || []).some(b => b.key === abilityKey);
+    const base = baseKey(abilityKey);
+    return (unit.buffs || []).some(b => baseKey(b.key) === base);
 }
+
+export { ownKey };
 
 // Lowest score wins. Ties keep the earlier candidate so results are deterministic.
 export function pickMin(candidates, score) {

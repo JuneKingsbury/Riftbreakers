@@ -681,27 +681,16 @@ export class BattleUI {
         const won = battle.winner === 'player';
         const rewards = flags?.rewards;
 
+        // rewards: the run's battle reward (RunState.completeBattle), or null outside a run.
         let rewardHtml = '';
-        const jpEntries = Object.entries(rewards?.jpGained || {}).filter(([, v]) => v > 0);
-        if (rewards && (won || jpEntries.length)) {
+        if (rewards && won) {
             rewardHtml += `<div style="margin-top:10px;border-top:1px solid #335;padding-top:8px;text-align:left;min-width:200px;">`;
-            for (const [name, jp] of jpEntries) {
-                rewardHtml += `<div style="color:#aaffaa;font-size:12px;">${esc(name)}: +${jp} JP</div>`;
+            for (const [name, xp] of Object.entries(rewards.xp || {})) {
+                const up = rewards.levelUps?.[name] ? ` <span style="color:#ffdd44;">LEVEL UP!</span>` : '';
+                rewardHtml += `<div style="color:#aaffaa;font-size:12px;">${esc(name)}: +${xp} XP${up}</div>`;
             }
-            if (rewards.jpBonus > 0) {
-                rewardHtml += `<div style="color:#668866;font-size:10px;">(includes +${rewards.jpBonus} victory bonus each)</div>`;
-            }
-            if (rewards.goldGained > 0) {
-                rewardHtml += `<div style="color:#ffdd88;font-size:12px;">+${rewards.goldGained} gold</div>`;
-            }
-            for (const item of (rewards.itemsGained || [])) {
-                const name = item.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-                rewardHtml += `<div style="color:#88ddff;font-size:12px;">Item: ${name}</div>`;
-            }
-            if (rewards.questsCompleted?.length) {
-                for (const q of rewards.questsCompleted) {
-                    rewardHtml += `<div style="color:#ffcc88;font-size:12px;">Quest updated: ${q.title}</div>`;
-                }
+            if (rewards.gold > 0) {
+                rewardHtml += `<div style="color:#ffdd88;font-size:12px;">+${rewards.gold} gold</div>`;
             }
             rewardHtml += `</div>`;
         }
@@ -710,10 +699,10 @@ export class BattleUI {
             <div style="font-size:40px;font-weight:bold;color:${won ? '#ffcc44' : '#f44'};text-shadow:0 0 24px currentColor;letter-spacing:4px;">
                 ${won ? 'VICTORY!' : 'DEFEAT'}
             </div>
-            <div style="color:#aaa;font-size:13px;">${won ? 'All enemies defeated.' : 'Your party was wiped out.'}</div>
+            <div style="color:#aaa;font-size:13px;">${won ? 'All enemies defeated.' : 'Your party was wiped out. The run is over.'}</div>
             ${rewardHtml}
             <button id="tac-return-btn" style="margin-top:12px;padding:10px 28px;background:#1a1a30;border:1px solid #557;color:#ccc;font-family:inherit;font-size:14px;cursor:pointer;border-radius:4px;pointer-events:auto;">
-                Return to Map
+                ${won ? 'Continue' : 'Return'}
             </button>
         `;
         document.getElementById('tac-return-btn')?.addEventListener('click', () => { if (onExit) onExit(); });

@@ -1,10 +1,29 @@
 # Riftbreakers
-A tactics RPG in the world of Rifthold.
+A tactics roguelike in the world of Rifthold.
 
 ## Running
 
 No build step. Serve the repo root (`npm run serve`, or any static server) and open `index.html`.
 Run the headless logic tests with `npm test` (Node 22+).
+
+## Runs
+
+A run is three acts (`js/run/`). Each act is a generated map of 15 floors (`map-gen.js`): pick a
+path through battles, elites, events, shops, rest sites, treasure and recruits, ending in a boss.
+
+- **Party:** start with three Tier 1 roles and recruit up to six. Battles are automatic, so the
+  party fully heals after every win; damage from events lasts until then. Losing a battle ends the run.
+- **Growth:** wins give XP; every level gives a skill point. Each role has a small skill tree
+  (`data/jobs.js`: cost and prerequisite per skill), and learned skills can be upgraded to rank II
+  and III (`data-registry.js` generates the ranked versions). At level 5 a member can promote once
+  into one of two Tier 2 jobs, at a rest site or after a boss. Equipment adds stats and can grant
+  abilities (`data/equipment.js`), and relics are party-wide modifiers (`js/run/data/relics.js`).
+- **Behavior:** by default each character follows rules generated from their current skills
+  (`ai/default-scripts.js` `autoScriptFor`). The Tactics editor lets you replace them with your own.
+- **State:** `RunState` (`run-state.js`) holds the whole run as plain data and autosaves to
+  localStorage, so a run can be continued from the title screen. Between runs, renown buys
+  unlocks (`profile.js`).
+- **Content:** encounters, events, relics and recruits live in `js/run/data/`.
 
 ## Tactical battle view
 
