@@ -64,12 +64,19 @@ export class BattleUI {
 
     setActionHandler(fn) { this._onAction = fn; }
 
+    // Pixels the HUD covers at the bottom of the screen (the unit list and log in portrait).
+    bottomInset() {
+        const top = Math.min(this._sidebar.getBoundingClientRect().top, this._log.getBoundingClientRect().top);
+        return Math.max(0, window.innerHeight - top);
+    }
+
     // fn('pause') toggles pause, fn('speed', n) sets the speed multiplier.
     setPlaybackHandler(fn) { this._onPlayback = fn; }
 
     // Pause / speed buttons and a readout of the rule the last scripted unit fired.
     _makeControls() {
         const el = document.createElement('div');
+        el.className = 'tac-controls';
         el.style.cssText = `
             position: absolute; top: 24px; left: 50%; transform: translateX(-50%);
             display: flex; flex-direction: column; align-items: center; gap: 4px;
@@ -116,6 +123,7 @@ export class BattleUI {
 
     _makeSidebar() {
         const el = document.createElement('div');
+        el.className = 'tac-sidebar';
         el.style.cssText = `
             position: absolute; top: 0; right: 0; width: 190px; height: 100%;
             background: rgba(8,8,20,0.92); border-left: 1px solid #335;
@@ -141,6 +149,7 @@ export class BattleUI {
 
     _makeLog() {
         const el = document.createElement('div');
+        el.className = 'tac-log';
         el.style.cssText = `
             position: absolute; bottom: 0; left: 0; right: 190px; height: 65px;
             background: rgba(8,8,20,0.88); border-top: 1px solid #335;
@@ -167,6 +176,7 @@ export class BattleUI {
 
     _makeHint() {
         const el = document.createElement('div');
+        el.className = 'tac-hint';
         el.style.cssText = `
             position: absolute; top: 6px; left: 8px;
             font-size: 10px; color: #556; pointer-events: none;
@@ -681,27 +691,16 @@ export class BattleUI {
         const won = battle.winner === 'player';
         const rewards = flags?.rewards;
 
+        // rewards: the run's battle reward (RunState.completeBattle), or null outside a run.
         let rewardHtml = '';
-        const jpEntries = Object.entries(rewards?.jpGained || {}).filter(([, v]) => v > 0);
-        if (rewards && (won || jpEntries.length)) {
+        if (rewards && won) {
             rewardHtml += `<div style="margin-top:10px;border-top:1px solid #335;padding-top:8px;text-align:left;min-width:200px;">`;
-            for (const [name, jp] of jpEntries) {
-                rewardHtml += `<div style="color:#aaffaa;font-size:12px;">${esc(name)}: +${jp} JP</div>`;
+            for (const [name, xp] of Object.entries(rewards.xp || {})) {
+                const up = rewards.levelUps?.[name] ? ` <span style="color:#ffdd44;">LEVEL UP!</span>` : '';
+                rewardHtml += `<div style="color:#aaffaa;font-size:12px;">${esc(name)}: +${xp} XP${up}</div>`;
             }
-            if (rewards.jpBonus > 0) {
-                rewardHtml += `<div style="color:#668866;font-size:10px;">(includes +${rewards.jpBonus} victory bonus each)</div>`;
-            }
-            if (rewards.goldGained > 0) {
-                rewardHtml += `<div style="color:#ffdd88;font-size:12px;">+${rewards.goldGained} gold</div>`;
-            }
-            for (const item of (rewards.itemsGained || [])) {
-                const name = item.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-                rewardHtml += `<div style="color:#88ddff;font-size:12px;">Item: ${name}</div>`;
-            }
-            if (rewards.questsCompleted?.length) {
-                for (const q of rewards.questsCompleted) {
-                    rewardHtml += `<div style="color:#ffcc88;font-size:12px;">Quest updated: ${q.title}</div>`;
-                }
+            if (rewards.gold > 0) {
+                rewardHtml += `<div style="color:#ffdd88;font-size:12px;">+${rewards.gold} gold</div>`;
             }
             rewardHtml += `</div>`;
         }
@@ -710,10 +709,10 @@ export class BattleUI {
             <div style="font-size:40px;font-weight:bold;color:${won ? '#ffcc44' : '#f44'};text-shadow:0 0 24px currentColor;letter-spacing:4px;">
                 ${won ? 'VICTORY!' : 'DEFEAT'}
             </div>
-            <div style="color:#aaa;font-size:13px;">${won ? 'All enemies defeated.' : 'Your party was wiped out.'}</div>
+            <div style="color:#aaa;font-size:13px;">${won ? 'All enemies defeated.' : 'Your party was wiped out. The run is over.'}</div>
             ${rewardHtml}
             <button id="tac-return-btn" style="margin-top:12px;padding:10px 28px;background:#1a1a30;border:1px solid #557;color:#ccc;font-family:inherit;font-size:14px;cursor:pointer;border-radius:4px;pointer-events:auto;">
-                Return to Map
+                ${won ? 'Continue' : 'Return'}
             </button>
         `;
         document.getElementById('tac-return-btn')?.addEventListener('click', () => { if (onExit) onExit(); });

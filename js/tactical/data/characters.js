@@ -6,12 +6,9 @@
 //   team       'player'|'enemy'
 //   x, y       number   Starting tile position
 //   ct         number   Starting charge-time offset (staggers initiative)
-//   jp         object   Map of job key → total JP earned, e.g. { novice: 250, evoker: 100 }.
-//                       Drives job levels and prerequisite checks; never decreases.
-//   jpSpent    object   Map of job key → JP spent learning that job's abilities.
-//   learned    string[] Ability keys learned with JP (in any job).
-//   loadout    object   { secondary, reaction, support, movement } — see loadout.js.
-//                       The current job's skillset is always the first ability slot.
+//   level, xp, sp, origin, learned, ranks, loadout
+//              Party members only: JP and learned skills, see loadout.js. An entry with a
+//              `learned` list is treated as a party member.
 //   statMods   object   Per-stat overrides applied on top of the job's base stats
 //   extraAbilities string[] Additional abilities beyond what the job provides
 //   appearance object   Optional visual description for sprite compositing:
@@ -35,10 +32,9 @@ export const CHARACTER_DATA = [
         team: 'player',
         x: 3, y: 8,
         ct: 40,
-        jp: { novice: 250, warden: 100 },
-        jpSpent: {},
+        level: 1, xp: 0, sp: 0, origin: null, ranks: {},
         learned: ['ward'],
-        loadout: { secondary: null, reaction: null, support: null, movement: null },
+        loadout: { reaction: null, support: null, movement: null },
         appearance: {
             race: 'human', bodyVariant: 1, hairVariant: 1, shirtVariant: 1,
             nameColor: '#4488ff',
@@ -51,10 +47,9 @@ export const CHARACTER_DATA = [
         team: 'player',
         x: 2, y: 6,
         ct: 10,
-        jp: { novice: 250, evoker: 100 },
-        jpSpent: {},
+        level: 1, xp: 0, sp: 0, origin: null, ranks: {},
         learned: ['fire'],
-        loadout: { secondary: null, reaction: null, support: null, movement: null },
+        loadout: { reaction: null, support: null, movement: null },
         appearance: {
             race: 'human', bodyVariant: 2, hairVariant: 3, shirtVariant: 2,
             nameColor: '#cc44ff',
@@ -67,10 +62,9 @@ export const CHARACTER_DATA = [
         team: 'player',
         x: 3, y: 11,
         ct: 55,
-        jp: { novice: 250, runebow: 100 },
-        jpSpent: {},
+        level: 1, xp: 0, sp: 0, origin: null, ranks: {},
         learned: ['long_shot'],
-        loadout: { secondary: null, reaction: null, support: null, movement: null },
+        loadout: { reaction: null, support: null, movement: null },
         appearance: {
             race: 'human', bodyVariant: 1, hairVariant: 2, shirtVariant: 1,
             nameColor: '#44cc66',
@@ -83,10 +77,9 @@ export const CHARACTER_DATA = [
         team: 'player',
         x: 2, y: 9,
         ct: 25,
-        jp: { novice: 250, spellblade: 100 },
-        jpSpent: {},
+        level: 1, xp: 0, sp: 0, origin: null, ranks: {},
         learned: ['hex'],
-        loadout: { secondary: null, reaction: null, support: null, movement: null },
+        loadout: { reaction: null, support: null, movement: null },
         appearance: {
             race: 'human', bodyVariant: 2, hairVariant: 4, shirtVariant: 2,
             nameColor: '#ffcc44',
@@ -100,10 +93,9 @@ export const CHARACTER_DATA = [
         team: 'player',
         x: 2, y: 3,
         ct: 35,
-        jp: { novice: 250, seer: 100 },
-        jpSpent: {},
+        level: 1, xp: 0, sp: 0, origin: null, ranks: {},
         learned: ['temporal_slip'],
-        loadout: { secondary: null, reaction: null, support: null, movement: null },
+        loadout: { reaction: null, support: null, movement: null },
         appearance: {
             race: 'human', bodyVariant: 2, hairVariant: 1, shirtVariant: 2,
             nameColor: '#44ccdd',
@@ -116,10 +108,9 @@ export const CHARACTER_DATA = [
         team: 'player',
         x: 3, y: 3,
         ct: 5,
-        jp: { novice: 250, stoneshaper: 100 },
-        jpSpent: {},
+        level: 1, xp: 0, sp: 0, origin: null, ranks: {},
         learned: ['rock_toss'],
-        loadout: { secondary: null, reaction: null, support: null, movement: null },
+        loadout: { reaction: null, support: null, movement: null },
         appearance: {
             race: 'human', bodyVariant: 1, hairVariant: 4, shirtVariant: 1,
             nameColor: '#cc8844',

@@ -6,11 +6,12 @@ import { createUnit } from '../../js/tactical/units.js';
 import { getCell, standZ } from '../../js/tactical/battle-map.js';
 import { gridMap } from '../map-fixtures.mjs';
 import { ABILITIES, JOB_STATS } from '../../js/tactical/data-registry.js';
+import { JOB_DATA } from '../../js/tactical/data/jobs.js';
 import { scaledLoadout } from '../../js/tactical/loadout.js';
 import { resolveAbility } from '../../js/tactical/abilities.js';
 import { estimateAbilityEffect } from '../../js/tactical/ai/estimate.js';
 import { runScript } from '../../js/tactical/ai/script-runtime.js';
-import { defaultScriptFor } from '../../js/tactical/ai/default-scripts.js';
+import { defaultScriptFor, autoScriptFor } from '../../js/tactical/ai/default-scripts.js';
 import { validateScript, sanitizeScript, hasErrors } from '../../js/tactical/ai/script-validate.js';
 import { executeIntent } from '../../js/tactical/ai/executor.js';
 import { inAbilityRange, canUse } from '../../js/tactical/ai/queries.js';
@@ -310,7 +311,7 @@ test('store round-trips a script and ignores corrupt data', () => {
     };
     try {
         const cd = { name: 'Aldric', job: 'warden', team: 'player' };
-        assert.deepEqual(store.getScriptFor(cd), defaultScriptFor('warden'));
+        assert.deepEqual(store.getScriptFor(cd), store.defaultBehaviorFor(cd));
 
         const custom = script(rule('only', always, { do: 'defend' }));
         assert.ok(store.saveScript('Aldric', custom));
@@ -321,10 +322,10 @@ test('store round-trips a script and ignores corrupt data', () => {
         assert.equal(store.getScriptFor(cd).rules[0].id, 'only', 'invalid save did not overwrite');
 
         mem.set(store.STORAGE_KEY, '{not json');
-        assert.deepEqual(store.getScriptFor(cd), defaultScriptFor('warden'));
+        assert.deepEqual(store.getScriptFor(cd), store.defaultBehaviorFor(cd));
 
         store.saveScript('Aldric', custom);
-        assert.deepEqual(store.getScriptFor({ ...cd, team: 'enemy' }), defaultScriptFor('warden'), 'enemies ignore saved scripts');
+        assert.deepEqual(store.getScriptFor({ ...cd, team: 'enemy' }), store.defaultBehaviorFor(cd), 'enemies ignore saved scripts');
         store.resetScript('Aldric');
         assert.ok(!store.hasCustomScript('Aldric'));
     } finally {
@@ -345,11 +346,12 @@ test('a saved script follows the character across a class change', () => {
         member.job = 'warden';   // changed from the Party menu
         assert.equal(store.getScriptFor(member).rules[0].id, 'mine', 'script is keyed by name, not job');
 
-        // And the unsaved default tracks the live job.
-        const fresh = { name: 'Ryn', job: 'runebow', team: 'player' };
-        assert.deepEqual(store.getScriptFor(fresh), defaultScriptFor('runebow'));
+        // And the default behavior tracks the live job and skills.
+        const fresh = { name: 'Ryn', job: 'runebow', team: 'player', learned: ['long_shot'], loadout: {} };
+        assert.deepEqual(store.getScriptFor(fresh), autoScriptFor('runebow', ['attack', 'long_shot']));
+        fresh.learned.push('pinning_shot');
         fresh.job = 'sanctifier';
-        assert.deepEqual(store.getScriptFor(fresh), defaultScriptFor('sanctifier'));
+        assert.deepEqual(store.getScriptFor(fresh), store.defaultBehaviorFor(fresh));
     } finally {
         delete globalThis.localStorage;
     }
@@ -471,4 +473,33 @@ test('passive and tile-terrain abilities are not offered to scripts', () => {
     assert.equal(scriptUsable('stone_wall'), false, 'tile terrain ability');
     assert.equal(scriptUsable('call_wisp'), true, 'summons are supported');
     assert.equal(scriptUsable('fire'), true);
+});
+
+test('default behavior uses every kind of skill the character has, and is always valid', () => {
+    const labels = (job, abilities) => autoScriptFor(job, abilities).rules.map(r => r.label).join(' | ');
+    const seer = labels('seer', ['attack', 'temporal_slip', 'time_lapse@2', 'swift_grace']);
+    assert.match(seer, /Swift Grace on an ally without haste/);
+    assert.match(seer, /Temporal Slip on an ally at the start/, 'Temporal Slip is protective, cast on allies');
+    assert.match(seer, /Time Lapse on a healthy enemy without slow/, 'a ranked skill is named by its base');
+    assert.match(seer, /Back off/);
+    const warden = labels('warden', ['attack', 'ward', 'stone_aegis']);
+    assert.match(warden, /Revive.*Heal.*Stone Aegis on a hurt ally/);
+    assert.match(labels('spellblade', ['attack', 'hex']), /Brace.*Attack the nearest enemy/);
+    assert.doesNotMatch(labels('evoker', ['attack', 'fire']), /Heal|Revive/, 'no rules for skills the character lacks');
+
+    for (const job of Object.keys(JOB_DATA).filter(j => JOB_DATA[j].learnable)) {
+        const all = ['attack', ...Object.keys(JOB_DATA[job].learnable).filter(k => !ABILITIES[k].passive && (ABILITIES[k].slot ?? 'action') === 'action')];
+        const auto = autoScriptFor(job, all);
+        assert.ok(sanitizeScript(auto), `${job} auto script is valid`);
+        assert.deepEqual(validateScript(auto).filter(p => p.severity !== 'warning'), [], job);
+    }
+});
+
+test('a script naming a skill uses whatever rank of it the unit has', () => {
+    const map = gridMap(Array.from({ length: 5 }, () => '.'.repeat(8)));
+    const me = Object.assign(createUnit('Me', 'evoker', 'player', 1, 2), { abilities: ['attack', 'fire@3'] });
+    const foe = createUnit('Foe', 'goblin', 'enemy', 3, 2);
+    const s = script(rule('f', always, { do: 'ability', ability: 'fire', target: enemyNearest }));
+    const intent = runScript(s, me, [me, foe], map);
+    assert.equal(intent.act.ability, 'fire@3');
 });

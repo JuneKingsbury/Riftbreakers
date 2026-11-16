@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 
 import { loadMapData, getCell, topCell, validateMap, reachableFrom, posKey } from '../../js/tactical/battle-map.js';
 import { CHARACTER_DATA } from '../../js/tactical/data/characters.js';
-import { BATTLE_SCENARIOS } from '../../js/tactical/world-map-data.js';
+import { ENCOUNTERS } from '../../js/run/data/encounters.js';
 import { MAP_DATA } from '../../js/tactical/data/maps/index.js';
 import { createUnit } from '../../js/tactical/units.js';
 import { moveEntityAlongPath } from '../../js/systems/movement-lerp.js';
@@ -76,7 +76,7 @@ test('terrain height comes from the block level only, never the material', () =>
 
 test('walking speed follows the battle\'s moveMsPerStep for both manual and scripted moves', () => {
     const map = loadMapData(MAP_DEF);
-    const units = buildUnits(null, 'none', map.playerSpawns, map.enemySpawns);
+    const units = buildUnits(null, map.playerSpawns, map.enemySpawns);
     const battle = new TacticalBattle(map, units);
     battle.moveMsPerStep = 45;   // what the scene sets at 4x
 
@@ -118,9 +118,11 @@ test('no map has a sealed-off pocket holding a large share of its walkable groun
     }
 });
 
-test('maps are much larger than the old ones (all under 400 tiles) and have no stone wall around the outside', () => {
+test('maps are compact (most at most 300 tiles, none over 400) and have no stone wall around the outside', () => {
+    const small = everyMap.filter(([, def]) => def.width * def.depth <= 300).length;
+    assert.ok(small >= everyMap.length / 2, `only ${small} of ${everyMap.length} maps are small`);
     for (const [name, def] of everyMap) {
-        assert.ok(def.width * def.depth >= 700, `${name} is only ${def.width}x${def.depth}`);
+        assert.ok(def.width * def.depth <= 400, `${name} is ${def.width}x${def.depth}`);
         const map = loadMapData(def);
         const edge = [];
         for (let x = 0; x < map.width; x++) edge.push(topCell(map, x, 0), topCell(map, x, map.height - 1));
@@ -130,10 +132,12 @@ test('maps are much larger than the old ones (all under 400 tiles) and have no s
     }
 });
 
-test('the default party and every enemy roster field six units a side', () => {
+test('the default party has six units a side, and every encounter roster can field five or six', () => {
     assert.equal(CHARACTER_DATA.filter(c => c.team === 'player').length, 6);
     assert.equal(CHARACTER_DATA.filter(c => c.team === 'enemy').length, 6);
-    for (const [id, sc] of Object.entries(BATTLE_SCENARIOS)) {
-        if (sc.roster) assert.equal(sc.roster.length, 6, `${id} roster`);
+    for (const act of Object.values(ENCOUNTERS)) {
+        for (const enc of [...act.normal, ...act.elite, ...act.boss]) {
+            assert.ok(enc.roster.length >= 5 && enc.roster.length <= 6, `${enc.id} roster`);
+        }
     }
 });

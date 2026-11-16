@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 
 import { gridMap } from '../map-fixtures.mjs';
 import { JOB_DATA } from '../../js/tactical/data/jobs.js';
+import { EQUIPMENT } from '../../js/tactical/data/equipment.js';
 import { ABILITIES } from '../../js/tactical/data-registry.js';
 import { createUnit } from '../../js/tactical/units.js';
 import { resolveAbility, inflictStatus } from '../../js/tactical/abilities.js';
@@ -24,17 +25,42 @@ const unit = (name, job, team, x, y, extra = {}) =>
 
 const playerJobs = Object.keys(JOB_DATA).filter(j => JOB_DATA[j].learnable);
 
-test('every player job has its own skillset plus a reaction, support and movement ability', () => {
+test('every player job has a short kit of its own: Tier 1 4+1+1+1, Tier 2 3+1+1', () => {
     const owner = {};
+    const count = (keys, slot) => keys.filter(k => abilitySlot(k) === slot).length;
     for (const job of playerJobs) {
-        const keys = Object.keys(JOB_DATA[job].learnable);
+        const def = JOB_DATA[job];
+        const keys = Object.keys(def.learnable);
         for (const k of keys) assert.ok(ABILITIES[k], `${job}: unknown ability ${k}`);
-        for (const slot of ['action', 'reaction', 'support', 'movement']) {
-            assert.ok(keys.some(k => abilitySlot(k) === slot), `${job} has a ${slot} ability`);
-        }
+        const expected = def.tier === 1
+            ? { action: 4, reaction: 1, support: 1, movement: 1 }
+            : { action: 3, reaction: 1, support: 1, movement: 0 };
+        for (const [slot, n] of Object.entries(expected)) assert.equal(count(keys, slot), n, `${job} ${slot}`);
         for (const k of keys) {
             assert.ok(!owner[k], `${k} is taught by both ${owner[k]} and ${job}`);
             owner[k] = job;
+        }
+    }
+});
+
+test('each starting role promotes into two Tier 2 jobs, and every Tier 2 job is reachable', () => {
+    const reached = new Set();
+    for (const job of playerJobs.filter(j => JOB_DATA[j].tier === 1)) {
+        assert.equal(JOB_DATA[job].promotions.length, 2, job);
+        for (const t2 of JOB_DATA[job].promotions) {
+            assert.equal(JOB_DATA[t2]?.tier, 2, `${job} → ${t2}`);
+            reached.add(t2);
+        }
+    }
+    for (const job of playerJobs.filter(j => JOB_DATA[j].tier === 2)) assert.ok(reached.has(job), job);
+});
+
+test('equipment only grants abilities that exist, in the right kind of slot', () => {
+    for (const [key, item] of Object.entries(EQUIPMENT)) {
+        for (const k of item.grants || []) assert.equal(abilitySlot(k), 'action', `${key}: ${k}`);
+        for (const k of item.grantsPassive || []) {
+            assert.ok(ABILITIES[k], `${key}: unknown ability ${k}`);
+            assert.notEqual(abilitySlot(k), 'action', `${key}: ${k}`);
         }
     }
 });
@@ -90,18 +116,27 @@ test('Providence survives one killing blow per battle', () => {
     assert.equal(seer.hp, 0, 'only once');
 });
 
-test('Swiftcast halves charge time and JP Boost raises JP', () => {
+test('Swiftcast halves charge time', () => {
     const seer = unit('S', 'seer', 'player', 1, 1, { support: 'swiftcast' });
     const battle = new TacticalBattle(map, [seer, unit('E', 'goblin', 'enemy', 5, 1)]);
     battle.applyEnemyAbility(seer, 'fire', 3, 1);
     assert.equal(seer._charging.needed, Math.round(ABILITIES.fire.chargeTime / 2));
+});
 
-    const novice = unit('N', 'novice', 'player', 1, 1, { jpEligible: true, jobLv: 1 });
-    const b2 = new TacticalBattle(map, [novice]);
-    b2._awardJp(novice);
-    novice.support = 'jp_boost';
-    b2._awardJp(novice);
-    assert.equal(b2.jpEarned.N.novice, 10 + 15);
+test('ranked skills hit harder for less MP; reactions trigger more often', () => {
+    assert.ok(ABILITIES['fire@3'].basePower > ABILITIES['fire@2'].basePower);
+    assert.ok(ABILITIES['fire@2'].basePower > ABILITIES.fire.basePower);
+    assert.ok(ABILITIES['fire@3'].mpCost < ABILITIES.fire.mpCost);
+    assert.ok(ABILITIES['counter@2'].chance > ABILITIES.counter.chance);
+    assert.equal(ABILITIES['fire@3'].name, 'Fire III');
+    assert.ok(!ABILITIES['mana_surge@2'], 'supports are not upgraded');
+    const caster = unit('C', 'evoker', 'player', 1, 1);
+    const dmg = (key) => withRandom(0.5, () => resolveAbility(caster, unit('G', 'goblin', 'enemy', 3, 1), key, map).damage);
+    assert.ok(dmg('fire@3') > dmg('fire'));
+});
+
+test('Temporal Slip protects an ally', () => {
+    assert.equal(ABILITIES.temporal_slip.targetType, 'ally');
 });
 
 test('Spirit Pact strengthens summons', () => {

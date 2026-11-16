@@ -4,7 +4,6 @@ import { isDead, isAlive, isConscious, isUnconscious, isStunned, faceToward, set
 import { getCell, applyTerrainEffect, settleZ, posKey, parseKey, cellKey } from './battle-map.js';
 import { moveEntity, moveEntityAlongPath } from '../systems/movement-lerp.js';
 import { tryReaction, tryAllyReactions } from './reactions.js';
-import { jpPerAction } from './loadout.js';
 
 export const STATES = {
     ADVANCE_CT:            'ADVANCE_CT',
@@ -46,16 +45,6 @@ export class TacticalBattle {
         this._ctPreSpent = 0;
         // IDs of player-team summons that should be auto-controlled by the AI.
         this._pendingSummons = [];
-        // JP earned per action by party members: { memberName: { jobKey: jp } }.
-        this.jpEarned = {};
-    }
-
-    // Party members earn JP in their current job for every action they commit.
-    _awardJp(unit) {
-        if (!unit.jpEligible) return;
-        const byJob = this.jpEarned[unit.name] = this.jpEarned[unit.name] || {};
-        const jp = Math.round(jpPerAction(unit.jobLv ?? 1) * (supportOf(unit)?.jpMult ?? 1));
-        byJob[unit.job] = (byJob[unit.job] || 0) + jp;
     }
 
     // Charge time after the caster's support (Swiftcast halves it).
@@ -461,7 +450,6 @@ export class TacticalBattle {
         if (!this.abilityRange.has(cellKey(tx, ty, tz))) return false;
 
         const source = this.activeUnit;
-        this._awardJp(source);
 
         if (ab.chargeTime && ab.chargeTime > 0) {
             source.mp = Math.max(0, source.mp - ab.mpCost);
@@ -597,7 +585,6 @@ export class TacticalBattle {
         if (!ab || ab.passive) return;
         if (tz === null || tz === undefined) tz = getCell(this.map, tx, ty)?.z ?? 0;
 
-        this._awardJp(unit);
         unit.mp = Math.max(0, unit.mp - ab.mpCost);
 
         if (ab.chargeTime && ab.chargeTime > 0) {

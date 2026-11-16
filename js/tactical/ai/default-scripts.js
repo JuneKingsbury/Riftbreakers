@@ -1,6 +1,11 @@
-// Starter scripts for player characters, chosen by job until the player edits
-// one. Each call returns a fresh deep copy so callers may mutate the result.
+// Default behavior for player characters. autoScriptFor() builds a script from the
+// abilities a character actually has, so a newly learned or equipped skill gets used
+// without the player writing any rules; players can still write their own (see
+// script-store.js). defaultScriptFor(job) is the simpler per-job starter. Each call
+// returns a fresh copy so callers may mutate the result.
 // Enemies do not use these: they keep the scoring AI in enemy-ai.js.
+import { ABILITIES, baseKey } from '../data-registry.js';
+import { POSITIVE_STATUSES } from '../abilities.js';
 
 const always = () => ({ test: 'always', params: {} });
 const test = (name, params = {}) => ({ test: name, params });
@@ -56,4 +61,64 @@ const BY_JOB = {
 
 export function defaultScriptFor(job) {
     return (BY_JOB[job] ?? GENERIC)();
+}
+
+// ---- Automatic behavior from a character's abilities ----
+
+const RANGED_KEEP = { evoker: 3, runebow: 4, riftcaller: 4, fatebinder: 3, seer: 3, spiritbinder: 3, worldsinger: 3, sanctifier: 3, lifeseer: 3, warden: 3 };
+const MELEE_JOBS = new Set(['novice', 'spellblade', 'battlemage', 'earthshaker', 'stoneshaper', 'paladin', 'beastcaller']);
+const HEALER_JOBS = new Set(['warden', 'sanctifier', 'lifeseer', 'paladin']);
+
+const statusFilter = (status) => [{ kind: 'status', status, has: false }];
+
+// A script that uses every kind of ability in `abilities` (unit ability keys, any rank),
+// in priority order: revive and heal, cure, summon, ally support, self buffs, control
+// spells on healthy enemies, then the best attack. Ranged jobs keep their distance; melee jobs
+// brace when nearly dead. Rules that have nothing useful to do fall through to the next.
+export function autoScriptFor(job, abilities = []) {
+    const abs = [...new Set(abilities.map(baseKey))].filter(k => k !== 'attack' && ABILITIES[k] && !ABILITIES[k].passive);
+    const of = (pred) => abs.filter(k => pred(ABILITIES[k]));
+    const rules = [];
+    let n = 0;
+    const id = () => `a${++n}`;
+
+    const heals = of(a => a.isHeal);
+    if (heals.length) {
+        rules.push(revive(id()));
+        rules.push(heal(id(), HEALER_JOBS.has(job) ? 60 : 40));
+    }
+    if (of(a => a.isCure && !a.isHeal).length) {
+        rules.push(rule(id(), 'Cure an afflicted ally', always(),
+            { do: 'ability', ability: 'best_cure', target: ally('lowest_hp_pct'), approach: true }));
+    }
+    if (MELEE_JOBS.has(job)) rules.push(brace(id()));
+    if (of(a => a.isSummon).length) rules.push(summon(id()));
+    // Haste is always worth it; protective buffs go on allies who are getting hurt;
+    // anything else (reflect, reraise) is cast once at the start.
+    for (const k of of(a => a.targetType === 'ally' && !a.isHeal && !a.isCure && a.applyStatus)) {
+        const ab = ABILITIES[k];
+        const target = (pick, extra = []) => ally(pick, [...statusFilter(ab.applyStatus), ...extra]);
+        const [when, label, tgt] = ab.applyStatus === 'haste'
+            ? [test('enemy_within', { range: 7 }), `${ab.name} on an ally without haste`, target('nearest')]
+            : ['protect', 'shell', 'regen'].includes(ab.applyStatus)
+                ? [test('ally_hp_below', { value: 70 }), `${ab.name} on a hurt ally`, target('lowest_hp_pct', [{ kind: 'hp_below', value: 70 }])]
+                : [test('first_turn'), `${ab.name} on an ally at the start`, target('nearest')];
+        rules.push(rule(id(), label, when, { do: 'ability', ability: k, target: tgt, approach: true }));
+    }
+    for (const k of of(a => a.targetType === 'self' && !a.isHeal && !a.isSummon)) {
+        rules.push(rule(id(), `${ABILITIES[k].name} when enemies are close`, test('enemy_within', { range: 2 }),
+            { do: 'ability', ability: k }));
+    }
+    // Control spells are saved for healthy enemies; weakened ones just get finished off.
+    for (const k of of(a => a.targetType === 'enemy' && a.applyStatus && !a.basePower && !POSITIVE_STATUSES.includes(a.applyStatus))) {
+        const ab = ABILITIES[k];
+        rules.push(rule(id(), `${ab.name} on a healthy enemy without ${ab.applyStatus}`, test('target_hp_pct', { cmp: '>=', value: 60 }),
+            { do: 'ability', ability: k, target: enemy('nearest', statusFilter(ab.applyStatus)), approach: true }));
+    }
+    const keep = RANGED_KEEP[job];
+    if (keep && !MELEE_JOBS.has(job)) rules.push(kite(id(), keep));
+    rules.push(MELEE_JOBS.has(job)
+        ? attack(id(), 'Attack the nearest enemy', 'nearest')
+        : attack(id(), 'Hit the weakest enemy with the best attack', 'lowest_hp'));
+    return { version: 1, rules };
 }

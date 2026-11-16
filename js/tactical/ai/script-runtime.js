@@ -11,6 +11,7 @@ import { columnCells, settleZ, posKey, parseKey } from '../battle-map.js';
 import { ABILITIES } from '../data-registry.js';
 import { isConscious, isDead, faceToward } from '../units.js';
 import { estimateAbilityEffect } from './estimate.js';
+import { NEGATIVE_STATUSES } from '../abilities.js';
 import * as Q from './queries.js';
 import { evalCond, describeCond, ACTION_KINDS, MOVE_MODES } from './blocks.js';
 
@@ -96,14 +97,12 @@ const CATEGORY_FILTERS = {
     best_summon: ab => !!ab.isSummon,
 };
 
-// Statuses a cure can remove (death and the defend stance are not afflictions).
-const NOT_AFFLICTIONS = new Set(['dead', 'unconscious', 'defend']);
 
 // Whether using the ability on this target could accomplish anything, so a
 // script never wastes a turn healing a full-HP ally or curing a clean one.
 function usefulOn(ab, key, target, ctx) {
     if (ab.isHeal) return target.hp < target.maxHp || Q.hasStatus(target, 'unconscious');
-    if (ab.isCure) return target.status.some(s => !NOT_AFFLICTIONS.has(s));
+    if (ab.isCure) return target.status.some(s => NEGATIVE_STATUSES.includes(s));
     if (ab.targetType === 'ally' && ab.applyStatus) return !Q.hasStatus(target, ab.applyStatus);
     if (ab.targetType === 'self' && !ab.isSummon) {
         if (Q.hasBuff(ctx.self, key)) return false;
@@ -126,11 +125,13 @@ function abilityCandidates(choice, target, side, ctx) {
             return choice !== 'best_status' || !Q.hasStatus(target, ab.applyStatus);
         });
     }
-    const ab = ABILITIES[choice];
-    if (!ab || !ctx.self.abilities.includes(choice) || !Q.canUse(ctx.self, choice)) return [];
+    // A script naming 'fire' uses whatever rank of Fire the unit has.
+    const key = Q.ownKey(ctx.self, choice);
+    const ab = ABILITIES[key];
+    if (!ab || !Q.canUse(ctx.self, key)) return [];
     // Tile-targeted abilities other than summons need terrain handling the AI path does not provide.
     if (ab.targetType === 'tile' && !ab.isSummon) return [];
-    return usable(ab, choice) ? [choice] : [];
+    return usable(ab, key) ? [key] : [];
 }
 
 function scoreAbility(key, choice, target, ctx) {

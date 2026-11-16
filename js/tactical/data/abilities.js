@@ -74,7 +74,7 @@
 //   statusDurationBonus number  Extra turns on statuses you inflict
 //   surviveLethal bool     Once per battle, a killing blow leaves you at 1 HP
 //   chargeMult    number   Charge time multiplier (battle.js)
-//   jpMult        number   JP earned multiplier (battle.js)
+//   xpMult        number   XP multiplier for the member after a won battle (run-state.js)
 //   turnRegenHp   number   HP healed at the start of each turn (battle.js)
 //   summonBoost   number   Summons gain this fraction to HP, ATK and MAT (battle.js)
 //
@@ -728,7 +728,7 @@ export const ABILITY_DATA = {
         aoe: 0,
         mpCost: 14,
         actionCost: 42,
-        targetType: 'enemy',
+        targetType: 'ally',
         basePower: 0,
         element: 'arcane',
         animType: 'cast',
@@ -1450,10 +1450,10 @@ export const ABILITY_DATA = {
 
     jp_boost: {
         extends: 'mana_surge',
-        name: 'JP Boost',
+        name: 'Quick Study',
         passiveMpCost: 0, dmgDealt: null,
-        jpMult: 1.5,
-        desc: 'Learn from every swing: earn 50% more JP from actions.',
+        xpMult: 1.5,
+        desc: 'Learn from every swing: earn 50% more XP from battles.',
     },
     rune_edge: {
         extends: 'mana_surge',

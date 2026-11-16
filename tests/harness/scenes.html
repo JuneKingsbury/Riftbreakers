@@ -24,8 +24,8 @@ await sm.switchSkin('16x16_tiny_world');
 const container = document.getElementById('game-container');
 const scenes = new SceneManager(container, sm, () => { window.harness.exited = true; });
 const manual = params.get('manual') === '1';
-const deploy = new DeployScene('none', null, sm, scenes, (mapDef, spawns) => {
-    scenes.replace(new BattleScene('none', null, null, { mapDef, customPlayerSpawns: spawns, manualControl: manual }));
+const deploy = new DeployScene(null, null, sm, scenes, (mapDef, spawns) => {
+    scenes.replace(new BattleScene(null, null, null, { mapDef, customPlayerSpawns: spawns, manualControl: manual }));
 });
 scenes.push(deploy);
 window.harness = { scenes, deploy, sm, exited: false, frames: 0 };

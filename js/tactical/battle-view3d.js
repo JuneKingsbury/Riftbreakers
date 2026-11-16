@@ -143,7 +143,7 @@ export class BattleView3D {
         this._ray   = new THREE.Raycaster();
 
         this._tileSize = DEFAULT_TILE_SIZE;
-        this._insets   = { left: 0, right: 190 };
+        this._insets   = { left: 0, right: 190, top: 0, bottom: 0 };
         this._width = 0;
         this._height = 0;
 
@@ -228,7 +228,7 @@ export class BattleView3D {
     }
 
     /** Space the HUD takes on each side, so the map centers in the visible area. */
-    setInsets(left, right) { this._insets = { left, right }; }
+    setInsets(left, right, top = 0, bottom = 0) { this._insets = { left, right, top, bottom }; }
 
     zoomBy(delta) { this.tileSize = this._tileSize + delta; }
 
@@ -522,7 +522,7 @@ export class BattleView3D {
         }
         const margin = 1.5;   // world units of breathing room around the map
         const availW = Math.max(100, this._width - this._insets.left - this._insets.right);
-        const availH = Math.max(100, this._height - 70);   // leave room for the top HUD
+        const availH = Math.max(100, this._height - this._insets.top - this._insets.bottom - 70);   // and the top HUD
         const ppu = Math.min(availW / (maxX - minX + margin), availH / (maxY - minY + margin));
         this._tileSize = Math.max(8, Math.min(80, ppu / PX_PER_UNIT_FACTOR));
 
@@ -541,18 +541,19 @@ export class BattleView3D {
         const w = this._width, h = this._height;
         // Shift so the map centers in the area the HUD leaves free.
         const off = (this._insets.left - this._insets.right) / 2;
+        const offY = ((this._insets.bottom || 0) - (this._insets.top || 0)) / 2;
         const cam = this.camera;
         cam.left   = (-w / 2 - off) / ppu;
         cam.right  = ( w / 2 - off) / ppu;
-        cam.top    = (h / 2) / ppu;
-        cam.bottom = (-h / 2) / ppu;
+        cam.top    = (h / 2 - offY) / ppu;
+        cam.bottom = (-h / 2 - offY) / ppu;
         cam.updateProjectionMatrix();
     }
 
     _resize() {
         const rect = this.container.getBoundingClientRect();
-        const w = Math.max(Math.floor(rect.width), 400);
-        const h = Math.max(Math.floor(rect.height), 300);
+        const w = Math.max(Math.floor(rect.width), 200);
+        const h = Math.max(Math.floor(rect.height), 200);
         if (w !== this._width || h !== this._height) {
             this._width = w;
             this._height = h;
@@ -1072,6 +1073,7 @@ export class BattleView3D {
             b.title = title;
             b.addEventListener('click', (e) => { e.stopPropagation(); fn(); });
             b.addEventListener('mousedown', (e) => e.stopPropagation());
+            b.addEventListener('pointerdown', (e) => e.stopPropagation());
             bar.appendChild(b);
             return b;
         };

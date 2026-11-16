@@ -1,0 +1,104 @@
+// Meta progression between runs: renown earned at the end of each run buys
+// permanent unlocks. Stored in localStorage, separate from the run save.
+
+export const PROFILE_KEY = 'riftbreak.profile.v1';
+
+export const BASE_JOBS = ['warden', 'evoker', 'runebow'];
+
+// requires: another unlock that must be bought first.
+export const UNLOCKS = {
+    job_spellblade:  { name: 'Spellblade', cost: 30, job: 'spellblade', desc: 'Spellblades can be chosen for your starting party.' },
+    job_stoneshaper: { name: 'Stoneshaper', cost: 40, job: 'stoneshaper', desc: 'Stoneshapers can be chosen for your starting party.' },
+    job_seer:        { name: 'Seer', cost: 50, job: 'seer', desc: 'Seers can be chosen for your starting party.' },
+    purse_1:         { name: 'Coin Purse', cost: 25, desc: 'Start each run with 50 more gold.' },
+    purse_2:         { name: 'Heavy Purse', cost: 50, requires: 'purse_1', desc: 'Start each run with another 50 gold.' },
+    veterans:        { name: 'Veterans', cost: 45, desc: 'Starting members begin at level 2, with a skill point more to spend.' },
+    heirloom:        { name: 'Heirloom', cost: 60, desc: 'Start each run by choosing one of three common relics.' },
+    drillmaster:     { name: 'Drillmaster', cost: 40, desc: 'Drilling gives 50% more XP, and training also gives 50 XP.' },
+    recruiter:       { name: 'Recruiter', cost: 35, desc: 'Recruit nodes offer four candidates instead of three.' },
+    fine_wares:      { name: 'Fine Wares', cost: 40, desc: 'Shops stock one more item, and more often uncommon ones.' },
+    relic_lore:      { name: 'Relic Lore', cost: 60, desc: 'Elites can drop rare relics.' },
+    second_wind:     { name: 'Second Wind', cost: 55, desc: 'Every member gains 50 XP at the start of each new act.' },
+};
+
+function storage() {
+    try { return globalThis.localStorage ?? null; } catch { return null; }
+}
+
+export function newProfile() {
+    return { renown: 0, unlocked: [], stats: { runs: 0, wins: 0, bestAct: 0, bestFloor: 0 } };
+}
+
+export function loadProfile() {
+    try {
+        const raw = storage()?.getItem(PROFILE_KEY);
+        if (!raw) return newProfile();
+        const p = JSON.parse(raw);
+        return { ...newProfile(), ...p, stats: { ...newProfile().stats, ...(p.stats || {}) } };
+    } catch {
+        return newProfile();
+    }
+}
+
+export function saveProfile(profile) {
+    try { storage()?.setItem(PROFILE_KEY, JSON.stringify(profile)); return true; } catch { return false; }
+}
+
+export function hasUnlock(profile, key) {
+    return !!profile?.unlocked?.includes(key);
+}
+
+export function canBuyUnlock(profile, key) {
+    const u = UNLOCKS[key];
+    if (!u || hasUnlock(profile, key)) return false;
+    if (u.requires && !hasUnlock(profile, u.requires)) return false;
+    return profile.renown >= u.cost;
+}
+
+export function buyUnlock(profile, key) {
+    if (!canBuyUnlock(profile, key)) return false;
+    profile.renown -= UNLOCKS[key].cost;
+    profile.unlocked.push(key);
+    return true;
+}
+
+// Starting roles the profile has unlocked. (Recruits met during a run can be any role.)
+export function unlockedJobs(profile) {
+    const jobs = [...BASE_JOBS];
+    for (const key of profile?.unlocked || []) if (UNLOCKS[key]?.job) jobs.push(UNLOCKS[key].job);
+    return jobs;
+}
+
+// Run options implied by a profile's unlocks (see RunState).
+export function runOptions(profile) {
+    const has = (k) => hasUnlock(profile, k);
+    return {
+        jobs:          unlockedJobs(profile),
+        startGold:     100 + (has('purse_1') ? 50 : 0) + (has('purse_2') ? 50 : 0),
+        startLevel:    has('veterans') ? 2 : 1,
+        heirloom:      has('heirloom'),
+        trainXp:       has('drillmaster') ? 50 : 0,
+        drillXp:       has('drillmaster') ? 60 : 40,
+        recruitChoices: has('recruiter') ? 4 : 3,
+        fineWares:     has('fine_wares'),
+        relicLore:     has('relic_lore'),
+        secondWind:    has('second_wind'),
+    };
+}
+
+// Renown a finished run earns: floors climbed, elites and bosses beaten, and a victory bonus.
+export function renownFor(stats, won) {
+    return (stats.floors || 0) + 3 * (stats.elites || 0) + 10 * (stats.bosses || 0) + (won ? 25 : 0);
+}
+
+// Records a finished run in the profile. Returns the renown earned.
+export function recordRun(profile, run) {
+    const won = run.status === 'won';
+    const earned = renownFor(run.stats, won);
+    profile.renown += earned;
+    profile.stats.runs += 1;
+    if (won) profile.stats.wins += 1;
+    profile.stats.bestAct = Math.max(profile.stats.bestAct, run.act);
+    profile.stats.bestFloor = Math.max(profile.stats.bestFloor, run.stats.floors || 0);
+    return earned;
+}

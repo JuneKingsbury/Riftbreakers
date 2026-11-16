@@ -8,18 +8,23 @@ import { isEntityMoving } from '../systems/movement-lerp.js';
 import { ABILITIES } from './abilities.js';
 import { buildUnits } from './build-units.js';
 import { viewState } from './view-state.js';
+import { attachTouchGestures } from './touch-gestures.js';
+import { isPortrait } from '../ui/layout.js';
 
 const SPEEDS = { '1': 1, '2': 2, '3': 4 };
 const BASE_MS_PER_STEP = 180;
 
 export class BattleScene {
+    // encounter              — the fight (see run/data/encounters.js); null for the default enemies
+    // run                    — the RunState whose party fights and which receives the result; null in harnesses
+    // onComplete(won, reward) — called after the player leaves the result screen
     // opts.mapDef           — pre-selected map definition (from DeployScene); random if omitted
     // opts.customPlayerSpawns — [{x,y}] array overriding map.playerSpawns order
     // opts.manualControl    — let the player command their own units by hand. By
     //                         default every player unit acts from its script.
-    constructor(scenarioId, worldMap, onComplete, opts = {}) {
-        this._scenarioId        = scenarioId;
-        this._worldMap          = worldMap;
+    constructor(encounter, run, onComplete, opts = {}) {
+        this._encounter         = encounter;
+        this._run               = run;
         this._onComplete        = onComplete || null;
         this._presetMapDef      = opts.mapDef            || null;
         this._customPlayerSpawns = opts.customPlayerSpawns || null;
@@ -45,7 +50,8 @@ export class BattleScene {
         const mapDef = this._presetMapDef ?? MAP_DATA[Math.floor(Math.random() * MAP_DATA.length)];
         const map    = loadMapData(mapDef);
         const playerSpawns = this._customPlayerSpawns ?? map.playerSpawns;
-        const units  = buildUnits(this._worldMap, this._scenarioId, playerSpawns, map.enemySpawns);
+        const units  = buildUnits({ party: this._run?.party, encounter: this._encounter, relics: this._run?.relics },
+            playerSpawns, map.enemySpawns);
 
         this._battle = new TacticalBattle(map, units);
         this._applySpeed();
@@ -72,7 +78,10 @@ export class BattleScene {
             for (const u of units) if (u.team === 'player') this._autoUnits.add(u.id);
         }
 
-        // Input listeners
+        // Input listeners. Touch screens also get one-finger pan and pinch zoom.
+        this._detachTouch = attachTouchGestures(this._renderer.canvas, this._renderer);
+        this._updateInsets();
+        this._renderer.fitToMap?.();
         this._renderer.canvas.addEventListener('mousedown',    this._onMouseDown   = (e) => this._handleMouseDown(e));
         this._renderer.canvas.addEventListener('mousemove',    this._onMouseMove   = (e) => this._handleMouseMove(e));
         this._renderer.canvas.addEventListener('mouseup',      this._onMouseUp     = (e) => this._handleMouseUp(e));
@@ -90,6 +99,7 @@ export class BattleScene {
         this._PAN_THRESHOLD = 4;
         this._abilityFromSkillMenu = null;
         this._pendingRewards = null;
+        this._settled = false;
 
         this._scheduleNextTurn();
     }
@@ -107,15 +117,24 @@ export class BattleScene {
     // Called when SceneManager restores this scene from the stack (not used here)
     resume() {}
 
+    // The HUD covers the right side in landscape and the bottom in portrait.
+    _updateInsets() {
+        if (!this._renderer || !this._ui) return;
+        if (isPortrait()) this._renderer.setInsets(0, 0, 0, this._ui.bottomInset());
+        else this._renderer.setInsets(0, 190);
+    }
+
     render(now) {
         if (this._stopped) return;
+        this._updateInsets();
         this._renderer?.render(this._battle, now);
-        // Compute rewards once when battle first ends
-        if (this._battle.state === STATES.BATTLE_OVER && !this._pendingRewards) {
-            const won = this._battle.winner === 'player';
-            this._pendingRewards = this._worldMap
-                ? this._worldMap.completeBattle(this._scenarioId, won, this._battle.jpEarned)
-                : { won };
+        // Settle the battle with the run once, when it first ends
+        if (this._battle.state === STATES.BATTLE_OVER && !this._settled) {
+            this._settled = true;
+            this._won = this._battle.winner === 'player';
+            this._pendingRewards = this._run
+                ? this._run.completeBattle(this._won)
+                : null;
         }
         this._ui?.update(this._battle, () => this._onBattleExit(), {
             hasMoved: this._turnHasMoved,
@@ -129,10 +148,7 @@ export class BattleScene {
     _onBattleExit() {
         // Rewards were already computed and applied in render(); just exit.
         this._sm.pop();
-        if (this._onComplete) this._onComplete(
-            this._pendingRewards?.won ?? false,
-            this._pendingRewards
-        );
+        if (this._onComplete) this._onComplete(this._won ?? false, this._pendingRewards);
     }
 
     // Schedules `fn` after `ms` of battle time. Honours speed and pause so the
@@ -477,6 +493,7 @@ export class BattleScene {
     }
 
     _removeListeners() {
+        this._detachTouch?.();
         const c = this._renderer?.canvas;
         if (c) {
             c.removeEventListener('mousedown',   this._onMouseDown);

@@ -94,7 +94,7 @@ export const CONDITIONS = {
     },
     can_afford: {
         group: 'Self', label: 'I can use {ability}', params: [{ name: 'ability', type: 'ability', default: 'attack' }],
-        test: (p, ctx) => ctx.self.abilities.includes(p.ability) && Q.canUse(ctx.self, p.ability),
+        test: (p, ctx) => !!Q.ownKey(ctx.self, p.ability) && Q.canUse(ctx.self, Q.ownKey(ctx.self, p.ability)),
     },
     self_buffed: {
         group: 'Self', label: 'My {ability} buff is active', params: [{ name: 'ability', type: 'ability', default: 'attack' }],
@@ -156,7 +156,7 @@ export const CONDITIONS = {
     target_in_range: {
         group: 'Target', label: 'Target is in range of {ability}', needsTarget: true,
         params: [{ name: 'ability', type: 'ability', default: 'attack' }],
-        test: (p, ctx) => Q.inAbilityRange(ctx.self, ctx.target, p.ability, ctx.map),
+        test: (p, ctx) => Q.inAbilityRange(ctx.self, ctx.target, Q.ownKey(ctx.self, p.ability) ?? p.ability, ctx.map),
     },
     target_within: {
         group: 'Target', label: 'Target is within {range} tiles', needsTarget: true,
@@ -188,7 +188,7 @@ export const CONDITIONS = {
     aoe_hit_count: {
         group: 'Target', label: '{ability} centred on target hits {cmp} {value} units', needsTarget: true,
         params: [{ name: 'ability', type: 'ability', default: 'fire' }, { name: 'cmp', type: 'cmp', default: '>=' }, { name: 'value', type: 'number', default: 2 }],
-        test: (p, ctx) => compare(p.cmp, Q.unitsAffected(ctx.self, p.ability, ctx.target, ctx.units, ctx.map).length, p.value),
+        test: (p, ctx) => compare(p.cmp, Q.unitsAffected(ctx.self, Q.ownKey(ctx.self, p.ability) ?? p.ability, ctx.target, ctx.units, ctx.map).length, p.value),
     },
 };
 

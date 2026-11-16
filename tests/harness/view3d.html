@@ -28,7 +28,7 @@ if (params.get('skin') !== 'ascii') {
 const mapParam = params.get('map') || '0';
 const mapDef = MAP_DATA.find(d => d.id === mapParam) ?? MAP_DATA[Number(mapParam) || 0];
 const map = loadMapData(mapDef);
-const units = buildUnits(null, 'none', map.playerSpawns, map.enemySpawns);
+const units = buildUnits(null, map.playerSpawns, map.enemySpawns);
 const battle = new TacticalBattle(map, units);
 const first = battle.advanceCT();
 battle.startTurn(first);

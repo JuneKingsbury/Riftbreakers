@@ -12,8 +12,7 @@ import {
 } from './blocks.js';
 import { MAX_RULES } from './script-runtime.js';
 import { validateScript, hasErrors } from './script-validate.js';
-import { getScriptFor, saveScript, resetScript, hasCustomScript } from './script-store.js';
-import { defaultScriptFor } from './default-scripts.js';
+import { getScriptFor, saveScript, resetScript, hasCustomScript, defaultBehaviorFor } from './script-store.js';
 import { abilitiesForMember } from './party.js';
 
 const FONT = "'Courier New',monospace";
@@ -290,36 +289,48 @@ export class ScriptEditor {
 
         const list = this._chars.map(c => {
             const active = c.name === this._selected;
-            const marks = `${this._isDirty(c.name) ? '<span style="color:#fc6;"> *</span>' : ''}${hasCustomScript(c.name) ? '<span style="color:#8c8;"> custom</span>' : ''}`;
+            const marks = `${this._isDirty(c.name) ? '<span style="color:#fc6;"> *</span>' : ''}${hasCustomScript(c.name) ? '<span style="color:#8c8;"> custom</span>' : '<span style="color:#667;"> default</span>'}`;
             return `<button data-act="select-char" data-name="${esc(c.name)}" style="${BTN}display:block;width:100%;margin-bottom:4px;text-align:left;${active ? 'border-color:#99f;background:#22224a;' : ''}">${esc(c.name)} <span style="color:#778;font-size:10px;">${esc(c.job)}</span>${marks}</button>`;
         }).join('');
 
         this._root.innerHTML = `
-            <div style="background:#0d0d1e;border:1px solid #447;border-radius:8px;width:min(980px,96vw);height:min(720px,92vh);display:flex;flex-direction:column;">
-                <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;border-bottom:1px solid #335;">
+            <div class="se-panel" style="background:#0d0d1e;border:1px solid #447;border-radius:8px;width:min(980px,96vw);height:min(720px,92vh);display:flex;flex-direction:column;">
+                <div class="se-header" style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;border-bottom:1px solid #335;">
                     <span style="color:#ffcc44;font-weight:bold;font-size:15px;">Party Tactics</span>
-                    <span style="color:#778;font-size:11px;">Rules run top to bottom. The first rule whose conditions hold and whose action is possible fires. Moving and turning are free, and an attack, defend or wait ends the turn.</span>
+                    <span class="se-help" style="color:#778;font-size:11px;">Rules run top to bottom. The first rule whose conditions hold and whose action is possible fires. Moving and turning are free, and an attack, defend or wait ends the turn.</span>
                     <button data-act="close" style="${BTN}">Close</button>
                 </div>
-                <div style="display:flex;flex:1;min-height:0;">
-                    <div style="width:170px;padding:10px;border-right:1px solid #335;overflow-y:auto;">${list}</div>
+                <div class="se-body" style="display:flex;flex:1;min-height:0;">
+                    <div class="se-list" style="width:170px;padding:10px;border-right:1px solid #335;overflow-y:auto;">${list}</div>
                     <div data-scroll style="flex:1;padding:12px 14px;overflow-y:auto;">
+                        ${this._modeBanner(cd, dirty)}
                         <div style="color:#aab;margin-bottom:8px;"><b>${esc(cd.name)}</b> knows: ${abilities.filter(k => ABILITIES[k] && !ABILITIES[k].passive).map(k => esc(ABILITIES[k].name)).join(', ')}</div>
                         ${draft.rules.map((r, i) => this._rule(r, i, problems, ctx)).join('') || '<div style="color:#888;">No rules. This character will just wait each turn.</div>'}
                         ${problems.filter(p => p.rule === -1).map(p => `<div style="color:#f66;">${esc(p.message)}</div>`).join('')}
                         <button data-act="add-rule" style="${BTN}"${draft.rules.length >= MAX_RULES ? ' disabled' : ''}>+ Add rule (${draft.rules.length}/${MAX_RULES})</button>
                     </div>
                 </div>
-                <div style="display:flex;gap:8px;align-items:center;padding:10px 16px;border-top:1px solid #335;">
+                <div class="se-footer" style="display:flex;gap:8px;align-items:center;padding:10px 16px;border-top:1px solid #335;">
                     <button data-act="save" style="${BTN}color:#8f8;border-color:#464;"${blocked || !dirty ? ' disabled' : ''}>Save ${esc(cd.name)}</button>
                     <button data-act="revert" style="${BTN}"${dirty ? '' : ' disabled'}>Revert changes</button>
-                    <button data-act="reset" style="${BTN}">Reset to job default</button>
+                    <button data-act="reset" style="${BTN}"${hasCustomScript(cd.name) || dirty ? '' : ' disabled'}>Use default behavior</button>
                     <span style="color:#8c8;">${esc(this._message)}</span>
                     <span style="margin-left:auto;color:#778;font-size:11px;">${blocked ? 'Fix the problems above to save.' : ''}</span>
                 </div>
             </div>`;
         const scroller = this._root.querySelector('[data-scroll]');
         if (scroller) scroller.scrollTop = keepScroll;
+    }
+
+    // Whether this character follows the automatic default or their own rules.
+    _modeBanner(cd, dirty) {
+        if (hasCustomScript(cd.name)) {
+            return `<div style="margin-bottom:10px;padding:7px 9px;border:1px solid #464;border-radius:4px;background:#0e180e;color:#ad8;">
+                <b>Custom tactics.</b> ${esc(cd.name)} follows these rules exactly. Use default behavior to go back to the automatic rules.</div>`;
+        }
+        return `<div style="margin-bottom:10px;padding:7px 9px;border:1px solid #335;border-radius:4px;background:#0c0c1c;color:#99a;">
+            <b>Default behavior.</b> These rules are generated from ${esc(cd.name)}'s current skills and update by themselves
+            when they learn, upgrade or equip something new.${dirty ? ' <span style="color:#fc6;">Save to switch to custom tactics.</span>' : ' Edit any rule and save to take control.'}</div>`;
     }
 
     // ---------- events ----------
@@ -409,10 +420,11 @@ export class ScriptEditor {
                 break;
             case 'reset':
                 resetScript(this._selected);
-                this._drafts[this._selected] = defaultScriptFor(this._char().job);
+                this._drafts[this._selected] = defaultBehaviorFor(this._char());
                 this._prepare(this._drafts[this._selected]);
                 this._saved[this._selected] = JSON.stringify(this._finalized(this._selected));
-                this._message = 'Reset to the job default.';
+                this._message = 'Back to default behavior.';
+                if (this._onSaved) this._onSaved(this._selected);
                 break;
             case 'save': {
                 const script = this._finalized(this._selected);
