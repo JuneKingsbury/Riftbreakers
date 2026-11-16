@@ -294,14 +294,14 @@ export class ScriptEditor {
         }).join('');
 
         this._root.innerHTML = `
-            <div style="background:#0d0d1e;border:1px solid #447;border-radius:8px;width:min(980px,96vw);height:min(720px,92vh);display:flex;flex-direction:column;">
-                <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;border-bottom:1px solid #335;">
+            <div class="se-panel" style="background:#0d0d1e;border:1px solid #447;border-radius:8px;width:min(980px,96vw);height:min(720px,92vh);display:flex;flex-direction:column;">
+                <div class="se-header" style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;border-bottom:1px solid #335;">
                     <span style="color:#ffcc44;font-weight:bold;font-size:15px;">Party Tactics</span>
-                    <span style="color:#778;font-size:11px;">Rules run top to bottom. The first rule whose conditions hold and whose action is possible fires. Moving and turning are free, and an attack, defend or wait ends the turn.</span>
+                    <span class="se-help" style="color:#778;font-size:11px;">Rules run top to bottom. The first rule whose conditions hold and whose action is possible fires. Moving and turning are free, and an attack, defend or wait ends the turn.</span>
                     <button data-act="close" style="${BTN}">Close</button>
                 </div>
-                <div style="display:flex;flex:1;min-height:0;">
-                    <div style="width:170px;padding:10px;border-right:1px solid #335;overflow-y:auto;">${list}</div>
+                <div class="se-body" style="display:flex;flex:1;min-height:0;">
+                    <div class="se-list" style="width:170px;padding:10px;border-right:1px solid #335;overflow-y:auto;">${list}</div>
                     <div data-scroll style="flex:1;padding:12px 14px;overflow-y:auto;">
                         ${this._modeBanner(cd, dirty)}
                         <div style="color:#aab;margin-bottom:8px;"><b>${esc(cd.name)}</b> knows: ${abilities.filter(k => ABILITIES[k] && !ABILITIES[k].passive).map(k => esc(ABILITIES[k].name)).join(', ')}</div>
@@ -310,7 +310,7 @@ export class ScriptEditor {
                         <button data-act="add-rule" style="${BTN}"${draft.rules.length >= MAX_RULES ? ' disabled' : ''}>+ Add rule (${draft.rules.length}/${MAX_RULES})</button>
                     </div>
                 </div>
-                <div style="display:flex;gap:8px;align-items:center;padding:10px 16px;border-top:1px solid #335;">
+                <div class="se-footer" style="display:flex;gap:8px;align-items:center;padding:10px 16px;border-top:1px solid #335;">
                     <button data-act="save" style="${BTN}color:#8f8;border-color:#464;"${blocked || !dirty ? ' disabled' : ''}>Save ${esc(cd.name)}</button>
                     <button data-act="revert" style="${BTN}"${dirty ? '' : ' disabled'}>Revert changes</button>
                     <button data-act="reset" style="${BTN}"${hasCustomScript(cd.name) || dirty ? '' : ' disabled'}>Use default behavior</button>

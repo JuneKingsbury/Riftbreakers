@@ -17,20 +17,28 @@ export class RunMapRenderer {
     constructor(canvas) {
         this.canvas = canvas;
         this.ctx = canvas.getContext('2d');
-        this.mapWidth = 600;      // drawable width (canvas minus the sidebar)
+        this.mapWidth = 600;      // drawable width (canvas minus a side panel)
+        this.insets = { top: 0, bottom: 0, right: 0 };
         this.scrollY = 0;         // 0 = bottom of the map in view
         this.hoveredId = null;
     }
 
-    resize(w, h, sidebarW) {
+    // insets: pixels the HUD covers on each side ({ top, bottom, right }).
+    resize(w, h, insets = {}) {
         const dpr = window.devicePixelRatio || 1;
         this.canvas.width = Math.round(w * dpr);
         this.canvas.height = Math.round(h * dpr);
         this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         this.w = w;
         this.h = h;
-        this.mapWidth = Math.max(320, w - sidebarW);
+        this.insets = { top: 0, bottom: 0, right: 0, ...insets };
+        this.mapWidth = Math.max(240, w - this.insets.right);
         this._clamp();
+    }
+
+    // Height of the part of the canvas the HUD leaves visible.
+    get viewHeight() {
+        return Math.max(100, this.h - this.insets.top - this.insets.bottom);
     }
 
     get contentHeight() {
@@ -38,7 +46,7 @@ export class RunMapRenderer {
     }
 
     _clamp() {
-        const max = Math.max(0, this.contentHeight - this.h);
+        const max = Math.max(0, this.contentHeight - this.viewHeight);
         this.scrollY = Math.max(0, Math.min(max, this.scrollY));
     }
 
@@ -49,17 +57,19 @@ export class RunMapRenderer {
 
     // Scroll so `floor` sits about a third of the way up the screen.
     focusFloor(floor) {
-        this.scrollY = (floor - 1) * ROW_H + MARGIN_Y - this.h * 0.35;
+        this.scrollY = (floor - 1) * ROW_H + MARGIN_Y - this.viewHeight * 0.35;
         this._clamp();
     }
 
     nodePos(node) {
-        const colW = Math.min(110, (this.mapWidth - 80) / LANES);
+        const colW = Math.min(110, (this.mapWidth - 30) / LANES);
         const left = (this.mapWidth - colW * LANES) / 2;
         const boss = node.type === 'boss';
         const x = left + (node.lane + 0.5) * colW + (boss ? 0 : jitter(node.id, 1) * colW * 0.35);
-        const y = this.h - MARGIN_Y - (node.floor - 1) * ROW_H + this.scrollY + (boss ? -10 : jitter(node.id, 2) * ROW_H * 0.3);
-        return { x, y, r: boss ? 26 : 15 };
+        const y = this.h - this.insets.bottom - MARGIN_Y - (node.floor - 1) * ROW_H + this.scrollY + (boss ? -10 : jitter(node.id, 2) * ROW_H * 0.3);
+        // Narrow screens get smaller nodes so neighbouring lanes don't overlap.
+        const r = Math.min(boss ? 26 : 15, Math.max(boss ? 18 : 11, colW * 0.3));
+        return { x, y, r: boss ? Math.max(r, 20) : r };
     }
 
     nodeAt(run, px, py) {
@@ -79,7 +89,7 @@ export class RunMapRenderer {
         // Faint floor bands
         ctx.fillStyle = 'rgba(255,255,255,0.02)';
         for (let f = 1; f <= BOSS_FLOOR; f += 2) {
-            const y = this.h - MARGIN_Y - (f - 1) * ROW_H + this.scrollY;
+            const y = this.h - this.insets.bottom - MARGIN_Y - (f - 1) * ROW_H + this.scrollY;
             ctx.fillRect(0, y - ROW_H / 2, this.mapWidth, ROW_H);
         }
 
@@ -133,7 +143,7 @@ export class RunMapRenderer {
             ctx.stroke();
 
             ctx.fillStyle = done ? '#a98' : info.color;
-            ctx.font = `bold ${n.type === 'boss' ? 26 : 16}px ${FONT}`;
+            ctx.font = `bold ${Math.round(p.r * (n.type === 'boss' ? 1 : 1.07))}px ${FONT}`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText(info.icon, p.x, p.y + 1);

@@ -4839,3 +4839,76 @@ details.settings-debug > summary::marker {
     height: 100%;
     padding: 0;
 }
+
+/* ===== Portrait screens (phones held upright): see js/ui/layout.js ===== */
+/* Battle HUD: the unit list moves from the right edge to a strip along the bottom. */
+body.portrait .tac-sidebar {
+    top: auto !important; bottom: 0 !important; left: 0 !important; right: 0 !important;
+    width: 100% !important; height: 28vh !important; max-height: 230px;
+    border-left: none !important; border-top: 1px solid #335;
+    column-count: 2; column-gap: 10px;
+    padding-bottom: max(8px, env(safe-area-inset-bottom)) !important;
+}
+body.portrait .tac-sidebar > * { break-inside: avoid; }
+body.portrait .tac-log {
+    right: 0 !important; bottom: min(28vh, 230px) !important; height: 32px !important; padding: 3px 8px !important;
+}
+body.portrait .tac-log > div { font-size: 10px !important; line-height: 13px !important; }
+body.portrait .tac-controls { top: max(8px, env(safe-area-inset-top)) !important; max-width: 96vw; }
+body.portrait .tac-controls [data-decision] { max-width: 92vw !important; }
+body.portrait .tac3d-compass { top: max(70px, calc(env(safe-area-inset-top) + 62px)) !important; }
+body.touch .tac-hint, body.portrait .tac-hint { display: none !important; }
+body.touch .tac-controls button { padding: 8px 12px !important; font-size: 13px !important; }
+
+/* Deploy screen: the side panel becomes a bottom sheet with the party in two columns. */
+body.portrait .deploy-panel {
+    top: auto !important; bottom: 0 !important; width: 100% !important; height: auto !important;
+    max-height: 46vh; border-right: none !important; border-top: 1px solid #335;
+    padding-bottom: max(10px, env(safe-area-inset-bottom)) !important;
+}
+body.portrait .deploy-panel .deploy-help { margin-bottom: 6px !important; padding-bottom: 4px !important; }
+body.portrait .deploy-panel .deploy-enemy { display: inline-block; margin-right: 10px; }
+body.portrait .deploy-panel .deploy-gap { height: 4px !important; }
+body.portrait .deploy-panel .deploy-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 0 6px; }
+body.portrait .deploy-panel .deploy-card { min-width: 0; }
+body.portrait .deploy-panel .deploy-footer {
+    display: flex; gap: 6px; align-items: center; flex-wrap: wrap;
+    position: sticky; bottom: calc(-1 * max(10px, env(safe-area-inset-bottom))); background: rgba(8,8,20,0.98);
+    padding-bottom: 4px;
+}
+body.portrait .deploy-panel .deploy-keys { width: 100%; margin-bottom: 2px !important; }
+body.portrait .deploy-panel .deploy-footer button { flex: 1; margin: 0 !important; padding: 10px !important; }
+
+/* Tactics editor: characters in a row along the top, buttons wrap at the bottom. */
+body.portrait .se-panel { width: 100vw !important; height: 100dvh !important; border-radius: 0 !important; }
+body.portrait .se-header { padding: max(8px, env(safe-area-inset-top)) 10px 8px !important; }
+body.portrait .se-help { display: none; }
+body.portrait .se-body { flex-direction: column; }
+body.portrait .se-list {
+    width: auto !important; border-right: none !important; border-bottom: 1px solid #335;
+    display: flex; gap: 4px; overflow-x: auto; overflow-y: hidden; padding: 6px !important; flex-shrink: 0;
+}
+body.portrait .se-list button { width: auto !important; min-width: 110px; margin: 0 !important; white-space: nowrap; }
+body.portrait .se-footer { flex-wrap: wrap; padding: 8px 10px max(8px, env(safe-area-inset-bottom)) !important; }
+body.portrait .se-footer button { flex: 1; }
+
+/* Run screens: modals use nearly the whole width of a phone. */
+body.portrait .rk-modal-body { width: 96% !important; padding: 14px 12px !important; max-height: 88dvh !important; }
+body.touch .rk-modal-body button { min-height: 34px; }
+body.portrait .se-panel select, body.portrait .se-panel input { max-width: 100%; box-sizing: border-box; }
+
+/* Narrow or short landscape screens (e.g. a phone on its side). */
+@media (max-width: 1100px), (max-height: 500px) {
+    .tac3d-compass { top: 70px !important; }
+}
+@media (max-height: 500px) {
+    .tac-log { height: 48px !important; }
+    .tac-log > div { font-size: 10px !important; line-height: 13px !important; }
+}
+/* The deploy panel's Begin/Cancel buttons stay in view however tall the party list gets. */
+.deploy-panel .deploy-footer { position: sticky; bottom: -10px; background: rgba(8,8,20,0.98); padding-bottom: 6px; }
+/* Log rows keep their height; the oldest just scroll out of the top. */
+.tac-log > div { flex-shrink: 0; }
+@media (max-height: 500px) {
+    .tac3d-compass { top: 86px !important; }
+}

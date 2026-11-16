@@ -64,12 +64,19 @@ export class BattleUI {
 
     setActionHandler(fn) { this._onAction = fn; }
 
+    // Pixels the HUD covers at the bottom of the screen (the unit list and log in portrait).
+    bottomInset() {
+        const top = Math.min(this._sidebar.getBoundingClientRect().top, this._log.getBoundingClientRect().top);
+        return Math.max(0, window.innerHeight - top);
+    }
+
     // fn('pause') toggles pause, fn('speed', n) sets the speed multiplier.
     setPlaybackHandler(fn) { this._onPlayback = fn; }
 
     // Pause / speed buttons and a readout of the rule the last scripted unit fired.
     _makeControls() {
         const el = document.createElement('div');
+        el.className = 'tac-controls';
         el.style.cssText = `
             position: absolute; top: 24px; left: 50%; transform: translateX(-50%);
             display: flex; flex-direction: column; align-items: center; gap: 4px;
@@ -116,6 +123,7 @@ export class BattleUI {
 
     _makeSidebar() {
         const el = document.createElement('div');
+        el.className = 'tac-sidebar';
         el.style.cssText = `
             position: absolute; top: 0; right: 0; width: 190px; height: 100%;
             background: rgba(8,8,20,0.92); border-left: 1px solid #335;
@@ -141,6 +149,7 @@ export class BattleUI {
 
     _makeLog() {
         const el = document.createElement('div');
+        el.className = 'tac-log';
         el.style.cssText = `
             position: absolute; bottom: 0; left: 0; right: 190px; height: 65px;
             background: rgba(8,8,20,0.88); border-top: 1px solid #335;
@@ -167,6 +176,7 @@ export class BattleUI {
 
     _makeHint() {
         const el = document.createElement('div');
+        el.className = 'tac-hint';
         el.style.cssText = `
             position: absolute; top: 6px; left: 8px;
             font-size: 10px; color: #556; pointer-events: none;

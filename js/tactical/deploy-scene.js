@@ -7,6 +7,8 @@ import { CHARACTER_DATA } from './data/characters.js';
 import { buildUnits, encounterEnemies } from './build-units.js';
 import { Modal } from '../run/ui-kit.js';
 import { PartyMenu } from '../run/party-menu.js';
+import { attachTouchGestures } from './touch-gestures.js';
+import { isPortrait, isTouch } from '../ui/layout.js';
 
 // Minimal battle-like object the renderer can consume without running the CT engine.
 class DeployPreview {
@@ -98,6 +100,7 @@ export class DeployScene {
         }
         // The side panel covers the left 220px, so center the map in what is left.
         this._renderer.setInsets(220, 0);
+        this._detachTouch = attachTouchGestures(this._renderer.canvas, this._renderer);
         this._renderer.onCenterRequest = () => this._centerOnMap();
         this._renderer.showFreeCameraButton(false);   // nothing to track while deploying
 
@@ -134,6 +137,11 @@ export class DeployScene {
 
     render(now) {
         if (this._stopped) return;
+        // The panel sits on the left in landscape and along the bottom in portrait.
+        if (this._renderer && this._overlay) {
+            if (isPortrait()) this._renderer.setInsets(0, 0, 0, this._overlay.offsetHeight);
+            else this._renderer.setInsets(220, 0);
+        }
         this._renderer?.render(this._preview, now);
     }
 
@@ -149,6 +157,7 @@ export class DeployScene {
             font-family:'Courier New',monospace; font-size:12px; color:#ccc;
             z-index:20;
         `;
+        el.className = 'deploy-panel';
         containerEl.appendChild(el);
         this._overlay = el;
         this._rebuildOverlay();
@@ -162,8 +171,8 @@ export class DeployScene {
 
         let html = `
             <div style="color:#ffcc44;font-weight:bold;font-size:14px;margin-bottom:2px;">Deploy Party</div>
-            <div style="color:#888;font-size:10px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #335;">
-                Select a party member then click a green tile to reposition them.
+            <div class="deploy-help" style="color:#888;font-size:10px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #335;">
+                ${isTouch() ? 'Tap' : 'Select'} a party member, then ${isTouch() ? 'tap' : 'click'} a highlighted tile to move them.
             </div>
         `;
 
@@ -176,13 +185,14 @@ export class DeployScene {
                 counts[label] = (counts[label] || 0) + 1;
             }
             for (const [name, n] of Object.entries(counts)) {
-                html += `<div style="color:#f88;font-size:11px;margin-bottom:2px;">&#x2694; ${name}${n > 1 ? ` ×${n}` : ''}</div>`;
+                html += `<div class="deploy-enemy" style="color:#f88;font-size:11px;margin-bottom:2px;">&#x2694; ${name}${n > 1 ? ` ×${n}` : ''}</div>`;
             }
-            html += `<div style="height:8px;"></div>`;
+            html += `<div class="deploy-gap" style="height:8px;"></div>`;
         }
 
         // Party members
-        html += `<div style="color:#fc8;font-size:10px;text-transform:uppercase;margin-bottom:6px;">Your Party</div>`;
+        html += `<div style="color:#fc8;font-size:10px;text-transform:uppercase;margin-bottom:6px;">Your Party</div>
+            <div class="deploy-cards">`;
         for (let i = 0; i < party.length; i++) {
             const member = party[i];
             const a = member.appearance;
@@ -216,11 +226,12 @@ export class DeployScene {
                     </button>` : ''}
                 </div>`;
         }
+        html += `</div>`;
 
         html += `
-            <div style="margin-top:8px;padding-top:8px;border-top:1px solid #335;">
-                <div style="font-size:10px;color:#888;margin-bottom:8px;">
-                    Q/E rotate &bull; Drag to pan &bull; Scroll zoom &bull; Enter to begin
+            <div class="deploy-footer" style="margin-top:8px;padding-top:8px;border-top:1px solid #335;">
+                <div class="deploy-keys" style="font-size:10px;color:#888;margin-bottom:8px;">
+                    ${isTouch() ? 'Drag to pan &bull; Pinch to zoom' : 'Q/E rotate &bull; Drag to pan &bull; Scroll zoom &bull; Enter to begin'}
                 </div>
                 <button id="deploy-begin"
                         style="${BTN}background:#1a1428;border-color:#74a;color:#daf;
@@ -429,6 +440,7 @@ export class DeployScene {
     }
 
     _removeListeners() {
+        this._detachTouch?.();
         const c = this._renderer?.canvas;
         if (c) {
             c.removeEventListener('mousedown',   this._onMouseDown);

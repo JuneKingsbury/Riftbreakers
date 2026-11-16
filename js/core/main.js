@@ -1,6 +1,8 @@
 import { SkinManager } from '../ui/skin-manager.js';
+import { watchLayout } from '../ui/layout.js';
 
 document.addEventListener('DOMContentLoaded', () => {
+    watchLayout();
     const startScreen   = document.getElementById('start-screen');
     const settingsPanel = document.getElementById('start-settings-panel');
     const creditsPanel  = document.getElementById('credits-panel');
