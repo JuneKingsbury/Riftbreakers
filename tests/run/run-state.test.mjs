@@ -169,7 +169,7 @@ test('recruits join up to six; a full party gets JP instead', () => {
     assert.deepEqual(run.party.map(totalXp), xps.map(x => x + 40));
 });
 
-test('shop: buy and sell; equipping moves items and respects job armour types', () => {
+test('shop: buy and sell; equipping moves items and respects class armor types', () => {
     const run = newRun();
     run.gold = 1000;
     enter(run, 'shop');
@@ -187,8 +187,8 @@ test('shop: buy and sell; equipping moves items and respects job armour types', 
     assert.ok(!run.equip(evoker.name, 'armorKey', 'iron_chainmail'), 'evokers wear cloth');
     assert.ok(run.equip(warden.name, 'armorKey', 'iron_chainmail'));
     assert.equal(warden.appearance.armorKey, 'iron_chainmail');
-    assert.equal(run.inventory.wool_tunic, 1, 'old armour back in the bag');
-    assert.ok(!run.equip(warden.name, 'helmetKey', 'wool_tunic'), 'wrong slot');
+    assert.equal(run.inventory.iron_brigandine, 1, 'old armor back in the bag');
+    assert.ok(!run.equip(warden.name, 'helmetKey', 'iron_brigandine'), 'wrong slot');
 });
 
 test("a gear passive works on top of the member's chosen slot, and goes with the item", () => {

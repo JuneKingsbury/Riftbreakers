@@ -14,7 +14,7 @@ const COLORS = ['#4488ff', '#cc44ff', '#44cc66', '#ffcc44', '#44ccdd', '#cc8844'
 
 // What each starting role carries when it joins: { armorKey, helmetKey, weaponKey, toolKey }.
 export const STARTING_GEAR = {
-    warden:      { armorKey: 'wool_tunic',     helmetKey: 'wool_cap',    weaponKey: 'wooden_wand', toolKey: 'iron_shield' },
+    warden:      { armorKey: 'iron_brigandine', helmetKey: 'iron_helmet', weaponKey: 'wooden_wand', toolKey: 'iron_shield' },
     evoker:      { armorKey: 'wool_tunic',     helmetKey: 'wool_cap',    weaponKey: 'wooden_wand', toolKey: null },
     runebow:     { armorKey: 'leather_jacket', helmetKey: 'leather_cap', weaponKey: 'short_bow',   toolKey: 'hunters_quiver' },
     spellblade:  { armorKey: 'leather_vest',   helmetKey: 'leather_cap', weaponKey: 'iron_sword',  toolKey: null },

@@ -5,6 +5,7 @@ import { TITLE_MUSIC } from '../audio/game-sounds.js';
 import { wireSavePanel } from '../ui/save-panel.js';
 import { mountStartBackdrop } from '../ui/start-backdrop.js';
 import { renderSkillPlanEditor } from '../ui/skill-plan-panel.js';
+import { runSplash } from '../ui/splash.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     watchLayout();
@@ -12,6 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const settingsPanel = document.getElementById('start-settings-panel');
     const creditsPanel  = document.getElementById('credits-panel');
     const modalBackdrop = document.getElementById('modal-backdrop');
+    runSplash(startScreen);
 
     // --- Skin manager (shared with tactical scenes) ---
     const skinManager = new SkinManager();

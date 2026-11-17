@@ -123,7 +123,8 @@ export const JOB_DATA = {
         char: 'A', color: '#88ccaa',
         schools: ['abjuration'],
         desc: 'A defensive mage who keeps allies standing with barriers, wards and simple healing. The Warden deals little damage, but the party lasts much longer with one around.',
-        allowedEquipment: { armor: ['cloth', 'medium'], helmet: ['cloth', 'medium'], weapon: ['magic', 'blade'], tool: ['shield', 'implement'] },
+        // A protector: armored, with a shield, casting its wards through a wand or staff.
+        allowedEquipment: { armor: ['medium'], helmet: ['medium'], weapon: ['magic'], tool: ['shield', 'implement'] },
     },
 
     runebow: {
@@ -146,7 +147,7 @@ export const JOB_DATA = {
         char: 'J', color: '#aaccff',
         schools: ['conjuration'],
         desc: 'An archer who inscribes runes onto arrows to strike from afar. The Runebow mixes plain arrows with conjured magic shots and moves faster than most mages, but lacks raw magical punch.',
-        allowedEquipment: { armor: ['light'], helmet: ['light'], weapon: ['bow', 'crossbow', 'magic'], tool: ['quiver', 'implement'] },
+        allowedEquipment: { armor: ['light'], helmet: ['light'], weapon: ['bow', 'crossbow'], tool: ['quiver', 'implement'] },
     },
 
     stoneshaper: {
@@ -295,6 +296,7 @@ export const JOB_DATA = {
     // ============================================================
 
     battlemage: {
+        equipmentExpansions: { weapon: ['blade'], armor: ['light'], helmet: ['light'] },
         maxHp: 52, maxMp: 36,
         spd: 8, atk: 12, def: 7, mat: 12, mdf: 7,
         move: 3, eva: 14,
@@ -334,6 +336,7 @@ export const JOB_DATA = {
     },
 
     riftcaller: {
+        equipmentExpansions: { weapon: ['magic'] },
         maxHp: 34, maxMp: 56,
         spd: 8, atk: 5, def: 3, mat: 16, mdf: 8,
         move: 4, eva: 16,
@@ -353,6 +356,7 @@ export const JOB_DATA = {
     },
 
     earthshaker: {
+        equipmentExpansions: { weapon: ['magic'] },
         maxHp: 56, maxMp: 32,
         spd: 6, atk: 10, def: 9, mat: 13, mdf: 8,
         move: 3, eva: 10,
@@ -372,6 +376,7 @@ export const JOB_DATA = {
     },
 
     sanctifier: {
+        equipmentExpansions: { weapon: ['magic'], armor: ['cloth'], helmet: ['cloth'] },
         maxHp: 44, maxMp: 52,
         spd: 7, atk: 6, def: 8, mat: 11, mdf: 13,
         move: 3, eva: 12,
@@ -391,6 +396,7 @@ export const JOB_DATA = {
     },
 
     spiritbinder: {
+        equipmentExpansions: { weapon: ['magic'], armor: ['cloth'], helmet: ['cloth'] },
         maxHp: 38, maxMp: 50,
         spd: 8, atk: 6, def: 4, mat: 14, mdf: 9,
         move: 4, eva: 16,
@@ -410,6 +416,7 @@ export const JOB_DATA = {
     },
 
     worldsinger: {
+        equipmentExpansions: { weapon: ['magic'] },
         maxHp: 40, maxMp: 46,
         spd: 7, atk: 6, def: 5, mat: 13, mdf: 10,
         move: 4, eva: 14,
@@ -467,6 +474,7 @@ export const JOB_DATA = {
     },
 
     beastcaller: {
+        equipmentExpansions: { weapon: ['magic'] },
         maxHp: 48, maxMp: 36,
         spd: 9, atk: 13, def: 6, mat: 10, mdf: 7,
         move: 4, eva: 18,
@@ -545,6 +553,7 @@ export const JOB_DATA = {
     },
 
     gravewarden: {
+        equipmentExpansions: { armor: ['medium'], helmet: ['medium'] },
         maxHp: 50, maxMp: 46,
         spd: 7, atk: 7, def: 9, mat: 12, mdf: 12,
         move: 3, eva: 10,
@@ -602,6 +611,7 @@ export const JOB_DATA = {
     },
 
     marshal: {
+        equipmentExpansions: { armor: ['heavy'], helmet: ['heavy'] },
         maxHp: 64, maxMp: 24,
         spd: 7, atk: 13, def: 13, mat: 4, mdf: 10,
         move: 3, eva: 10,

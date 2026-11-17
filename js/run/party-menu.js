@@ -1,16 +1,16 @@
 // Party menu: each member's level, HP, stats, skills to learn and upgrade with skill points, passive slots,
 // equipment and promotion. Works on a RunState and saves it after every change.
-import { createUnitFromCharData } from '../tactical/units.js';
+import { previewUnit, STATS } from './member-stats.js';
+import { GearScreen } from './gear-screen.js';
 import { Sound } from '../audio/sound.js';
 import { ABILITIES } from '../tactical/data-registry.js';
 import { JOB_DATA } from '../tactical/data/jobs.js';
-import { EQUIPMENT, EQUIP_FIELDS, equipmentStatBonuses, equipmentGrants } from '../tactical/data/equipment.js';
+import { EQUIPMENT, EQUIP_FIELDS, equipmentGrants } from '../tactical/data/equipment.js';
 import {
     LOADOUT_SLOTS, abilitySlot, isLearned, learnBlocker, memberJobs, equippable, skillRank, canUpgrade,
     upgradeCost, canSpendPoints, canPromote, promotionOptions, buildLoadout, PROMOTION_LEVEL, XP_PER_LEVEL,
 } from '../tactical/loadout.js';
 import { MAX_RANK, isUpgradeable, rankedKey, rankChanges } from '../tactical/data-registry.js';
-import { relicStatMods } from './data/relics.js';
 import { MAX_PARTY } from './run-state.js';
 import {
     BTN, BTN_DISABLED, BTN_GOLD, GLOW, esc, jobLabel, abilityName, abilityTooltip, itemTitle,
@@ -23,21 +23,8 @@ import { renderSkillPlanEditor } from '../ui/skill-plan-panel.js';
 const NUMERAL = ['', 'I', 'II', 'III'];
 
 const SLOT_LABEL = { armorKey: 'Armor', helmetKey: 'Helmet', weaponKey: 'Weapon', toolKey: 'Tool' };
-const STATS = [['maxHp', 'HP'], ['maxMp', 'MP'], ['atk', 'ATK'], ['def', 'DEF'], ['mat', 'MAT'], ['mdf', 'MDF'], ['spd', 'SPD'], ['move', 'MOV'], ['eva', 'EVA']];
-
-function addMods(...mods) {
-    const out = {};
-    for (const m of mods) for (const [k, v] of Object.entries(m || {})) out[k] = (out[k] || 0) + v;
-    return out;
-}
-
-// The member as a battle unit would be built (equipment and relics included), for its stats.
-export function previewUnit(run, member) {
-    return createUnitFromCharData({
-        ...member,
-        statMods: addMods(member.statMods, equipmentStatBonuses(member.appearance), relicStatMods(run.relics)),
-    });
-}
+// Kept for anything importing it from here.
+export { previewUnit };
 
 export class PartyMenu {
     // modal: a ui-kit Modal. onChange: called after any change (the caller saves the run).
@@ -47,6 +34,7 @@ export class PartyMenu {
         this.skin = skinManager;
         this.onChange = onChange || (() => {});
         this.onClose = onClose || null;
+        this.gear = new GearScreen(modal, run, skinManager, { onChange: () => this._changed() });
     }
 
     _changed() {
@@ -265,31 +253,8 @@ export class PartyMenu {
         return html;
     }
 
+    // The equipment screen, on this member with the bag filtered to the slot. Back returns here.
     showEquipPicker(name, field) {
-        const run = this.run;
-        const m = run.member(name);
-        const slot = field.replace('Key', '');
-        const keys = Object.keys(run.inventory).filter(k => EQUIPMENT[k]?.slot === slot);
-        let html = `<div style="color:#ffcc44;font-weight:bold;font-size:14px;margin-bottom:8px;">${esc(m.name)}: ${SLOT_LABEL[field]}</div>`;
-        const cur = m.appearance?.[field];
-        if (cur) {
-            html += `<div style="color:#888;font-size:10px;margin-bottom:6px;">Equipped: ${itemTitle(cur)}<br>${esc(itemSummary(cur))}</div>
-                <button data-pick="" style="${BTN}">Unequip</button>`;
-        }
-        if (!keys.length) html += `<div style="color:#666;margin:8px 0;">Nothing in the bag fits this slot.</div>`;
-        for (const k of keys) {
-            const ok = run.canEquip(m, k);
-            html += `<button data-pick="${k}" style="${BTN}${ok ? '' : BTN_DISABLED}display:flex;gap:8px;align-items:center;" ${ok ? '' : 'disabled'}>
-                ${itemIconHtml(k)}
-                <span style="flex:1;">${itemTitle(k)} <span style="color:#888;">×${run.inventory[k]}</span><br>
-                <span style="color:#889;font-size:10px;">${esc(itemSummary(k))}${ok ? '' : ` · ${jobLabel(m.job)} can't use this`}</span></span>
-            </button>`;
-        }
-        const body = this.modal.show(html, { width: 460, onBack: () => this.showMember(name), onClose: this.onClose, view: `equip:${name}:${field}`, returnTo: `member:${name}` });
-        drawSprites(body, run.party, this.skin);
-        body.querySelectorAll('[data-pick]').forEach(b => b.addEventListener('click', () => {
-            if (run.equip(name, field, b.dataset.pick || null)) { Sound.playSfx('equip'); this._changed(); }
-            this.showMember(name);
-        }));
+        this.gear.show(name, { slot: field, onBack: () => this.showMember(name), onClose: this.onClose });
     }
 }

@@ -72,6 +72,7 @@ export class RunMapScene {
             fight: () => this._startBattle(),
             leave: () => this._leaveNode(),
             openParty: (onClose) => this._openParty(onClose),
+            openGear: (onClose) => this._openGear(onClose),
             changed: () => this._changed(),
             finish: () => this._finish(),
         });
@@ -89,6 +90,7 @@ export class RunMapScene {
             if (this._modal.isOpen) return;
             if (e.key === 'p' || e.key === 'P') this._openParty();
             if (e.key === 't' || e.key === 'T') this._openTactics();
+            if (e.key === 'g' || e.key === 'G') this._openGear(this.run.pending ? () => this._screens.show() : null);
         });
 
         this._sidebarKey = null;
@@ -206,6 +208,10 @@ export class RunMapScene {
         this._party.showList();
     }
 
+    _openGear(onClose = null) {
+        this._party.gear.show(null, { onClose });
+    }
+
     _openTactics() {
         openScriptEditor(this.run.party, {
             onSaved: (name) => { this._changed(); this._toast.show(`${name}'s tactics saved.`); },
@@ -222,6 +228,7 @@ export class RunMapScene {
                 this._party.showMember(btn.dataset.member);
                 break;
             case 'tactics': this._openTactics(); break;
+            case 'gear': this._openGear(this.run.pending ? () => this._screens.show() : null); break;
             case 'menu': this._openMenu(); break;
             case 'resume': this._screens.show(); break;
             case 'abandon':
@@ -315,6 +322,7 @@ export class RunMapScene {
 
         const btn = (action, label, extra = '') => `<button data-action="${action}" style="${BTN}margin:0;flex:1;text-align:center;padding:10px 4px;${extra}">${label}</button>`;
         let bottom = btn('party', `☰ Party${spend ? ' <span style="color:#afa;">●</span>' : ''}`, `color:#adf;border-color:#448;${spend ? GLOW : ''}`)
+            + btn('gear', '⚔ Gear', 'color:#fda;border-color:#664;')
             + btn('tactics', '⚙ Tactics', 'color:#cf9;border-color:#575;');
         if (run.pending && run.status === 'active') bottom += btn('resume', `› ${esc(NODE_INFO[run.currentNode?.type]?.label ?? 'Node')}`, 'color:#fc8;border-color:#664;');
         bottom += btn('menu', '≡ Menu');
@@ -348,6 +356,7 @@ export class RunMapScene {
 
         html += `<div style="height:6px;"></div>
             <button data-action="party" style="${BTN}color:#adf;border-color:#448;${run.party.some(canSpendPoints) ? GLOW : ''}">☰ Party <span style="color:#666;font-size:10px;">(P)</span>${run.party.some(canSpendPoints) ? ' <span style="color:#afa;font-size:10px;">● skill points!</span>' : ''}</button>
+            <button data-action="gear" style="${BTN}color:#fda;border-color:#664;">⚔ Equipment <span style="color:#666;font-size:10px;">(G)</span></button>
             <button data-action="tactics" style="${BTN}color:#cf9;border-color:#575;">⚙ Tactics <span style="color:#666;font-size:10px;">(T, optional)</span></button>`;
         if (run.pending && run.status === 'active') {
             html += `<button data-action="resume" style="${BTN}color:#fc8;border-color:#664;">› Return to ${esc(NODE_INFO[run.currentNode?.type]?.label ?? 'node')}</button>`;

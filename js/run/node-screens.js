@@ -32,7 +32,7 @@ function relicHtml(key) {
 }
 
 export class NodeScreens {
-    // hooks: { fight(), leave(), openParty(onClose), changed(), finish() }
+    // hooks: { fight(), leave(), openParty(onClose), openGear(onClose), changed(), finish() }
     constructor(modal, run, skinManager, hooks) {
         this._chimed = new WeakSet();   // reward screens whose level-up chime has played
         this.modal = modal;
@@ -75,11 +75,15 @@ export class NodeScreens {
 
     _partyButton() {
         const spend = this.run.party.some(canSpendPoints);
-        return `<button data-party style="${BTN}color:#adf;border-color:#448;${spend ? GLOW : ''}">☰ Party · gear &amp; skills${spend ? ' <span style="color:#afa;">● skill points to spend</span>' : ''}</button>`;
+        return `<div style="display:flex;gap:6px;">
+            <button data-party style="${BTN}flex:1;color:#adf;border-color:#448;${spend ? GLOW : ''}">☰ Party · skills${spend ? ' <span style="color:#afa;">● points to spend</span>' : ''}</button>
+            <button data-gear style="${BTN}flex:1;color:#fda;border-color:#664;">⚔ Equipment</button>
+        </div>`;
     }
 
     _wireParty(on) {
         on('[data-party]', () => this.hooks.openParty(() => this.show()));
+        on('[data-gear]', () => this.hooks.openGear(() => this.show()));
     }
 
     // ---- Battle briefing ----

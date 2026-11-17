@@ -49,6 +49,15 @@ path through battles, elites, events, shops, rest sites, treasure and recruits, 
   into one of two Tier 2 jobs, at any time from the Party menu (it costs nothing). Equipment adds stats and can grant
   abilities (`data/equipment.js`): actions join the skill list, and passives (e.g. Ghost Step) are
   always on, on top of the reaction/support/movement the character chose, and relics are party-wide modifiers (`js/run/data/relics.js`).
+- **Equipment screen:** Equipment (G on the map, the Change buttons in the Party menu, or the
+  button on node screens) shows one character on a paper doll beside the party's shared bag
+  (`js/run/gear-screen.js`). Tabs or ← → switch characters. Hovering an item (a first tap on
+  touch screens) previews it on the doll with every stat change; clicking it equips it. The
+  numbers come from `member-stats.js`, the same calculation battles use.
+- **Equipment rules:** each class's `allowedEquipment` (`data/jobs.js`) fits its role, and a
+  promoted class adds to its starting class's list with `equipmentExpansions` (e.g. Battlemage
+  gains blades, Marshal heavy armor). `tests/tactical/equipment-rules.test.mjs` checks that
+  starting gear is wearable and that magic-heavy classes can always hold a magic weapon.
 - **Skill plans:** Settings > Skill Plans (or Edit skill plan in the Party menu) sets, per class,
   an ordered list of skills to learn and upgrade (`js/run/skill-plans.js`). With auto-allocate
   on, members spend points on the next step as soon as they can afford it, saving up when it
@@ -68,6 +77,9 @@ path through battles, elites, events, shops, rest sites, treasure and recruits, 
   Each ability or move rule has a positioning style (`positionStyle` in `ai/script-runtime.js`):
   ranged roles default to Careful (stay out of enemy reach, attack from near max range, don't run
   ahead of the group, melee only as a last resort); everyone else defaults to Bold.
+- **Splash:** the studio splash from Rifthold plays on load (`js/ui/splash.js`, with
+  `icons/splash.gif`, `icons/splashBackgroundTile.png` and Pixelify Sans in `fonts/`). Any key
+  or tap skips it.
 - **State:** `RunState` (`run-state.js`) holds the whole run as plain data and autosaves to
   localStorage, so a run can be continued from the title screen. Between runs, renown buys
   unlocks (`profile.js`). The profile is saved separately, and loading cleans up damaged or

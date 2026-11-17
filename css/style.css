@@ -56,6 +56,80 @@ body {
     position: relative;
 }
 
+/* ---- Studio splash (js/ui/splash.js), as in Rifthold ---- */
+#splash-overlay {
+    position: fixed;
+    inset: 0;
+    background: #000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 20000;
+    transition: opacity 1s ease;
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+}
+#splash-bg {
+    position: absolute;
+    inset: -64px;
+    background: url('../icons/splashBackgroundTile.png') repeat;
+    background-size: 64px 64px;
+    image-rendering: pixelated;
+    animation: splash-scroll 16s linear infinite;
+    z-index: 0;
+}
+#splash-vignette {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at center, transparent 30%, rgba(0,0,0,0.85) 100%);
+    z-index: 1;
+    pointer-events: none;
+}
+@keyframes splash-scroll {
+    from { transform: translate(0, 0); }
+    to   { transform: translate(64px, 64px); }
+}
+#splash-overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+#splash-image {
+    max-width: 80vw;
+    max-height: 60vh;
+    opacity: 0;
+    transition: opacity 1.5s ease;
+    object-fit: contain;
+    position: relative;
+    z-index: 2;
+    image-rendering: pixelated;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-user-drag: none;
+    pointer-events: none;
+}
+#splash-image.visible, #splash-studio.visible {
+    opacity: 1;
+}
+#splash-studio {
+    font-family: 'Pixelify Sans', monospace;
+    color: #ffffff;
+    font-size: 35px;
+    margin-top: 16px;
+    opacity: 0;
+    transition: opacity 1.5s ease;
+    text-align: center;
+    position: relative;
+    z-index: 2;
+}
+@media (max-width: 500px) {
+    #splash-studio { font-size: 26px; }
+}
+@media (prefers-reduced-motion: reduce) {
+    #splash-bg { animation: none; }
+}
+
 #start-bg-canvas {
     position: absolute;
     inset: 0;
