@@ -1,5 +1,5 @@
 import { STATES } from './battle.js';
-import { ABILITIES } from './abilities.js';
+import { ABILITIES, passivesOf } from './abilities.js';
 
 // Rule labels and unit names can come from player-authored scripts.
 function esc(text) {
@@ -394,8 +394,6 @@ export class BattleUI {
     _patchSidebarRoster(sb, living, activeUnit, battle) {
         const activeBorderCol = activeUnit?.team === 'player' ? '#44ff8866' : '#ffcc4466';
         // Scale CT bars within each team so the leader shows full.
-        const maxCtPlayer = Math.max(1, ...living.filter(u => u.team === 'player').map(u => u.ct));
-        const maxCtEnemy  = Math.max(1, ...living.filter(u => u.team === 'enemy').map(u => u.ct));
         sb.querySelectorAll('.tac-roster-row').forEach(row => {
             const uid  = row.dataset.uid;
             const unit = living.find(u => String(u.id) === uid);
@@ -404,8 +402,10 @@ export class BattleUI {
             const isActive = unit === activeUnit;
             const hpF   = unit.hp / unit.maxHp;
             const hpC   = hpF > 0.5 ? '#3c3' : hpF > 0.25 ? '#cc3' : '#c33';
-            const maxCt = unit.team === 'player' ? maxCtPlayer : maxCtEnemy;
-            const ctPct = Math.round((unit.ct / maxCt) * 100);
+            // A full gauge (100 CT) means the unit is ready to act; a channeling unit shows its spell's progress.
+            const ctPct = unit._charging
+                ? Math.round(Math.min(1, unit._charging.ct / Math.max(1, unit._charging.needed)) * 100)
+                : Math.round(Math.min(1, unit.ct / 100) * 100);
             const ctC   = isActive ? (unit.team === 'player' ? '#44ff88' : '#ffcc44')
                                    : (unit.team === 'player' ? '#4af' : '#f64');
 
@@ -573,11 +573,13 @@ export class BattleUI {
             });
 
             // Equipped reaction / support / movement as non-clickable info
-            const slotted = ['reaction', 'support', 'movement'].filter(slot => ABILITIES[unit[slot]]);
-            if (slotted.length > 0) {
+            // (chosen ones, then any from equipment)
+            const passives = ['reaction', 'support', 'movement'].flatMap(slot => passivesOf(unit, slot).map(k => [k, slot]));
+            if (passives.length > 0) {
                 html += `<div style="font-size:10px;color:#666;margin-top:4px;padding-top:4px;border-top:1px solid #223;">`;
-                for (const slot of slotted) {
-                    html += `<div style="padding:2px 0;">${ABILITIES[unit[slot]].name} <span style="color:#555;">(${slot})</span></div>`;
+                for (const [k, slot] of passives) {
+                    const fromGear = k !== unit[slot];
+                    html += `<div style="padding:2px 0;">${ABILITIES[k].name} <span style="color:#555;">(${slot}${fromGear ? ', gear' : ''})</span></div>`;
                 }
                 html += `</div>`;
             }

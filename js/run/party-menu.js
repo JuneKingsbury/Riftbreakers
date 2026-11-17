@@ -6,7 +6,7 @@ import { JOB_DATA } from '../tactical/data/jobs.js';
 import { EQUIPMENT, EQUIP_FIELDS, equipmentStatBonuses, equipmentGrants } from '../tactical/data/equipment.js';
 import {
     LOADOUT_SLOTS, abilitySlot, isLearned, learnBlocker, memberJobs, equippable, skillRank, canUpgrade,
-    upgradeCost, canSpendPoints, canPromote, promotionOptions, PROMOTION_LEVEL, XP_PER_LEVEL,
+    upgradeCost, canSpendPoints, canPromote, promotionOptions, buildLoadout, PROMOTION_LEVEL, XP_PER_LEVEL,
 } from '../tactical/loadout.js';
 import { MAX_RANK, isUpgradeable, rankedKey } from '../tactical/data-registry.js';
 import { relicStatMods } from './data/relics.js';
@@ -189,7 +189,6 @@ export class PartyMenu {
 
     _slotsHtml(m) {
         let html = `<div style="color:#fc8;font-size:10px;text-transform:uppercase;margin:10px 0 4px;">Passive slots</div>`;
-        const granted = new Set(equipmentGrants(m.appearance).passives);
         for (const slot of LOADOUT_SLOTS) {
             const opts = equippable(m, slot);
             const cur = m.loadout?.[slot] || '';
@@ -197,10 +196,20 @@ export class PartyMenu {
                 <span style="width:70px;color:#a8f;font-size:10px;text-transform:uppercase;">${slot}</span>
                 <select data-slot="${slot}" style="flex:1;background:#151528;color:#ccc;border:1px solid #447;padding:3px;font-family:inherit;font-size:11px;border-radius:3px;">
                     <option value="">${opts.length ? '— none —' : '— none learned —'}</option>
-                    ${opts.map(k => `<option value="${k}" ${k === cur ? 'selected' : ''}>${esc(abilityName(k))}${granted.has(k) && !isLearned(m, k) ? ' (item)' : ''}</option>`).join('')}
+                    ${opts.map(k => `<option value="${k}" ${k === cur ? 'selected' : ''}>${esc(abilityName(rankedKey(k, skillRank(m, k))))}</option>`).join('')}
                 </select>
             </div>`;
             if (cur) html += `<div style="color:#667;font-size:10px;margin:-2px 0 6px 78px;">${esc(ABILITIES[cur]?.desc || '')}</div>`;
+        }
+        // Gear passives don't use a slot: they work on top of the chosen ones.
+        const bonus = buildLoadout(m).bonusPassives;
+        if (bonus.length) {
+            html += `<div style="color:#7bf;font-size:10px;text-transform:uppercase;margin:8px 0 4px;">From equipment (always on)</div>`;
+            for (const k of bonus) {
+                html += `<div style="padding:2px 0;"><span style="color:#ddd;">${esc(abilityName(k))}</span>
+                    <span style="color:#a8f;font-size:9px;text-transform:uppercase;"> ${esc(ABILITIES[k]?.slot)}</span>
+                    <div style="color:#667;font-size:10px;">${esc(ABILITIES[k]?.desc || '')}</div></div>`;
+            }
         }
         return html;
     }

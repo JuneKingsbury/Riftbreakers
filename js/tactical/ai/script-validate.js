@@ -1,7 +1,7 @@
 // Structural validation and sanitizing for scripts. Used by the editor to show
 // problems live and by the store so a corrupted save can never reach the interpreter.
 import { ABILITIES } from '../data-registry.js';
-import { CONDITIONS, ABILITY_CATEGORIES, ACTION_KINDS, MOVE_MODES, SIDES, PICKS, FILTER_KINDS, FACINGS } from './blocks.js';
+import { CONDITIONS, ABILITY_CATEGORIES, ACTION_KINDS, MOVE_MODES, SIDES, PICKS, FILTER_KINDS, FACINGS, POSITIONING } from './blocks.js';
 import { MAX_RULES } from './script-runtime.js';
 
 const MAX_COND_DEPTH = 6;
@@ -49,6 +49,7 @@ export function validateScript(script, unit = null) {
             }
         }
         if (a.do === 'move' && !MOVE_MODES[a.mode]) add(i, 'then', `Unknown move mode "${a.mode}".`);
+        if (a.position != null && !POSITIONING[a.position]) add(i, 'then', `Unknown positioning "${a.position}".`);
         if (a.do === 'pivot' && a.facing && !FACINGS.includes(a.facing)) add(i, 'then', `Unknown facing "${a.facing}".`);
 
         if (a.do === 'ability') {

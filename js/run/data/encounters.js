@@ -9,7 +9,8 @@
 //     map         Optional map id (js/tactical/data/maps); otherwise one is picked at random.
 //     easy        true: gentle enough for a run's opening fights (see EASY_FIGHTS)
 //
-// ACT_STAT_MODS scale every enemy of an act on top of their job stats; elites add ELITE_STAT_MODS.
+// ACT_STAT_MODS scale every enemy of an act on top of their job stats; elites (and bosses from
+// act 2) add ELITE_STAT_MODS.
 
 export const ENCOUNTERS = {
     1: {
@@ -243,11 +244,11 @@ export const ACT_COUNT = 3;
 
 export const ACT_STAT_MODS = {
     1: { maxHp: -4, atk: -1 },
-    2: { maxHp: 22, atk: 5, def: 3, mat: 5, mdf: 3 },
+    2: { maxHp: 26, atk: 6, def: 3, mat: 6, mdf: 3 },
     3: { maxHp: 32, atk: 7, def: 4, mat: 7, mdf: 4, spd: 1 },
 };
 
-export const ELITE_STAT_MODS = { maxHp: 4 };
+export const ELITE_STAT_MODS = { maxHp: 8, atk: 1, mat: 1 };
 
 // Gold and the XP every member earns, by encounter kind.
 export function battleRewards(kind, act) {
@@ -278,7 +279,9 @@ function addMods(...mods) {
 //   kind: 'normal' | 'elite' | 'boss'
 export function buildEncounter(def, kind, act, partySize, easy = false) {
     const roster = def.roster.slice(0, enemyCount(kind, partySize, easy, act));
-    const scale = addMods(ACT_STAT_MODS[act], kind === 'elite' ? ELITE_STAT_MODS : null);
+    // Elite fights, and boss fights after the first act, add ELITE_STAT_MODS to everyone.
+    const tough = kind === 'elite' || (kind === 'boss' && act > 1);
+    const scale = addMods(ACT_STAT_MODS[act], tough ? ELITE_STAT_MODS : null);
     return {
         id: def.id,
         name: def.name,

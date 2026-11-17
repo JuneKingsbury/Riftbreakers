@@ -17,9 +17,17 @@ path through battles, elites, events, shops, rest sites, treasure and recruits, 
   (`data/jobs.js`: cost and prerequisite per skill), and learned skills can be upgraded to rank II
   and III (`data-registry.js` generates the ranked versions). At level 5 a member can promote once
   into one of two Tier 2 jobs, at a rest site or after a boss. Equipment adds stats and can grant
-  abilities (`data/equipment.js`), and relics are party-wide modifiers (`js/run/data/relics.js`).
+  abilities (`data/equipment.js`): actions join the skill list, and passives (e.g. Ghost Step) are
+  always on, on top of the reaction/support/movement the character chose, and relics are party-wide modifiers (`js/run/data/relics.js`).
+- **Real time:** battles run in real time (`js/tactical/realtime.js`). Everyone acts at the
+  opening, then each unit acts whenever its speed gauge fills, while others are still moving.
+  A move-and-attack lands when the walker arrives. Commanding units by hand (the manual test
+  harness) keeps the turn-by-turn flow.
 - **Behavior:** by default each character follows rules generated from their current skills
   (`ai/default-scripts.js` `autoScriptFor`). The Tactics editor lets you replace them with your own.
+  Each ability or move rule has a positioning style (`positionStyle` in `ai/script-runtime.js`):
+  ranged roles default to Careful (stay out of enemy reach, attack from near max range, don't run
+  ahead of the group, melee only as a last resort); everyone else defaults to Bold.
 - **State:** `RunState` (`run-state.js`) holds the whole run as plain data and autosaves to
   localStorage, so a run can be continued from the title screen. Between runs, renown buys
   unlocks (`profile.js`).

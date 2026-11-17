@@ -8,7 +8,7 @@
 import { JOB_STATS, ABILITIES } from '../data-registry.js';
 import {
     CONDITIONS, COMPARATORS, STATUS_OPTIONS, TILE_TYPES, ABILITY_CATEGORIES,
-    SIDES, PICKS, FILTER_KINDS, MOVE_MODES, ACTION_KINDS, FACINGS, sideForAbility, scriptUsable,
+    SIDES, PICKS, FILTER_KINDS, MOVE_MODES, ACTION_KINDS, FACINGS, POSITIONING, sideForAbility, scriptUsable,
 } from './blocks.js';
 import { MAX_RULES } from './script-runtime.js';
 import { validateScript, hasErrors } from './script-validate.js';
@@ -217,18 +217,27 @@ export class ScriptEditor {
         if (a.do === 'ability') {
             html += ' ' + this._abilityPicker(a.ability, `${base}.ability`, ctx);
             html += ` <label title="Walk into range first if needed"><input type="checkbox" data-bind="${base}.approach" data-kind="check"${a.approach !== false ? ' checked' : ''}> approach</label>`;
+            html += this._positioning(a, base);
         } else if (a.do === 'move') {
             html += ' ' + this._select(Object.keys(MOVE_MODES), a.mode, `${base}.mode`, k => MOVE_MODES[k]);
             if (a.mode === 'keep_range') html += ` distance <input type="number" data-bind="${base}.range" data-kind="number" value="${esc(a.range ?? 3)}" style="${FIELD}width:44px;">`;
+            if (a.mode !== 'high_ground') html += this._positioning(a, base);
         } else if (a.do === 'pivot') {
             html += ' ' + this._select(FACINGS, a.facing ?? 'toward_target', `${base}.facing`, k => k.replace('_', ' '));
         }
         // Summons choose their own tile, so they have no target to edit.
         const picksOwnTile = a.do === 'ability' && sideForAbility(a.ability) === null && (a.ability === 'best_summon' || ABILITIES[a.ability]?.isSummon);
-        if ((a.do === 'ability' || a.do === 'move' || a.do === 'pivot') && !picksOwnTile) {
+        // Regrouping always heads for the nearest ally.
+        const noTarget = picksOwnTile || (a.do === 'move' && a.mode === 'regroup');
+        if ((a.do === 'ability' || a.do === 'move' || a.do === 'pivot') && !noTarget) {
             html += `<div style="margin-top:3px;">${this._targetEditor(rule, i, ctx)}</div>`;
         }
         return html;
+    }
+
+    // How the unit moves around enemies and allies when carrying out this rule.
+    _positioning(a, base) {
+        return ` <span title="Careful: stay out of enemy reach and near allies. Stay with group: don't charge in far ahead. Bold: go straight for it. Auto: careful for ranged attackers, bold otherwise.">positioning ${this._select(Object.keys(POSITIONING), a.position ?? 'auto', `${base}.position`, k => POSITIONING[k])}</span>`;
     }
 
     // Ability dropdown: "best of a kind" choices that adapt to the character, then each

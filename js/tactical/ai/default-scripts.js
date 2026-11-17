@@ -65,6 +65,10 @@ export function defaultScriptFor(job) {
 
 // ---- Automatic behavior from a character's abilities ----
 
+// Jobs that fight from range and should keep out of harm's way (see positionStyle in
+// script-runtime.js). Healers aren't listed: holding them back lost fights.
+export const RANGED_ROLES = new Set(['evoker', 'runebow', 'riftcaller', 'fatebinder', 'seer', 'spiritbinder', 'worldsinger']);
+
 const RANGED_KEEP = { evoker: 3, runebow: 4, riftcaller: 4, fatebinder: 3, seer: 3, spiritbinder: 3, worldsinger: 3, sanctifier: 3, lifeseer: 3, warden: 3 };
 const MELEE_JOBS = new Set(['novice', 'spellblade', 'battlemage', 'earthshaker', 'stoneshaper', 'paladin', 'beastcaller']);
 const HEALER_JOBS = new Set(['warden', 'sanctifier', 'lifeseer', 'paladin']);
@@ -73,8 +77,10 @@ const statusFilter = (status) => [{ kind: 'status', status, has: false }];
 
 // A script that uses every kind of ability in `abilities` (unit ability keys, any rank),
 // in priority order: revive and heal, cure, summon, ally support, self buffs, control
-// spells on healthy enemies, then the best attack. Ranged jobs keep their distance; melee jobs
-// brace when nearly dead. Rules that have nothing useful to do fall through to the next.
+// spells on healthy enemies, then the best attack. Ranged jobs regroup when cut off and keep
+// their distance; melee jobs brace when nearly dead. Every rule uses 'auto' positioning
+// (see positionStyle in script-runtime.js): careful for ranged attackers, bold otherwise.
+// Rules that have nothing useful to do fall through to the next.
 export function autoScriptFor(job, abilities = []) {
     const abs = [...new Set(abilities.map(baseKey))].filter(k => k !== 'attack' && ABILITIES[k] && !ABILITIES[k].passive);
     const of = (pred) => abs.filter(k => pred(ABILITIES[k]));
@@ -116,7 +122,13 @@ export function autoScriptFor(job, abilities = []) {
             { do: 'ability', ability: k, target: enemy('nearest', statusFilter(ab.applyStatus)), approach: true }));
     }
     const keep = RANGED_KEEP[job];
-    if (keep && !MELEE_JOBS.has(job)) rules.push(kite(id(), keep));
+    if (keep && !MELEE_JOBS.has(job)) {
+        // Cut off from the group and in reach of enemies: fall back to the others first.
+        if (RANGED_ROLES.has(job)) rules.push(rule(id(), 'Regroup when cut off and threatened',
+            { op: 'and', args: [test('self_isolated', { range: 5 }), test('self_threatened')] },
+            { do: 'move', mode: 'regroup' }));
+        rules.push(kite(id(), keep));
+    }
     rules.push(MELEE_JOBS.has(job)
         ? attack(id(), 'Attack the nearest enemy', 'nearest')
         : attack(id(), 'Hit the weakest enemy with the best attack', 'lowest_hp'));

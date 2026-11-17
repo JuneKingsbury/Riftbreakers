@@ -226,8 +226,10 @@ export class RunMapScene {
         if (!this.run.relics.length) html += `<div style="color:#555;font-size:10px;">None yet</div>`;
         for (const k of this.run.relics) {
             const r = RELICS[k];
-            html += `<div title="${esc(r.desc)}" style="font-size:11px;color:${RARITY_COLOR[r.rarity]};margin-bottom:3px;cursor:help;">◆ ${esc(r.name)}
-                ${isPortrait() ? `<div style="color:#889;font-size:10px;">${esc(r.desc)}</div>` : ''}</div>`;
+            // The effect is spelled out, not left to a hover tooltip: hovering doesn't exist on
+            // touch screens, and node screens cover the sidebar.
+            html += `<div style="font-size:11px;color:${RARITY_COLOR[r.rarity]};margin-bottom:5px;">◆ ${esc(r.name)}
+                <div style="color:#889;font-size:10px;line-height:1.35;">${esc(r.desc)}</div></div>`;
         }
         return html;
     }

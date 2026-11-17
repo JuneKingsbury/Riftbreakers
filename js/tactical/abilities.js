@@ -14,17 +14,62 @@ export function getEffectiveStat(unit, stat) {
     return val;
 }
 
-// The unit's equipped support ability, or null. Supports with an MP upkeep
-// switch off while the unit is out of MP.
-export function supportOf(unit) {
-    const ab = ABILITIES[unit?.support];
-    if (!ab) return null;
-    return (ab.passiveMpCost > 0 && unit.mp <= 0) ? null : ab;
+// A unit's passive abilities of one slot kind ('reaction' | 'support' | 'movement'): the
+// one chosen for the slot, then any its equipment grants on top (unit.bonusPassives).
+// The same skill from both counts once, at the chosen (possibly upgraded) rank.
+export function passivesOf(unit, slot) {
+    const out = [];
+    const chosen = unit?.[slot];
+    if (chosen && ABILITIES[chosen]) out.push(chosen);
+    for (const k of unit?.bonusPassives || []) {
+        const base = k.split('@')[0];
+        if (ABILITIES[k]?.slot === slot && !out.some(o => o.split('@')[0] === base)) out.push(k);
+    }
+    return out;
 }
 
-// Returns true if this support ability is equipped and active on the unit.
+// Supports with an MP upkeep switch off while the unit is out of MP.
+function activeSupports(unit) {
+    return passivesOf(unit, 'support').filter(k => !(ABILITIES[k].passiveMpCost > 0 && unit.mp <= 0));
+}
+
+const MULT_FIELDS = ['xpMult', 'chargeMult', 'highGroundMult', 'aoeDmgMult', 'healMult'];
+const ADD_FIELDS = ['evaBonus', 'statusDurationBonus', 'turnRegenHp', 'passiveMpCost', 'matToPhysical', 'summonBoost'];
+const MAP_FIELDS = ['dmgDealt', 'dmgTaken', 'lowHpDmgDealt'];
+
+// Several supports combined into one profile: multipliers multiply, bonuses add,
+// immunities pool, and flags hold if any support sets them.
+function mergeSupports(abs) {
+    const out = { name: abs.map(a => a.name).join(' + '), slot: 'support' };
+    for (const ab of abs) {
+        for (const f of MULT_FIELDS) if (ab[f] != null) out[f] = (out[f] ?? 1) * ab[f];
+        for (const f of ADD_FIELDS) if (ab[f] != null) out[f] = (out[f] ?? 0) + ab[f];
+        for (const f of MAP_FIELDS) {
+            if (!ab[f]) continue;
+            out[f] = { ...(out[f] || {}) };
+            for (const [k, v] of Object.entries(ab[f])) out[f][k] = (out[f][k] ?? 1) * v;
+        }
+        if (ab.mdfPierce != null) out.mdfPierce = Math.max(out.mdfPierce ?? 0, ab.mdfPierce);
+        if (ab.statusImmune) out.statusImmune = [...new Set([...(out.statusImmune || []), ...ab.statusImmune])];
+        if (ab.ignoreEvasion) out.ignoreEvasion = true;
+        if (ab.surviveLethal) out.surviveLethal = true;
+        if (ab.attackProc && !out.attackProc) out.attackProc = ab.attackProc;
+    }
+    return out;
+}
+
+// The unit's support effects (its chosen support plus any from equipment), or null.
+export function supportOf(unit) {
+    if (!unit) return null;
+    const keys = activeSupports(unit);
+    if (keys.length === 0) return null;
+    if (keys.length === 1) return ABILITIES[keys[0]];
+    return mergeSupports(keys.map(k => ABILITIES[k]));
+}
+
+// Returns true if this support ability is equipped (chosen or from gear) and active on the unit.
 export function passiveActive(unit, key) {
-    return unit.support === key && !!supportOf(unit);
+    return activeSupports(unit).some(k => k.split('@')[0] === key.split('@')[0]);
 }
 
 export const NEGATIVE_STATUSES = ['poison', 'slow', 'silence', 'sleep', 'stun', 'berserk', 'charm', 'frog', 'enfeebled', 'doom'];
@@ -68,13 +113,14 @@ function applyBuffs(target, ab, abKey) {
     for (const b of ab.buffs) target.buffs.push({ key: abKey, ...b });
 }
 
-// Movement-slot effects for pathfinding. moveBonus is already folded into unit.move.
+// Movement effects for pathfinding, from every movement passive the unit has. moveBonus is
+// already folded into unit.move.
 export function moveProfile(unit) {
-    const ab = ABILITIES[unit.movement] || {};
+    const abs = passivesOf(unit, 'movement').map(k => ABILITIES[k]);
     return {
-        climb:            ab.ignoreClimb ? Infinity : MAX_CLIMB + (ab.climbBonus || 0),
-        ignoreTerrainCost: !!ab.ignoreTerrainCost,
-        passThroughUnits:  !!ab.passThroughUnits,
+        climb:            abs.some(a => a.ignoreClimb) ? Infinity : MAX_CLIMB + abs.reduce((s, a) => s + (a.climbBonus || 0), 0),
+        ignoreTerrainCost: abs.some(a => a.ignoreTerrainCost),
+        passThroughUnits:  abs.some(a => a.passThroughUnits),
     };
 }
 

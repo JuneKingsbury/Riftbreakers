@@ -6,7 +6,7 @@ import { RunState, MAX_PARTY } from '../../js/run/run-state.js';
 import { battleRewards } from '../../js/run/data/encounters.js';
 import { runOptions, newProfile, buyUnlock, recordRun, renownFor } from '../../js/run/profile.js';
 import { EVENTS } from '../../js/run/data/events.js';
-import { PROMOTION_LEVEL, XP_PER_LEVEL } from '../../js/tactical/loadout.js';
+import { PROMOTION_LEVEL, XP_PER_LEVEL, buildLoadout } from '../../js/tactical/loadout.js';
 
 const totalXp = (m) => (m.level - 1) * XP_PER_LEVEL + m.xp;
 
@@ -167,12 +167,16 @@ test('shop: buy and sell; equipping moves items and respects job armour types', 
     assert.ok(!run.equip(warden.name, 'helmetKey', 'wool_tunic'), 'wrong slot');
 });
 
-test('equipment-granted passives are dropped from the loadout when the item comes off', () => {
+test("a gear passive works on top of the member's chosen slot, and goes with the item", () => {
     const run = newRun();
-    const warden = run.party[0];
-    warden.loadout.reaction = 'martyr';           // from the Iron Shield
+    const warden = run.party[0];                    // starts with an Iron Shield (Martyr)
+    warden.learned.push('guardian_ward');
+    warden.loadout.reaction = 'guardian_ward';
+    assert.deepEqual(buildLoadout(warden).bonusPassives, ['martyr']);
+    assert.equal(buildLoadout(warden).reaction, 'guardian_ward');
     assert.ok(run.equip(warden.name, 'toolKey', null));
-    assert.equal(warden.loadout.reaction, null);
+    assert.deepEqual(buildLoadout(warden).bonusPassives, []);
+    assert.equal(warden.loadout.reaction, 'guardian_ward', 'the learned choice is untouched');
 });
 
 test('events apply their effects and can lead to a battle or recruits', () => {

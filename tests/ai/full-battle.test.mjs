@@ -14,6 +14,7 @@ import { createMember } from '../../js/run/data/recruits.js';
 import { Rng } from '../../js/run/rng.js';
 import { buildUnits } from '../../js/tactical/build-units.js';
 import { runAutoTurn } from '../../js/tactical/ai/executor.js';
+import { runRealtimeBattle } from '../../js/tactical/realtime.js';
 import { abilitiesForMember } from '../../js/tactical/ai/party.js';
 import { autoScriptFor } from '../../js/tactical/ai/default-scripts.js';
 import { promote, PROMOTION_LEVEL } from '../../js/tactical/loadout.js';
@@ -21,6 +22,17 @@ import { promote, PROMOTION_LEVEL } from '../../js/tactical/loadout.js';
 const MAX_TURNS = 3000;
 const players = () => CHARACTER_DATA.filter(c => c.team === 'player');
 
+// The real-time flow every automatic battle uses.
+function playRealtime(mapDef, setup = null) {
+    const map = loadMapData(mapDef);
+    const units = buildUnits(setup, map.playerSpawns, map.enemySpawns);
+    const battle = new TacticalBattle(map, units);
+    let scriptedTurns = 0;
+    const rt = runRealtimeBattle(battle, { hooks: { onTurn: (u) => { if (u.script) scriptedTurns++; } } });
+    return { battle, turns: rt.turnsTaken, scriptedTurns, rt };
+}
+
+// The turn-by-turn flow (still used when commanding units by hand).
 function playBattle(mapDef, setup = null) {
     const map = loadMapData(mapDef);
     const units = buildUnits(setup, map.playerSpawns, map.enemySpawns);
@@ -98,7 +110,7 @@ test('fully automatic battles finish on every map, for any party size and act', 
         for (const [size, act, kind] of cases) {
             const party = runParty(size, size * 7 + act);
             const encounter = buildEncounter(ENCOUNTERS[act][kind][0], kind, act, size);
-            const { battle, turns, scriptedTurns } = playBattle(mapDef, { party, encounter });
+            const { battle, turns, scriptedTurns } = playRealtime(mapDef, { party, encounter });
             const label = `${mapDef.id} / ${size}v${encounter.roster.length} act ${act} ${kind}`;
             assert.equal(battle.state, STATES.BATTLE_OVER, `${label} stalled after ${turns} turns`);
             assert.ok(battle.winner === 'player' || battle.winner === 'enemy');
@@ -123,12 +135,20 @@ test('a run party carries its wounds and relics into battle', () => {
     assert.ok(units.filter(u => u.team === 'enemy').every(u => !u.status.includes('haste')));
 });
 
-test('no two units ever share a tile at the end of a battle', () => {
-    const { battle } = playBattle(MAP_DATA[0], { encounter: ENCOUNTERS[1].normal[0] });
-    const seen = new Set();
-    for (const u of battle.livingUnits) {
-        const key = `${u.x},${u.y},${u.z}`;
-        assert.ok(!seen.has(key), `two units on ${key}`);
-        seen.add(key);
+test('no two units ever share a tile at the end of a battle, in either flow', () => {
+    for (const play of [playBattle, playRealtime]) {
+        const { battle } = play(MAP_DATA[0], { encounter: ENCOUNTERS[1].normal[0] });
+        const seen = new Set();
+        for (const u of battle.livingUnits) {
+            const key = `${u.x},${u.y},${u.z}`;
+            assert.ok(!seen.has(key), `two units on ${key}`);
+            seen.add(key);
+        }
     }
 });
+
+test('the turn-by-turn flow still finishes battles', () => {
+    const { battle } = playBattle(MAP_DATA[0], { encounter: ENCOUNTERS[1].normal[0] });
+    assert.equal(battle.state, STATES.BATTLE_OVER);
+});
+

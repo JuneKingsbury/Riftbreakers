@@ -9,8 +9,8 @@
 // type          Equipment class; jobs restrict which types they can wear (allowedEquipment)
 // rarity        'common' (default) | 'uncommon' | 'rare': which loot and shop pools offer it
 // grants        string[] Action abilities the wearer can use while it is equipped
-// grantsPassive string[] Reaction/support/movement abilities that become selectable in
-//               the matching loadout slot while it is equipped
+// grantsPassive string[] Reaction/support/movement abilities that are active while it is
+//               equipped, on top of the wearer's chosen reaction/support/movement
 
 export const EQUIPMENT = {
     // ============================================================

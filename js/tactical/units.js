@@ -17,7 +17,10 @@ export { JOB_STATS };
 export function createUnit(name, job, team, x, y, { statMods = {}, extraAbilities = [], ct = 0, appearance = null, loadout = null, level = 1, z = null } = {}) {
     const base    = JOB_STATS[job];
     if (!loadout && !base.abilities) loadout = scaledLoadout(job, level);
-    const moveBonus = ABILITIES[loadout?.movement]?.moveBonus ?? 0;
+    // Movement passives' extra Move adds up: the chosen one plus any from equipment.
+    const moveBonus = [loadout?.movement, ...(loadout?.bonusPassives ?? [])]
+        .filter((k, i, arr) => k && arr.indexOf(k) === i && ABILITIES[k]?.slot === 'movement')
+        .reduce((s, k) => s + (ABILITIES[k].moveBonus ?? 0), 0);
     const mod = (key) => statMods[key] ?? 0;
     const maxHp = base.maxHp + mod('maxHp');
     const maxMp = base.maxMp + mod('maxMp');
@@ -47,6 +50,8 @@ export function createUnit(name, job, team, x, y, { statMods = {}, extraAbilitie
         reaction:  loadout?.reaction ?? null,
         support:   loadout?.support  ?? null,
         movement:  loadout?.movement ?? null,
+        // Passives granted by equipment, active on top of the chosen slots.
+        bonusPassives: loadout?.bonusPassives ?? [],
         status: [],
         statusTimers: {},
         buffs: [],

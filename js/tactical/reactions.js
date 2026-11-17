@@ -1,9 +1,10 @@
-// Reaction-slot abilities: effects that fire on their own when the owner (or an
-// adjacent ally, for 'allyHit') is hit. TacticalBattle._applyResult calls
+// Reaction abilities: effects that fire on their own when the owner (or an adjacent
+// ally, for 'allyHit') is hit. A unit may have several (its chosen reaction plus any
+// from equipment); each gets its chance in turn, and at most one fires per hit. TacticalBattle._applyResult calls
 // tryReaction and tryAllyReactions after every resolved hit; the reaction's own
 // results go back through _applyResult flagged as reactions, so a counter can
 // never trigger another counter.
-import { ABILITIES, resolveAbility, inflictStatus, cleanseStatuses, NEGATIVE_STATUSES } from './abilities.js';
+import { ABILITIES, resolveAbility, inflictStatus, cleanseStatuses, passivesOf, NEGATIVE_STATUSES } from './abilities.js';
 import { isConscious, isDead, isUnconscious } from './units.js';
 import { columnCells, posKey } from './battle-map.js';
 import { moveEntity } from '../systems/movement-lerp.js';
@@ -70,48 +71,55 @@ function dealDamage(battle, target, amt) {
     }
 }
 
-function announce(battle, reactor, rx) {
+function announce(battle, reactor, rx, key) {
     reactor._reactionsUsed = reactor._reactionsUsed || {};
-    reactor._reactionsUsed[reactor.reaction] = true;
+    reactor._reactionsUsed[key] = true;
     battle.logMsg(`${reactor.name} reacts: ${rx.name}!`);
     battle._spawnFloat(reactor, `${rx.name}!`, '#ffd866');
 }
 
 export function tryReaction(battle, reactor, attacker, abKey, result) {
-    const rx = ABILITIES[reactor.reaction];
+    for (const key of passivesOf(reactor, 'reaction')) {
+        if (tryOneReaction(battle, reactor, key, attacker, abKey, result)) return;
+    }
+}
+
+// Returns true if the reaction fired.
+function tryOneReaction(battle, reactor, key, attacker, abKey, result) {
+    const rx = ABILITIES[key];
     const hit = ABILITIES[abKey];
-    if (!rx || !hit || rx.trigger === 'allyHit') return;
+    if (!rx || !hit || rx.trigger === 'allyHit') return false;
     // Status reactions answer any affliction; everything else needs damage.
-    if (rx.trigger === 'statusHit' ? !result.statusApplied : !(result.damage > 0)) return;
-    if (!canReact(reactor, attacker)) return;
+    if (rx.trigger === 'statusHit' ? !result.statusApplied : !(result.damage > 0)) return false;
+    if (!canReact(reactor, attacker)) return false;
 
     const d = dist(reactor, attacker);
-    if (rx.adjacentOnly && d !== 1) return;
-    if (!triggerMatches(rx, hit, d, reactor, result)) return;
-    if (rx.oncePerBattle && reactor._reactionsUsed?.[reactor.reaction]) return;
+    if (rx.adjacentOnly && d !== 1) return false;
+    if (!triggerMatches(rx, hit, d, reactor, result)) return false;
+    if (rx.oncePerBattle && reactor._reactionsUsed?.[key]) return false;
 
     // Check the effect is possible before rolling, so a failed check costs nothing.
     if (rx.counterWith) {
         const ab = ABILITIES[rx.counterWith];
-        if (!isConscious(attacker) || !canCast(reactor, rx.counterWith) || d > (ab.range || 1)) return;
+        if (!isConscious(attacker) || !canCast(reactor, rx.counterWith) || d > (ab.range || 1)) return false;
     }
-    if (rx.selfCast && !canCast(reactor, rx.selfCast)) return;
+    if (rx.selfCast && !canCast(reactor, rx.selfCast)) return false;
     const phaseTo = rx.phaseAway
         ? freeCells(battle, reactor, rx.phaseAway, c => dist(c, attacker) * 10 - dist(c, reactor))[0]
         : null;
-    if (rx.phaseAway && !phaseTo) return;
+    if (rx.phaseAway && !phaseTo) return false;
     const summonAt = rx.summon ? freeCells(battle, reactor, 1, c => -dist(c, attacker))[0] : null;
-    if (rx.summon && !summonAt) return;
-    if (Math.random() >= (rx.chance ?? 1)) return;
+    if (rx.summon && !summonAt) return false;
+    if (Math.random() >= (rx.chance ?? 1)) return false;
 
-    announce(battle, reactor, rx);
+    announce(battle, reactor, rx, key);
 
     if (rx.counterWith) castOn(battle, reactor, rx.counterWith, attacker);
     if (rx.selfCast) castOn(battle, reactor, rx.selfCast, reactor);
     if (rx.selfStatus && !reactor.status.includes(rx.selfStatus)) reactor.status.push(rx.selfStatus);
     if (rx.selfBuff) {
         reactor.buffs = reactor.buffs || [];
-        reactor.buffs.push({ key: reactor.reaction, ...rx.selfBuff });
+        reactor.buffs.push({ key, ...rx.selfBuff });
     }
     if (rx.mpRestoreFrac) {
         const amt = Math.max(1, Math.round(result.damage * rx.mpRestoreFrac));
@@ -137,29 +145,39 @@ export function tryReaction(battle, reactor, attacker, abKey, result) {
         battle._resolveSummon(reactor, { summonJob: rx.summon.job, summonName: rx.summon.name }, summonAt.x, summonAt.y, summonAt.z);
     }
     battle._checkVictory();
+    return true;
 }
 
 // 'allyHit' reactions: units adjacent to the victim, on the victim's side.
 export function tryAllyReactions(battle, victim, attacker, abKey, result) {
     if (!(result.damage > 0) || isDead(victim)) return;
     for (const reactor of battle.livingUnits) {
-        const rx = ABILITIES[reactor.reaction];
-        if (rx?.trigger !== 'allyHit' || reactor === victim || reactor.team !== victim.team) continue;
+        if (reactor === victim || reactor.team !== victim.team) continue;
         if (dist(reactor, victim) !== 1 || !canReact(reactor, attacker)) continue;
-        if (rx.allyCast && !canCast(reactor, rx.allyCast)) continue;
-        const share = rx.shareDamageFrac ? Math.min(reactor.hp - 1, Math.round(result.damage * rx.shareDamageFrac)) : 0;
-        if (rx.shareDamageFrac && share <= 0) continue;
-        if (Math.random() >= (rx.chance ?? 1)) continue;
-
-        announce(battle, reactor, rx);
-        if (rx.allyCast) castOn(battle, reactor, rx.allyCast, victim);
-        if (share > 0) {
-            reactor.hp -= share;
-            victim.hp = Math.min(victim.maxHp, victim.hp + share);
-            if (isUnconscious(victim) && victim.hp > 0) victim.status = victim.status.filter(s => s !== 'unconscious');
-            battle.logMsg(`${reactor.name} takes ${share} of the blow meant for ${victim.name}.`);
-            battle._spawnFloat(reactor, `-${share}`, '#f88');
-            battle._spawnFloat(victim, `+${share}`, '#8f8');
+        for (const key of passivesOf(reactor, 'reaction')) {
+            if (tryAllyReaction(battle, reactor, key, victim, result)) break;
         }
     }
+}
+
+// Returns true if the reaction fired.
+function tryAllyReaction(battle, reactor, key, victim, result) {
+    const rx = ABILITIES[key];
+    if (rx?.trigger !== 'allyHit') return false;
+    if (rx.allyCast && !canCast(reactor, rx.allyCast)) return false;
+    const share = rx.shareDamageFrac ? Math.min(reactor.hp - 1, Math.round(result.damage * rx.shareDamageFrac)) : 0;
+    if (rx.shareDamageFrac && share <= 0) return false;
+    if (Math.random() >= (rx.chance ?? 1)) return false;
+
+    announce(battle, reactor, rx, key);
+    if (rx.allyCast) castOn(battle, reactor, rx.allyCast, victim);
+    if (share > 0) {
+        reactor.hp -= share;
+        victim.hp = Math.min(victim.maxHp, victim.hp + share);
+        if (isUnconscious(victim) && victim.hp > 0) victim.status = victim.status.filter(s => s !== 'unconscious');
+        battle.logMsg(`${reactor.name} takes ${share} of the blow meant for ${victim.name}.`);
+        battle._spawnFloat(reactor, `-${share}`, '#f88');
+        battle._spawnFloat(victim, `+${share}`, '#8f8');
+    }
+    return true;
 }

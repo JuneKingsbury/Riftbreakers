@@ -68,7 +68,7 @@ export function itemSummary(key) {
     if (!item) return '';
     const parts = [itemStats(key)];
     for (const a of item.grants || []) parts.push(`grants ${abilityName(a)}`);
-    for (const a of item.grantsPassive || []) parts.push(`${ABILITIES[a]?.slot ?? 'passive'}: ${abilityName(a)}`);
+    for (const a of item.grantsPassive || []) parts.push(`+${abilityName(a)} (${ABILITIES[a]?.slot ?? 'passive'}, always on)`);
     return parts.filter(Boolean).join(' · ');
 }
 

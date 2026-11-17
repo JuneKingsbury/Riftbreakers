@@ -1,6 +1,5 @@
-import { computeMoveRange, computeMovePath, computeAoeArea, ABILITIES } from './abilities.js';
+import { computeMoveRange, computeAoeArea, ABILITIES } from './abilities.js';
 import { isDead, isConscious, isUnconscious, faceToward } from './units.js';
-import { moveEntity, moveEntityAlongPath } from '../systems/movement-lerp.js';
 import { hasLineOfSight, columnCells, posKey, parseKey } from './battle-map.js';
 
 // ─── Internal helpers ────────────────────────────────────────────────────────
@@ -242,14 +241,17 @@ function pivotTowardThreat(unit, opponents) {
 
 // ─── Main entry point ────────────────────────────────────────────────────────
 
-// onAbility(source, targetX, targetY, abilityKey) — optional animation callback.
-export function runEnemyTurn(unit, battle, onAbility) {
+// Decides a turn for a unit without a script (enemies, charmed units, summons) and
+// returns it as an intent, the same shape runScript produces (see ai/executor.js):
+//   { move: {x,y,z}|null, act: { kind: 'ability', ability, x, y, z, targetId } | { kind: 'wait' },
+//     onIdle: fn }   onIdle turns the unit toward its biggest threat if it ends up not acting.
+export function planEnemyTurn(unit, battle) {
     const living       = battle.livingUnits;
     // Charmed units attack their own team.
     const charmed      = unit.status.includes('charm');
     const opponentTeam = charmed ? unit.team : (unit.team === 'enemy' ? 'player' : 'enemy');
     const opponents    = living.filter(u => u.team === opponentTeam && isConscious(u) && u !== unit);
-    if (opponents.length === 0) { battle.endTurn(100); return; }
+    if (opponents.length === 0) return { move: null, act: { kind: 'wait' }, trace: [] };
 
     const moveRange = computeMoveRange(unit, battle.map, living);
 
@@ -357,60 +359,20 @@ export function runEnemyTurn(unit, battle, onAbility) {
         if (!moveDest) moveDest = { x: unit.x, y: unit.y, z: unit.z };
     }
 
-    // ── Execute movement ─────────────────────────────────────────────────────
-    const originKey = posKey(unit);
-    const willMove = posKey(moveDest) !== originKey;
-
-    if (willMove) {
-        faceToward(unit, moveDest.x, moveDest.y);
-        const path = computeMovePath(unit, battle.map, battle.livingUnits, moveDest.x, moveDest.y, moveDest.z);
-        if (path && path.length > 0) {
-            moveEntityAlongPath(unit, path, battle.moveMsPerStep ?? 180);
-        } else {
-            moveEntity(unit, moveDest.x, moveDest.y, battle.moveMsPerStep ?? 180, moveDest.z);
-        }
-        battle.logMsg(`${unit.name} moves to (${unit.x}, ${unit.y}).`);
-        battle.afterMove?.(unit, path);
-    }
-
-    // ── Execute action ───────────────────────────────────────────────────────
-    const didMove = posKey(unit) !== originKey;
-    let animMs = 0;
-    let didAct = false;
-
+    // ── The intent ───────────────────────────────────────────────────────────
+    const willMove = !!moveDest && posKey(moveDest) !== posKey(unit);
+    const intent = {
+        move: willMove ? { x: moveDest.x, y: moveDest.y, z: moveDest.z } : null,
+        act: { kind: 'wait' },
+        trace: [],
+        onIdle: () => pivotTowardThreat(unit, battle.livingUnits.filter(u => u.team === opponentTeam && isConscious(u) && u !== unit)),
+    };
     if (bestAbKey && ABILITIES[bestAbKey]?.isSummon && bestSummonTile) {
-        if (onAbility) animMs = onAbility(unit, bestSummonTile.x, bestSummonTile.y, bestAbKey) || 0;
-        battle.applyEnemyAbility(unit, bestAbKey, bestSummonTile.x, bestSummonTile.y, bestSummonTile.z);
-        didAct = true;
+        intent.act = { kind: 'ability', ability: bestAbKey, x: bestSummonTile.x, y: bestSummonTile.y, z: bestSummonTile.z, targetId: null };
     } else if (bestAbKey && bestTarget) {
-        const ab          = ABILITIES[bestAbKey];
-        const isSelf      = ab.targetType === 'self';
-        const isAllyAb    = ab.isHeal || ab.isCure;
-        const tgt         = isSelf ? unit : bestTarget;
-        const tgtX        = tgt.x;
-        const tgtY        = tgt.y;
-        const dist        = Math.abs(unit.x - tgtX) + Math.abs(unit.y - tgtY);
-        const requiresLos = ab.requiresLos !== false;
-        const losOk       = !requiresLos || hasLineOfSight(battle.map, unit, tgt);
-
-        // Allow dist=0 for ally/self targeting (healing self, earth_skin, etc.).
-        const distOk = (isSelf || isAllyAb) ? (dist <= ab.range) : (dist > 0 && dist <= ab.range);
-        const canAct = isSelf ? true : (distOk && losOk);
-
-        if (canAct) {
-            if (onAbility) animMs = onAbility(unit, tgtX, tgtY, bestAbKey) || 0;
-            battle.applyEnemyAbility(unit, bestAbKey, tgtX, tgtY, tgt.z);
-            didAct = true;
-        } else {
-            battle.logMsg(`${unit.name} waits.`);
-        }
-    } else {
-        battle.logMsg(`${unit.name} waits.`);
+        // Self-targeted abilities aim at the tile the unit ends its move on.
+        const tgt = ABILITIES[bestAbKey].targetType === 'self' ? (intent.move ?? unit) : bestTarget;
+        intent.act = { kind: 'ability', ability: bestAbKey, x: tgt.x, y: tgt.y, z: tgt.z, targetId: bestTarget.id ?? null };
     }
-
-    if (!didAct) pivotTowardThreat(unit, opponents);
-
-    const ctCost = (didMove && didAct) ? 100 : (didMove || didAct) ? 80 : 60;
-    battle.endTurn(ctCost);
-    return animMs;
+    return intent;
 }

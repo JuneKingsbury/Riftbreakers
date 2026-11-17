@@ -7,6 +7,7 @@
 import { unitCell } from '../battle-map.js';
 import { ABILITIES } from '../data-registry.js';
 import * as Q from './queries.js';
+import { isConscious } from '../units.js';
 
 export const COMPARATORS = ['<', '<=', '>', '>=', '=='];
 
@@ -107,6 +108,11 @@ export const CONDITIONS = {
     self_threatened: {
         group: 'Self', label: 'An enemy could hit me next turn', params: [],
         test: (p, ctx) => Q.isThreatenedAt(ctx.self, ctx.self.x, ctx.self.y, ctx.self.z, ctx.map, ctx.units),
+    },
+    self_isolated: {
+        group: 'Self', label: 'No ally is within {range} tiles of me', params: [{ name: 'range', type: 'number', default: 4 }],
+        test: (p, ctx) => !Q.alliesOf(ctx.self, ctx.units)
+            .some(a => a.id !== ctx.self.id && isConscious(a) && Q.distance(a, ctx.self) <= p.range),
     },
 
     enemy_exists: {
@@ -248,7 +254,11 @@ export const MOVE_MODES = {
     away:        'Move away from target',
     keep_range:  'Move to keep a set distance',
     high_ground: 'Move to higher ground',
+    regroup:     'Move toward my allies',
 };
+
+// How an ability or move rule positions the unit (see positionStyle in script-runtime.js).
+export const POSITIONING = { auto: 'Auto', careful: 'Careful', group: 'Stay with group', bold: 'Bold' };
 
 export const ACTION_KINDS = {
     ability: 'Use ability',

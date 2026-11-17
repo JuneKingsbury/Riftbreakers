@@ -9,6 +9,7 @@ import { ABILITIES } from './abilities.js';
 import { buildUnits } from './build-units.js';
 import { viewState } from './view-state.js';
 import { attachTouchGestures } from './touch-gestures.js';
+import { RealtimeBattle } from './realtime.js';
 import { isPortrait } from '../ui/layout.js';
 
 const SPEEDS = { '1': 1, '2': 2, '3': 4 };
@@ -101,7 +102,19 @@ export class BattleScene {
         this._pendingRewards = null;
         this._settled = false;
 
-        this._scheduleNextTurn();
+        if (this._manualControl) {
+            // Commanding units by hand keeps the turn-by-turn flow.
+            this._scheduleNextTurn();
+        } else {
+            // Automatic battles run in real time: render() drives the clock.
+            this._lastFrame = null;
+            this._lastTrackAt = 0;
+            this._realtime = new RealtimeBattle(this._battle, {
+                onAbility: (u, x, y, key) => this._playAbilityAnimation(u, x, y, key),
+                onCharge: (fired) => { for (const fc of fired) this._playAbilityAnimation(fc.unit, fc.targetX, fc.targetY, fc.ability); },
+                onTurn: (u) => this._followActor(u),
+            });
+        }
     }
 
     exit() {
@@ -124,8 +137,24 @@ export class BattleScene {
         else this._renderer.setInsets(0, 190);
     }
 
+    // With the tracking camera on, glide toward whoever just started a turn, at most once a second.
+    _followActor(unit) {
+        if (this._renderer.freeCamera) return;
+        const t = performance.now();
+        if (t - this._lastTrackAt < 1000) return;
+        this._lastTrackAt = t;
+        this._renderer.centerOn(unit.x, unit.y);
+    }
+
     render(now) {
         if (this._stopped) return;
+        if (this._realtime) {
+            // Battle time runs at the playback speed and stops while paused. A long gap
+            // (e.g. the tab was hidden) counts as one short step.
+            const dt = this._lastFrame == null ? 0 : Math.min(100, now - this._lastFrame);
+            this._lastFrame = now;
+            if (!this._paused) this._realtime.update(dt * this._speed);
+        }
         this._updateInsets();
         this._renderer?.render(this._battle, now);
         // Settle the battle with the run once, when it first ends

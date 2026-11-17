@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 
 import { gridMap } from '../map-fixtures.mjs';
 import { createUnit, createUnitFromCharData } from '../../js/tactical/units.js';
-import { resolveAbility, computeMoveRange, computeMovePath } from '../../js/tactical/abilities.js';
+import { resolveAbility, computeMoveRange, computeMovePath, inflictStatus } from '../../js/tactical/abilities.js';
 import {
     canLearn, learnAbility, learnBlocker, buildLoadout, equippable, sanitizeLoadout, scaledLoadout,
     canPromote, promote, promotionOptions, learnableFor, canUpgrade, upgradeAbility, canSpendPoints,
@@ -124,18 +124,58 @@ test('promotion needs a level, keeps learned skills and adds the Tier 2 skillset
     assert.deepEqual(lo.abilities, ['attack', 'fire', 'ice', 'arcane_strike']);
 });
 
-test('equipment grants actions and slot options only while worn', () => {
-    const m = member({ appearance: { weaponKey: 'void_dagger', toolKey: 'iron_shield' } });
-    assert.ok(buildLoadout(m).abilities.includes('draining_edge'));
-    assert.deepEqual(equippable(m, 'reaction'), ['martyr']);
+test('equipment grants actions, and passives that work on top of the chosen slots, only while worn', () => {
+    const m = member({ learned: ['hex', 'sunder', 'counter'], appearance: { weaponKey: 'void_dagger', toolKey: 'iron_shield' } });
+    m.loadout.reaction = 'counter';
+    let lo = buildLoadout(m);
+    assert.ok(lo.abilities.includes('draining_edge'));
+    assert.equal(lo.reaction, 'counter', 'the learned reaction keeps its slot');
+    assert.deepEqual(lo.bonusPassives, ['martyr'], "the shield's Martyr is active as well");
+    assert.deepEqual(equippable(m, 'reaction'), ['counter'], 'gear passives are not slot options');
+
+    // Wearing gear that grants the skill already in its slot doesn't count it twice.
+    m.loadout.reaction = null;
+    m.learned.push('martyr');
     m.loadout.reaction = 'martyr';
-    assert.equal(buildLoadout(m).reaction, 'martyr');
+    assert.deepEqual(buildLoadout(m).bonusPassives, []);
 
     m.appearance = { weaponKey: 'iron_sword' };
-    assert.ok(!buildLoadout(m).abilities.includes('draining_edge'));
-    assert.equal(buildLoadout(m).reaction, null, 'the slot empties with the item gone');
-    sanitizeLoadout(m);
-    assert.equal(m.loadout.reaction, null);
+    lo = buildLoadout(m);
+    assert.ok(!lo.abilities.includes('draining_edge'));
+    assert.deepEqual(lo.bonusPassives, []);
+});
+
+test('gear passives stack with the chosen ones in battle', () => {
+    const map = field();
+    // Support: Mana Surge (chosen) + Iron Will (gear) both apply.
+    const caster = Object.assign(createUnit('Evo', 'evoker', 'player', 3, 3), { support: 'mana_surge', bonusPassives: ['iron_will'] });
+    const plain = createUnit('Plain', 'evoker', 'player', 3, 3);
+    const foe = () => createUnit('Foe', 'goblin', 'enemy', 5, 3);
+    const dmg = (u) => withRandom(0.5, () => resolveAbility(u, foe(), 'fire', map).damage);
+    assert.ok(dmg(caster) > dmg(plain), 'Mana Surge still boosts magic');
+    assert.equal(inflictStatus(caster, 'stun', 1), false, 'and Iron Will blocks stun');
+
+    // Movement: a chosen Move +1 and gear Ghost Step add their Move and keep pass-through.
+    const walker = createUnitFromCharData(member({
+        x: 7, y: 3, learned: ['hex', 'momentum'], loadout: { movement: 'momentum' },
+        appearance: { armorKey: 'cloak_of_shadows' },
+    }));
+    assert.deepEqual(walker.bonusPassives, ['ghost_step']);
+    assert.equal(walker.move, createUnit('X', 'spellblade', 'player', 0, 0).move + 1, 'Ghost Step adds its Move');
+    const ring = [[6, 3], [8, 3], [7, 2], [7, 4]].map(([x, y], i) => createUnit(`R${i}`, 'novice', 'player', x, y));
+    assert.ok(computeMoveRange(walker, map, [walker, ...ring]).size > 0, 'and lets it pass through allies');
+});
+
+test('with two reactions, each gets a chance but only one fires per hit', () => {
+    const map = field();
+    const blade = Object.assign(createUnit('Blade', 'spellblade', 'player', 4, 3), {
+        reaction: 'counter', bonusPassives: ['brace'], eva: 0,
+    });
+    const gob = Object.assign(createUnit('Gob', 'goblin', 'enemy', 5, 3), { eva: 0 });
+    const battle = new TacticalBattle(map, [blade, gob]);
+    withRandom(0.01, () => battle.applyEnemyAbility(gob, 'goblin_slash', blade.x, blade.y));
+    assert.equal(battle.log.filter(l => l.includes('reacts')).length, 1, 'one reaction');
+    assert.ok(battle.log.some(l => l.includes('reacts: Counter')), 'the chosen one goes first');
 });
 
 test('Mana Surge only boosts magic when equipped as Support', () => {

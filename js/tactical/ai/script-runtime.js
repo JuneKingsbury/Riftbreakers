@@ -14,6 +14,8 @@ import { estimateAbilityEffect } from './estimate.js';
 import { NEGATIVE_STATUSES } from '../abilities.js';
 import * as Q from './queries.js';
 import { evalCond, describeCond, ACTION_KINDS, MOVE_MODES } from './blocks.js';
+import { RANGED_ROLES } from './default-scripts.js';
+import { JOB_DATA } from '../data/jobs.js';
 
 export const MAX_RULES = 16;
 
@@ -71,6 +73,71 @@ export function resolveTarget(sel, ctx) {
     for (const f of filters) cands = cands.filter(c => passesFilter(f, c, ctx));
     if (cands.length === 0) return null;
     return pickFrom(s.pick, cands, ctx);
+}
+
+// ---- Positioning ----
+// How a rule moves the unit around enemies and allies (action.position):
+//   careful  avoid tiles an enemy could hit next turn, attack from near max range, and
+//            don't get more than LEAD_LIMIT tiles ahead of the group
+//   group    advance normally, but don't walk into enemy reach far ahead of everyone else
+//   bold     go straight for it (the old behavior)
+//   auto     (default) careful for ranged attackers, bold for everyone else. (Holding melee
+//            units and healers back measurably lost fights: they need to reach the action.)
+const LEAD_LIMIT = 3;           // careful units stay within this many tiles of the group's front
+const GROUP_LEAD_LIMIT = 4;     // group units only enter enemy reach this far ahead
+
+export function positionStyle(action, unit) {
+    const style = action?.position ?? 'auto';
+    if (style !== 'auto') return style;
+    // Party jobs go by their role; anything else (enemy jobs, summons) by its reach.
+    if (JOB_DATA[unit.job]?.tier) return RANGED_ROLES.has(unit.job) ? 'careful' : 'bold';
+    const reach = Math.max(0, ...unit.abilities.map(k => ABILITIES[k])
+        .filter(ab => ab && !ab.passive && ab.targetType === 'enemy' && !ab.isSummon).map(ab => ab.range ?? 1));
+    return reach >= 3 ? 'careful' : 'bold';
+}
+
+// Per-decision facts about the field, computed once: how many enemies could hit each
+// tile next turn, and where the conscious allies are.
+function positionInfo(ctx) {
+    if (ctx._pos) return ctx._pos;
+    const threat = new Map();
+    for (const e of Q.enemiesOf(ctx.self, ctx.units).filter(isConscious)) {
+        for (const key of Q.threatTiles(e, ctx.map, ctx.units)) threat.set(key, (threat.get(key) || 0) + 1);
+    }
+    const allies = Q.alliesOf(ctx.self, ctx.units).filter(a => a.id !== ctx.self.id && isConscious(a));
+    ctx._pos = { threat, allies };
+    return ctx._pos;
+}
+
+const threatAt = (t, pos) => pos.threat.get(posKey(t)) || 0;
+
+// How many tiles closer to `target` than the nearest-to-it ally a unit on `t` would be
+// (0 when it isn't ahead, or has no allies).
+function leadAt(t, target, pos) {
+    if (!target || pos.allies.length === 0) return 0;
+    const front = Math.min(...pos.allies.map(a => Q.distance(a, target)));
+    return Math.max(0, front - Q.distance(t, target));
+}
+
+// Lower is better: for careful units, fewest enemies able to hit the tile, then not far
+// ahead of the group, then far from the target (near max range), then a short walk.
+function fireScore(t, target, style, ctx) {
+    const d = Q.distance(t, target);
+    if (style !== 'careful') return -d * 1000 + Q.distance(t, ctx.self);
+    const pos = positionInfo(ctx);
+    return threatAt(t, pos) * 1e6 + Math.max(0, leadAt(t, target, pos) - LEAD_LIMIT) * 1e4 - d * 1000 + Q.distance(t, ctx.self);
+}
+
+// Fire tile for an ability that can hit `target` from any of `keys` this turn.
+function chooseFireTile(keys, target, style, ctx) {
+    if (style === 'bold') return bestTile(keys, target, 'far', ctx);
+    let best = null, bestScore = Infinity;
+    for (const key of keys) {
+        const t = parseKey(key);
+        const score = fireScore(t, target, style, ctx);
+        if (score < bestScore) { best = t; bestScore = score; }
+    }
+    return best;
 }
 
 // Chooses a tile out of `keys`. mode 'far' maximizes distance to target, 'near'
@@ -186,23 +253,47 @@ function planAbility(action, target, ctx) {
     const cands = abilityCandidates(choice, target, side, ctx);
     if (cands.length === 0) return null;
 
+    const style = positionStyle(action, ctx.self);
     let best = null;
+    let fallback = null;
     for (const key of cands) {
         let dest = null;
         if (!Q.inAbilityRange(ctx.self, target, key, ctx.map)) {
             if (!approach || ctx.hasMoved) continue;
             const tiles = Q.tilesToUseFrom(ctx.self, target, key, ctx.map, ctx.units);
             if (tiles.size === 0) continue;
-            dest = bestTile(tiles, target, 'far', ctx);
+            dest = chooseFireTile(tiles, target, style, ctx);
+        } else if (style === 'careful' && approach && !ctx.hasMoved && ABILITIES[key].targetType !== 'self') {
+            // Already in range: step to a safer tile it can still attack from, or back out
+            // to max range, if that beats where it stands.
+            const tiles = Q.tilesToUseFrom(ctx.self, target, key, ctx.map, ctx.units);
+            const better = chooseFireTile(tiles, target, style, ctx);
+            if (better && posKey(better) !== posKey(ctx.self)
+                && fireScore(better, target, style, ctx) < fireScore(ctx.self, target, style, ctx)) dest = better;
+        }
+        // Careful units treat close-range strikes (e.g. the basic Attack) as a last resort:
+        // used only when no longer-reach option works, and never by walking into the reach
+        // of enemies other than the target.
+        const melee = (ABILITIES[key].range ?? 1) <= 1 && ABILITIES[key].targetType === 'enemy';
+        if (style === 'careful' && melee) {
+            if (dest && threatAt(dest, positionInfo(ctx)) > 1) continue;
+            const score = scoreAbility(key, choice, target, ctx);
+            if (!fallback || score > fallback.score) fallback = { key, dest, score };
+            continue;
         }
         const score = scoreAbility(key, choice, target, ctx);
         if (!best || score > best.score) best = { key, dest, score };
     }
+    if (!best && fallback) best = fallback;
 
     if (best) {
         return { kind: 'ability', ability: best.key, dest: best.dest, x: target.x, y: target.y, z: target.z, target };
     }
-    if (approach && !ctx.hasMoved) return planMove({ mode: 'toward' }, target, ctx, true);
+    if (approach && !ctx.hasMoved) {
+        // Walking to an ally to heal or buff them: go straight there.
+        const toAlly = target.team === ctx.self.team;
+        return planMove({ mode: 'toward', position: toAlly ? 'bold' : action.position }, target, ctx, true);
+    }
     return null;
 }
 
@@ -226,18 +317,42 @@ function planMove(action, target, ctx, approach = false) {
             consider(t, -t.z * 1000 + (target ? Q.distance(t, target) : Q.distance(t, here)));
         }
         if (!best || best.z <= hereElev) return null;
+    } else if (mode === 'regroup') {
+        // Walk toward the nearest ally, preferring tiles enemies can't reach.
+        const pos = positionInfo(ctx);
+        const friend = Q.nearest(here, pos.allies);
+        if (!friend || Q.distance(here, friend) <= 2) return null;
+        const field = Q.walkCostField(ctx.map, friend);
+        const walk = t => field.get(posKey(t)) ?? 1000 + Q.distance(t, friend);
+        hereScore = threatAt(here, pos) * 1e6 + walk(here) * 1000;
+        for (const t of tiles) consider(t, threatAt(t, pos) * 1e6 + walk(t) * 1000 + Q.distance(t, here));
+        if (!best || bestScore >= hereScore) return null;
     } else {
         if (!target) return null;
         const wanted = action.range ?? 3;
+        const style = positionStyle(action, here);
+        const pos = style === 'bold' ? null : positionInfo(ctx);
         // Walking distance (not straight-line) so a pond or cliff in the way doesn't trap the unit.
         const field = Q.walkCostField(ctx.map, target);
         const walk = t => field.get(posKey(t)) ?? 1000 + Q.distance(t, target);
-        const score = {
+        const base = {
             toward:     walk,
             away:       t => -walk(t),
             keep_range: t => Math.abs(Q.distance(t, target) - wanted) * 10 - Q.distance(t, target),
         }[mode];
-        if (!score) return null;
+        if (!base) return null;
+        // Careful: stay out of enemy reach and within LEAD_LIMIT of the group's front.
+        // Group: only avoid enemy reach when that far ahead of everyone else.
+        const nearAlly = t => pos.allies.length ? Math.min(...pos.allies.map(a => Q.distance(a, t))) : 0;
+        // Behind the front line enemy reach is only a mild concern (allies are taking the
+        // heat); ahead of it, or alone, it is something to avoid.
+        const exposed = t => pos.allies.length === 0 || leadAt(t, target, pos) > 0;
+        const score = style === 'careful'
+            ? t => threatAt(t, pos) * (exposed(t) ? 1e4 : 3) + Math.max(0, leadAt(t, target, pos) - LEAD_LIMIT) * 100
+                + (mode === 'keep_range' ? Math.max(0, nearAlly(t) - 3) * 5 : 0) + base(t)
+            : style === 'group' && mode === 'toward'
+                ? t => (threatAt(t, pos) > 0 && leadAt(t, target, pos) > GROUP_LEAD_LIMIT ? 1e4 : 0) + base(t)
+                : base;
         hereScore = score(here);
         for (const t of tiles) consider(t, score(t) * 1000 + Q.distance(t, here));
         // Strictly better than staying put, otherwise the move would be a no-op.

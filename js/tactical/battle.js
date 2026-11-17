@@ -1,4 +1,4 @@
-import { computeMoveRange, computeMovePath, computeAttackRange, computeAoeArea, computePatternArea, resolveAbility, ABILITIES, supportOf, inflictStatus, cleanseStatuses } from './abilities.js';
+import { computeMoveRange, computeMovePath, computeAttackRange, computeAoeArea, computePatternArea, resolveAbility, ABILITIES, supportOf, passivesOf, inflictStatus, cleanseStatuses } from './abilities.js';
 import { viewState } from './view-state.js';
 import { isDead, isAlive, isConscious, isUnconscious, isStunned, faceToward, setFacing, createUnit } from './units.js';
 import { getCell, applyTerrainEffect, settleZ, posKey, parseKey, cellKey } from './battle-map.js';
@@ -58,14 +58,18 @@ export class TacticalBattle {
     }
 
     // Called after any unit finishes a move (player, script or enemy AI) with the
-    // path it walked. Applies the equipped Movement ability's after-move effects.
+    // path it walked. Applies the after-move effects of every Movement passive it has
+    // (its chosen one and any from equipment).
     afterMove(unit, path) {
         const tiles = path?.length ?? 0;
         if (tiles === 0) return;
         unit._movedThisTurn = true;
-        const mv = ABILITIES[unit.movement];
-        if (!mv) return;
-        if (mv.momentumPct) unit._momentumMult = 1 + Math.min(5, tiles) * mv.momentumPct;
+        for (const key of passivesOf(unit, 'movement')) this._movementEffects(unit, key, tiles);
+    }
+
+    _movementEffects(unit, key, tiles) {
+        const mv = ABILITIES[key];
+        if (mv.momentumPct) unit._momentumMult = Math.max(unit._momentumMult ?? 1, 1 + Math.min(5, tiles) * mv.momentumPct);
         const fx = mv.onMove;
         if (!fx) return;
         const heal = (u, pct) => {
@@ -85,7 +89,7 @@ export class TacticalBattle {
         if (fx.alliesBuff) {
             for (const a of allies) {
                 a.buffs = a.buffs || [];
-                a.buffs.push({ key: unit.movement, ...fx.alliesBuff });
+                a.buffs.push({ key, ...fx.alliesBuff });
             }
         }
         const foes = this._adjacent(unit, u => u.team !== unit.team);
@@ -235,7 +239,7 @@ export class TacticalBattle {
         const regenHp = supportOf(unit)?.turnRegenHp;
         if (regenHp && unit.hp > 0) {
             unit.hp = Math.min(unit.maxHp, unit.hp + regenHp);
-            this.logMsg(`${unit.name} regenerates ${regenHp} HP from ${ABILITIES[unit.support].name}.`);
+            this.logMsg(`${unit.name} regenerates ${regenHp} HP from ${supportOf(unit).name}.`);
         }
 
         // regen status: heal ~8% max HP
@@ -641,14 +645,12 @@ export class TacticalBattle {
             this.activeUnit.ct -= remaining;
             if (this.activeUnit.ct < 0) this.activeUnit.ct = 0;
 
-            // Equipped support ability MP drain
-            const support = ABILITIES[this.activeUnit.support];
-            if (support?.passiveMpCost > 0) {
-                this.activeUnit.mp = Math.max(0, this.activeUnit.mp - support.passiveMpCost);
-            }
+            // Support upkeep: each active support with an MP cost drains it
+            const upkeep = supportOf(this.activeUnit)?.passiveMpCost ?? 0;
+            if (upkeep > 0) this.activeUnit.mp = Math.max(0, this.activeUnit.mp - upkeep);
 
             // Take Root: heal at the end of a turn spent standing still
-            const rooted = ABILITIES[this.activeUnit.movement]?.rootedHealPct;
+            const rooted = Math.max(0, ...passivesOf(this.activeUnit, 'movement').map(k => ABILITIES[k].rootedHealPct ?? 0));
             const u = this.activeUnit;
             if (rooted && !u._movedThisTurn && isConscious(u) && u.hp < u.maxHp) {
                 const amt = Math.min(u.maxHp - u.hp, Math.max(1, Math.round(u.maxHp * rooted)));

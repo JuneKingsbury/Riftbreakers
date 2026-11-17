@@ -10,7 +10,8 @@
 //   learned   string[] Ability keys learned with skill points (base keys, no rank)
 //   ranks     object   ability key → rank (2..MAX_RANK) for upgraded skills; absent = rank I
 //   loadout   { reaction, support, movement } (base keys)
-//   appearance  Equipped items (armorKey, ...) also grant abilities, see data/equipment.js
+//   appearance  Equipped items (armorKey, ...) also grant abilities, see data/equipment.js:
+//               actions join the skill list, passives are active on top of the chosen slots
 import { ABILITIES, MAX_RANK, rankedKey, isUpgradeable } from './data-registry.js';
 import { JOB_DATA } from './data/jobs.js';
 import { equipmentGrants } from './data/equipment.js';
@@ -135,16 +136,13 @@ export function skillsetFor(member, job) {
         .map(k => rankedKey(k, skillRank(member, k)));
 }
 
-// Options for a loadout slot: learned abilities of that slot, then ones granted by equipment.
+// Options for a loadout slot: the learned abilities of that slot. (Passives granted by
+// equipment don't take a slot: they are active on top, see buildLoadout.)
 export function equippable(member, slot) {
-    const out = (member.learned || []).filter(k => abilitySlot(k) === slot);
-    for (const k of equipmentGrants(member.appearance).passives) {
-        if (abilitySlot(k) === slot && !out.includes(k)) out.push(k);
-    }
-    return out;
+    return (member.learned || []).filter(k => abilitySlot(k) === slot);
 }
 
-// Drops loadout entries that are no longer valid (e.g. after unequipping the item that granted one).
+// Drops loadout entries that are no longer valid.
 export function sanitizeLoadout(member) {
     const lo = member.loadout = { reaction: null, support: null, movement: null, ...(member.loadout || {}) };
     for (const slot of LOADOUT_SLOTS) {
@@ -167,15 +165,14 @@ export function buildLoadout(member) {
     const slotted = (slot) => {
         const k = lo[slot];
         if (!k || !equippable(member, slot).includes(k)) return null;
-        return isLearned(member, k) ? rankedKey(k, skillRank(member, k)) : k;
+        return rankedKey(k, skillRank(member, k));
     };
-    return {
-        abilities,
-        skillsets,
-        reaction: slotted('reaction'),
-        support:  slotted('support'),
-        movement: slotted('movement'),
-    };
+    const reaction = slotted('reaction'), support = slotted('support'), movement = slotted('movement');
+    // Equipment passives are always on, on top of the chosen slots (a skill already in its
+    // slot isn't counted twice).
+    const chosen = [reaction, support, movement].filter(Boolean).map(k => k.split('@')[0]);
+    const bonusPassives = grants.passives.filter(k => !chosen.includes(k));
+    return { abilities, skillsets, reaction, support, movement, bonusPassives };
 }
 
 // Loadout for a non-party unit (e.g. an enemy) using a player job at `level`. Like a
