@@ -1,136 +1,69 @@
-# Audio System
+# Audio
 
-## How It Works
+Music and sound effects play through `js/audio/sound.js`, which follows Rifthold's sound
+system. Every file is listed by name in `js/audio/sound-manifest.js`. Which name plays at
+which moment is decided in `js/audio/game-sounds.js`.
 
-The sound system is fully dynamic. Just drop `.ogg` files into the right folder and they'll play automatically when the matching game event happens. If a file is missing, the game just skips it quietly. No errors, no crashes, no code changes needed.
+- **Volume:** the Music and SFX sliders in Settings (0 to 100) control the two volume buses.
+  A change is heard at once, and the values are saved. The music files are mastered much louder
+  than the effects, so music is turned down by `MUSIC_TRIM_DB` in `js/audio/sound.js` (−10 dB)
+  to keep the two balanced at equal slider values.
+- **Starting audio:** browsers only allow sound after the player interacts with the page, so
+  audio starts on the first click or key press.
+- **Missing files** are skipped quietly. You can list a name in the manifest before its file
+  exists.
 
-## Adding Sounds
+## Music
 
-1. Create your audio file in `.ogg` format
-2. Name it exactly as listed below
-3. Drop it in the correct subfolder
-4. Next time that event fires in-game, you'll hear it
+Every track loops, and changing track crossfades over 2 seconds.
 
-## Volume Controls
+| When | Track |
+|------|-------|
+| Title screen | `music/menu_theme.ogg` |
+| A whole act | `music/expedition_<realm>.ogg` for the act's realm, e.g. `expedition_crystal_caves.ogg`. It plays on the map and keeps going through deploying and every battle, so it never restarts mid-act. |
+| A battle outside a run (test harnesses) | `music/combat.ogg` |
+| A won run | `music/credits.ogg` |
+| A lost run | Fades to silence |
 
-Both the start screen and the in-game settings panel have Music and SFX volume sliders (0 to 100). These values are saved with your game automatically.
+If a realm's track is missing, the game falls back to `music/expedition.ogg`, which is optional
+and isn't shipped. In battle it falls back further, to `music/combat.ogg`.
 
-## Music Behavior
+## Sound effects
 
-Background music is layered. Each tick the game picks the most specific track that has a file present, and falls back to a more general one when a specialized track is missing. Priority, highest first:
+Each play shifts the pitch randomly, by up to the sound's `pitch` setting in cents (300 by
+default, as in Rifthold, so up to 3 semitones either way). This keeps sounds heard over and
+over from repeating exactly. The same sound can't restart within 200 ms, and at most 8 play at
+once, so busy fights stay clear.
 
-1. **Expedition** (a party is out exploring a realm): first tries `music/expedition_<realmKey>.ogg` (e.g. `expedition_crystal_caves.ogg`), then falls back to `music/expedition.ogg`. If neither file is present, colony music goes silent for the duration of the expedition.
-2. **Combat** (raid or wave active): `music/combat.ogg`
-3. **Weather** (current weather is not clear): `music/weather_<type>.ogg`, e.g. `music/weather_rain.ogg`
-4. **Season**: `music/season_<name>.ogg`, e.g. `music/season_winter.ogg`
-5. **Day / Night** (the always-present base): `music/ambient_day.ogg` or `music/ambient_night.ogg`
+| Name | File | When |
+|------|------|------|
+| `hit_party` | `sfx/combat/colonist_damaged.ogg` | A party member takes damage |
+| `hit_enemy` | `sfx/work/chop_hit.ogg` | An enemy takes damage |
+| `miss` | `sfx/combat/shield_block.ogg` | An attack misses |
+| `party_down` | `sfx/combat/colonist_death.ogg` | A party member is knocked out |
+| `enemy_down` | `sfx/combat/enemy_death.ogg` | An enemy is knocked out |
+| `arrow_fire` | `sfx/combat/arrow_fire.ogg` | A ranged shot |
+| `spell_cast` | `sfx/spells/spell_cast.ogg` | A spell is cast |
+| `spell_heal` | `sfx/spells/spell_heal.ogg` | A heal lands |
+| `spell_revive` | `sfx/spells/magic_levelup.ogg` | A knocked-out ally is revived |
+| `spell_buff` | `sfx/spells/spell_buff.ogg` | A stat buff (Rallying Beat), haste, regen |
+| `spell_shield` | `sfx/spells/spell_shield.ogg` | Protect, Shell, Reflect |
+| `spell_affliction` | `sfx/ui/mental_break.ogg` | Stun, sleep, charm, berserk, frog or doom lands |
+| `summon` | `sfx/spells/summon_arrival.ogg` | A summoned creature appears |
+| `terraform` | `sfx/spells/spell_terraform.ogg` | A terrain spell (Stone Wall, Root Field) |
+| `battle_alert` | `sfx/ui/wave_alert.ogg` | An elite or boss fight begins |
+| `level_up` | `sfx/spells/magic_levelup.ogg` | Someone leveled up (reward screen) |
+| `skill_learned` | `sfx/spells/magic_levelup.ogg` | A skill is learned or upgraded |
+| `promote` | `sfx/spells/spell_divination.ogg` | A member promotes |
+| `loot` | `sfx/combat/loot_drop.ogg` | Item, relic, treasure, buying and selling, a won battle |
+| `equip` | `sfx/work/craft_complete.ogg` | Equipment changes |
+| `rest` | `sfx/spells/spell_heal.ogg` | Drill or train at a rest site |
+| `travel` | `sfx/environment/footstep.ogg` | Moving to a node |
+| `event` | `sfx/ui/notification.ogg` | An event choice resolves, or a recruit joins |
+| `click` | `sfx/ui/button_click.ogg` | Any button |
+| `panel` | `sfx/ui/open_close_click.ogg` | A panel opens or closes |
+| `notify` | `sfx/ui/notification.ogg` | A notice pops up |
 
-So on a rainy winter night with no enemies, the game plays `weather_rain.ogg` if it exists, else `season_winter.ogg` if it exists, else `ambient_night.ogg`. Weather takes precedence over season. The weather and season tracks are entirely optional: add only the ones you want, and the rest fall through to day/night automatically.
-
-When the music changes, it crossfades over 2 seconds so you don't get a jarring cut. All tracks loop.
-
-## SFX Behavior
-
-- There's a 200ms cooldown per sound so rapid-fire events don't stack the same clip on top of itself
-- Up to 8 SFX can play at once (prevents distortion during big fights)
-- Each sound is fetched and cached the first time it plays, so after that initial load it's instant
-
-## Accepted Files
-
-### Music
-
-Listed highest priority first. Weather and season tracks are optional, and missing ones fall through to the day/night base.
-
-| File | Trigger |
-|------|---------|
-| `music/expedition.ogg` | A party is out exploring any realm. Generic fallback used when no realm-specific track is present. |
-| `music/expedition_crystal_caves.ogg` | *(optional)* Crystal Caves expedition. Overrides generic expedition track if present. |
-| `music/expedition_crystal_mines.ogg` | *(optional)* Crystal Mines expedition |
-| `music/expedition_crystal_depths.ogg` | *(optional)* Crystal Depths expedition |
-| `music/expedition_verdant_depths.ogg` | *(optional)* Verdant Depths expedition |
-| `music/expedition_fungal_hollows.ogg` | *(optional)* Fungal Hollows expedition |
-| `music/expedition_primeval_canopy.ogg` | *(optional)* Primeval Canopy expedition |
-| `music/expedition_arcane_library.ogg` | *(optional)* Arcane Library expedition |
-| `music/expedition_ancient_university.ogg` | *(optional)* Ancient University expedition |
-| `music/expedition_abandoned_laboratory.ogg` | *(optional)* Abandoned Laboratory expedition |
-| `music/expedition_shadow_realm.ogg` | *(optional)* Shadow Realm expedition |
-| `music/expedition_void_abyss.ogg` | *(optional)* Void Abyss expedition |
-| `music/expedition_oblivion_rift.ogg` | *(optional)* Oblivion Rift expedition |
-| `music/expedition_kingdom_outskirts.ogg` | *(optional)* Kingdom Outskirts expedition |
-| `music/expedition_crusader_barracks.ogg` | *(optional)* Crusader Barracks expedition |
-| `music/expedition_palace_fortress.ogg` | *(optional)* Palace Fortress expedition |
-| `music/combat.ogg` | Raid or wave enemies active |
-| `music/weather_rain.ogg` | Current weather is rain (no enemies) |
-| `music/weather_thunderstorm.ogg` | Current weather is thunderstorm (no enemies) |
-| `music/weather_snow.ogg` | Current weather is snow (no enemies) |
-| `music/weather_blizzard.ogg` | Current weather is blizzard (no enemies) |
-| `music/weather_heatwave.ogg` | Current weather is heat wave (no enemies) |
-| `music/season_spring.ogg` | Season is spring (no enemies, weather clear or no weather track) |
-| `music/season_summer.ogg` | Season is summer (no enemies, weather clear or no weather track) |
-| `music/season_autumn.ogg` | Season is autumn (no enemies, weather clear or no weather track) |
-| `music/season_winter.ogg` | Season is winter (no enemies, weather clear or no weather track) |
-| `music/ambient_day.ogg` | Daytime base (no enemies, no more specific track) |
-| `music/ambient_night.ogg` | Nighttime base (no enemies, no more specific track), also the track a new game starts on |
-| `music/menu_theme.ogg` | Start menu / main menu |
-| `music/credits.ogg` | Credits screen |
-
-### SFX: Combat
-
-| File | Trigger |
-|------|---------|
-| `sfx/combat/colonist_damaged.ogg` | Colonist takes damage |
-| `sfx/combat/colonist_death.ogg` | Colonist dies |
-| `sfx/combat/enemy_death.ogg` | Raider or wave enemy dies |
-| `sfx/combat/critical_hit.ogg` | Critical hit lands |
-| `sfx/combat/shield_block.ogg` | Shield absorbs damage or colonist dodges |
-| `sfx/combat/loot_drop.ogg` | Enemy drops loot on death |
-| `sfx/combat/arrow_fire.ogg` | Arrow projectile fired |
-| `sfx/combat/bolt_fire.ogg` | Bolt projectile fired |
-| `sfx/combat/turret_fire.ogg` | Arcane or void turret fires |
-
-### SFX: Spells
-
-| File | Trigger |
-|------|---------|
-| `sfx/spells/spell_cast.ogg` | Any spell is auto-cast |
-| `sfx/spells/spell_heal.ogg` | Heal spell effect applied |
-| `sfx/spells/spell_buff.ogg` | Speed buff spell applied |
-| `sfx/spells/spell_shield.ogg` | Defense/shield spell applied |
-| `sfx/spells/spell_teleport.ogg` | Teleport spell used |
-| `sfx/spells/spell_growth.ogg` | Crop growth spell cast |
-| `sfx/spells/spell_terraform.ogg` | Terraform spell cast |
-| `sfx/spells/spell_divination.ogg` | Divination modifier spell cast |
-| `sfx/spells/magic_levelup.ogg` | Magic skill level increases |
-| `sfx/spells/mana_regen.ogg` | Not yet wired up (mana regen tick) |
-| `sfx/spells/summon_arrival.ogg` | Summoned creature appears |
-| `sfx/spells/golem_activate.ogg` | Golem is crafted and animated |
-
-### SFX: Work
-
-| File | Trigger |
-|------|---------|
-| `sfx/work/build_complete.ogg` | Building construction finishes |
-| `sfx/work/craft_complete.ogg` | Crafting order finishes |
-| `sfx/work/research_complete.ogg` | Research project completes |
-| `sfx/work/harvest.ogg` | Crop harvested |
-| `sfx/work/mine_hit.ogg` | Mining completes (rock removed) |
-| `sfx/work/chop_hit.ogg` | Chopping completes (tree removed) |
-
-### SFX: Environment
-
-| File | Trigger |
-|------|---------|
-| `sfx/environment/fire_ignite.ogg` | Fire starts or spreads to a new tile |
-| `sfx/environment/freezing.ogg` | Not yet wired up (colonist freezing) |
-| `sfx/environment/rain_ambient.ogg` | Not yet wired up (rain weather) |
-| `sfx/environment/thunder_crack.ogg` | Not yet wired up (thunderstorm) |
-| `sfx/environment/wind_blizzard.ogg` | Not yet wired up (blizzard weather) |
-
-### SFX: UI
-
-| File | Trigger |
-|------|---------|
-| `sfx/ui/button_click.ogg` | Not yet wired up (button clicks) |
-| `sfx/ui/notification.ogg` | Not yet wired up (notification popups) |
-| `sfx/ui/wave_alert.ogg` | New wave begins |
-| `sfx/ui/mental_break.ogg` | Colonist has a mental break |
+Several files came from Rifthold as copies of each other. For example `chop_hit` and
+`mine_hit` are the same file, and so are `magic_levelup` and `spell_teleport`. Replacing one
+of them with a new recording only changes the names that point at it.

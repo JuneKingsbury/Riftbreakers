@@ -1,4 +1,6 @@
 import { loadMapData, posKey } from './battle-map.js';
+import { Sound } from '../audio/sound.js';
+import { battleMusic, abilitySound, battleEventSound, battleOpensWithAlert, downSound, downChanges } from '../audio/game-sounds.js';
 import { pickRealmMap, realmLook } from '../run/data/realms.js';
 import { TacticalBattle, STATES } from './battle.js';
 import { BattleView3D, showViewError } from './battle-view3d.js';
@@ -57,6 +59,13 @@ export class BattleScene {
 
         this._battle = new TacticalBattle(map, units);
         this._applySpeed();
+        this._battle.onEvent = (type, data) => {
+            const sfx = battleEventSound(type, data);
+            if (sfx) Sound.playSfx(sfx);
+        };
+        this._downIds = downChanges(units).down;
+        Sound.playMusic(battleMusic(this._encounter, this._run));
+        if (battleOpensWithAlert(this._encounter)) Sound.playSfx('battle_alert');
 
         containerEl.innerHTML = '';
         containerEl.style.position = 'relative';
@@ -159,9 +168,12 @@ export class BattleScene {
         this._updateInsets();
         this._renderer?.render(this._battle, now);
         // Settle the battle with the run once, when it first ends
+        this._soundDowns();
         if (this._battle.state === STATES.BATTLE_OVER && !this._settled) {
             this._settled = true;
             this._won = this._battle.winner === 'player';
+            if (this._won) Sound.playSfx('loot');
+            else Sound.stopMusic(1500);
             this._pendingRewards = this._run
                 ? this._run.completeBattle(this._won)
                 : null;
@@ -215,9 +227,18 @@ export class BattleScene {
         this._abilityFromSkillMenu = null;
     }
 
+    // A unit that has just gone down, from any cause (a hit, poison, doom), sounds once.
+    _soundDowns() {
+        const { down, fresh } = downChanges(this._battle.units, this._downIds);
+        for (const u of fresh) Sound.playSfx(downSound(u));
+        this._downIds = down;
+    }
+
     _playAbilityAnimation(source, targetX, targetY, abilityKey, targetZ = null) {
         const ab = ABILITIES[abilityKey];
         if (!ab) return 0;
+        const sfx = abilitySound(abilityKey);
+        if (sfx) Sound.playSfx(sfx);
         const animType = ab.animType || 'slash';
         const rawDx = targetX - source.x;
         const rawDy = targetY - source.y;

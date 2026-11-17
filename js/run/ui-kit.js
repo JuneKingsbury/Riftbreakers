@@ -3,6 +3,7 @@
 import { ABILITIES } from '../tactical/data-registry.js';
 import { JOB_DATA } from '../tactical/data/jobs.js';
 import { EQUIPMENT, EQUIP_STAT_KEYS, itemRarity, itemName } from '../tactical/data/equipment.js';
+import { Sound } from '../audio/sound.js';
 
 export const FONT = `'Courier New',monospace`;
 
@@ -202,6 +203,7 @@ export class Modal {
             : 0;
         this._opts = opts;
         const dismissible = opts.dismissible !== false;
+        if (!this.isOpen) Sound.playSfx('panel');
         this.el.innerHTML = `
             <div class="rk-modal-body" style="background:#0d0d1e;border:1px solid #447;border-radius:8px;
                         padding:18px 22px;max-width:${opts.width || 460}px;width:92%;max-height:84vh;
@@ -224,6 +226,7 @@ export class Modal {
 
     close() {
         if (!this.isOpen) return;
+        Sound.playSfx('panel');
         this.el.style.display = 'none';
         this.el.innerHTML = '';
         const done = this._opts.onClose;
@@ -250,6 +253,7 @@ export class Toast {
     }
 
     show(text, ms = 2800) {
+        Sound.playSfx('notify');
         this.el.textContent = text;
         this.el.style.display = 'block';
         this.el.style.opacity = '1';

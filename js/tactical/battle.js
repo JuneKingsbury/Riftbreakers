@@ -38,6 +38,9 @@ export class TacticalBattle {
         this.hitPreview = new Set();
         this.log = [];
         this.winner = null;
+        // Optional listener for what happens in the fight, for presentation (sound): called
+        // as onEvent(type, data) with the types listed at _emit. Never affects the rules.
+        this.onEvent = null;
         this._animEnd = 0;
         this._pendingEnemy = null;
         this.onLogMessage = null;
@@ -110,27 +113,42 @@ export class TacticalBattle {
     }
 
     // Log and float one resolved hit, then give the target a chance to react.
+    // Event types: hit { source, target, damage }, miss { source, target },
+    // heal { source, target, amount }, revive { target }, buff { source, target, ability },
+    // status { source, target, status }, summon { source, unit }.
+    _emit(type, data) {
+        if (!this.onEvent) return;
+        try { this.onEvent(type, data); } catch { /* a listener must not break the fight */ }
+    }
+
     _applyResult(source, target, abKey, result, { isReaction = false } = {}) {
         if (result.silenced) {
             this.logMsg(`${source.name} is silenced and cannot cast!`);
             return;
         }
         if (result.missed) {
+            this._emit('miss', { source, target });
             this.logMsg(`${source.name} missed ${target.name}!`);
             this._spawnFloat(target, 'Miss!', '#aaa');
             return;
         }
         if (result.damage > 0) {
+            this._emit('hit', { source, target, damage: result.damage });
             const highGround = (source.z ?? 0) > (target.z ?? 0);
             const suffix = highGround ? ' (high gnd!)' : '';
             this.logMsg(`${source.name} hits ${target.name} for ${result.damage} dmg${suffix}.`);
             this._spawnFloat(target, `-${result.damage}`, '#f88');
         }
         if (result.healing > 0) {
+            this._emit(result.revived ? 'revive' : 'heal', { source, target, amount: result.healing });
             this.logMsg(`${source.name} heals ${target.name} for ${result.healing} HP.`);
             this._spawnFloat(target, `+${result.healing}`, '#8f8');
         }
         if (result.floatingText) this._spawnFloat(target, result.floatingText, '#ccf');
+        const ab = ABILITIES[abKey];
+        if (ab?.buffs?.every(b => b.value > 0) && !result.damage && !result.healing && !result.statusApplied) {
+            this._emit('buff', { source, target, ability: abKey });
+        }
         if (result.drained > 0) {
             this.logMsg(`${source.name} drains ${result.drained} HP.`);
             this._spawnFloat(source, `+${result.drained}`, '#8f8');
@@ -147,6 +165,7 @@ export class TacticalBattle {
             this._spawnFloat(target, 'Reraise!', '#ffeeaa');
         }
         if (result.statusApplied) {
+            this._emit('status', { source, target, status: result.statusApplied });
             this.logMsg(`${target.name} is afflicted with ${result.statusApplied}!`);
         }
         if (result.killedInstantly) {
@@ -704,6 +723,7 @@ export class TacticalBattle {
         faceToward(summon, source.x, source.y);
         this.units.push(summon);
         this.logMsg(`${source.name} summons a ${ab.summonName}!`);
+        this._emit('summon', { source, unit: summon });
 
         // Player-team summons are tracked so battle-scene can add them to _autoUnits.
         if (source.team === 'player') this._pendingSummons.push(summon.id);

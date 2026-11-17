@@ -1,6 +1,7 @@
 // Party menu: each member's level, HP, stats, skills to learn and upgrade with skill points, passive slots,
 // equipment and promotion. Works on a RunState and saves it after every change.
 import { createUnitFromCharData } from '../tactical/units.js';
+import { Sound } from '../audio/sound.js';
 import { ABILITIES } from '../tactical/data-registry.js';
 import { JOB_DATA } from '../tactical/data/jobs.js';
 import { EQUIPMENT, EQUIP_FIELDS, equipmentStatBonuses, equipmentGrants } from '../tactical/data/equipment.js';
@@ -103,13 +104,13 @@ export class PartyMenu {
         const body = this.modal.show(html, { width: 520, onBack: () => this.showList(), onClose: this.onClose, view: `member:${name}` });
         drawSprites(body, run.party, this.skin);
         body.querySelectorAll('[data-learn]').forEach(b => b.addEventListener('click', () => {
-            if (run.learn(m.name, b.dataset.learn)) { this._changed(); this.showMember(m.name); }
+            if (run.learn(m.name, b.dataset.learn)) { Sound.playSfx('skill_learned'); this._changed(); this.showMember(m.name); }
         }));
         body.querySelectorAll('[data-upgrade]').forEach(b => b.addEventListener('click', () => {
-            if (run.upgrade(m.name, b.dataset.upgrade)) { this._changed(); this.showMember(m.name); }
+            if (run.upgrade(m.name, b.dataset.upgrade)) { Sound.playSfx('skill_learned', { semitones: 2 }); this._changed(); this.showMember(m.name); }
         }));
         body.querySelectorAll('[data-promote]').forEach(b => b.addEventListener('click', () => {
-            if (run.promote(m.name, b.dataset.promote)) { this._changed(); this.showMember(m.name); }
+            if (run.promote(m.name, b.dataset.promote)) { Sound.playSfx('promote'); this._changed(); this.showMember(m.name); }
         }));
         body.querySelectorAll('select[data-slot]').forEach(sel => sel.addEventListener('change', () => {
             m.loadout[sel.dataset.slot] = sel.value || null;
@@ -253,7 +254,7 @@ export class PartyMenu {
         const body = this.modal.show(html, { width: 460, onBack: () => this.showMember(name), onClose: this.onClose, view: `equip:${name}:${field}`, returnTo: `member:${name}` });
         drawSprites(body, run.party, this.skin);
         body.querySelectorAll('[data-pick]').forEach(b => b.addEventListener('click', () => {
-            if (run.equip(name, field, b.dataset.pick || null)) this._changed();
+            if (run.equip(name, field, b.dataset.pick || null)) { Sound.playSfx('equip'); this._changed(); }
             this.showMember(name);
         }));
     }

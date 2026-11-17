@@ -3,6 +3,7 @@
 // the run. Every action goes through RunState; `hooks` tell the scene what to do next.
 import { RELICS } from './data/relics.js';
 import { REALMS } from './data/realms.js';
+import { Sound } from '../audio/sound.js';
 import { canPromote, canSpendPoints } from '../tactical/loadout.js';
 import { JOB_DATA } from '../tactical/data/jobs.js';
 import { MAX_PARTY } from './run-state.js';
@@ -24,6 +25,7 @@ function relicHtml(key) {
 export class NodeScreens {
     // hooks: { fight(), leave(), openParty(onClose), changed(), finish() }
     constructor(modal, run, skinManager, hooks) {
+        this._chimed = new WeakSet();   // reward screens whose level-up chime has played
         this.modal = modal;
         this.run = run;
         this.skin = skinManager;
@@ -53,8 +55,12 @@ export class NodeScreens {
         return body;
     }
 
-    _act(ok) {
-        if (ok) this.hooks.changed();
+    // After a player action: save and redraw, with `sfx` (sound-manifest.js) when it worked.
+    _act(ok, sfx = null) {
+        if (ok) {
+            this.hooks.changed();
+            if (sfx) Sound.playSfx(sfx);
+        }
         this.show();
     }
 
@@ -99,6 +105,9 @@ export class NodeScreens {
     // ---- Battle rewards ----
 
     reward(p) {
+        // The level-up chime plays once per reward, not on every redraw of the screen.
+        if (!this._chimed.has(p) && Object.values(p.levelUps ?? {}).some(n => n > 0)) Sound.playSfx('level_up');
+        this._chimed.add(p);
         const run = this.run;
         let html = H1(p.boss ? '♛ Boss Defeated!' : '✦ Victory!');
         html += `<div style="color:#fd8;margin-bottom:4px;">+${p.gold} gold</div>`;
@@ -135,8 +144,8 @@ export class NodeScreens {
             <button data-continue style="${BTN}${BTN_GOOD}text-align:center;">Continue ›</button>`;
         this._show(html, (on) => {
             this._wireParty(on);
-            on('[data-item]', (el) => this._act(run.claimRewardItem(el.dataset.item)));
-            on('[data-relic]', (el) => this._act(run.claimRewardRelic(el.dataset.relic)));
+            on('[data-item]', (el) => this._act(run.claimRewardItem(el.dataset.item), 'loot'));
+            on('[data-relic]', (el) => this._act(run.claimRewardRelic(el.dataset.relic), 'loot'));
             on('[data-continue]', () => {
                 const unclaimed = (!p.itemClaimed && p.items.length) || (p.relicPick && !p.relicClaimed && p.relics.length);
                 if (unclaimed && !window.confirm('Leave without taking your reward?')) return;
@@ -180,9 +189,9 @@ export class NodeScreens {
             <button data-continue style="${BTN}${BTN_GOOD}text-align:center;">Leave shop ›</button>`;
         this._show(html, (on) => {
             this._wireParty(on);
-            on('[data-buy]', (el) => this._act(run.buy(Number(el.dataset.buy))));
-            on('[data-relic]', () => this._act(run.buyRelic()));
-            on('[data-sell]', (el) => this._act(run.sell(el.dataset.sell)));
+            on('[data-buy]', (el) => this._act(run.buy(Number(el.dataset.buy)), 'loot'));
+            on('[data-relic]', () => this._act(run.buyRelic(), 'loot'));
+            on('[data-sell]', (el) => this._act(run.sell(el.dataset.sell), 'loot'));
             on('[data-continue]', () => this.hooks.leave());
         }, 520);
     }
@@ -209,6 +218,7 @@ export class NodeScreens {
         this._show(html, (on) => {
             on('[data-choice]', (el) => {
                 const res = run.chooseEvent(Number(el.dataset.choice));
+                if (res) Sound.playSfx('event');
                 if (!res) return;
                 this.hooks.changed();
                 if (res.next) this._eventFollowUp(ev, res);
@@ -253,8 +263,8 @@ export class NodeScreens {
         html += `<div style="height:6px;"></div>${this._partyButton()}`;
         this._show(html, (on) => {
             this._wireParty(on);
-            on('[data-rest]', () => this._act(run.drill()));
-            on('[data-train]', (el) => this._act(run.train(el.dataset.train)));
+            on('[data-rest]', () => this._act(run.drill(), 'rest'));
+            on('[data-train]', (el) => this._act(run.train(el.dataset.train), 'rest'));
         });
     }
 
@@ -270,7 +280,7 @@ export class NodeScreens {
             ? `<button data-continue style="${BTN}${BTN_GOOD}text-align:center;">Continue ›</button>`
             : `<button data-claim style="${BTN}${BTN_GOLD}text-align:center;">Open it</button>`;
         this._show(html, (on) => {
-            on('[data-claim]', () => this._act(run.claimTreasure()));
+            on('[data-claim]', () => this._act(run.claimTreasure(), 'loot'));
             on('[data-continue]', () => this.hooks.leave());
         });
     }
@@ -307,7 +317,7 @@ export class NodeScreens {
         }
         // Candidates aren't party members yet, so draw their portraits from the pending list.
         const body = this._show(html, (on) => {
-            on('[data-recruit]', (el) => this._act(run.recruit(Number(el.dataset.recruit))));
+            on('[data-recruit]', (el) => this._act(run.recruit(Number(el.dataset.recruit)), 'event'));
             on('[data-decline]', () => this._act(run.declineRecruit()));
             on('[data-continue]', () => this.hooks.leave());
         }, 520);

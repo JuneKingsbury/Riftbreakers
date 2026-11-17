@@ -50,6 +50,13 @@ path through battles, elites, events, shops, rest sites, treasure and recruits, 
   unlocks (`profile.js`).
 - **Content:** encounters, events, relics and recruits live in `js/run/data/`.
 
+## Audio
+
+Music and sound effects follow Rifthold's sound system (`js/audio/`): looping music that
+crossfades between scenes, with each realm's own track on its act map, and short sound effects
+with a slight random pitch shift so repeated sounds don't grate. The Music and SFX sliders in
+Settings control them. `audio/README.md` lists every track and sound and when it plays.
+
 ## Tactical battle view
 
 Battles render in real 3D with [Three.js](https://threejs.org) (vendored in `lib/three/`, r186, MIT).

@@ -6,6 +6,8 @@
 // upright) get a top bar with the party and a bottom bar of buttons instead, with
 // relics, the legend and quitting moved into a Menu.
 import { RunMapRenderer } from './run-map-renderer.js';
+import { Sound } from '../audio/sound.js';
+import { mapMusic, VICTORY_MUSIC } from '../audio/game-sounds.js';
 import { NodeScreens } from './node-screens.js';
 import { PartyMenu } from './party-menu.js';
 import { RunState } from './run-state.js';
@@ -127,6 +129,8 @@ export class RunMapScene {
     _afterChange() {
         this._changed();
         if (this.run.status !== 'active') return this._endRun();
+        // The act realm's track, also on returning from a battle and when a new act begins.
+        Sound.playMusic(mapMusic(this.run));
         if (this._needsActIntro()) return this._showActIntro();
         this._screens.show();
     }
@@ -167,6 +171,8 @@ export class RunMapScene {
             saveProfile(profile);
             RunState.clearSave();
         }
+        if (this.run.status === 'won') Sound.playMusic(VICTORY_MUSIC);
+        else Sound.stopMusic(2000);
         this._screens.runOver();
     }
 
@@ -412,6 +418,7 @@ export class RunMapScene {
             return;
         }
         this.run.enterNode(id);
+        Sound.playSfx('travel');
         this._afterChange();
     }
 }

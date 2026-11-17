@@ -1,5 +1,7 @@
 import { SkinManager } from '../ui/skin-manager.js';
 import { watchLayout } from '../ui/layout.js';
+import { Sound } from '../audio/sound.js';
+import { TITLE_MUSIC } from '../audio/game-sounds.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     watchLayout();
@@ -43,10 +45,15 @@ document.addEventListener('DOMContentLoaded', () => {
     function loadSettings() {
         try { return JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {}; } catch { return {}; }
     }
+    // A slider at 0 must stay at 0 (|| would turn it back into the default).
+    const sliderValue = (id, fallback) => {
+        const n = parseInt(document.getElementById(id)?.value, 10);
+        return Number.isFinite(n) ? n : fallback;
+    };
     function saveSettings() {
         const s = {
-            musicVolume: parseInt(document.getElementById('start-music-vol')?.value) || 50,
-            sfxVolume:   parseInt(document.getElementById('start-sfx-vol')?.value) || 50,
+            musicVolume: sliderValue('start-music-vol', 50),
+            sfxVolume:   sliderValue('start-sfx-vol', 80),
             colorblindMode: document.getElementById('start-colorblind')?.value || 'none',
         };
         localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
@@ -64,10 +71,29 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('start-colorblind').value = s.colorblindMode;
         }
     }
+    // The volume sliders drive the sound buses directly, so a change is heard at once.
+    function applyVolumes() {
+        Sound.setMusicVolume(sliderValue('start-music-vol', 50));
+        Sound.setSfxVolume(sliderValue('start-sfx-vol', 80));
+    }
     applySettings(loadSettings());
+    applyVolumes();
 
-    settingsPanel?.addEventListener('change', saveSettings);
-    settingsPanel?.addEventListener('input',  saveSettings);
+    settingsPanel?.addEventListener('change', () => { saveSettings(); applyVolumes(); });
+    settingsPanel?.addEventListener('input',  () => { saveSettings(); applyVolumes(); });
+
+    // --- Sound ---
+    // Browsers only start audio after the player interacts with the page.
+    const unlockAudio = () => Sound.unlock();
+    for (const type of ['pointerdown', 'keydown', 'touchstart']) {
+        document.addEventListener(type, unlockAudio, { capture: true, passive: true });
+    }
+    // Every enabled button clicks. Screens add their own sound for what the click did.
+    document.addEventListener('click', (e) => {
+        const button = e.target.closest?.('button');
+        if (button && !button.disabled) Sound.playSfx('click');
+    }, true);
+    Sound.playMusic(TITLE_MUSIC);
 
     document.getElementById('start-reset-defaults')?.addEventListener('click', () => {
         document.getElementById('start-skin').value = 'ascii';
@@ -77,6 +103,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('start-sfx-vol-val').textContent = '80';
         document.getElementById('start-colorblind').value = 'none';
         saveSettings();
+        applyVolumes();
     });
 
     // --- Settings tab switching ---
@@ -146,6 +173,7 @@ document.addEventListener('DOMContentLoaded', () => {
         gameEl.innerHTML = '';
         startScreen.style.display = '';
         refreshContinue();
+        Sound.playMusic(TITLE_MUSIC);
     };
     const refreshContinue = () => {
         import('../run/start.js').then(({ hasSavedRun }) => { continueBtn.disabled = !hasSavedRun(); });

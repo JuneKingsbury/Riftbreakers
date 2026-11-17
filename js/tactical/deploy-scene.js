@@ -1,4 +1,6 @@
 import { loadMapData, posKey } from './battle-map.js';
+import { Sound } from '../audio/sound.js';
+import { battleMusic } from '../audio/game-sounds.js';
 import { MAP_DATA } from './data/maps/index.js';
 import { pickRealmMap, realmLook } from '../run/data/realms.js';
 import { viewState } from './view-state.js';
@@ -83,6 +85,7 @@ export class DeployScene {
         }
         const map    = loadMapData(this._mapDef);
         map.look     = realmLook(enc?.zone ?? enc?.realm);
+        Sound.playMusic(battleMusic(enc, this._run));
 
         this._playerSpawns = map.playerSpawns.map(s => ({ ...s }));
 
