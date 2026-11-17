@@ -176,3 +176,28 @@ test('the import confirmation sums up what the save holds', () => {
     assert.match(text, /Run in progress: act 1/);
     assert.match(text, /2026-11-17/);
 });
+
+test('skill plans travel with an export, and an older save without them leaves the current plans alone', async () => {
+    const { savePlans, loadPlans } = await import('../../js/run/skill-plans.js');
+    const { storage } = deviceWithProgress();
+    const plans = { evoker: { auto: true, steps: [{ learn: 'fire' }, { learn: 'ice' }] } };
+    savePlans(plans, storage);
+    const save = exportSave(storage);
+    assert.deepEqual(save.skillPlans, plans);
+
+    const other = memoryStorage();
+    const { save: checked } = readSaveText(saveToCode(save));
+    assert.match(describeSave(checked), /1 skill plan\b/);
+    assert.ok(applySave(checked, other));
+    assert.deepEqual(loadPlans(other), plans);
+
+    // A save from before skill plans existed.
+    const old = { ...save };
+    delete old.skillPlans;
+    const mine = { warden: { auto: true, steps: [{ learn: 'ward' }] } };
+    savePlans(mine, other);
+    const { save: oldChecked } = checkSave(old);
+    assert.equal(oldChecked.skillPlans, null);
+    assert.ok(applySave(oldChecked, other));
+    assert.deepEqual(loadPlans(other), mine);
+});

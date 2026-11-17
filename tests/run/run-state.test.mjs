@@ -99,29 +99,31 @@ test('winning the act 3 boss wins the run', () => {
     assert.equal(run.status, 'won');
 });
 
-test('rest drills everyone or trains one member; only one per visit, and it tends wounds', () => {
+test('rest trains everyone or enchants one item; only one per visit, and it tends wounds', () => {
     const run = newRun();
     const [a, b] = run.party;
     a.hp = 10;
     enter(run, 'rest');
     const xps = run.party.map(totalXp);
-    assert.ok(run.drill());
+    assert.ok(run.train());
     assert.deepEqual(run.party.map(totalXp), xps.map(x => x + run.options.drillXp));
     assert.equal(a.hp, null, 'wounds tended');
-    assert.ok(!run.train(b.name), 'already rested');
+    const weapon = b.appearance.weaponKey;
+    assert.ok(weapon, 'members start armed');
+    assert.ok(!run.enchant({ member: b.name, field: 'weaponKey' }), 'already rested');
     run.leaveNode();
 
     enter(run, 'rest');
-    const sp = b.sp;
-    assert.ok(run.train(b.name));
-    assert.equal(b.sp, sp + 1, 'training gives a skill point');
+    assert.ok(run.enchant({ member: b.name, field: 'weaponKey' }));
+    assert.equal(b.appearance.weaponKey, `${weapon}+1`, 'enchanting levels the item');
+    assert.ok(!run.train(), 'one or the other');
     run.leaveNode();
 
     enter(run, 'rest');
     b.level = PROMOTION_LEVEL;
     assert.ok(run.promote(b.name, 'riftcaller'));
     assert.equal(b.origin, 'evoker');
-    assert.ok(run.drill(), 'promoting does not use up the rest');
+    assert.ok(run.train(), 'promoting does not use up the rest');
 });
 
 test('a member who is ready can promote anywhere, at no cost, but only once and only while the run lasts', () => {

@@ -172,6 +172,52 @@ export const EQUIPMENT = {
 // Stat fields that equipment can modify.
 export const EQUIP_STAT_KEYS = ['atk','def','mat','mdf','spd','move','eva','maxHp','maxMp'];
 
+// ---- Enchanting ----
+// An item can be enchanted up to MAX_ENCHANT times (at rest sites, and very rarely an item is
+// found already enchanted). Like ability ranks, an enchanted item is its own key, the base key
+// plus '+N' (iron_sword+1), so inventories, equipping, saving and battle need nothing new.
+// The variants are registered on EQUIPMENT as non-enumerable entries: EQUIPMENT['x+1'] works,
+// but loops over EQUIPMENT (loot and shop pools, editors) only see base items.
+export const MAX_ENCHANT = 2;
+// Each level adds 20% of each of these stats the item has (at least 1). Speed, movement and
+// evasion are left alone, so enchanting can't break movement or dodge balance.
+const ENCHANT_STATS = ['atk', 'def', 'mat', 'mdf', 'maxHp', 'maxMp'];
+const ENCHANT_FRAC = 0.2;
+const ENCHANT_FALLBACK_HP = 4;   // per level, for an item with none of ENCHANT_STATS
+
+export function enchantLevel(key) {
+    const m = /\+(\d)$/.exec(String(key));
+    return m ? Number(m[1]) : 0;
+}
+
+export function baseItemKey(key) {
+    return typeof key === 'string' ? key.replace(/\+\d$/, '') : key;
+}
+
+export function enchantedKey(key, level) {
+    const base = baseItemKey(key);
+    return level > 0 ? `${base}+${level}` : base;
+}
+
+// Can this item be enchanted once more?
+export function canEnchant(key) {
+    return !!EQUIPMENT[key] && enchantLevel(key) < MAX_ENCHANT;
+}
+
+function enchantedEntry(item, level) {
+    const out = { ...item, name: `${item.name} +${level}`, enchant: level };
+    const boosted = ENCHANT_STATS.filter(s => item[s] > 0);
+    for (const s of boosted) out[s] = item[s] + level * Math.max(1, Math.round(item[s] * ENCHANT_FRAC));
+    if (!boosted.length) out.maxHp = (item.maxHp || 0) + level * ENCHANT_FALLBACK_HP;
+    return out;
+}
+
+for (const [key, item] of Object.entries(EQUIPMENT)) {
+    for (let lv = 1; lv <= MAX_ENCHANT; lv++) {
+        Object.defineProperty(EQUIPMENT, enchantedKey(key, lv), { value: enchantedEntry(item, lv), enumerable: false });
+    }
+}
+
 // Returns the combined stat bonuses from all equipped items on a member's appearance.
 export function equipmentStatBonuses(appearance) {
     const bonuses = {};
@@ -207,12 +253,13 @@ export function itemRarity(key) {
     return EQUIPMENT[key]?.rarity ?? 'common';
 }
 
-// Shop price: by rarity, plus a premium for items that grant an ability.
+// Shop price: by rarity, plus a premium for items that grant an ability, scaled up by enchants.
 export function itemPrice(key) {
     const item = EQUIPMENT[key];
     if (!item) return 0;
     const base = { common: 60, uncommon: 120, rare: 220 }[itemRarity(key)];
-    return base + ((item.grants || item.grantsPassive) ? 40 : 0);
+    // Each enchant level adds half the price again.
+    return Math.round((base + ((item.grants || item.grantsPassive) ? 40 : 0)) * (1 + 0.5 * enchantLevel(key)));
 }
 
 // Display name for an item key, e.g. 'scholars_spectacles' → "Scholar's Spectacles".

@@ -58,7 +58,7 @@ once, so busy fights stay clear.
 | `promote` | `sfx/spells/spell_divination.ogg` | A member promotes |
 | `loot` | `sfx/combat/loot_drop.ogg` | Item, relic, treasure, buying and selling, a won battle |
 | `equip` | `sfx/work/craft_complete.ogg` | Equipment changes |
-| `rest` | `sfx/spells/spell_heal.ogg` | Drill or train at a rest site |
+| `rest` | `sfx/spells/spell_heal.ogg` | Train or enchant at a rest site |
 | `travel` | `sfx/environment/footstep.ogg` | Moving to a node |
 | `event` | `sfx/ui/notification.ogg` | An event choice resolves, or a recruit joins |
 | `click` | `sfx/ui/button_click.ogg` | Any button |

@@ -41,7 +41,7 @@ path through battles, elites, events, shops, rest sites, treasure and recruits, 
   - **Warlord** (no school): orders that move speed gauges (Rally, Delay), Taunt, and swapping
     places with an ally.
   Recruits met on the road can be any role, unlocked or not.
-- **Party:** start with three Tier 1 roles and recruit up to six. Battles are automatic, so the
+- **Party:** start with one to three Tier 1 roles (fewer is a challenge run) and recruit up to six. Battles are automatic, so the
   party fully heals after every win; damage from events lasts until then. Losing a battle ends the run.
 - **Growth:** wins give XP; every level gives a skill point. Each role has a small skill tree
   (`data/jobs.js`: cost and prerequisite per skill), and learned skills can be upgraded to rank II
@@ -49,6 +49,16 @@ path through battles, elites, events, shops, rest sites, treasure and recruits, 
   into one of two Tier 2 jobs, at any time from the Party menu (it costs nothing). Equipment adds stats and can grant
   abilities (`data/equipment.js`): actions join the skill list, and passives (e.g. Ghost Step) are
   always on, on top of the reaction/support/movement the character chose, and relics are party-wide modifiers (`js/run/data/relics.js`).
+- **Skill plans:** Settings > Skill Plans (or Edit skill plan in the Party menu) sets, per class,
+  an ordered list of skills to learn and upgrade (`js/run/skill-plans.js`). With auto-allocate
+  on, members spend points on the next step as soon as they can afford it, saving up when it
+  costs more than they have. A promoted member finishes their starting class's plan first.
+  Plans are stored on the device (`riftbreak.skillplans.v1`) and travel with save exports.
+- **Rest sites and enchanting:** a rest site offers Train (XP for everyone) or Enchant: one owned
+  item, equipped or in the bag, gains a level, up to +2 (about +20% of its main stats per level).
+  An enchanted item is its own key (`iron_sword+1`, registered in `data/equipment.js` and hidden
+  from loops over `EQUIPMENT`), so it equips, sells and saves like any item. Found items are
+  rarely already enchanted: 3% +1 and 0.5% +2, doubled from elites and bosses (`run-state.js`).
 - **Real time:** battles run in real time (`js/tactical/realtime.js`). Everyone acts at the
   opening, then each unit acts whenever its speed gauge fills, while others are still moving.
   A move-and-attack lands when the walker arrives. Commanding units by hand (the manual test
@@ -62,7 +72,7 @@ path through battles, elites, events, shops, rest sites, treasure and recruits, 
   localStorage, so a run can be continued from the title screen. Between runs, renown buys
   unlocks (`profile.js`). The profile is saved separately, and loading cleans up damaged or
   edited data (`sanitizeProfile`).
-- **Backups:** Settings > Save Data exports progress (the profile and any run in progress) to a
+- **Backups:** Settings > Save Data exports progress (the profile, skill plans and any run in progress) to a
   `.json` file or a copyable save code, and imports it back on any device (`save-transfer.js`).
   Importing checks the save and asks before replacing current progress. Browsers can clear
   local storage, mobile Safari after about a week of not visiting, so a backup is the only

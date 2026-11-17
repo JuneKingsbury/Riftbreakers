@@ -26,15 +26,19 @@ import { RELICS, relicStatMods, relicMult, relicsWith } from './data/relics.js';
 import { eventsFor, EVENTS } from './data/events.js';
 import { rollRealms, REALMS } from './data/realms.js';
 import { createMember, recruitCandidates } from './data/recruits.js';
+import { autoAllocate } from './skill-plans.js';
 import { runOptions, BASE_JOBS } from './profile.js';
-import { EQUIPMENT, EQUIP_FIELDS, equipmentStatBonuses, itemPrice, itemRarity, itemName } from '../tactical/data/equipment.js';
+import { EQUIPMENT, EQUIP_FIELDS, equipmentStatBonuses, itemPrice, itemRarity, itemName, canEnchant, enchantedKey, enchantLevel } from '../tactical/data/equipment.js';
 import { JOB_STATS, ABILITIES, allowedEquipTypes, jobsOfTier } from '../tactical/data-registry.js';
 import { sanitizeLoadout, learnAbility, upgradeAbility, canPromote, promote, promotionOptions, addXp, levelStatMods } from '../tactical/loadout.js';
 
 export const SAVE_KEY = 'riftbreak.run.v1';
 export const SAVE_VERSION = 4;
 export const MAX_PARTY = 6;
-export const TRAIN_SP = 1;
+// Found items (loot, shops, events) are very rarely already enchanted: the chance an item is
+// +1 or +2. Elite and boss rewards double both.
+export const FOUND_ENCHANT_CHANCE = { plus1: 0.03, plus2: 0.005 };
+export const ELITE_ENCHANT_MULT = 2;
 // Extra skill points the starting party begins with, so each member opens with a choice.
 export const START_BONUS_SP = 1;
 // A run starts with 1 to START_PARTY members of the player's choosing (fewer is a challenge run).
@@ -244,6 +248,14 @@ export class RunState {
         return !!m && upgradeAbility(m, key);
     }
 
+    // Spends every member's skill points on their class's skill plan (see skill-plans.js).
+    // Plans are the player's, so the caller passes them in. Returns [{ name, key, rank }].
+    autoAllocate(plans) {
+        const out = [];
+        for (const m of this.party) for (const b of autoAllocate(m, plans)) out.push({ name: m.name, ...b });
+        return out;
+    }
+
     learn(memberName, key) {
         const m = this.member(memberName);
         return !!m && learnAbility(m, key);
@@ -308,7 +320,10 @@ export class RunState {
         return Math.floor(itemPrice(key) / 2);
     }
 
-    _rollItems(weights, count) {
+    // Rolls `count` different items. Pools hold base items only (enchanted variants aren't
+    // enumerable, see equipment.js); each pick then has a small chance to come enchanted.
+    // kind: 'elite' or 'boss' for better odds of an enchanted find.
+    _rollItems(weights, count, kind = 'normal') {
         const out = [];
         for (let i = 0; i < count * 6 && out.length < count; i++) {
             const rarity = this.rng.weighted(weights);
@@ -317,7 +332,15 @@ export class RunState {
             const pool = usable.length ? usable : keys;
             if (pool.length) out.push(this.rng.pick(pool));
         }
-        return out;
+        return out.map(k => this._maybeEnchant(k, kind));
+    }
+
+    _maybeEnchant(key, kind = 'normal') {
+        const mult = kind === 'elite' || kind === 'boss' ? ELITE_ENCHANT_MULT : 1;
+        const r = this.rng.next();
+        if (r < FOUND_ENCHANT_CHANCE.plus2 * mult) return enchantedKey(key, 2);
+        if (r < (FOUND_ENCHANT_CHANCE.plus2 + FOUND_ENCHANT_CHANCE.plus1) * mult) return enchantedKey(key, 1);
+        return key;
     }
 
     _rollRelics(rarities, count) {
@@ -396,7 +419,7 @@ export class RunState {
             gold,
             xp: xpGained,
             levelUps,
-            items: this._rollItems(ITEM_RARITY[this.act][enc.kind], choices),
+            items: this._rollItems(ITEM_RARITY[this.act][enc.kind], choices, enc.kind),
             itemClaimed: false,
             relics,
             // Bosses offer a choice of relics; elites give their one relic.
@@ -470,9 +493,9 @@ export class RunState {
 
     // ---- Rest ----
 
-    // A rest site offers one of: drill (XP for everyone) or train (a skill point for one
-    // member). Resting also tends any wounds from events.
-    drill() {
+    // A rest site offers one of: train (XP for everyone) or enchant one item the party owns
+    // (see enchant). Resting also tends any wounds from events.
+    train() {
         if (this.pending?.kind !== 'rest' || this.pending.used) return false;
         for (const m of this.party) this._grantXp(m, this.options.drillXp);
         this._useRest();
@@ -484,11 +507,28 @@ export class RunState {
         for (const m of this.party) m.hp = null;
     }
 
-    train(memberName) {
-        const m = this.member(memberName);
-        if (!m || this.pending?.kind !== 'rest' || this.pending.used) return false;
-        m.sp = (m.sp || 0) + TRAIN_SP;
-        if (this.options.trainXp) this._grantXp(m, this.options.trainXp);
+    // Enchants one owned item a level (to at most +2): an equipped one, where is
+    // { member, field } (an EQUIP_FIELDS name), or one in the bag, where is { item: key }.
+    // Uses up the rest. With Master Trainer, the party also gains XP.
+    enchant(where) {
+        if (this.pending?.kind !== 'rest' || this.pending.used || !where) return false;
+        let m = null;
+        if (where.member != null) {
+            m = this.member(where.member);
+            const key = m && EQUIP_FIELDS.includes(where.field) ? m.appearance?.[where.field] : null;
+            if (!key || !canEnchant(key)) return false;
+            const before = this.maxHp(m);
+            m.appearance[where.field] = enchantedKey(key, enchantLevel(key) + 1);
+            if (m.hp != null) m.hp = Math.max(1, Math.min(this.maxHp(m), m.hp + this.maxHp(m) - before));
+        } else {
+            const key = where.item;
+            if (!this.inventory[key] || !canEnchant(key)) return false;
+            this.removeItem(key);
+            this.addItem(enchantedKey(key, enchantLevel(key) + 1));
+        }
+        // Runs saved before enchanting have the Master Trainer bonus as trainXp instead.
+        const xp = this.options.enchantXp ?? (this.options.trainXp ? 25 : 0);
+        if (xp) for (const p of this.party) this._grantXp(p, xp);
         this._useRest();
         return true;
     }

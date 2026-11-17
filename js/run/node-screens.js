@@ -7,6 +7,7 @@ import { Sound } from '../audio/sound.js';
 import { canPromote, canSpendPoints } from '../tactical/loadout.js';
 import { JOB_DATA } from '../tactical/data/jobs.js';
 import { MAX_PARTY } from './run-state.js';
+import { EQUIPMENT, EQUIP_FIELDS, EQUIP_STAT_KEYS, canEnchant, enchantedKey, enchantLevel, MAX_ENCHANT } from '../tactical/data/equipment.js';
 import {
     BTN, BTN_DISABLED, BTN_GOOD, BTN_GOLD, BTN_DANGER, GLOW, RARITY_COLOR, esc, jobLabel, jobDesc,
     abilityName, itemTitle, itemSummary, itemIconHtml, portraitHtml, drawSprites,
@@ -15,6 +16,14 @@ import {
 const H1 = (t, color = '#ffcc44') => `<div style="color:${color};font-weight:bold;font-size:16px;margin-bottom:6px;">${t}</div>`;
 const SUB = (t) => `<div style="color:#999;font-size:11px;line-height:1.6;margin-bottom:12px;">${t}</div>`;
 const SECTION = (t) => `<div style="color:#fc8;font-size:10px;text-transform:uppercase;margin:12px 0 5px;">${t}</div>`;
+
+// What enchanting an item changes: "ATK 8 → 10, HP 20 → 24".
+function enchantPreview(key) {
+    const a = EQUIPMENT[key], b = EQUIPMENT[enchantedKey(key, enchantLevel(key) + 1)];
+    const label = { maxHp: 'HP', maxMp: 'MP' };
+    return EQUIP_STAT_KEYS.filter(s => (b[s] || 0) !== (a[s] || 0))
+        .map(s => `${(label[s] || s).toUpperCase()} ${a[s] || 0} → ${b[s]}`).join(', ');
+}
 
 function relicHtml(key) {
     const r = RELICS[key];
@@ -248,14 +257,27 @@ export class NodeScreens {
             return;
         }
         const wounded = run.party.some(m => m.hp != null);
-        html += SUB(`Choose one: drill the whole company or train one member.${wounded ? ' Either also tends your wounds.' : ''}`);
-        html += `<button data-rest style="${BTN}${BTN_GOOD}">♨ Drill: every member gains ${run.options.drillXp} XP</button>`;
-        html += SECTION(`Train: one member gains a skill point${run.options.trainXp ? ` and ${run.options.trainXp} XP` : ''}`);
+        html += SUB(`Choose one: train the whole company or enchant one item.${wounded ? ' Either also tends your wounds.' : ''}`);
+        html += `<button data-rest style="${BTN}${BTN_GOOD}">♨ Train: every member gains ${run.options.drillXp} XP</button>`;
+        const xp = run.options.enchantXp ?? (run.options.trainXp ? 25 : 0);
+        html += SECTION(`Enchant: an item gains a level (up to +${MAX_ENCHANT})${xp ? ` and everyone gains ${xp} XP` : ''}`);
+        const choices = [];
+        const itemRow = (key, where, owner) => {
+            const i = choices.push(where) - 1;
+            const ok = canEnchant(key);
+            return `<button data-enchant="${i}" ${ok ? '' : 'disabled'} style="${BTN}display:flex;gap:8px;align-items:center;${ok ? '' : BTN_DISABLED}">${itemIconHtml(key)}
+                <span style="flex:1;">${itemTitle(key)}${owner ? ` <span style="color:#777;font-size:10px;">· ${esc(owner)}</span>` : ''}<br>
+                <span style="color:${ok ? '#d9a6ff' : '#666'};font-size:10px;">${ok ? esc(enchantPreview(key)) : `+${MAX_ENCHANT} (max)`}</span></span></button>`;
+        };
+        let rows = '';
         for (const m of run.party) {
-            html += `<button data-train="${esc(m.name)}" style="${BTN}display:flex;gap:8px;align-items:center;">${portraitHtml(m, 20)}
-                <span style="flex:1;">${esc(m.name)} <span style="color:#777;font-size:10px;">${jobLabel(m.job)}</span></span>
-                <span style="color:#8c8;">Lv ${m.level} · ${m.sp || 0} SP</span></button>`;
+            for (const field of EQUIP_FIELDS) {
+                const key = m.appearance?.[field];
+                if (key && EQUIPMENT[key]) rows += itemRow(key, { member: m.name, field }, m.name);
+            }
         }
+        for (const key of Object.keys(run.inventory)) if (EQUIPMENT[key]) rows += itemRow(key, { item: key }, 'in the bag');
+        html += rows || `<div style="color:#777;font-size:11px;margin-bottom:6px;">The company has no items to enchant.</div>`;
         const ready = run.party.filter(m => canPromote(m));
         if (ready.length) {
             html += `<div style="color:#fc6;font-size:11px;margin:6px 0;">★ ${esc(ready.map(m => m.name).join(', '))} can promote any time, from the Party menu. It doesn't use up the rest.</div>`;
@@ -263,8 +285,8 @@ export class NodeScreens {
         html += `<div style="height:6px;"></div>${this._partyButton()}`;
         this._show(html, (on) => {
             this._wireParty(on);
-            on('[data-rest]', () => this._act(run.drill(), 'rest'));
-            on('[data-train]', (el) => this._act(run.train(el.dataset.train), 'rest'));
+            on('[data-rest]', () => this._act(run.train(), 'rest'));
+            on('[data-enchant]', (el) => this._act(run.enchant(choices[+el.dataset.enchant]), 'rest'));
         });
     }
 

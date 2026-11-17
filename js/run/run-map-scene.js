@@ -14,6 +14,7 @@ import { RunState } from './run-state.js';
 import { RELICS } from './data/relics.js';
 import { CHAINS } from './data/realms.js';
 import { loadProfile, saveProfile, recordRun } from './profile.js';
+import { loadPlans, describePurchases } from './skill-plans.js';
 import { Modal, Toast, BTN, BTN_GOOD, BTN_DANGER, GLOW, RARITY_COLOR, NODE_INFO, FONT, esc, jobLabel, hpBar, portraitHtml, drawSprites } from './ui-kit.js';
 import { DeployScene } from '../tactical/deploy-scene.js';
 import { BattleScene } from '../tactical/battle-scene.js';
@@ -120,8 +121,14 @@ export class RunMapScene {
 
     // ---- State ----
 
+    // Every change passes through here: members with an auto skill plan spend their new
+    // points first (see skill-plans.js), then the run is saved.
     _changed() {
-        if (this.run.status === 'active') this.run.save();
+        if (this.run.status === 'active') {
+            const bought = this.run.autoAllocate(loadPlans());
+            if (bought.length) this._toast?.show(`Auto: ${describePurchases(bought)}`, 3600);
+            this.run.save();
+        }
         this._sidebarKey = null;
     }
 

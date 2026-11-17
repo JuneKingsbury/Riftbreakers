@@ -1,8 +1,9 @@
 // Exporting and importing save data, so progress can be backed up or moved to another device:
 // the profile (renown, unlocks and stats) and the run in progress, if any.
 //
-// A save is { format: 'riftbreak-save', version, exportedAt, profile, run }, where run is the
-// run's own save data (RunState.serialize) or null. It travels as a .json file or as a save
+// A save is { format: 'riftbreak-save', version, exportedAt, profile, run, skillPlans }, where
+// run is the run's own save data (RunState.serialize) or null, and skillPlans the class skill
+// plans (skill-plans.js). Saves from before skill plans have no skillPlans field. It travels as a .json file or as a save
 // code: the same JSON, base64 encoded with a 'RB1:' prefix, for copying and pasting.
 //
 // Importing never trusts the data: the profile goes through sanitizeProfile and the run must
@@ -10,6 +11,7 @@
 import { loadProfile, saveProfile, sanitizeProfile, defaultStorage, UNLOCKS } from './profile.js';
 import { RunState, SAVE_KEY } from './run-state.js';
 import { REALMS } from './data/realms.js';
+import { loadPlans, savePlans, sanitizePlans, planCount } from './skill-plans.js';
 
 export const SAVE_FORMAT = 'riftbreak-save';
 export const SAVE_FORMAT_VERSION = 1;
@@ -22,7 +24,10 @@ export function exportSave(storage = defaultStorage(), now = new Date()) {
         const raw = storage?.getItem(SAVE_KEY);
         if (raw && RunState.deserialize(raw)) run = JSON.parse(raw);
     } catch { run = null; }
-    return { format: SAVE_FORMAT, version: SAVE_FORMAT_VERSION, exportedAt: now.toISOString(), profile: loadProfile(storage), run };
+    return {
+        format: SAVE_FORMAT, version: SAVE_FORMAT_VERSION, exportedAt: now.toISOString(),
+        profile: loadProfile(storage), run, skillPlans: loadPlans(storage),
+    };
 }
 
 /** A file name for an export, e.g. riftbreak-save-2026-11-17.json. */
@@ -77,17 +82,20 @@ export function checkSave(save) {
         if (loaded?.status === 'active') run = loaded;
         else runDropped = true;
     }
-    return { save: { profile, run, runDropped, exportedAt: save.exportedAt ?? null } };
+    // null: the save has no plans (an older save), so importing leaves the current ones.
+    const skillPlans = save.skillPlans === undefined ? null : sanitizePlans(save.skillPlans);
+    return { save: { profile, run, runDropped, skillPlans, exportedAt: save.exportedAt ?? null } };
 }
 
 /** One-paragraph summary of a checked save, for the import confirmation. */
-export function describeSave({ profile, run, runDropped, exportedAt }) {
+export function describeSave({ profile, run, runDropped, skillPlans, exportedAt }) {
     const unlocks = profile.unlocked.length;
     const parts = [
         `${profile.renown} renown`,
         `${unlocks} of ${Object.keys(UNLOCKS).length} unlocks`,
         `${profile.stats.runs} run${profile.stats.runs === 1 ? '' : 's'} played (${profile.stats.wins} won)`,
     ];
+    if (skillPlans) parts.push(`${planCount(skillPlans)} skill plan${planCount(skillPlans) === 1 ? '' : 's'}`);
     let runLine = 'No run in progress.';
     if (run) runLine = `Run in progress: act ${run.act}, ${REALMS[run.realmId]?.name ?? 'unknown realm'}, ${run.party.length} members.`;
     else if (runDropped) runLine = 'The run in progress in this save couldn\'t be read, so it will be left out.';
@@ -99,9 +107,10 @@ export function describeSave({ profile, run, runDropped, exportedAt }) {
  * Replaces the current progress with a checked save: the profile, and the run in progress
  * (or no run, if the save has none). Returns true on success.
  */
-export function applySave({ profile, run }, storage = defaultStorage()) {
+export function applySave({ profile, run, skillPlans }, storage = defaultStorage()) {
     if (!storage) return false;
     if (!saveProfile(profile, storage)) return false;
+    if (skillPlans && !savePlans(skillPlans, storage)) return false;
     if (run) return run.save(storage);
     RunState.clearSave(storage);
     return true;

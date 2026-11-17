@@ -48,6 +48,7 @@
             </div>
             <div class="settings-tabs" style="display:flex; gap:4px; margin-bottom:8px; border-bottom:1px solid #444;">
                 <button data-start-tab-btn="general" class="settings-tab-btn active" style="flex:1; padding:5px 8px; background:#2a2a4e; color:#ffcc00; border:1px solid #444; border-bottom:none; border-radius:4px 4px 0 0; cursor:pointer; font-family:inherit; font-size:inherit;">General</button>
+                <button data-start-tab-btn="skillplans" class="settings-tab-btn" style="flex:1; padding:5px 8px; background:#16162a; color:#999; border:1px solid #444; border-bottom:none; border-radius:4px 4px 0 0; cursor:pointer; font-family:inherit; font-size:inherit;">Skill Plans</button>
                 <button data-start-tab-btn="graphics" class="settings-tab-btn" style="flex:1; padding:5px 8px; background:#16162a; color:#999; border:1px solid #444; border-bottom:none; border-radius:4px 4px 0 0; cursor:pointer; font-family:inherit; font-size:inherit;">Graphics</button>
                 <button data-start-tab-btn="devtools" class="settings-tab-btn" style="flex:1; padding:5px 8px; background:#16162a; color:#999; border:1px solid #444; border-bottom:none; border-radius:4px 4px 0 0; cursor:pointer; font-family:inherit; font-size:inherit;">Dev Tools</button>
             </div>
@@ -79,7 +80,7 @@
 
             <div class="settings-section" data-start-tab="general">
                 <div class="settings-section-title">Save Data</div>
-                <div style="color:#999; font-size:11px; line-height:1.4; margin-bottom:6px;">Progress saves on this device automatically. Export a backup to keep it safe, or to move it to another device. It includes your renown, unlocks and any run in progress.</div>
+                <div style="color:#999; font-size:11px; line-height:1.4; margin-bottom:6px;">Progress saves on this device automatically. Export a backup to keep it safe, or to move it to another device. It includes your renown, unlocks, skill plans and any run in progress.</div>
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
                     <button id="save-export-file" style="padding:5px 8px; font-size:11px; background:#1a1a2e; border:1px solid #446; color:#cde; border-radius:4px; cursor:pointer; font-family:inherit;">Export save file</button>
                     <button id="save-import-file" style="padding:5px 8px; font-size:11px; background:#1a1a2e; border:1px solid #446; color:#cde; border-radius:4px; cursor:pointer; font-family:inherit;">Import save file</button>
@@ -96,6 +97,11 @@
 
             <div class="settings-section" data-start-tab="general" style="border-bottom:none; text-align:center;">
                 <button id="start-reset-defaults" style="padding:6px 16px; font-size:11px; background:#442222; border:1px solid #664444; color:#ff8888; border-radius:4px; cursor:pointer;">Reset to Defaults</button>
+            </div>
+
+            <div class="settings-section" data-start-tab="skillplans" style="display:none; border-bottom:none;">
+                <div class="settings-section-title">Skill Plans</div>
+                <div id="skill-plan-editor"></div>
             </div>
 
             <div class="settings-section" data-start-tab="graphics" style="display:none;">

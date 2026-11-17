@@ -1,5 +1,8 @@
 import { EQUIPMENT_OVERLAY_OFFSETS, RENDER_CONFIG } from '../core/config.js';
 
+// Enchanted items ('iron_sword+1', see equipment.js) draw with their base item's sprites.
+const spriteKey = (itemKey) => String(itemKey).replace(/\+\d$/, '');
+
 export class SkinManager {
     constructor() {
         this._sprites = new Map();
@@ -96,7 +99,7 @@ export class SkinManager {
     }
 
     getItemSprite(itemKey) {
-        return this._sprites.get('items:' + itemKey) || null;
+        return this._sprites.get('items:' + spriteKey(itemKey)) || null;
     }
 
     getMaterialSprite(materialKey) {
@@ -266,11 +269,11 @@ export class SkinManager {
         const base = this.getColonistSprite(colonistId, drafted, race, bodyVariant, hairVariant, shirtVariant, nameColor, highlight, false);
         if (!base) return null;
 
-        const clothesSprite = clothesKey ? this._sprites.get('equipment_worn:' + clothesKey) : null;
-        const armorSprite = armorKey ? this._sprites.get('equipment_worn:' + armorKey) : null;
-        const helmetSprite = helmetKey ? this._sprites.get('equipment_worn:' + helmetKey) : null;
-        const weaponSprite = weaponKey ? this._sprites.get('equipment_worn:' + weaponKey) : null;
-        const toolSprite = toolKey ? this._sprites.get('equipment_worn:' + toolKey) : null;
+        const clothesSprite = clothesKey ? this._sprites.get('equipment_worn:' + spriteKey(clothesKey)) : null;
+        const armorSprite = armorKey ? this._sprites.get('equipment_worn:' + spriteKey(armorKey)) : null;
+        const helmetSprite = helmetKey ? this._sprites.get('equipment_worn:' + spriteKey(helmetKey)) : null;
+        const weaponSprite = weaponKey ? this._sprites.get('equipment_worn:' + spriteKey(weaponKey)) : null;
+        const toolSprite = toolKey ? this._sprites.get('equipment_worn:' + spriteKey(toolKey)) : null;
 
         if (!armorSprite && !helmetSprite && !weaponSprite && !toolSprite && !clothesSprite) {
             this._compositeCache.set(cacheKey, base);

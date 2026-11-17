@@ -134,7 +134,7 @@ const GENERAL_EVENTS = [
         title: 'Abandoned Training Grounds',
         text: 'Weathered dummies and a rack of blunted weapons stand in a clearing.',
         choices: [
-            { label: 'Drill hard', effect: { healPct: -0.15, xp: 70 },
+            { label: 'Train hard', effect: { healPct: -0.15, xp: 70 },
               resultText: 'Bruised but sharper. Every member gains 70 XP.' },
             { label: 'Spar lightly', effect: { xp: 30 }, resultText: 'Every member gains 30 XP.' },
         ],

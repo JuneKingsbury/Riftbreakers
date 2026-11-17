@@ -3,6 +3,8 @@ import { watchLayout } from '../ui/layout.js';
 import { Sound } from '../audio/sound.js';
 import { TITLE_MUSIC } from '../audio/game-sounds.js';
 import { wireSavePanel } from '../ui/save-panel.js';
+import { mountStartBackdrop } from '../ui/start-backdrop.js';
+import { renderSkillPlanEditor } from '../ui/skill-plan-panel.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     watchLayout();
@@ -14,6 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Skin manager (shared with tactical scenes) ---
     const skinManager = new SkinManager();
     window._sharedSkinManager = skinManager;
+    const redrawBackdrop = mountStartBackdrop(document.getElementById('start-bg-canvas'), skinManager);
 
     // Load skin preference and populate selector
     const savedSkin = localStorage.getItem('convocation_skin') || '16x16_tiny_world';
@@ -30,7 +33,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 skinSelect.appendChild(opt);
             }
             if (savedSkin !== 'ascii') {
-                skinManager.switchSkin(savedSkin);
+                skinManager.switchSkin(savedSkin).then(redrawBackdrop);
             }
         })
         .catch(() => {});
@@ -38,7 +41,7 @@ document.addEventListener('DOMContentLoaded', () => {
     skinSelect?.addEventListener('change', () => {
         const val = skinSelect.value;
         localStorage.setItem('convocation_skin', val);
-        skinManager.switchSkin(val);
+        skinManager.switchSkin(val).then(redrawBackdrop);
     });
 
     // --- Settings persistence ---
@@ -111,6 +114,8 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('[data-start-tab-btn]').forEach(btn => {
         btn.addEventListener('click', () => {
             const tab = btn.getAttribute('data-start-tab-btn');
+            // Rendered on opening, so plans changed during a run show up.
+            if (tab === 'skillplans') renderSkillPlanEditor(document.getElementById('skill-plan-editor'));
             document.querySelectorAll('[data-start-tab-btn]').forEach(b => {
                 b.style.background = b === btn ? '#2a2a4e' : '#16162a';
                 b.style.color      = b === btn ? '#ffcc00' : '#999';
@@ -173,6 +178,7 @@ document.addEventListener('DOMContentLoaded', () => {
         gameEl.style.display = 'none';
         gameEl.innerHTML = '';
         startScreen.style.display = '';
+        redrawBackdrop();   // a resize while hidden drew at zero size
         refreshContinue();
         Sound.playMusic(TITLE_MUSIC);
     };

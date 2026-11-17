@@ -16,6 +16,9 @@ import {
     itemSummary, itemIconHtml, portraitHtml, drawSprites, hpBar, xpBar, spBadge, jobDesc,
 } from './ui-kit.js';
 
+import { loadPlans, plannedNext, activePlans, stepLabel } from './skill-plans.js';
+import { renderSkillPlanEditor } from '../ui/skill-plan-panel.js';
+
 const NUMERAL = ['', 'I', 'II', 'III'];
 
 const SLOT_LABEL = { armorKey: 'Armor', helmetKey: 'Helmet', weaponKey: 'Weapon', toolKey: 'Tool' };
@@ -118,6 +121,32 @@ export class PartyMenu {
             this.showMember(m.name);
         }));
         body.querySelectorAll('[data-equip-slot]').forEach(b => b.addEventListener('click', () => this.showEquipPicker(m.name, b.dataset.equipSlot)));
+        body.querySelector('[data-edit-plan]')?.addEventListener('click', () => this.showPlanEditor(m.name));
+    }
+
+    // The skill plan editor for this member's class (the same one as in Settings). Going back
+    // applies the plan at once (onChange auto-spends), so the member view is current.
+    showPlanEditor(name) {
+        const m = this.run.member(name);
+        if (!m) return this.showList();
+        const job = plannedNext(m, loadPlans())?.job ?? m.job;
+        const body = this.modal.show(`<div style="color:#ffcc44;font-weight:bold;font-size:15px;margin-bottom:8px;">Skill Plan</div><div data-plan-host></div>`,
+            { width: 520, onBack: () => { this._changed(); this.showMember(name); }, onClose: this.onClose, view: `plan:${name}`, returnTo: `member:${name}` });
+        renderSkillPlanEditor(body.querySelector('[data-plan-host]'), { job });
+    }
+
+    // One line on the member's skill plan: what it buys next, or that there is none.
+    _planHtml(m) {
+        const plans = loadPlans();
+        const next = plannedNext(m, plans);
+        let text;
+        if (next) text = `<span style="color:#afa;">Auto:</span> next ${esc(stepLabel(next))} · ${next.cost} SP`;
+        else if (activePlans(m, plans).length) text = `<span style="color:#6a6;">Auto: plan finished</span>`;
+        else text = `<span style="color:#777;">No auto skill plan for this class</span>`;
+        return `<div style="display:flex;gap:8px;align-items:center;justify-content:space-between;margin:8px 0 2px;font-size:11px;">
+            <span>${text}</span>
+            <button data-edit-plan style="padding:2px 8px;font-family:inherit;font-size:10px;border-radius:3px;background:#151528;border:1px solid #447;color:#ccc;cursor:pointer;white-space:nowrap;">Edit skill plan</button>
+        </div>`;
     }
 
     _promotionHtml(m) {
@@ -145,7 +174,7 @@ export class PartyMenu {
     _skillsHtml(m) {
         const btn = (attr, label, on) => `<button ${attr} style="padding:2px 8px;font-family:inherit;font-size:10px;border-radius:3px;white-space:nowrap;
             background:${on ? '#122012' : '#111'};border:1px solid ${on ? '#6f6' : '#333'};color:${on ? '#afa' : '#555'};cursor:${on ? 'pointer' : 'not-allowed'};${on ? GLOW : ''}" ${on ? '' : 'disabled'}>${label}</button>`;
-        let html = '';
+        let html = this._planHtml(m);
         for (const job of memberJobs(m)) {
             const def = JOB_DATA[job];
             html += `<div style="color:#fc8;font-size:10px;text-transform:uppercase;margin:10px 0 4px;">${esc(def.skillsetName)} <span style="color:#666;">(${jobLabel(job)})</span></div>`;
