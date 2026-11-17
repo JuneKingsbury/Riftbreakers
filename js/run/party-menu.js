@@ -9,11 +9,12 @@ import {
     LOADOUT_SLOTS, abilitySlot, isLearned, learnBlocker, memberJobs, equippable, skillRank, canUpgrade,
     upgradeCost, canSpendPoints, canPromote, promotionOptions, buildLoadout, PROMOTION_LEVEL, XP_PER_LEVEL,
 } from '../tactical/loadout.js';
-import { MAX_RANK, isUpgradeable, rankedKey } from '../tactical/data-registry.js';
+import { MAX_RANK, isUpgradeable, rankedKey, rankChanges } from '../tactical/data-registry.js';
 import { relicStatMods } from './data/relics.js';
+import { MAX_PARTY } from './run-state.js';
 import {
     BTN, BTN_DISABLED, BTN_GOLD, GLOW, esc, jobLabel, abilityName, abilityTooltip, itemTitle,
-    itemSummary, itemIconHtml, portraitHtml, drawSprites, hpBar, xpBar, spBadge, jobDesc,
+    itemSummary, itemIconHtml, portraitHtml, drawSprites, hpBar, xpBar, spBadge, jobDesc, wireTips,
 } from './ui-kit.js';
 
 import { loadPlans, plannedNext, activePlans, stepLabel } from './skill-plans.js';
@@ -54,7 +55,7 @@ export class PartyMenu {
 
     showList() {
         const run = this.run;
-        let html = `<div style="color:#ffcc44;font-weight:bold;font-size:15px;margin-bottom:10px;">Party <span style="color:#888;font-size:11px;">(${run.party.length}/6)</span></div>`;
+        let html = `<div style="color:#ffcc44;font-weight:bold;font-size:15px;margin-bottom:10px;">Party <span style="color:#888;font-size:11px;">(${run.party.length}/${MAX_PARTY})</span></div>`;
         for (const m of run.party) {
             const hp = run.hp(m), max = run.maxHp(m);
             const promo = canPromote(m) ? `<span style="color:#fc6;font-size:10px;"> ★ can promote</span>` : '';
@@ -105,6 +106,7 @@ export class PartyMenu {
         html += this._equipmentHtml(m);
 
         const body = this.modal.show(html, { width: 520, onBack: () => this.showList(), onClose: this.onClose, view: `member:${name}` });
+        wireTips(body);
         drawSprites(body, run.party, this.skin);
         body.querySelectorAll('[data-learn]').forEach(b => b.addEventListener('click', () => {
             if (run.learn(m.name, b.dataset.learn)) { Sound.playSfx('skill_learned'); this._changed(); this.showMember(m.name); }
@@ -140,8 +142,8 @@ export class PartyMenu {
         const plans = loadPlans();
         const next = plannedNext(m, plans);
         let text;
-        if (next) text = `<span style="color:#afa;">Auto:</span> next ${esc(stepLabel(next))} · ${next.cost} SP`;
-        else if (activePlans(m, plans).length) text = `<span style="color:#6a6;">Auto: plan finished</span>`;
+        if (next) text = `<span style="color:#afa;">Next in plan:</span> ${esc(stepLabel(next))} · ${next.cost} SP`;
+        else if (activePlans(m, plans).length) text = `<span style="color:#6a6;">Skill plan complete</span>`;
         else text = `<span style="color:#777;">No auto skill plan for this class</span>`;
         return `<div style="display:flex;gap:8px;align-items:center;justify-content:space-between;margin:8px 0 2px;font-size:11px;">
             <span>${text}</span>
@@ -155,9 +157,9 @@ export class PartyMenu {
         let html = `<div style="margin-bottom:10px;padding:8px;border:1px solid ${ready ? '#664' : '#223'};border-radius:4px;background:#0c0c18;">
             <div style="color:#fc8;font-size:10px;text-transform:uppercase;margin-bottom:4px;">Promotion</div>`;
         if (!ready) {
-            html += `<div style="color:#888;font-size:11px;">Reach level ${PROMOTION_LEVEL} (now ${m.level}) to promote into a Tier 2 job. You keep every skill you know.</div>`;
+            html += `<div style="color:#888;font-size:11px;">Promotes into a Tier 2 class at level ${PROMOTION_LEVEL}. Currently level ${m.level}. Every learned skill carries over.</div>`;
         } else {
-            html += `<div style="color:#fc6;font-size:11px;">Ready! Choose a Tier 2 job. You keep every skill you know.</div>`;
+            html += `<div style="color:#fc6;font-size:11px;">Ready to promote! Pick a Tier 2 class. Every learned skill carries over.</div>`;
         }
         for (const job of promotionOptions(m)) {
             const kit = Object.keys(JOB_DATA[job].learnable).map(abilityName).join(', ');
@@ -173,7 +175,7 @@ export class PartyMenu {
     // learned ones. Anything affordable right now glows.
     _skillsHtml(m) {
         const btn = (attr, label, on) => `<button ${attr} style="padding:2px 8px;font-family:inherit;font-size:10px;border-radius:3px;white-space:nowrap;
-            background:${on ? '#122012' : '#111'};border:1px solid ${on ? '#6f6' : '#333'};color:${on ? '#afa' : '#555'};cursor:${on ? 'pointer' : 'not-allowed'};${on ? GLOW : ''}" ${on ? '' : 'disabled'}>${label}</button>`;
+            background:${on ? '#122012' : '#111'};border:1px solid ${on ? '#6f6' : '#333'};color:${on ? '#afa' : '#555'};cursor:${on ? 'pointer' : 'not-allowed'};${on ? GLOW : 'pointer-events:none;'}" ${on ? '' : 'disabled'}>${label}</button>`;
         let html = this._planHtml(m);
         for (const job of memberJobs(m)) {
             const def = JOB_DATA[job];
@@ -190,7 +192,10 @@ export class PartyMenu {
                     const why = learnBlocker(m, key);
                     right = btn(`data-learn="${key}"`, why === null ? `Learn · ${skill.sp} SP` : esc(why), why === null);
                 } else if (isUpgradeable(key) && rank < MAX_RANK) {
-                    right = btn(`data-upgrade="${key}"`, `Upgrade → ${NUMERAL[rank + 1]} · ${upgradeCost(m, key)} SP`, canUpgrade(m, key));
+                    // Hovering shows what the next rank changes. The wrapper holds the tooltip, so
+                    // it shows even while the button is disabled (disabled buttons get no hover).
+                    const tip = [`${abilityName(rankedKey(key, rank + 1))}:`, ...rankChanges(key, rank)].join('\n');
+                    right = `<span data-tip="${esc(tip)}" style="display:inline-block;">${btn(`data-upgrade="${key}"`, `Upgrade → ${NUMERAL[rank + 1]} · ${upgradeCost(m, key)} SP`, canUpgrade(m, key))}</span>`;
                 } else {
                     right = `<span style="color:#6a6;font-size:10px;">✓ ${isUpgradeable(key) ? 'max rank' : 'learned'}</span>`;
                 }
@@ -204,7 +209,7 @@ export class PartyMenu {
                 </div>`;
             }
         }
-        html += `<div style="color:#556;font-size:10px;margin-top:4px;">Upgrades: +20% power and -15% MP per rank; reactions trigger more often.</div>`;
+        html += `<div style="color:#556;font-size:10px;margin-top:4px;">Each upgrade rank adds 20% power, cuts the MP cost by 15% and makes buffs and debuffs 25% stronger. Reactions trigger more often, and rank III adds a turn to any status the skill inflicts.</div>`;
         const grants = equipmentGrants(m.appearance);
         if (grants.actions.length) {
             html += `<div style="color:#7bf;font-size:10px;text-transform:uppercase;margin:8px 0 4px;">From equipment</div>`;
@@ -233,7 +238,7 @@ export class PartyMenu {
         // Gear passives don't use a slot: they work on top of the chosen ones.
         const bonus = buildLoadout(m).bonusPassives;
         if (bonus.length) {
-            html += `<div style="color:#7bf;font-size:10px;text-transform:uppercase;margin:8px 0 4px;">From equipment (always on)</div>`;
+            html += `<div style="color:#7bf;font-size:10px;text-transform:uppercase;margin:8px 0 4px;">From equipment · always on</div>`;
             for (const k of bonus) {
                 html += `<div style="padding:2px 0;"><span style="color:#ddd;">${esc(abilityName(k))}</span>
                     <span style="color:#a8f;font-size:9px;text-transform:uppercase;"> ${esc(ABILITIES[k]?.slot)}</span>
@@ -271,7 +276,7 @@ export class PartyMenu {
             html += `<div style="color:#888;font-size:10px;margin-bottom:6px;">Equipped: ${itemTitle(cur)}<br>${esc(itemSummary(cur))}</div>
                 <button data-pick="" style="${BTN}">Unequip</button>`;
         }
-        if (!keys.length) html += `<div style="color:#666;margin:8px 0;">No ${slot} items in the bag.</div>`;
+        if (!keys.length) html += `<div style="color:#666;margin:8px 0;">Nothing in the bag fits this slot.</div>`;
         for (const k of keys) {
             const ok = run.canEquip(m, k);
             html += `<button data-pick="${k}" style="${BTN}${ok ? '' : BTN_DISABLED}display:flex;gap:8px;align-items:center;" ${ok ? '' : 'disabled'}>

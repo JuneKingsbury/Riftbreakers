@@ -76,7 +76,7 @@ function dealDamage(battle, target, amt) {
 function announce(battle, reactor, rx, key) {
     reactor._reactionsUsed = reactor._reactionsUsed || {};
     reactor._reactionsUsed[key] = true;
-    battle.logMsg(`${reactor.name} reacts: ${rx.name}!`);
+    battle.logMsg(`${reactor.name} reacts with ${rx.name}!`);
     battle._spawnFloat(reactor, `${rx.name}!`, '#ffd866');
 }
 

@@ -145,6 +145,7 @@ export function cleanseStatuses(unit) {
     unit.status = unit.status.filter(s => !NEGATIVE_STATUSES.includes(s));
     for (const s of removed) delete (unit.statusTimers || {})[s];
     if (removed.includes('frog')) unit.buffs = (unit.buffs || []).filter(b => !b.key.startsWith('frog_'));
+    if (removed.includes('enfeebled')) unit.buffs = (unit.buffs || []).filter(b => b.key !== 'enfeebled');
     return removed;
 }
 
@@ -352,9 +353,9 @@ export function resolveAbility(source, target, ability, map) {
     let highGroundBonus = 1.0;
     if ((source.z ?? 0) > (target.z ?? 0) && !tgtSup?.highGroundMult) highGroundBonus = srcSup?.highGroundMult ?? 1.25;
 
+    // Cures clear harmful statuses only: Haste, Protect and other boons stay.
     if (ab.isCure) {
-        target.status = target.status.filter(s => s === 'dead' || s === 'unconscious');
-        target.statusTimers = {};
+        cleanseStatuses(target);
         faceToward(source, target.x, target.y);
         return { damage: 0, healing: 0, statusApplied: null, floatingText: 'Cured!' };
     }

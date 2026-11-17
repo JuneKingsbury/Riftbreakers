@@ -37,11 +37,11 @@ const GENERAL_EVENTS = [
     {
         id: 'wounded_traveller',
         chains: ROADS,
-        title: 'Wounded Traveller',
+        title: 'Wounded Traveler',
         text: 'A wounded merchant slumps against a mile-marker, their saddlebag still intact.',
         choices: [
             { label: 'Tend their wounds', effect: { healPct: -0.1, gold: 50 },
-              resultText: 'Your party gives up bandages and sleep to stabilise them. They press 50 gold into your hands.' },
+              resultText: 'The party gives up bandages and a night\'s sleep to keep them alive. They press 50 gold into your hands.' },
             { label: 'Take the saddlebag', effect: { gold: 40 },
               resultText: 'You pocket 40 gold and move on. No one will know.' },
             { label: 'Leave them be', resultText: 'You walk on. The road is long enough without other people\'s troubles.' },
@@ -62,9 +62,9 @@ const GENERAL_EVENTS = [
     {
         id: 'hidden_spring',
         title: 'Hidden Spring',
-        text: 'Tucked between two boulders: a crystal-clear spring with faint healing properties.',
+        text: 'A clear spring bubbles up between two boulders. Dip a cut hand in and the sting fades.',
         choices: [
-            { label: 'Rest and drink', effect: { healPct: 1, xp: 25 }, resultText: 'The cool water mends every wound and clears your heads. Every member gains 25 XP.' },
+            { label: 'Rest and drink', effect: { healPct: 1, xp: 25 }, resultText: 'The cool water mends every wound and clears every head. Everyone gains 25 XP.' },
             { label: 'Bottle it to sell', effect: { gold: 45 }, resultText: 'A merchant down the road pays 45 gold for "miracle water".' },
         ],
     },
@@ -72,10 +72,10 @@ const GENERAL_EVENTS = [
         id: 'wandering_mage',
         chains: ROADS,
         title: 'Wandering Mage',
-        text: 'An eccentric old mage offers to share battle knowledge, for a price.',
+        text: 'An old mage with ink-stained fingers offers to teach battle tactics, for a price.',
         choices: [
             { label: 'Pay 60 gold', requires: { gold: 60 }, effect: { gold: -60, xp: 60 },
-              resultText: 'He lectures through the night. Every member gains 60 XP.' },
+              resultText: 'He lectures through the night, and some of it even sticks. Everyone gains 60 XP.' },
             { label: 'Decline', resultText: 'He shrugs and shuffles off into the trees.' },
         ],
     },
@@ -86,10 +86,10 @@ const GENERAL_EVENTS = [
         text: 'A roadside shrine to a forgotten deity. Copper offerings sit undisturbed.',
         choices: [
             { label: 'Leave an offering (30 gold)', requires: { gold: 30 }, effect: { gold: -30, xp: 50 },
-              resultText: 'A warmth suffuses the air. Every member gains 50 XP.' },
+              resultText: 'Warmth settles over the shrine. Every member gains 50 XP.' },
             { label: 'Pocket the offerings', outcomes: [
-                { weight: 1, effect: { gold: 35 }, resultText: 'You pocket 35 gold of old coins.' },
-                { weight: 1, effect: { gold: 35, healPct: -0.15 }, resultText: 'You take 35 gold. On the road, a sudden fever runs through the party.' },
+                { weight: 1, effect: { gold: 35 }, resultText: 'You pocket 35 gold in old coins.' },
+                { weight: 1, effect: { gold: 35, healPct: -0.15 }, resultText: 'You take 35 gold. By evening, a fever is running through the party.' },
             ] },
         ],
     },
@@ -115,18 +115,18 @@ const GENERAL_EVENTS = [
             { label: 'Hand over 50 gold', requires: { gold: 50 }, effect: { gold: -50 },
               resultText: 'They take the gold and vanish. Bitter, but nobody bleeds.' },
             { label: 'Fight back', effect: { battle: 'normal' },
-              resultText: 'Your party draws steel.' },
+              resultText: 'The party draws steel.' },
         ],
     },
     {
         id: 'lost_sellsword',
         title: 'Lost Sellsword',
-        text: 'A lone fighter sits by a dying fire. Their company was wiped out; they need work.',
+        text: 'A lone fighter sits by a dying fire. Their company is dead, and they need work.',
         choices: [
             { label: 'Offer them a place', requires: { partyBelow: 6 }, effect: { recruit: true },
               resultText: 'They size up your party and nod.' },
             { label: 'Share your food', effect: { healPct: -0.05, xp: 30 },
-              resultText: 'They trade war stories for supper. Every member gains 30 XP.' },
+              resultText: 'They trade war stories for supper. 30 XP for every member.' },
         ],
     },
     {
@@ -136,13 +136,13 @@ const GENERAL_EVENTS = [
         choices: [
             { label: 'Train hard', effect: { healPct: -0.15, xp: 70 },
               resultText: 'Bruised but sharper. Every member gains 70 XP.' },
-            { label: 'Spar lightly', effect: { xp: 30 }, resultText: 'Every member gains 30 XP.' },
+            { label: 'Spar lightly', effect: { xp: 30 }, resultText: 'A few easy rounds to loosen up. Everyone gains 30 XP.' },
         ],
     },
     {
         id: 'blacksmith',
-        title: 'Travelling Smith',
-        text: 'A smith with a portable forge offers to rework a piece of gear.',
+        title: 'Traveling Smith',
+        text: 'A smith with a portable forge has set up by the road. She takes commissions, and buys scrap.',
         choices: [
             { label: 'Pay 80 gold for a commission', requires: { gold: 80 }, effect: { gold: -80, item: 'rare' },
               resultText: 'Two hours of hammering later, she hands over {item}.' },
@@ -154,12 +154,12 @@ const GENERAL_EVENTS = [
     {
         id: 'rift_tremor',
         title: 'Rift Tremor',
-        text: 'The earth shudders as a Rift discharge crackles overhead.',
+        text: 'The ground shudders as a rift discharge crackles overhead.',
         acts: [2, 3],
         choices: [
-            { label: 'Shield the party', effect: { healPct: -0.1 }, resultText: 'The discharge clips everyone. You will start the next fight a little hurt.' },
+            { label: 'Shield the party', effect: { healPct: -0.1 }, resultText: 'The discharge clips everyone. You go into the next fight a little singed.' },
             { label: 'Study the discharge', outcomes: [
-                { weight: 1, effect: { xp: 60 }, resultText: 'The pattern is illuminating. Every member gains 60 XP.' },
+                { weight: 1, effect: { xp: 60 }, resultText: 'The pattern makes a strange kind of sense. Everyone gains 60 XP.' },
                 { weight: 1, effect: { healPct: -0.25 }, resultText: 'It arcs straight into you. Everyone is badly burned.' },
             ] },
         ],
@@ -181,10 +181,10 @@ const GENERAL_EVENTS = [
         id: 'fallen_knight',
         chains: ROADS,
         title: 'Fallen Knight',
-        text: 'A knight\'s body lies under a tree, armour intact. A pendant glints at their throat.',
+        text: 'A knight\'s body lies under a tree, armor intact. A pendant glints at their throat.',
         choices: [
             { label: 'Take the pendant', effect: { relic: 'common' }, resultText: 'You take {relic}. It is warm to the touch.' },
-            { label: 'Bury them', effect: { healPct: 1, xp: 20 }, resultText: 'A quiet hour. The party feels lighter for it. Every member gains 20 XP.' },
+            { label: 'Bury them', effect: { healPct: 1, xp: 20 }, resultText: 'A quiet hour with borrowed shovels. Everyone rests easier for it and gains 20 XP.' },
         ],
     },
     {
@@ -212,7 +212,7 @@ const GENERAL_EVENTS = [
     {
         id: 'war_camp',
         title: 'Abandoned War Camp',
-        text: 'The smouldering remains of a camp. Whoever was here left in a hurry.',
+        text: 'The smoldering remains of a camp. Whoever was here left in a hurry.',
         choices: [
             { label: 'Search the tents', effect: { gold: 30, item: 'common' }, resultText: 'You find 30 gold and {item}.' },
             { label: 'Search the command tent', outcomes: [
@@ -239,9 +239,9 @@ const GENERAL_EVENTS = [
         text: 'A figure in a too-still cloak offers wares "from the other side".',
         acts: [2, 3],
         choices: [
-            { label: 'Trade your health (lose 20% HP)', effect: { healPct: -0.2, relic: 'uncommon' },
+            { label: 'Pay in blood (lose 20% HP)', effect: { healPct: -0.2, relic: 'uncommon' },
               resultText: 'Something cold passes between you. You now carry {relic}.' },
-            { label: 'Buy with gold (120)', requires: { gold: 120 }, effect: { gold: -120, relic: 'rare' },
+            { label: 'Pay in coin (120 gold)', requires: { gold: 120 }, effect: { gold: -120, relic: 'rare' },
               resultText: 'The coins vanish mid-air. In your palm: {relic}.' },
             { label: 'Refuse', resultText: 'The figure is gone when you blink.' },
         ],
@@ -263,8 +263,8 @@ const GENERAL_EVENTS = [
         text: 'For a moment you see yourselves, older and scarred, standing at the end of this road.',
         acts: [3],
         choices: [
-            { label: 'Listen', effect: { xp: 90 }, resultText: 'Your future selves have advice. Every member gains 90 XP.' },
-            { label: 'Turn away', effect: { gold: 60 }, resultText: 'You steady yourselves. On the road you find a fallen purse: 60 gold.' },
+            { label: 'Listen', effect: { xp: 90 }, resultText: 'Your future selves have a lot of advice. Some of it is good. Everyone gains 90 XP.' },
+            { label: 'Turn away', effect: { gold: 60 }, resultText: 'You look away and keep walking. A little further on, a dropped purse holds 60 gold.' },
         ],
     },
 ];

@@ -8,9 +8,12 @@
 import { JOB_STATS, ABILITIES } from '../data-registry.js';
 import {
     CONDITIONS, COMPARATORS, STATUS_OPTIONS, TILE_TYPES, ABILITY_CATEGORIES,
-    SIDES, PICKS, FILTER_KINDS, MOVE_MODES, ACTION_KINDS, FACINGS, POSITIONING, sideForAbility, scriptUsable,
+    SIDES, PICKS, FILTER_KINDS, MOVE_MODES, ACTION_KINDS, FACINGS, POSITIONING, sideForAbility, scriptUsable, paramLabel,
 } from './blocks.js';
 import { MAX_RULES } from './script-runtime.js';
+
+// A class id as players see it: 'field_surgeon' → "Field Surgeon".
+const classLabel = (job) => String(job || '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 import { validateScript, hasErrors } from './script-validate.js';
 import { getScriptFor, saveScript, resetScript, hasCustomScript, defaultBehaviorFor } from './script-store.js';
 import { abilitiesForMember } from './party.js';
@@ -150,7 +153,7 @@ export class ScriptEditor {
             case 'cmp':    return this._select(COMPARATORS, v, bind);
             case 'status': return this._select(STATUS_OPTIONS, v, bind);
             case 'tile':   return this._select(TILE_TYPES, v, bind);
-            case 'job':    return this._select(Object.keys(JOB_STATS), v, bind);
+            case 'job':    return this._select(Object.keys(JOB_STATS), v, bind, classLabel);
             case 'ability': {
                 const known = ctx.abilities.filter(k => ABILITIES[k] && !ABILITIES[k].passive);
                 return this._select(known, v, bind, k => (ABILITIES[k]?.name ?? `${k} (unknown)`));
@@ -170,9 +173,9 @@ export class ScriptEditor {
         for (const [id, d] of Object.entries(CONDITIONS)) (groups[d.group] ||= []).push(id);
         const picker = `<select data-bind="${base}.test" data-kind="test" style="${FIELD}">${Object.entries(groups).map(([g, ids]) =>
             `<optgroup label="${esc(g)}">${ids.map(id =>
-                `<option value="${id}"${id === leaf.test ? ' selected' : ''}>${esc(CONDITIONS[id].label.replace(/\{(\w+)\}/g, '[$1]'))}</option>`).join('')}</optgroup>`).join('')}</select>`;
+                `<option value="${id}"${id === leaf.test ? ' selected' : ''}>${esc(CONDITIONS[id].label.replace(/\{(\w+)\}/g, (_, n) => `[${paramLabel(n)}]`))}</option>`).join('')}</optgroup>`).join('')}</select>`;
         if (!def) return `${picker} <span style="color:#f66;">unknown test</span>`;
-        const inputs = def.params.map(p => `${esc(p.name)} ${this._paramInput(p, leaf.params?.[p.name], `${base}.params.${p.name}`, ctx)}`).join(' ');
+        const inputs = def.params.map(p => `${esc(paramLabel(p.name))} ${this._paramInput(p, leaf.params?.[p.name], `${base}.params.${p.name}`, ctx)}`).join(' ');
         return `${picker} ${inputs}`;
     }
 
@@ -258,7 +261,7 @@ export class ScriptEditor {
             : '';
         return `<select data-bind="${bind}" data-kind="ability" style="${FIELD}">
             <optgroup label="Best of a kind">${kinds.map(k => option(k, ABILITY_CATEGORIES[k])).join('')}</optgroup>
-            <optgroup label="Known abilities">${known.map(k => option(k, label(k))).join('')}</optgroup>
+            <optgroup label="Known skills">${known.map(k => option(k, label(k))).join('')}</optgroup>
             ${stale}</select>`;
     }
 
@@ -275,7 +278,7 @@ export class ScriptEditor {
                 <button data-act="del-rule" data-rule="${i}" style="${BTN}color:#f88;">&times;</button>
             </div>
             <div><b style="color:#fc8;">IF</b> ${complex
-                ? `<span style="color:#f88;">Nested condition the editor cannot show.</span> <button data-act="clear-when" data-rule="${i}" style="${BTN}">Clear conditions</button>`
+                ? `<span style="color:#f88;">These conditions are nested too deeply for the editor to show.</span> <button data-act="clear-when" data-rule="${i}" style="${BTN}">Clear conditions</button>`
                 : this._conditions(rule, i, ctx)}</div>
             <div style="margin-top:4px;"><b style="color:#8cf;">THEN</b> ${rule.then ? this._action(rule, i, ctx) : ''}</div>
             ${mine.map(p => `<div style="color:${p.severity === 'warning' ? '#fc6' : '#f66'};font-size:11px;margin-top:3px;">${p.severity === 'warning' ? 'Warning' : 'Problem'}: ${esc(p.message)}</div>`).join('')}
@@ -299,14 +302,14 @@ export class ScriptEditor {
         const list = this._chars.map(c => {
             const active = c.name === this._selected;
             const marks = `${this._isDirty(c.name) ? '<span style="color:#fc6;"> *</span>' : ''}${hasCustomScript(c.name) ? '<span style="color:#8c8;"> custom</span>' : '<span style="color:#667;"> default</span>'}`;
-            return `<button data-act="select-char" data-name="${esc(c.name)}" style="${BTN}display:block;width:100%;margin-bottom:4px;text-align:left;${active ? 'border-color:#99f;background:#22224a;' : ''}">${esc(c.name)} <span style="color:#778;font-size:10px;">${esc(c.job)}</span>${marks}</button>`;
+            return `<button data-act="select-char" data-name="${esc(c.name)}" style="${BTN}display:block;width:100%;margin-bottom:4px;text-align:left;${active ? 'border-color:#99f;background:#22224a;' : ''}">${esc(c.name)} <span style="color:#778;font-size:10px;">${esc(classLabel(c.job))}</span>${marks}</button>`;
         }).join('');
 
         this._root.innerHTML = `
             <div class="se-panel" style="background:#0d0d1e;border:1px solid #447;border-radius:8px;width:min(980px,96vw);height:min(720px,92vh);display:flex;flex-direction:column;">
                 <div class="se-header" style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;border-bottom:1px solid #335;">
                     <span style="color:#ffcc44;font-weight:bold;font-size:15px;">Party Tactics</span>
-                    <span class="se-help" style="color:#778;font-size:11px;">Rules run top to bottom. The first rule whose conditions hold and whose action is possible fires. Moving and turning are free, and an attack, defend or wait ends the turn.</span>
+                    <span class="se-help" style="color:#778;font-size:11px;">Rules are checked from the top down. The first one whose conditions are met and whose action is possible fires. Moving and turning don't end the turn. Using a skill, defending or waiting does.</span>
                     <button data-act="close" style="${BTN}">Close</button>
                 </div>
                 <div class="se-body" style="display:flex;flex:1;min-height:0;">
@@ -338,7 +341,7 @@ export class ScriptEditor {
                 <b>Custom tactics.</b> ${esc(cd.name)} follows these rules exactly. Use default behavior to go back to the automatic rules.</div>`;
         }
         return `<div style="margin-bottom:10px;padding:7px 9px;border:1px solid #335;border-radius:4px;background:#0c0c1c;color:#99a;">
-            <b>Default behavior.</b> These rules are generated from ${esc(cd.name)}'s current skills and update by themselves
+            <b>Default behavior.</b> These rules are built from ${esc(cd.name)}'s current skills and update on their own
             when they learn, upgrade or equip something new.${dirty ? ' <span style="color:#fc6;">Save to switch to custom tactics.</span>' : ' Edit any rule and save to take control.'}</div>`;
     }
 
@@ -442,7 +445,7 @@ export class ScriptEditor {
                     this._message = 'Saved.';
                     if (this._onSaved) this._onSaved(this._selected);
                 } else {
-                    this._message = 'Could not save (invalid script or storage unavailable).';
+                    this._message = "Couldn't save. Check the rules for problems, or storage may be unavailable.";
                 }
                 break;
             }

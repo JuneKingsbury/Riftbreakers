@@ -69,7 +69,7 @@ export function itemSummary(key) {
     if (!item) return '';
     const parts = [itemStats(key)];
     for (const a of item.grants || []) parts.push(`grants ${abilityName(a)}`);
-    for (const a of item.grantsPassive || []) parts.push(`+${abilityName(a)} (${ABILITIES[a]?.slot ?? 'passive'}, always on)`);
+    for (const a of item.grantsPassive || []) parts.push(`+${abilityName(a)}, always-on ${ABILITIES[a]?.slot ?? 'passive'}`);
     return parts.filter(Boolean).join(' · ');
 }
 
@@ -205,6 +205,7 @@ export class Modal {
             ? this._scrolls[opts.view] ?? 0
             : 0;
         this._opts = opts;
+        hideTip();   // the content it pointed at is about to be replaced
         const dismissible = opts.dismissible !== false;
         if (!this.isOpen) Sound.playSfx('panel');
         this.el.innerHTML = `
@@ -229,6 +230,7 @@ export class Modal {
 
     close() {
         if (!this.isOpen) return;
+        hideTip();
         Sound.playSfx('panel');
         this.el.style.display = 'none';
         this.el.innerHTML = '';
@@ -241,6 +243,66 @@ export class Modal {
         document.removeEventListener('keydown', this._onKey);
         this.el.remove();
     }
+}
+
+// ---- Hover tips ----
+// Any element inside `root` with a data-tip attribute shows a styled tip: on hover with a
+// mouse, or on tap with touch (where hovering doesn't exist). The text may have line breaks;
+// the first line is shown as a heading. Disabled buttons get no pointer events, so put the
+// data-tip on a wrapper around them (with pointer-events:none on the button).
+let tipEl = null, tipTimer = 0;
+function tipBox() {
+    if (tipEl?.isConnected) return tipEl;
+    tipEl = document.createElement('div');
+    tipEl.style.cssText = `position:fixed; z-index:2000; display:none; pointer-events:none;
+        background:rgba(8,8,24,0.97); border:1px solid #559; border-radius:5px; padding:7px 10px;
+        font-family:${FONT}; font-size:11px; color:#ccc; line-height:1.5; max-width:240px;
+        box-shadow:0 4px 16px rgba(0,0,0,0.7);`;
+    document.body.appendChild(tipEl);
+    return tipEl;
+}
+function placeTip(x, y) {
+    const el = tipBox(), pad = 12;
+    const w = el.offsetWidth, h = el.offsetHeight;
+    el.style.left = `${Math.max(4, Math.min(window.innerWidth - w - 4, x + pad))}px`;
+    el.style.top = `${y + pad + h > window.innerHeight ? Math.max(4, y - h - pad) : y + pad}px`;
+}
+function showTip(text, x, y) {
+    const el = tipBox();
+    const [head, ...rest] = String(text).split('\n');
+    el.innerHTML = `<div style="color:#fc8;font-weight:bold;">${esc(head)}</div>${rest.map(l => `<div>${esc(l)}</div>`).join('')}`;
+    el.style.display = 'block';
+    placeTip(x, y);
+}
+export function hideTip() {
+    clearTimeout(tipTimer);
+    if (tipEl) tipEl.style.display = 'none';
+}
+export function wireTips(root) {
+    if (!root || root._tipsWired) return;
+    root._tipsWired = true;
+    const target = (e) => e.target.closest?.('[data-tip]');
+    root.addEventListener('pointerover', (e) => {
+        if (e.pointerType === 'touch') return;
+        const t = target(e);
+        if (t) showTip(t.dataset.tip, e.clientX, e.clientY);
+    });
+    root.addEventListener('pointermove', (e) => {
+        if (e.pointerType === 'touch') return;
+        if (target(e)) placeTip(e.clientX, e.clientY); else hideTip();
+    });
+    root.addEventListener('pointerout', (e) => {
+        if (!e.relatedTarget || !target({ target: e.relatedTarget })) hideTip();
+    });
+    // Touch: a tap shows the tip for a few seconds (and still presses the button).
+    root.addEventListener('pointerdown', (e) => {
+        const t = target(e);
+        if (e.pointerType !== 'touch') { hideTip(); return; }
+        if (!t) return;
+        showTip(t.dataset.tip, e.clientX, e.clientY - 40);
+        clearTimeout(tipTimer);
+        tipTimer = setTimeout(hideTip, 3000);
+    });
 }
 
 export class Toast {

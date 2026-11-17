@@ -16,6 +16,10 @@ const ROLE = {
     spellblade: 'Melee debuffer',
     stoneshaper: 'Durable melee bruiser',
     seer: 'Control and support',
+    illusionist: 'Evasive trickster',
+    gravecaller: 'Life-draining necromancer',
+    alchemist: 'Splash healing and damage',
+    warlord: 'Commander and taunter',
 };
 
 export function hasSavedRun() {
@@ -46,7 +50,7 @@ export function newRun(containerEl, skinManager, { onStart, onExit, onCancel }) 
 
     const render = () => {
         let html = `<div style="color:#ffcc44;font-weight:bold;font-size:16px;margin-bottom:4px;">New Run</div>
-            <div style="color:#999;font-size:11px;margin-bottom:10px;">Choose up to ${START_PARTY} starting roles. You will meet recruits on the road and can grow to six.</div>`;
+            <div style="color:#999;font-size:11px;margin-bottom:10px;">Choose up to ${START_PARTY} starting classes. You'll meet recruits on the road, and the party can grow to six.</div>`;
         if (hasSavedRun()) html += `<div style="color:#f99;font-size:11px;margin-bottom:8px;">Starting a new run abandons the saved one.</div>`;
         for (const job of jobsOfTier(1)) {
             const unlocked = options.jobs.includes(job);
@@ -64,7 +68,7 @@ export function newRun(containerEl, skinManager, { onStart, onExit, onCancel }) 
             html += `<div style="color:#fc8;font-size:11px;margin-top:6px;">Challenge run: starting with ${picked.length === 1 ? 'a lone hero' : `${picked.length} members`} makes the road a lot harder.</div>`;
         }
         html += `<div style="height:6px;"></div>
-            <button data-begin ${ready ? '' : 'disabled'} style="${BTN}${ready ? BTN_GOOD : BTN_DISABLED}text-align:center;font-weight:bold;">${ready ? `Begin with ${picked.length} (${picked.length}/${START_PARTY})` : `Choose a role to begin (0/${START_PARTY})`}</button>`;
+            <button data-begin ${ready ? '' : 'disabled'} style="${BTN}${ready ? BTN_GOOD : BTN_DISABLED}text-align:center;font-weight:bold;">${ready ? `Set out (${picked.length}/${START_PARTY})` : `Choose a class to begin (0/${START_PARTY})`}</button>`;
         const body = modal.show(html, { width: 480, onClose: () => { modal.destroy(); onCancel?.(); }, view: 'new-run' });
         body.querySelectorAll('[data-job]').forEach(b => b.addEventListener('click', () => {
             const job = b.dataset.job;
@@ -92,7 +96,7 @@ export function showUnlocks(onClose) {
         const s = profile.stats;
         let html = `<div style="color:#ffcc44;font-weight:bold;font-size:16px;margin-bottom:4px;">Unlocks</div>
             <div style="color:#fc6;margin-bottom:2px;">${profile.renown} renown</div>
-            <div style="color:#777;font-size:10px;margin-bottom:10px;">Runs ${s.runs} · Wins ${s.wins} · Best: act ${s.bestAct || '-'}, ${s.bestFloor} floors. Renown comes from floors climbed, elites, bosses and victories.</div>`;
+            <div style="color:#777;font-size:10px;margin-bottom:10px;">Runs ${s.runs} · Wins ${s.wins} · Best: act ${s.bestAct || '-'}, ${s.bestFloor} floors<br>Earn renown by climbing floors, beating elites and bosses, and winning runs.</div>`;
         for (const [key, u] of Object.entries(UNLOCKS)) {
             const owned = hasUnlock(profile, key);
             const can = canBuyUnlock(profile, key);

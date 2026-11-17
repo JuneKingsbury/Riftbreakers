@@ -1,14 +1,16 @@
-// The title screen's backdrop: the skin's stone wall sprite tiled across the screen, tinted
+// The title screen's backdrop: the skin's abyss floor tile repeated across the screen, tinted
 // dark so the menu stays readable, with a soft vignette. Without a sprite (ASCII skin, or the
 // skin still loading) the canvas is left clear and the plain page color shows.
 
+// The sprite to tile, as [category, key] in the skin (was buildings:stone_wall).
+const BACKDROP_TILE = ['floors', 'abyss_floor'];
 const TILE_PX = 16 * 4;                 // sprite drawn at 4x, crisp
-const TINT = 'rgba(14, 14, 30, 0.78)';  // darkening wash, close to the page color #1a1a2e
+const TINT = 'rgba(14, 14, 30, 0.4)';  // darkening wash, close to the page color #1a1a2e
 
 /**
  * Paints the backdrop onto a canvas.
  * @param {HTMLCanvasElement} canvas
- * @param {HTMLImageElement|null} sprite  The stone wall sprite, or null to clear.
+ * @param {HTMLImageElement|null} sprite  The backdrop tile sprite, or null to clear.
  */
 export function drawStartBackdrop(canvas, sprite) {
     const dpr = window.devicePixelRatio || 1;
@@ -49,7 +51,7 @@ export function drawStartBackdrop(canvas, sprite) {
  */
 export function mountStartBackdrop(canvas, skinManager) {
     if (!canvas) return () => {};
-    const redraw = () => drawStartBackdrop(canvas, skinManager.getSprite('buildings', 'stone_wall'));
+    const redraw = () => drawStartBackdrop(canvas, skinManager.getSprite(BACKDROP_TILE[0], BACKDROP_TILE[1]));
     let pending = 0;
     window.addEventListener('resize', () => {
         cancelAnimationFrame(pending);

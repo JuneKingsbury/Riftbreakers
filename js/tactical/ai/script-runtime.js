@@ -498,7 +498,7 @@ export function runScript(script, unit, units, map) {
 
         const entry = {
             ruleId: rule.id,
-            label: rule.label || `${describeCond(rule.when)} -> ${describeAction(rule.then)}`,
+            label: rule.label || `${describeCond(rule.when)} → ${describeAction(rule.then)}`,
             kind: plan.kind,
         };
 

@@ -27,7 +27,7 @@ export const RELICS = {
     scholars_tome:    { rarity: 'uncommon', name: "Scholar's Tome", xpMult: 1.25,
                         desc: 'The party earns 25% more XP from battles.' },
     featherweight:    { rarity: 'uncommon', name: 'Featherweight Charm', statMods: { eva: 5 },
-                        desc: 'Every member has +5 evasion.' },
+                        desc: 'Every member has +5 EVA.' },
     bulwark_sigil:    { rarity: 'uncommon', name: 'Bulwark Sigil', battleStart: { status: 'protect', duration: 3 },
                         desc: 'Every member starts each battle with Protect for 3 turns.' },
     silver_veil:      { rarity: 'uncommon', name: 'Silver Veil', battleStart: { status: 'shell', duration: 3 },

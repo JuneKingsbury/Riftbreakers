@@ -53,12 +53,12 @@ export const ENCOUNTERS = {
                 { job: 'raider', name: 'Bandit', ct: 65 },
             ] },
             { id: 'wolf_pack', name: 'Wolf Pack', enemyLevel: 1, roster: [
-                { job: 'wolf', name: 'Grey Wolf', ct: 20 },
-                { job: 'wolf', name: 'Grey Wolf', ct: 55 },
+                { job: 'wolf', name: 'Gray Wolf', ct: 20 },
+                { job: 'wolf', name: 'Gray Wolf', ct: 55 },
                 { job: 'boar', name: 'Wild Boar', ct: 25 },
-                { job: 'wolf', name: 'Grey Wolf', ct: 35 },
+                { job: 'wolf', name: 'Gray Wolf', ct: 35 },
                 { job: 'boar', name: 'Wild Boar', ct: 60 },
-                { job: 'wolf', name: 'Grey Wolf', ct: 5 },
+                { job: 'wolf', name: 'Gray Wolf', ct: 5 },
             ] },
             { id: 'goblin_raid', name: 'Goblin Raid', enemyLevel: 1, easy: true, roster: [
                 { job: 'goblin', name: 'Goblin', ct: 10 },

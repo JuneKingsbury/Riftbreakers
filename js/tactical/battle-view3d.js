@@ -1535,9 +1535,9 @@ export class BattleView3D {
             return b;
         };
         mk('↺', 'Rotate left (Q)',  () => this.rotateView(-1));
-        mk('◎', 'Fit whole map / center on unit (F)', () => { if (this._tracking) this.onCenterRequest?.(); else this.fitToMap(); });
+        mk('◎', 'Center on the unit, or show the whole map (F)', () => { if (this._tracking) this.onCenterRequest?.(); else this.fitToMap(); });
         mk('↻', 'Rotate right (E)', () => this.rotateView(1));
-        this._freeButton = mk('⤢', 'Free camera on/off (V). On: whole map, no auto-follow', () => this.setFreeCamera(this._tracking));
+        this._freeButton = mk('⤢', 'Free camera (V). Shows the whole map and stops following units.', () => this.setFreeCamera(this._tracking));
         this._freeButton.classList.toggle('active', !this._tracking);
         this.overlay.appendChild(bar);
         this._compass = bar;

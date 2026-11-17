@@ -79,6 +79,15 @@
             </div>
 
             <div class="settings-section" data-start-tab="general">
+                <div class="settings-section-title">Battle</div>
+                <div class="settings-row">
+                    <label for="start-tactics-log">Show tactics decisions in the battle log</label>
+                    <input type="checkbox" id="start-tactics-log">
+                </div>
+                <div style="color:#999; font-size:11px; line-height:1.4;">Each turn, the log names the tactics rules a character followed. Handy when you're writing your own tactics.</div>
+            </div>
+
+            <div class="settings-section" data-start-tab="general">
                 <div class="settings-section-title">Save Data</div>
                 <div style="color:#999; font-size:11px; line-height:1.4; margin-bottom:6px;">Progress saves on this device automatically. Export a backup to keep it safe, or to move it to another device. It includes your renown, unlocks, skill plans and any run in progress.</div>
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
@@ -123,7 +132,7 @@
                     </tr>
                     <tr>
                         <td style="padding:4px 8px 4px 0;"><button id="start-map-editor" style="width:100%;padding:6px 10px;">Map</button></td>
-                        <td style="padding:4px 0; color:#aaa; font-size:11px;">3D block editor for battle maps (run npm run dev to save to disk)</td>
+                        <td style="padding:4px 0; color:#aaa; font-size:11px;">3D block editor for battle maps. Run npm run dev to save to disk.</td>
                     </tr>
                 </table>
             </div>

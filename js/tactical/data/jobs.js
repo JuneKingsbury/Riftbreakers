@@ -76,7 +76,7 @@ export const JOB_DATA = {
         spriteKey: 'royal_mage',
         char: 'V', color: '#ff8844',
         schools: ['evocation'],
-        desc: 'A mage who focuses on pure destructive output. The Evoker channels raw elemental energy into fire and lightning, hitting hard from a distance at the cost of low defense and HP. The clearest damage-dealer path.',
+        desc: 'A mage devoted to pure destruction. The Evoker hurls fire, ice and lightning from a distance, but has little HP and even less defense. The simplest way to deal heavy damage.',
         allowedEquipment: { armor: ['cloth'], helmet: ['cloth'], weapon: ['magic'], tool: ['implement'] },
     },
 
@@ -99,7 +99,7 @@ export const JOB_DATA = {
         spriteKey: 'spell_wraith',
         char: 'C', color: '#cc88dd',
         schools: ['enchantment'],
-        desc: 'A warrior who imbues their blade with runes and hexes. The Spellblade fights up close, cursing enemies to sap their strength while buffing companions before the charge. Tougher and faster than a pure mage, but relies on positioning and setup to shine.',
+        desc: 'A warrior who carves runes and hexes into their blade. The Spellblade fights up close, cursing enemies to sap their strength, speed and magic. Tougher and faster than a pure mage, but needs good positioning to shine.',
         allowedEquipment: { armor: ['light'], helmet: ['light'], weapon: ['blade'], tool: ['offhand_weapon', 'implement'] },
     },
 
@@ -122,7 +122,7 @@ export const JOB_DATA = {
         spriteKey: 'npc_ally',
         char: 'A', color: '#88ccaa',
         schools: ['abjuration'],
-        desc: 'A defensive mage who specialises in protecting allies with barriers and basic healing. The Warden keeps a team alive without dealing much damage.',
+        desc: 'A defensive mage who keeps allies standing with barriers, wards and simple healing. The Warden deals little damage, but the party lasts much longer with one around.',
         allowedEquipment: { armor: ['cloth', 'medium'], helmet: ['cloth', 'medium'], weapon: ['magic', 'blade'], tool: ['shield', 'implement'] },
     },
 
@@ -145,7 +145,7 @@ export const JOB_DATA = {
         spriteKey: 'crusader_archer',
         char: 'J', color: '#aaccff',
         schools: ['conjuration'],
-        desc: 'A mage who inscribes runes onto arrows and bolts to strike at range. The Runebow uses conjured projectiles to deliver magical attacks from a distance. Faster than most mages but lacks raw magical punch.',
+        desc: 'An archer who inscribes runes onto arrows to strike from afar. The Runebow mixes plain arrows with conjured magic shots and moves faster than most mages, but lacks raw magical punch.',
         allowedEquipment: { armor: ['light'], helmet: ['light'], weapon: ['bow', 'crossbow', 'magic'], tool: ['quiver', 'implement'] },
     },
 
@@ -168,7 +168,7 @@ export const JOB_DATA = {
         spriteKey: 'void_brute',
         char: 'T', color: '#aa8855',
         schools: ['transmutation'],
-        desc: 'A mage who reshapes stone and earth, turning raw rock into weapons and armour. The Stoneshaper is a durable melee-range hybrid.',
+        desc: 'A mage who reshapes stone and earth, turning rock into weapons and armor. The Stoneshaper is a sturdy fighter who does best close to the enemy.',
         allowedEquipment: { armor: ['light', 'medium'], helmet: ['light', 'medium'], weapon: ['blade', 'heavy_weapon'], tool: ['offhand_weapon', 'implement'] },
     },
 
@@ -191,7 +191,7 @@ export const JOB_DATA = {
         spriteKey: 'npc_ally',
         char: 'D', color: '#99ccff',
         schools: ['divination'],
-        desc: 'A mage who reads time and probability, foreseeing attacks before they happen and guiding allies away from harm. The Seer has the highest evasion of any starting role.',
+        desc: "A mage who reads time and chance, foreseeing attacks before they land and guiding allies out of harm's way. Few classes are harder to hit.",
         allowedEquipment: { armor: ['cloth', 'light'], helmet: ['cloth', 'light'], weapon: ['magic'], tool: ['implement'] },
     },
 
@@ -310,7 +310,7 @@ export const JOB_DATA = {
         spriteKey: 'royal_mage',
         char: 'B', color: '#aa88ff',
         schools: ['evocation', 'enchantment'],
-        desc: 'A warrior who weaves enchantments into every swing. The Battlemage closes to melee and uses magic to amplify strikes and lock down targets, blending physical pressure with short-range crowd control. Balanced stats mean no single weakness, but no dominant strength either.',
+        desc: 'A warrior who weaves enchantments into every swing. The Battlemage fights in melee, using magic to hit harder and to slow or stun targets. Balanced stats mean no single weakness, but no standout strength either.',
     },
 
     paladin: {
@@ -329,7 +329,7 @@ export const JOB_DATA = {
         spriteKey: 'knight',
         char: 'P', color: '#ffee88',
         schools: ['evocation', 'abjuration'],
-        desc: 'A crusader who balances offensive holy power with protective Abjuration. The Paladin hits hard up close with Smite, keeps allies alive with Heal, and passively soaks damage through Divine Ward. A durable frontliner who is never purely offensive or purely defensive.',
+        desc: 'A holy warrior who balances divine power with protective magic. The Paladin hits hard up close with Smite, keeps allies alive with Heal, and shrugs off blows through Divine Ward. A durable frontliner, never purely offense or purely defense.',
         equipmentExpansions: { armor: ['heavy'], helmet: ['heavy'] },
     },
 
@@ -349,7 +349,7 @@ export const JOB_DATA = {
         spriteKey: 'spell_wraith',
         char: 'R', color: '#55aaff',
         schools: ['evocation', 'conjuration'],
-        desc: 'A sorcerer who blasts with interdimensional energy and tears open space itself. The Riftcaller excels at long-range single-target elimination with Rift Bolt, then detonates Void Burst when enemies cluster. High mobility and range, but fragile up close.',
+        desc: 'A sorcerer who tears open space itself. The Riftcaller picks off targets from long range with Rift Bolt, then sets off Void Burst when enemies bunch up. Quick and far-reaching, but fragile up close.',
     },
 
     earthshaker: {
@@ -368,7 +368,7 @@ export const JOB_DATA = {
         spriteKey: 'void_brute',
         char: 'E', color: '#aa7744',
         schools: ['evocation', 'transmutation'],
-        desc: 'A geomancer who reshapes the battlefield through seismic force. Tremor disrupts entire enemy formations by slowing them in place, while Stone Spike punishes isolated targets with massive focused damage. Slow and deliberate, but area denial and raw damage make every cast matter.',
+        desc: 'A geomancer who reshapes the battlefield with seismic force. Tremor slows whole enemy formations, and Stone Spike crushes isolated targets. Slow and deliberate, but every cast counts.',
     },
 
     sanctifier: {
@@ -387,7 +387,7 @@ export const JOB_DATA = {
         spriteKey: 'npc_ally',
         char: 'H', color: '#ffeeaa',
         schools: ['enchantment', 'abjuration'],
-        desc: 'A divine support who combines crowd control with healing. Holy Bind stuns enemies at range while Radiant Heal and Cure keep allies fighting. The Sanctifier cannot ignore the enemy line entirely, but their control spells make them a threat the enemy cannot safely dismiss.',
+        desc: 'A holy support who mixes control with healing. Holy Bind stuns enemies at range, Holy Chains stuns whole groups, and Radiant Heal keeps allies fighting. The enemy can never safely ignore a Sanctifier.',
     },
 
     spiritbinder: {
@@ -406,7 +406,7 @@ export const JOB_DATA = {
         spriteKey: 'shadow_imp',
         char: 'X', color: '#aaccff',
         schools: ['enchantment', 'conjuration'],
-        desc: 'A medium who binds and directs conjured spirits against the living. Spirit Lash provides reliable slowing pressure at range, while Haunting uses a fully possessed spirit to stun a key target after a charge. Fragile but slippery, excelling at disrupting enemy action economy.',
+        desc: 'A medium who binds spirits and sets them on the living. Spirit Lash slows targets at range, a summoned wisp joins the fight, and Haunting stuns a group after a charge. Fragile but slippery, and good at taking turns away from the enemy.',
     },
 
     worldsinger: {
@@ -425,7 +425,7 @@ export const JOB_DATA = {
         spriteKey: 'npc_ally',
         char: 'W', color: '#66dd22',
         schools: ['enchantment', 'transmutation'],
-        desc: 'A nature mage who shapes living growth into weapons and traps. Verdant Lash provides consistent slowing damage while Toxic Spores poisons whole groups and a summoned Thorn Beast pelts them from range. Regen Aura sustains their own HP over a long fight. Excels at zoning and prolonged attrition.',
+        desc: 'A nature mage who turns living growth into weapons. Verdant Lash slows as it strikes, Toxic Spores poisons whole groups, and a summoned Thorn Beast pelts enemies from range. Regen Aura keeps them on their feet through a long fight.',
     },
 
     fatebinder: {
@@ -444,7 +444,7 @@ export const JOB_DATA = {
         spriteKey: 'spell_wraith',
         char: 'F', color: '#cc44aa',
         schools: ['enchantment', 'divination'],
-        desc: 'A fate-weaver who unravels an enemy\'s destiny from a safe distance. Doom Hex inflicts a long-lasting slow instantly, and Fate Seal locks down a single target after a short charge. Wyrd Drain fuels their curse engine through the turn cycle. Frail but uniquely capable of controlling the fastest enemies.',
+        desc: "A mage who unravels an enemy's destiny from a safe distance. Doom Hex lays a long slow on a target instantly, Fate Seal stuns a small group after a short charge, and Wyrd Drain makes every curse last longer. Frail, but good at holding down even the fastest enemies.",
     },
 
     lifeseer: {
@@ -463,7 +463,7 @@ export const JOB_DATA = {
         spriteKey: 'npc_ally',
         char: 'L', color: '#aaddff',
         schools: ['abjuration', 'divination'],
-        desc: 'A prophetic healer who foreknows wounds and cancels them before they land. Foresight Heal is the most powerful single-target restore in the roster, Mass Foresight mends the whole line at once, and Providence cheats death once per battle. Pure support with no offensive angle.',
+        desc: 'A prophetic healer who sees wounds coming and undoes them before they land. Foresight Heal is the strongest single-target heal of any class, Mass Foresight mends a cluster of allies at once, and Providence cheats death once per battle. Pure support, with no offensive spells.',
     },
 
     beastcaller: {
@@ -482,7 +482,7 @@ export const JOB_DATA = {
         spriteKey: 'shadow_imp',
         char: 'C', color: '#cc8833',
         schools: ['conjuration', 'transmutation'],
-        desc: 'A shapeshifting fighter who battles with the ferocity of the beasts they call. Wild Surge delivers heavy physical hits that leave targets staggered, while Savage Howl disrupts entire groups at short range. Fast and mobile, the Beastcaller wants to be in the thick of the enemy formation rather than hanging back.',
+        desc: 'A shapeshifting fighter with the ferocity of the beasts they call. Wild Surge hits hard and slows, Savage Howl stuns whole groups nearby, and a summoned wolf joins the hunt. Fast and mobile, the Beastcaller belongs in the thick of the enemy line.',
     },
 
     // ---- Tier 2: promotions of the added classes ----
@@ -522,7 +522,7 @@ export const JOB_DATA = {
         spriteKey: 'mirror_twin',
         char: 'M', color: '#ddddff',
         schools: ['illusion', 'divination'],
-        desc: 'An illusionist who foresees where blows will fall and puts a copy there first. The Mirage Oracle fills the field with mirrors, blurs the whole line, and strikes past every defense with True Strike.',
+        desc: 'An illusionist who foresees where blows will fall and puts a copy there first. The Mirage Oracle fills the field with mirrors, blurs the whole line, and pierces wards and resistance with True Strike.',
     },
 
     lich: {
@@ -598,7 +598,7 @@ export const JOB_DATA = {
         spriteKey: 'npc_wandering_druid',
         char: 'F', color: '#88ffcc',
         schools: ['abjuration'],
-        desc: 'An alchemist who has learned precision. The Field Surgeon doses single allies with Elixir, cures and hastens whole groups, and patches up a falling friend on the spot. Steady Hands finally keeps every splash on the right side.',
+        desc: 'An alchemist who has learned precision. The Field Surgeon doses single allies with Elixir, cures whole groups and hurries them along, and patches up a falling friend on the spot. Steady Hands finally keeps every splash on the right side.',
     },
 
     marshal: {

@@ -175,7 +175,7 @@ test('with two reactions, each gets a chance but only one fires per hit', () => 
     const battle = new TacticalBattle(map, [blade, gob]);
     withRandom(0.01, () => battle.applyEnemyAbility(gob, 'goblin_slash', blade.x, blade.y));
     assert.equal(battle.log.filter(l => l.includes('reacts')).length, 1, 'one reaction');
-    assert.ok(battle.log.some(l => l.includes('reacts: Counter')), 'the chosen one goes first');
+    assert.ok(battle.log.some(l => l.includes('reacts with Counter')), 'the chosen one goes first');
 });
 
 test('Mana Surge only boosts magic when equipped as Support', () => {

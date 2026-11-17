@@ -22,7 +22,7 @@
 //   applyStatus   string   Status effect to inflict on hit
 //   statusDuration number  Turns the applied status lasts
 //   isHeal        bool     True for HP-restoring abilities
-//   isCure        bool     True for status-clearing abilities
+//   isCure        bool     True for abilities that clear harmful statuses (helpful ones stay)
 //   passive       bool     True for always-on abilities
 //   passiveMpCost number   MP drained per turn (passive only)
 //   projectileColor string CSS color for the projectile
@@ -111,6 +111,7 @@ export const ABILITY_DATA = {
         basePower: 0.7,
         applyStatus: 'stun',
         statusDuration: 1,
+        desc: 'A blow with the face of your shield. Deals damage and stuns the target for {turns}.',
     },
 
     // --- Mage spells ---
@@ -128,6 +129,7 @@ export const ABILITY_DATA = {
         projectileColor: '#ff6622',
         chargeTime: 30,
         requiresLos: false,
+        desc: 'A burst of flame dropped onto the target. It burns every enemy beside them too.',
     },
 
     ice: {
@@ -142,6 +144,7 @@ export const ABILITY_DATA = {
         statusDuration: 2,
         projectileColor: '#88ddff',
         chargeTime: 25,
+        desc: 'A shard of ice that chills the target to the bone. Deals damage and slows them for {turns}.',
     },
 
     thunder: {
@@ -155,6 +158,7 @@ export const ABILITY_DATA = {
         element: 'thunder',
         projectileColor: '#ffee44',
         chargeTime: 45,
+        desc: 'A bolt of lightning that strikes the target and arcs into every enemy beside them.',
     },
 
     // --- Archer ---
@@ -170,6 +174,7 @@ export const ABILITY_DATA = {
         animType: 'shot',
         projectileColor: '#aaddaa',
         chargeTime: 0,
+        desc: 'A carefully aimed arrow, loosed from far away.',
     },
 
     // --- Healer ---
@@ -186,6 +191,7 @@ export const ABILITY_DATA = {
         animType: 'cast',
         projectileColor: '#66ff99',
         chargeTime: 0,
+        desc: 'Closes an ally\'s wounds with gentle magic. Restores a solid amount of HP.',
     },
 
     cure: {
@@ -200,6 +206,7 @@ export const ABILITY_DATA = {
         animType: 'cast',
         projectileColor: '#aaffcc',
         chargeTime: 0,
+        desc: 'Washes an ally clean of poison, sleep, curses and every other harmful status.',
     },
 
     // --- Passive abilities ---
@@ -215,7 +222,7 @@ export const ABILITY_DATA = {
         actionCost: 0,
         targetType: 'self',
         dmgDealt: { magic: 1.15 },
-        desc: 'Channels a constant trickle of MP into your spells: +15% magic damage dealt. Drains 2 MP per turn.',
+        desc: 'A steady trickle of MP feeds every spell you cast. Magic damage +15%. Costs 2 MP per turn.',
         chargeTime: 0,
     },
 
@@ -225,7 +232,7 @@ export const ABILITY_DATA = {
         passiveMpCost: 1,
         dmgDealt: null,
         turnRegenHp: 5,
-        desc: 'Living growth knits your wounds: heal 5 HP at the start of each turn. Drains 1 MP per turn.',
+        desc: 'Living growth knits your wounds closed. Heal 5 HP at the start of each turn. Costs 1 MP per turn.',
     },
 
     // =====================================================================
@@ -250,7 +257,7 @@ export const ABILITY_DATA = {
         chargeTime: 0,
         applyStatus: 'slow',
         statusDuration: 1,
-        desc: 'A rudimentary enchantment that scratches at the target\'s will, dealing minor damage and leaving them sluggish.',
+        desc: 'A crude curse that scratches at the target\'s will. Deals light damage and slows them for {turns}.',
     },
 
     // Warden basic: a modest single-target heal, weaker than full Heal
@@ -267,7 +274,7 @@ export const ABILITY_DATA = {
         animType: 'cast',
         projectileColor: '#88ccaa',
         chargeTime: 0,
-        desc: 'A basic protective charm that restores a modest amount of HP to an ally.',
+        desc: 'A simple protective charm. Restores a modest amount of HP to one ally.',
     },
 
     // Transmuter basic: hurls a conjured stone at range, purely physical
@@ -283,7 +290,7 @@ export const ABILITY_DATA = {
         animType: 'shot',
         projectileColor: '#886644',
         chargeTime: 0,
-        desc: 'Transmutes loose stone underfoot into a hurled projectile, dealing ranged physical damage.',
+        desc: 'Turns loose stone underfoot into a thrown missile. Physical damage at range.',
     },
 
     // Seer basic: passive divinatory trance that slowly drains MP
@@ -293,7 +300,7 @@ export const ABILITY_DATA = {
         passiveMpCost: 1,
         dmgDealt: null,
         evaBonus: 0.2,
-        desc: 'A light divinatory trance reads the next few heartbeats: +20% evasion against physical attacks. Drains 1 MP per turn.',
+        desc: 'A light trance that reads the next few heartbeats. +20% evasion against physical attacks. Costs 1 MP per turn.',
     },
 
     // =====================================================================
@@ -307,7 +314,7 @@ export const ABILITY_DATA = {
         basePower: 1.15,
         applyStatus: 'slow',
         statusDuration: 1,
-        desc: 'Channels arcane energy through the blade, hitting harder and leaving the target sluggish.',
+        desc: 'Arcane force runs down the blade. Hits harder than a normal attack and slows the target for {turns}.',
     },
 
     force_pulse: {
@@ -326,7 +333,7 @@ export const ABILITY_DATA = {
         chargeTime: 25,
         applyStatus: 'stun',
         statusDuration: 1,
-        desc: 'Releases a concussive burst of raw magical force, staggering all nearby foes.',
+        desc: 'A concussive burst of raw force. Damages every enemy in the area and stuns them for {turns}.',
     },
 
     // =====================================================================
@@ -346,7 +353,7 @@ export const ABILITY_DATA = {
         animType: 'slash',
         projectileColor: '#fff8aa',
         chargeTime: 35,
-        desc: 'Channels divine fire through the weapon for a devastating, consecrated blow.',
+        desc: 'Holy fire poured through your weapon into a foe within reach. A heavy blow that also scorches enemies beside them.',
     },
 
     divine_ward: {
@@ -355,7 +362,7 @@ export const ABILITY_DATA = {
         passiveMpCost: 1,
         dmgDealt: null,
         dmgTaken: { physical: 0.8 },
-        desc: 'A constant barrier of holy force: -20% physical damage taken. Drains 1 MP per turn.',
+        desc: 'A constant barrier of holy force. Physical damage taken -20%. Costs 1 MP per turn.',
     },
 
     // =====================================================================
@@ -375,7 +382,7 @@ export const ABILITY_DATA = {
         animType: 'cast',
         projectileColor: '#55aaff',
         chargeTime: 40,
-        desc: 'Tears a pinhole rift in space, blasting the target with raw dimensional energy.',
+        desc: 'Tears a pinhole rift in space and blasts the target with whatever pours through. Enemies right beside them are caught too.',
     },
 
     void_burst: {
@@ -389,7 +396,7 @@ export const ABILITY_DATA = {
         basePower: 0.8,
         projectileColor: '#3355ff',
         chargeTime: 50,
-        desc: 'Rips open a rift that collapses violently outward, damaging everything nearby.',
+        desc: 'Opens a rift that collapses violently outward, hitting every enemy in a wide area.',
     },
 
     // =====================================================================
@@ -412,7 +419,7 @@ export const ABILITY_DATA = {
         chargeTime: 30,
         applyStatus: 'slow',
         statusDuration: 2,
-        desc: 'Slams the earth with seismic force, cracking the ground and slowing all caught within.',
+        desc: 'Seismic force cracks the ground open. Damages every enemy in a wide area and slows them for {turns}.',
     },
 
     stone_spike: {
@@ -427,7 +434,7 @@ export const ABILITY_DATA = {
         projectileColor: '#886644',
         chargeTime: 55,
         applyStatus: null,
-        desc: 'Erupts a massive spike of stone beneath the target, dealing concentrated crushing damage.',
+        desc: 'A great spike of stone bursts up beneath the target. Heavy damage, and it clips enemies right beside them.',
     },
 
     // =====================================================================
@@ -449,7 +456,7 @@ export const ABILITY_DATA = {
         chargeTime: 0,
         applyStatus: 'stun',
         statusDuration: 1,
-        desc: 'Binds the target in chains of holy light, dealing minor damage and rooting them in place.',
+        desc: 'Chains of holy light hold the target fast. Light damage, and a stun that lasts {turns}.',
     },
 
     radiant_heal: {
@@ -459,7 +466,7 @@ export const ABILITY_DATA = {
         mpCost: 18,
         basePower: 1.1,
         projectileColor: '#ffeeaa',
-        desc: 'A more powerful prayer with extended reach, drawing on both Enchantment and Abjuration.',
+        desc: 'A stronger prayer that reaches farther. Restores a large amount of HP to one ally.',
     },
 
     // =====================================================================
@@ -481,7 +488,7 @@ export const ABILITY_DATA = {
         chargeTime: 0,
         applyStatus: 'slow',
         statusDuration: 2,
-        desc: 'Unleashes a bound spirit against a target, leaving them slowed by its ethereal chill.',
+        desc: 'Sets a bound spirit on the target. Its ghostly chill deals damage and slows them for {turns}.',
     },
 
     haunting: {
@@ -496,7 +503,7 @@ export const ABILITY_DATA = {
         chargeTime: 40,
         applyStatus: 'stun',
         statusDuration: 1,
-        desc: 'Sends a spirit to possess the target momentarily, stunning them as it tears free.',
+        desc: 'A spirit seizes the target and everyone beside them, then tears free. Damages them all and stuns them for {turns}.',
     },
 
     // =====================================================================
@@ -518,7 +525,7 @@ export const ABILITY_DATA = {
         chargeTime: 0,
         applyStatus: 'slow',
         statusDuration: 1,
-        desc: 'Snaps a whip of enchanted vines at the target, dealing damage and briefly entangling them.',
+        desc: 'A whip of enchanted vine. Deals damage and tangles the target\'s legs, slowing them for {turns}.',
     },
 
     spore_cloud: {
@@ -534,7 +541,7 @@ export const ABILITY_DATA = {
         chargeTime: 25,
         applyStatus: 'slow',
         statusDuration: 2,
-        desc: 'Sings up a cloud of narcotic spores that drifts across the battlefield, slowing all caught within.',
+        desc: 'Sings up a drifting cloud of narcotic spores. Damages every enemy in a wide area and slows them for {turns}.',
     },
 
     // =====================================================================
@@ -556,7 +563,7 @@ export const ABILITY_DATA = {
         chargeTime: 0,
         applyStatus: 'slow',
         statusDuration: 3,
-        desc: 'Weaves a thread of doomed fate around the target, dragging their destiny toward an inevitable end.',
+        desc: 'Wraps the target in a thread of ill fate. Deals damage and slows them for {duration} turns.',
     },
 
     fate_seal: {
@@ -571,7 +578,7 @@ export const ABILITY_DATA = {
         chargeTime: 40,
         applyStatus: 'stun',
         statusDuration: 1,
-        desc: 'Seals a moment in time around the target, briefly locking them out of the flow of causality.',
+        desc: 'Freezes a moment in time around the target. Damages them and every enemy beside them, and stuns them all for {turns}.',
     },
 
     wyrd_drain: {
@@ -580,7 +587,7 @@ export const ABILITY_DATA = {
         passiveMpCost: 2,
         dmgDealt: null,
         statusDurationBonus: 1,
-        desc: 'Tightens the threads of fate around your victims: every status you inflict lasts 1 extra turn. Drains 2 MP per turn.',
+        desc: 'Pulls the threads of fate tight around your victims. Statuses you inflict last 1 turn longer. Costs 2 MP per turn.',
     },
 
     // =====================================================================
@@ -593,7 +600,7 @@ export const ABILITY_DATA = {
         mpCost: 18,
         basePower: 1.3,
         projectileColor: '#aaddff',
-        desc: 'Heals a wound before it fully manifests, guided by prophetic sight into the target\'s near future.',
+        desc: 'Mends a wound before it fully lands, guided by a glimpse of the target\'s near future. A powerful single-target heal.',
     },
 
     aegis_ward: {
@@ -608,7 +615,7 @@ export const ABILITY_DATA = {
         animType: 'cast',
         projectileColor: '#ccddff',
         chargeTime: 0,
-        desc: 'Purges all afflictions and seals the target in a brief protective ward, seen moments in advance.',
+        desc: 'A flash of warding light. Clears every harmful status from one ally.',
     },
 
 
@@ -623,7 +630,7 @@ export const ABILITY_DATA = {
         basePower: 1.2,
         applyStatus: 'slow',
         statusDuration: 1,
-        desc: 'Channels bestial rage into a savage strike, the raw force leaving the target staggered.',
+        desc: 'A savage strike fueled by bestial rage. Hits harder than a normal attack and slows the target for {turns}.',
     },
 
     savage_howl: {
@@ -642,7 +649,7 @@ export const ABILITY_DATA = {
         chargeTime: 40,
         applyStatus: 'stun',
         statusDuration: 1,
-        desc: 'Lets out a primal howl resonating with transmutation magic, briefly stunning all nearby foes.',
+        desc: 'A primal howl that rattles everything nearby. Damages every enemy in a wide area and stuns them for {turns}.',
     },
 
     // =====================================================================
@@ -662,7 +669,7 @@ export const ABILITY_DATA = {
         animType: 'cast',
         projectileColor: '#886644',
         chargeTime: 45,
-        desc: 'Erupts a wall of stone from the earth, sealing passage for the rest of the battle.',
+        desc: 'Raises a three-tile wall of stone from the earth. It blocks the way for the rest of the battle.',
     },
 
     root_field: {
@@ -678,7 +685,7 @@ export const ABILITY_DATA = {
         animType: 'cast',
         projectileColor: '#66aa22',
         chargeTime: 30,
-        desc: 'Chokes an area with tangling roots, turning open ground into difficult terrain.',
+        desc: 'Tangling roots choke a cross-shaped patch of ground, turning it into difficult terrain.',
     },
 
     // =====================================================================
@@ -699,7 +706,7 @@ export const ABILITY_DATA = {
         chargeTime: 0,
         buffs: [{ stat: 'def', value: 8, duration: 2 }],
         floatText: 'DEF UP!',
-        desc: 'Transmutes your own skin to stone, raising DEF by 8 for 2 turns.',
+        desc: 'Your skin hardens into stone. DEF +{buff:def} for 2 turns.',
     },
 
     // Enchanter: ranged ATK debuff
@@ -717,7 +724,7 @@ export const ABILITY_DATA = {
         projectileColor: '#aa44cc',
         chargeTime: 0,
         applyStatus: 'enfeebled',
-        desc: 'Saps the target\'s fighting spirit, dealing minor damage and reducing their ATK for 2 turns.',
+        desc: 'Saps the target\'s fighting spirit. Light damage, and ATK -5 for 2 turns.',
     },
 
     // Seer: causes the next physical attack against target to miss
@@ -735,7 +742,7 @@ export const ABILITY_DATA = {
         projectileColor: '#aaddff',
         chargeTime: 0,
         applyStatus: 'slipped',
-        desc: 'Nudges fate so the next physical attack against this target misses entirely.',
+        desc: 'Nudges fate around an ally. The next physical attack against them misses, if it comes within 2 turns.',
     },
 
     // =====================================================================
@@ -758,7 +765,7 @@ export const ABILITY_DATA = {
         chargeTime: 0,
         applyStatus: 'haste',
         statusDuration: 3,
-        desc: 'Accelerates an ally\'s flow of time, letting them act far more often.',
+        desc: 'Quickens an ally\'s flow of time. Haste lets them act 50% more often for {turns}.',
     },
 
     // SILENCE — prevent target from casting magic
@@ -777,7 +784,7 @@ export const ABILITY_DATA = {
         chargeTime: 0,
         applyStatus: 'silence',
         statusDuration: 2,
-        desc: 'Seals the target\'s voice and will, preventing them from casting any magic.',
+        desc: 'Seals the target\'s voice. They can\'t cast any magic for {turns}.',
     },
 
     // SLEEP — skip turns until woken by damage
@@ -796,7 +803,7 @@ export const ABILITY_DATA = {
         chargeTime: 0,
         applyStatus: 'sleep',
         statusDuration: 3,
-        desc: 'Draws the target into a deep slumber. They skip turns until struck.',
+        desc: 'Draws the target into a deep sleep. They skip their turns for up to {turns}, or until something hits them.',
     },
 
     // BERSERK — forces target into uncontrolled auto-attacks each turn
@@ -815,7 +822,7 @@ export const ABILITY_DATA = {
         chargeTime: 0,
         applyStatus: 'berserk',
         statusDuration: 2,
-        desc: 'Floods the target\'s mind with primal fury, forcing them into mindless attacks.',
+        desc: 'Floods the target\'s mind with primal fury. For {turns}, they can only attack the nearest foe.',
     },
 
     // CHARM — target fights for the other side for 1 turn
@@ -834,7 +841,7 @@ export const ABILITY_DATA = {
         chargeTime: 30,
         applyStatus: 'charm',
         statusDuration: 1,
-        desc: 'Binds the target\'s will to yours, turning them against their own side for a turn.',
+        desc: 'Binds the target\'s will to yours. Charmed, they fight for your side for {turns}.',
     },
 
     // POISON — AoE poison cloud
@@ -854,7 +861,7 @@ export const ABILITY_DATA = {
         chargeTime: 20,
         applyStatus: 'poison',
         statusDuration: 3,
-        desc: 'Releases a cloud of toxic spores that deal damage and poison all caught within.',
+        desc: 'A burst of toxic spores. Light damage, and every enemy in the area is poisoned for {turns}.',
     },
 
     // POISON — single-target melee venom
@@ -865,7 +872,7 @@ export const ABILITY_DATA = {
         basePower: 0.9,
         applyStatus: 'poison',
         statusDuration: 3,
-        desc: 'A bite or strike laced with natural venom, poisoning the target.',
+        desc: 'A strike laced with venom. Deals damage and poisons the target for {turns}.',
     },
 
     // RERAISE — auto-revive on KO
@@ -884,7 +891,7 @@ export const ABILITY_DATA = {
         chargeTime: 0,
         applyStatus: 'reraise',
         statusDuration: 6,
-        desc: 'Blesses an ally so that the next killing blow instead leaves them at 1 HP.',
+        desc: 'Blesses an ally against death. For {turns}, the next blow that would knock them out leaves them at 1 HP instead.',
     },
 
     // PROTECT — reduce incoming physical damage by 25%
@@ -903,7 +910,7 @@ export const ABILITY_DATA = {
         chargeTime: 0,
         applyStatus: 'protect',
         statusDuration: 3,
-        desc: 'Wraps an ally in transmuted stone, absorbing 25% of all incoming physical strikes.',
+        desc: 'Wraps an ally in transmuted stone. Protect cuts the physical damage they take by 25% for {turns}.',
     },
 
     // SHELL — reduce incoming magic damage by 25%
@@ -922,7 +929,7 @@ export const ABILITY_DATA = {
         chargeTime: 0,
         applyStatus: 'shell',
         statusDuration: 3,
-        desc: 'Wraps an ally in an arcane ward that absorbs 25% of all incoming magic damage.',
+        desc: 'Wraps an ally in an arcane ward. Shell cuts the magic damage they take by 25% for {turns}.',
     },
 
     // FROG — cripple target stats
@@ -941,7 +948,7 @@ export const ABILITY_DATA = {
         chargeTime: 0,
         applyStatus: 'frog',
         statusDuration: 2,
-        desc: 'Transmutes the target\'s form into something diminished, cutting their combat stats by half.',
+        desc: 'Twists the target into a frog for {turns}. Their ATK and MAT drop by 60% and their DEF by half.',
     },
 
     // REFLECT — bounce incoming magic back at the caster
@@ -960,7 +967,7 @@ export const ABILITY_DATA = {
         chargeTime: 0,
         applyStatus: 'reflect',
         statusDuration: 2,
-        desc: 'Erects a divination mirror around an ally, reflecting magic spells back at their caster.',
+        desc: 'Raises a mirror of force around an ally. For {turns}, enemy spells bounce back at their caster.',
     },
 
     // REGEN — status-based HP regen each turn (ally buff)
@@ -979,7 +986,7 @@ export const ABILITY_DATA = {
         chargeTime: 0,
         applyStatus: 'regen',
         statusDuration: 4,
-        desc: 'Blesses an ally with divine healing energy that restores HP each turn.',
+        desc: 'Bathes an ally in gentle holy light. Regen restores 8% of their max HP each turn for {turns}.',
     },
 
     // =====================================================================
@@ -992,7 +999,7 @@ export const ABILITY_DATA = {
         range: 0, aoe: 0, mpCost: 0, actionCost: 0, targetType: 'self', chargeTime: 0,
         trigger: 'anyHit', chance: 0.4,
         selfStatus: 'defend',
-        desc: 'When struck, may set your feet and take a defensive stance until your next turn.',
+        desc: 'When struck, you may set your feet. Until your next turn, DEF and MDF are 50% higher and you have +20% evasion against physical attacks.',
     },
 
     flame_retort: {
@@ -1001,7 +1008,7 @@ export const ABILITY_DATA = {
         trigger: 'magicHit', chance: 0.3,
         selfStatus: null,
         counterWith: 'fire',
-        desc: 'When hit by magic, may answer with a Fire spell at the caster if they are in range.',
+        desc: 'When hit by magic, you may answer with a Fire spell at the caster, if they are in range. It costs MP as usual.',
     },
 
     counter: {
@@ -1010,7 +1017,7 @@ export const ABILITY_DATA = {
         trigger: 'physicalHit', chance: 0.5, adjacentOnly: true,
         selfStatus: null,
         counterWith: 'attack',
-        desc: 'When struck in melee, may strike the attacker back.',
+        desc: 'When struck in melee, you may hit the attacker back.',
     },
 
 
@@ -1020,7 +1027,7 @@ export const ABILITY_DATA = {
         trigger: 'rangedHit', chance: 0.4,
         selfStatus: null,
         counterWith: 'long_shot',
-        desc: 'When hit from range, may loose a Long Shot back at the attacker.',
+        desc: 'When hit from range, you may answer with a Long Shot, if the shooter is in range.',
     },
 
     stone_reflex: {
@@ -1029,7 +1036,7 @@ export const ABILITY_DATA = {
         trigger: 'physicalHit', chance: 0.5,
         selfStatus: null,
         selfBuff: { stat: 'def', value: 6, duration: 2 },
-        desc: 'When struck physically, may harden your skin, raising DEF by 6 for 2 turns.',
+        desc: 'When struck by a physical attack, your skin may harden. DEF +6 for 2 turns.',
     },
 
     void_siphon: {
@@ -1038,7 +1045,7 @@ export const ABILITY_DATA = {
         trigger: 'magicHit', chance: 0.6,
         selfStatus: null,
         mpRestoreFrac: 0.5,
-        desc: 'When hit by magic, may pull the spell into the void, restoring MP equal to half the damage taken.',
+        desc: 'When hit by magic, you may pull part of the spell into the void and restore MP equal to half the damage taken.',
     },
 
     retribution: {
@@ -1047,14 +1054,14 @@ export const ABILITY_DATA = {
         trigger: 'anyHit', chance: 0.3,
         selfStatus: null,
         counterWith: 'smite',
-        desc: 'When struck, may answer with an instant Smite against an adjacent attacker.',
+        desc: 'When struck by an adjacent attacker, you may answer with an instant Smite. It costs MP as usual.',
     },
 
     feral_counter: {
         extends: 'counter',
         name: 'Feral Counter',
         counterWith: 'wild_surge',
-        desc: 'When struck in melee, may lash back with a Wild Surge.',
+        desc: 'When struck in melee, you may lash back with a Wild Surge.',
     },
 
     second_sight: {
@@ -1063,7 +1070,7 @@ export const ABILITY_DATA = {
         trigger: 'lowHp', chance: 1, oncePerBattle: true,
         selfStatus: null,
         selfCast: 'renewing_light',
-        desc: 'The first time a blow drops you below 30% HP, you foresee it and cast Renewing Light on yourself.',
+        desc: 'Once per battle, when a blow leaves you below 30% HP, you see it coming and cast Renewing Light on yourself.',
     },
 
     // =====================================================================
@@ -1082,35 +1089,35 @@ export const ABILITY_DATA = {
         extends: 'move_plus_1',
         name: 'Beast Lope',
         moveBonus: 2,
-        desc: 'Run on all fours like the beasts you call: movement range +2.',
+        desc: 'Run on all fours like the beasts you call. Move +2.',
     },
 
     fleet_step: {
         extends: 'move_plus_1',
         name: 'Fleet Step',
         moveBonus: 1, climbBonus: 1,
-        desc: 'Increases movement range by 1 and lets you climb 1 extra level of elevation.',
+        desc: 'Move +1, and you can climb 1 extra level of elevation.',
     },
 
     stone_stride: {
         extends: 'move_plus_1',
         name: 'Stone Stride',
         moveBonus: 0, ignoreTerrainCost: true,
-        desc: 'Earth parts beneath your feet: every tile costs only 1 movement.',
+        desc: 'The earth parts beneath your feet. Every tile costs only 1 Move, whatever the terrain.',
     },
 
     featherstep: {
         extends: 'move_plus_1',
         name: 'Levitate',
         moveBonus: 0, climbBonus: 2,
-        desc: 'Drift a hand\'s breadth above the ground, rising over ledges: climb 2 extra levels of elevation.',
+        desc: 'Drift a hand\'s breadth above the ground and rise over ledges. Climb 2 extra levels of elevation.',
     },
 
     blink: {
         extends: 'move_plus_1',
         name: 'Blink',
         moveBonus: 1, ignoreClimb: true, passThroughUnits: true, ignoreTerrainCost: true,
-        desc: 'Fold space with every step: +1 movement, ignores elevation and terrain, and passes through other units.',
+        desc: 'Fold space with every step. Move +1, ignore elevation and terrain, and pass through other units.',
     },
 
     // =====================================================================
@@ -1125,7 +1132,7 @@ export const ABILITY_DATA = {
         targetType: 'self', animType: 'cast', projectileColor: '#ffeeaa', chargeTime: 0,
         buffs: [{ stat: 'atk', value: 3, duration: 3 }, { stat: 'mat', value: 3, duration: 3 }],
         floatText: 'Focus!',
-        desc: 'Steady your breath and remember your training: ATK and MAT +3 for 3 turns.',
+        desc: 'Steady your breath and remember your training. ATK and MAT +{buff:atk} for 3 turns.',
     },
     rallying_beat: {
         name: 'Rallying Beat',
@@ -1134,14 +1141,14 @@ export const ABILITY_DATA = {
         targetType: 'ally', animType: 'cast', projectileColor: '#ffcc66', chargeTime: 0,
         buffs: [{ stat: 'atk', value: 2, duration: 3 }, { stat: 'mat', value: 2, duration: 3 }],
         floatText: 'Rallied!',
-        desc: 'Pound out a war beat that steadies everyone near an ally: ATK and MAT +2 for 3 turns.',
+        desc: 'Pound out a war beat. The target ally and everyone beside them get ATK and MAT +{buff:atk} for 3 turns.',
     },
     rush: {
         extends: 'attack',
         name: 'Rush',
         actionCost: 40,
         basePower: 1.15,
-        desc: 'A headlong shoulder-charge that hits a little harder than a normal attack.',
+        desc: 'A headlong shoulder charge. Hits a little harder than a normal attack.',
     },
     throw_stone: {
         name: 'Throw Stone',
@@ -1155,7 +1162,7 @@ export const ABILITY_DATA = {
         type: 'physical',
         range: 1, aoe: 0, mpCost: 0, actionCost: 40,
         targetType: 'ally', basePower: 0.6, isHeal: true, animType: 'cast', projectileColor: '#ccffcc', chargeTime: 0,
-        desc: 'Bind a wound with field dressings. Heals an adjacent ally (or yourself) without MP.',
+        desc: 'Bind a wound with field dressings. Heals an adjacent ally or yourself, and needs no MP.',
     },
 
     // Evoker (Evocation)
@@ -1169,7 +1176,7 @@ export const ABILITY_DATA = {
         element: 'arcane',
         projectileColor: '#ffffff',
         chargeTime: 55,
-        desc: 'The pinnacle of evocation: a single point of white-hot force that annihilates one target.',
+        desc: 'The pinnacle of evocation. A single point of white-hot force that devastates one target.',
     },
 
     // Spellblade (Runeblade)
@@ -1179,7 +1186,7 @@ export const ABILITY_DATA = {
         actionCost: 40,
         basePower: 0.8,
         buffs: [{ stat: 'def', value: -5, duration: 2 }],
-        desc: 'A rune-etched cut that splits armour: deals damage and lowers the target\'s DEF by 5 for 2 turns.',
+        desc: 'A rune-etched cut that splits armor. Deals damage and lowers the target\'s DEF by {buff:def} for 2 turns.',
     },
     draining_edge: {
         extends: 'attack',
@@ -1187,7 +1194,7 @@ export const ABILITY_DATA = {
         actionCost: 45,
         basePower: 0.9,
         drainFrac: 0.5,
-        desc: 'The rune on your blade drinks deep: heal yourself for half the damage dealt.',
+        desc: 'The rune on your blade drinks deep. Heals you for half the damage dealt.',
     },
 
     // Runebow (Runecraft)
@@ -1197,7 +1204,7 @@ export const ABILITY_DATA = {
         range: 4,
         basePower: 0.7,
         applyStatus: 'slow', statusDuration: 2,
-        desc: 'An arrow aimed at the legs, pinning the target and slowing them for 2 turns.',
+        desc: 'An arrow aimed at the legs. Deals damage and slows the target for {duration} turns.',
     },
     rune_arrow: {
         name: 'Rune Arrow',
@@ -1205,7 +1212,7 @@ export const ABILITY_DATA = {
         range: 5, aoe: 0, mpCost: 10, actionCost: 45,
         targetType: 'enemy', basePower: 1.0, element: 'arcane',
         animType: 'shot', projectileColor: '#aaccff', chargeTime: 0,
-        desc: 'A conjured arrow inscribed with a rune of force. Magic damage at long range.',
+        desc: 'A conjured arrow inscribed with a rune of force. It deals magic damage instead of physical.',
     },
     arrow_rain: {
         extends: 'long_shot',
@@ -1215,7 +1222,7 @@ export const ABILITY_DATA = {
         actionCost: 50,
         basePower: 0.65,
         chargeTime: 25,
-        desc: 'Loose a volley high into the air that falls across an area.',
+        desc: 'Loose a volley high into the air. It comes down on every enemy in the area.',
     },
 
     // Stoneshaper (Transmutation)
@@ -1224,7 +1231,7 @@ export const ABILITY_DATA = {
         name: 'Stone Fist',
         actionCost: 45,
         basePower: 1.35,
-        desc: 'Transmute your fist to granite mid-swing for a crushing blow.',
+        desc: 'Your fist turns to granite mid-swing. A crushing blow.',
     },
     calcify: {
         name: 'Calcify',
@@ -1233,7 +1240,7 @@ export const ABILITY_DATA = {
         targetType: 'enemy', basePower: 0.3, element: 'earth',
         animType: 'cast', projectileColor: '#bbaa88', chargeTime: 0,
         applyStatus: 'stun', statusDuration: 1,
-        desc: 'Turns the target\'s joints briefly to stone, stunning them.',
+        desc: 'Turns the target\'s joints briefly to stone. Light damage, and a stun that lasts {turns}.',
     },
 
     // Seer (Divination)
@@ -1244,7 +1251,7 @@ export const ABILITY_DATA = {
         targetType: 'enemy', basePower: 0, element: 'arcane',
         animType: 'cast', projectileColor: '#ccddff', chargeTime: 0,
         applyStatus: 'slow', statusDuration: 3,
-        desc: 'Thickens the flow of time around the target, slowing them for 3 turns.',
+        desc: 'Thickens the flow of time around the target, slowing them for {duration} turns.',
     },
 
     // Battlemage (Battle Arts)
@@ -1254,7 +1261,7 @@ export const ABILITY_DATA = {
         actionCost: 42,
         basePower: 0.9,
         applyStatus: 'silence', statusDuration: 2,
-        desc: 'A strike to the throat wrapped in anti-magic, silencing the target for 2 turns.',
+        desc: 'A strike to the throat wrapped in anti-magic. Deals damage and silences the target for {duration} turns.',
     },
     blade_storm: {
         extends: 'attack',
@@ -1262,7 +1269,7 @@ export const ABILITY_DATA = {
         aoe: 1,
         actionCost: 55,
         basePower: 0.75,
-        desc: 'A whirling, spell-driven sweep that strikes the target and everything beside it.',
+        desc: 'A whirling, spell-driven sweep. Hits the target and every enemy beside them.',
     },
 
     // Paladin (Holy Arts)
@@ -1272,7 +1279,7 @@ export const ABILITY_DATA = {
         range: 2, aoe: 1, requiresLos: false, mpCost: 18, actionCost: 50,
         targetType: 'enemy', basePower: 0.8, element: 'holy',
         animType: 'cast', projectileColor: '#fff4bb', chargeTime: 30,
-        desc: 'Hallows the ground in a burst of light that sears every foe standing on it.',
+        desc: 'Hallows the ground in a burst of light that sears every enemy standing on it.',
     },
 
     // Riftcaller (Riftcraft)
@@ -1286,7 +1293,7 @@ export const ABILITY_DATA = {
         projectileColor: '#3344aa',
         chargeTime: 30,
         applyStatus: 'slow', statusDuration: 2,
-        desc: 'Collapses a pocket of space into crushing weight, damaging and slowing everything inside.',
+        desc: 'Collapses a pocket of space into crushing weight. Damages every enemy inside and slows them for {turns}.',
     },
 
     // Earthshaker (Geomancy)
@@ -1308,7 +1315,7 @@ export const ABILITY_DATA = {
         range: 3, aoe: 1,
         mpCost: 16, actionCost: 45,
         projectileColor: '#ffffdd',
-        desc: 'A cleansing prayer that removes all afflictions from every ally in the area.',
+        desc: 'A cleansing prayer. Clears every harmful status from each ally in the area.',
     },
     holy_chains: {
         extends: 'holy_bind',
@@ -1316,7 +1323,7 @@ export const ABILITY_DATA = {
         aoe: 1,
         mpCost: 22, actionCost: 50,
         chargeTime: 40,
-        desc: 'Chains of light lash out across an area, binding every foe caught in them.',
+        desc: 'Chains of light lash out across an area. Every enemy caught takes light damage and is stunned for {turns}.',
     },
 
     // Spiritbinder (Spiritbinding)
@@ -1328,7 +1335,7 @@ export const ABILITY_DATA = {
         applyStatus: null,
         drainFrac: 0.5,
         projectileColor: '#99aaee',
-        desc: 'A bound spirit tears a sliver of life from the target and carries it back to you.',
+        desc: 'A bound spirit tears a sliver of life from the target and carries it back to you. Heals you for half the damage dealt.',
     },
 
     // Fatebinder (Fateweaving)
@@ -1339,7 +1346,7 @@ export const ABILITY_DATA = {
         targetType: 'enemy', basePower: 0, element: 'shadow',
         animType: 'cast', projectileColor: '#dd66bb', chargeTime: 0,
         isDispel: true,
-        desc: 'Pulls loose every thread of good fortune on the target, stripping its buffs and protective statuses.',
+        desc: 'Pulls loose every thread of good fortune on the target. Strips their positive statuses and stat boosts.',
     },
     death_sentence: {
         name: 'Death Sentence',
@@ -1348,7 +1355,7 @@ export const ABILITY_DATA = {
         targetType: 'enemy', basePower: 0, element: 'shadow',
         animType: 'cast', projectileColor: '#660033', chargeTime: 30,
         applyStatus: 'doom', statusDuration: 3,
-        desc: 'Seals the target\'s fate. When the count of 3 turns runs out they fall, unless the doom is cured first.',
+        desc: 'Pronounces Doom on the target. When its {duration} turns run out they fall, unless someone cures it first.',
     },
 
     // Lifeseer (Providence)
@@ -1360,7 +1367,7 @@ export const ABILITY_DATA = {
         basePower: 0.8,
         chargeTime: 30,
         projectileColor: '#bbddff',
-        desc: 'Foresees the wounds of everyone nearby and mends them together.',
+        desc: 'Foresees the wounds of everyone nearby and mends them together. Heals the target ally and everyone beside them.',
     },
 
     // =====================================================================
@@ -1372,7 +1379,7 @@ export const ABILITY_DATA = {
         name: 'Premonition',
         trigger: 'anyHit', chance: 0.5,
         selfStatus: 'slipped',
-        desc: 'After being hit, may glimpse the next blow coming: the next physical attack against you misses.',
+        desc: 'After a hit, you may glimpse the next blow coming. The next physical attack against you misses.',
     },
     guardian_ward: {
         extends: 'brace',
@@ -1380,7 +1387,7 @@ export const ABILITY_DATA = {
         trigger: 'allyHit', chance: 0.4,
         selfStatus: null,
         allyCast: 'ward',
-        desc: 'When an adjacent ally is hurt, may cast Ward on them (uses your MP).',
+        desc: 'When an adjacent ally is hurt, you may cast Ward on them. It costs your MP as usual.',
     },
     martyr: {
         extends: 'brace',
@@ -1388,14 +1395,14 @@ export const ABILITY_DATA = {
         trigger: 'allyHit', chance: 0.5,
         selfStatus: null,
         shareDamageFrac: 0.5,
-        desc: 'When an adjacent ally is hurt, may take half of that wound onto yourself (never below 1 HP).',
+        desc: 'When an adjacent ally is hurt, you may take half the wound onto yourself. It never drops you below 1 HP.',
     },
     arcane_rebuke: {
         extends: 'counter',
         name: 'Arcane Rebuke',
         chance: 0.45,
         counterWith: 'arcane_strike',
-        desc: 'When struck in melee, may answer with an Arcane Strike that slows the attacker.',
+        desc: 'When struck in melee, may answer with an Arcane Strike that slows the attacker for 1 turn.',
     },
     phase_shift: {
         extends: 'brace',
@@ -1403,14 +1410,14 @@ export const ABILITY_DATA = {
         trigger: 'anyHit', chance: 0.4,
         selfStatus: null,
         phaseAway: 3,
-        desc: 'When hit, may slip through a rift and reappear up to 3 tiles away from the attacker.',
+        desc: 'When hit, you may slip through a rift and reappear up to 3 tiles away, as far from the attacker as you can get.',
     },
     aftershock: {
         extends: 'counter',
         name: 'Aftershock',
         counterWith: null,
         attackerStatus: { status: 'slow', duration: 2 },
-        desc: 'When struck in melee, may send a tremor back through the attacker\'s feet, slowing them.',
+        desc: 'When struck in melee, you may send a tremor back through the attacker\'s feet. They are slowed for 2 turns.',
     },
     purifying_light: {
         extends: 'brace',
@@ -1418,7 +1425,7 @@ export const ABILITY_DATA = {
         trigger: 'statusHit', chance: 0.6,
         selfStatus: null,
         cleanseSelf: true,
-        desc: 'When afflicted with a harmful status, may burn it away with holy light.',
+        desc: 'When hit with a harmful status, holy light may burn it away.',
     },
     spirit_hush: {
         extends: 'brace',
@@ -1426,7 +1433,7 @@ export const ABILITY_DATA = {
         trigger: 'magicHit', chance: 0.4,
         selfStatus: null,
         attackerStatus: { status: 'silence', duration: 2 },
-        desc: 'When hit by magic, a guardian spirit may clamp a hand over the caster\'s mouth, silencing them.',
+        desc: 'When hit by magic, a guardian spirit may clamp a hand over the caster\'s mouth. They are silenced for 2 turns.',
     },
     thorn_hide: {
         extends: 'counter',
@@ -1434,7 +1441,7 @@ export const ABILITY_DATA = {
         chance: 1,
         counterWith: null,
         thornsFrac: 0.3,
-        desc: 'Bark and thorn cover your skin: melee attackers take 30% of the damage they deal.',
+        desc: 'Bark and thorn cover your skin. Whoever hits you in melee takes back 30% of the damage they dealt.',
     },
     karmic_rebound: {
         extends: 'brace',
@@ -1442,7 +1449,7 @@ export const ABILITY_DATA = {
         trigger: 'anyHit', chance: 0.4,
         selfStatus: null,
         attackerStatus: { status: 'enfeebled', duration: 2 },
-        desc: 'Harm done to you may come back around: the attacker is enfeebled (ATK -5) for 2 turns.',
+        desc: 'Harm done to you may come back around. The attacker is enfeebled, ATK -5 for 2 turns.',
     },
     call_of_the_pack: {
         extends: 'brace',
@@ -1450,7 +1457,7 @@ export const ABILITY_DATA = {
         trigger: 'lowHp', chance: 1, oncePerBattle: true,
         selfStatus: null,
         summon: { job: 'wolf', name: 'Wolf' },
-        desc: 'The first time you drop below 30% HP, a wolf answers your howl and appears beside you.',
+        desc: 'Once per battle, when a blow leaves you below 30% HP, a wolf answers your howl and appears beside you.',
     },
 
     // =====================================================================
@@ -1462,91 +1469,91 @@ export const ABILITY_DATA = {
         name: 'Quick Study',
         passiveMpCost: 0, dmgDealt: null,
         xpMult: 1.5,
-        desc: 'Learn from every swing: earn 50% more XP from battles.',
+        desc: 'Learn from every swing. Earn 50% more XP from battles.',
     },
     rune_edge: {
         extends: 'mana_surge',
         name: 'Rune Edge',
         passiveMpCost: 0, dmgDealt: null,
         attackProc: { status: 'slow', chance: 0.35, duration: 1 },
-        desc: 'A binding rune on your weapon: physical hits have a 35% chance to slow the target.',
+        desc: 'A binding rune on your weapon. Physical hits have a 35% chance to slow the target for 1 turn.',
     },
     iron_will: {
         extends: 'mana_surge',
         name: 'Iron Will',
         passiveMpCost: 0, dmgDealt: null,
         statusImmune: ['stun', 'sleep', 'charm', 'berserk'],
-        desc: 'An unbreakable mind: immune to stun, sleep, charm and berserk.',
+        desc: 'An unbreakable mind. You are immune to Stun, Sleep, Charm and Berserk.',
     },
     concentrate: {
         extends: 'mana_surge',
         name: 'Concentrate',
         passiveMpCost: 0, dmgDealt: null,
         ignoreEvasion: true,
-        desc: 'Breathe, aim, release: your physical attacks ignore the target\'s evasion.',
+        desc: 'Breathe, aim, release. Your physical attacks ignore the target\'s evasion.',
     },
     earthen_footing: {
         extends: 'mana_surge',
         name: 'Earthen Footing',
         passiveMpCost: 0, dmgDealt: null,
         highGroundMult: 1.5,
-        desc: 'The earth answers you: attacking from higher ground deals +50% (instead of +25%), and enemies above you get no height bonus.',
+        desc: 'The earth answers you. Attacking from higher ground deals +50% damage instead of +25%, and enemies above you get no height bonus.',
     },
     swiftcast: {
         extends: 'mana_surge',
         name: 'Swiftcast',
         passiveMpCost: 0, dmgDealt: null,
         chargeMult: 0.5,
-        desc: 'Skip ahead to the moment the spell completes: charge times are halved.',
+        desc: 'Skip ahead to the moment the spell completes. Charge times are halved.',
     },
     arcane_weapon: {
         extends: 'mana_surge',
         name: 'Arcane Weapon',
         passiveMpCost: 1, dmgDealt: null,
         matToPhysical: 0.5,
-        desc: 'Sheathe your weapon in magic: half your MAT is added to ATK for physical damage. Drains 1 MP per turn.',
+        desc: 'Your weapon is sheathed in magic. Half your MAT is added to ATK for physical damage. Costs 1 MP per turn.',
     },
     spell_pierce: {
         extends: 'mana_surge',
         name: 'Spell Pierce',
         passiveMpCost: 1, dmgDealt: null,
         mdfPierce: 0.5,
-        desc: 'Your spells arrive from just outside reality: they ignore half the target\'s MDF. Drains 1 MP per turn.',
+        desc: 'Your spells arrive from just outside reality. They ignore half the target\'s MDF. Costs 1 MP per turn.',
     },
     seismic_power: {
         extends: 'mana_surge',
         name: 'Seismic Power',
         passiveMpCost: 0, dmgDealt: null,
         aoeDmgMult: 1.25,
-        desc: 'Every blow shakes the ground: area abilities deal +25% damage.',
+        desc: 'Every blow shakes the ground. Area skills deal +25% damage.',
     },
     benediction: {
         extends: 'mana_surge',
         name: 'Benediction',
         passiveMpCost: 0, dmgDealt: null,
         healMult: 1.3,
-        desc: 'Your prayers carry further grace: healing is 30% stronger.',
+        desc: 'Your prayers carry extra grace. Healing is 30% stronger.',
     },
     spirit_pact: {
         extends: 'mana_surge',
         name: 'Spirit Pact',
         passiveMpCost: 0, dmgDealt: null,
         summonBoost: 0.3,
-        desc: 'Creatures you summon are bound with your own strength: +30% HP, ATK and MAT.',
+        desc: 'Creatures you summon share your strength. They get +30% HP, ATK and MAT.',
     },
     providence: {
         extends: 'mana_surge',
         name: 'Providence',
         passiveMpCost: 0, dmgDealt: null,
         surviveLethal: true,
-        desc: 'You have already seen this ending and refused it: once per battle, a killing blow leaves you at 1 HP.',
+        desc: 'You have already seen this ending and refused it. Once per battle, a killing blow leaves you at 1 HP.',
     },
     bloodlust: {
         extends: 'mana_surge',
         name: 'Bloodlust',
         passiveMpCost: 0, dmgDealt: null,
         lowHpDmgDealt: { physical: 1.3 },
-        desc: 'Wounds only make the beast angrier: +30% physical damage while below 50% HP.',
+        desc: 'Wounds only make the beast angrier. +30% physical damage while below 50% HP.',
     },
 
     // =====================================================================
@@ -1558,41 +1565,41 @@ export const ABILITY_DATA = {
         name: 'Mana Stride',
         moveBonus: 0,
         onMove: { mpPct: 0.1 },
-        desc: 'Draw ambient mana from the ground you cross: restore 10% MP after moving.',
+        desc: 'Draw ambient mana from the ground you cross. Restore 10% of your max MP after moving.',
     },
     momentum: {
         extends: 'move_plus_1',
         name: 'Momentum',
         moveBonus: 0,
         momentumPct: 0.06,
-        desc: 'Every step builds power: +6% damage per tile moved this turn (up to +30%).',
+        desc: 'Every step builds power. +6% damage per tile moved this turn, up to +30%.',
     },
     sentinel_step: {
         extends: 'move_plus_1',
         name: 'Sentinel Step',
         moveBonus: 0,
         onMove: { alliesBuff: { stat: 'def', value: 4, duration: 1 } },
-        desc: 'Take up a guarding position: after moving, you and adjacent allies gain DEF +4 until your next turn.',
+        desc: 'Take up a guarding position. After moving, you and adjacent allies gain DEF +4 for 1 turn.',
     },
     force_leap: {
         extends: 'move_plus_1',
         name: 'Force Leap',
         moveBonus: 0, climbBonus: 3,
-        desc: 'A spell-propelled jump: climb 3 extra levels of elevation.',
+        desc: 'A spell-propelled jump. Climb 3 extra levels of elevation.',
     },
     hallowed_step: {
         extends: 'move_plus_1',
         name: 'Hallowed Step',
         moveBonus: 0,
         onMove: { alliesHealPct: 0.08 },
-        desc: 'Where you walk the ground is blessed: after moving, you and adjacent allies heal 8% of max HP.',
+        desc: 'The ground you walk is blessed. After moving, you and adjacent allies heal 8% of max HP.',
     },
     quake_step: {
         extends: 'move_plus_1',
         name: 'Quake Step',
         moveBonus: 0,
         onMove: { enemiesStatus: { status: 'slow', duration: 1 } },
-        desc: 'Stamp the earth as you arrive: adjacent enemies are slowed for a turn.',
+        desc: 'Stamp the earth as you arrive. Adjacent enemies are slowed for 1 turn.',
     },
     pilgrim_step: {
         extends: 'move_plus_1',
@@ -1605,7 +1612,7 @@ export const ABILITY_DATA = {
         extends: 'move_plus_1',
         name: 'Ghost Step',
         moveBonus: 1, passThroughUnits: true,
-        desc: 'Walk half in the spirit world: +1 movement and pass through other units.',
+        desc: 'Walk half in the spirit world. Move +1, and you pass through other units.',
     },
     take_root: {
         extends: 'move_plus_1',
@@ -1619,14 +1626,14 @@ export const ABILITY_DATA = {
         name: 'Omen Step',
         moveBonus: 0,
         onMove: { enemiesCt: -15 },
-        desc: 'Your arrival is an ill omen: adjacent enemies lose 15 CT, delaying their next turn.',
+        desc: 'Your arrival is an ill omen. Adjacent enemies lose 15 CT from their speed gauge, delaying their next turn.',
     },
     restorative_step: {
         extends: 'move_plus_1',
         name: 'Restorative Step',
         moveBonus: 0,
         onMove: { hpPct: 0.08 },
-        desc: 'You walk where the wound will not be: heal 8% of max HP after moving.',
+        desc: 'Each step takes you where the blow will not land. Heal 8% of max HP after moving.',
     },
 
     // --- Enemy abilities ---
@@ -1647,6 +1654,7 @@ export const ABILITY_DATA = {
         element: 'shadow',
         projectileColor: '#aa44ff',
         chargeTime: 40,
+        desc: 'A bolt of shadow that bursts on the target and everyone beside them.',
     },
 
     // =====================================================================
@@ -1661,6 +1669,7 @@ export const ABILITY_DATA = {
         basePower: 0.95,
         applyStatus: 'slow',
         statusDuration: 1,
+        desc: 'A snapping bite at the legs. Deals damage and slows the target for {turns}.',
     },
 
     // Boar: charge — melee stun, slightly weaker hit
@@ -1671,6 +1680,7 @@ export const ABILITY_DATA = {
         basePower: 0.85,
         applyStatus: 'stun',
         statusDuration: 1,
+        desc: 'A headlong charge with lowered tusks. Deals damage and stuns the target for {turns}.',
     },
 
     // Thorn beast: ranged thorn volley — nature magic, AoE
@@ -1687,6 +1697,7 @@ export const ABILITY_DATA = {
         chargeTime: 20,
         applyStatus: 'slow',
         statusDuration: 1,
+        desc: 'A spray of thorns that hits the target and everyone beside them, slowing them for {turns}.',
     },
 
     // Spore walker: spore burst — AoE nature, no LOS (drifting cloud)
@@ -1703,6 +1714,7 @@ export const ABILITY_DATA = {
         chargeTime: 30,
         applyStatus: 'slow',
         statusDuration: 2,
+        desc: 'A cloud of spores that drifts over a wide area, damaging everyone caught and slowing them for {turns}.',
     },
 
     // Shard spider: venom bite — physical, inflicts slow
@@ -1713,6 +1725,7 @@ export const ABILITY_DATA = {
         basePower: 0.8,
         applyStatus: 'slow',
         statusDuration: 2,
+        desc: 'A venomous bite that numbs the limbs. Deals damage and slows the target for {turns}.',
     },
 
     // Canopy stalker: pounce — high-damage physical
@@ -1737,6 +1750,7 @@ export const ABILITY_DATA = {
         chargeTime: 0,
         applyStatus: 'slow',
         statusDuration: 1,
+        desc: 'A chill that pulls at the target\'s soul. Deals damage and slows them for {turns}.',
     },
 
     // Void stalker: void strike — high-damage physical melee
@@ -1769,7 +1783,7 @@ export const ABILITY_DATA = {
         projectileColor: '#aaaacc',
         chargeTime: 0,
         requiresLos: false,
-        desc: 'Calls a wolf spirit to fight alongside you. Fast and hard to hit.',
+        desc: 'Calls a wolf spirit to fight beside you. Fast and hard to hit.',
     },
 
     call_boar: {
@@ -1788,7 +1802,7 @@ export const ABILITY_DATA = {
         projectileColor: '#996644',
         chargeTime: 20,
         requiresLos: false,
-        desc: 'Conjures a charging boar — tougher and hits harder than the wolf, but slower.',
+        desc: 'Conjures a charging boar. Tougher and harder-hitting than the wolf, but slower.',
     },
 
     call_thorn_beast: {
@@ -1807,7 +1821,7 @@ export const ABILITY_DATA = {
         projectileColor: '#449922',
         chargeTime: 0,
         requiresLos: false,
-        desc: 'Calls a thorn beast to pelt enemies with volleys from range.',
+        desc: 'Calls a thorn beast that pelts enemies with thorns from range.',
     },
 
     call_wisp: {
@@ -1826,7 +1840,7 @@ export const ABILITY_DATA = {
         projectileColor: '#8888ff',
         chargeTime: 0,
         requiresLos: false,
-        desc: 'Binds a spectral wisp and directs it to drain life from enemies.',
+        desc: 'Binds a spectral wisp to fight for you. It chills enemies from range and can put them to sleep.',
     },
 
     // ============================================================
@@ -1841,46 +1855,46 @@ export const ABILITY_DATA = {
     mirror_image: {
         extends: 'call_wisp', name: 'Mirror Image', range: 3, mpCost: 12, actionCost: 32,
         summonJob: 'decoy', summonName: 'Mirror Image', element: 'illusion', projectileColor: '#e0c0ff',
-        desc: 'Conjures a copy of yourself up to 3 tiles away, out toward the enemy. Enemies would rather strike the copy, which breaks after a few hits.',
+        desc: 'Conjures a copy of yourself up to 3 tiles away. Enemies would rather strike the copy, which breaks after a few hits.',
     },
     blur: {
         name: 'Blur', type: 'magic', range: 3, aoe: 0, mpCost: 10, actionCost: 38,
         targetType: 'ally', basePower: 0, element: 'illusion', animType: 'cast',
         projectileColor: '#ccbbff', chargeTime: 0,
         buffs: [{ stat: 'eva', value: 20, duration: 3 }], floatText: 'Blurred!',
-        desc: 'Smears an ally\'s outline in the air: evasion +20 for 3 turns.',
+        desc: 'Smears an ally\'s outline in the air. EVA +{buff:eva} for 3 turns.',
     },
     vanish: {
         name: 'Vanish', type: 'magic', range: 3, aoe: 0, mpCost: 14, actionCost: 42,
         targetType: 'ally', basePower: 0, element: 'illusion', animType: 'cast',
         projectileColor: '#9988cc', chargeTime: 0, applyStatus: 'hidden', statusDuration: 2,
-        desc: 'Hides an ally from enemy eyes. Enemies can\'t pick them as a target until they act or 2 turns pass.',
+        desc: 'Hides an ally from enemy eyes. Enemies can\'t target them until they act or {duration} turns pass.',
     },
     displacement: {
         extends: 'phase_shift', name: 'Displacement', chance: 0.3, phaseAway: 2,
-        desc: 'You were never quite where they struck: when hit, may reappear up to 2 tiles away.',
+        desc: 'You were never quite where they struck. When hit, you may reappear up to 2 tiles away.',
     },
     glamour: {
         extends: 'mana_surge', name: 'Glamour', passiveMpCost: 0, dmgDealt: null, summonBoost: 0.6,
-        desc: 'More convincing illusions: the copies and creatures you summon have 60% more HP and power.',
+        desc: 'More convincing illusions. Copies and creatures you summon get +60% HP, ATK and MAT.',
     },
     mirage_step: {
         extends: 'move_plus_1', name: 'Mirage Step', moveBonus: 0,
         onMove: { selfBuff: { stat: 'eva', value: 15, duration: 1 } },
-        desc: 'Leave an afterimage behind: after moving, evasion +15 until your next turn.',
+        desc: 'You leave an afterimage behind. After moving, EVA +15 for 1 turn.',
     },
 
     // Dreamweaver (Illusion + Enchantment)
     mass_sleep: {
         extends: 'dream_veil', name: 'Mass Sleep', aoe: 1, mpCost: 20, actionCost: 50, chargeTime: 25,
         statusDuration: 2, requiresLos: false, element: 'illusion',
-        desc: 'A lullaby that settles over an area: everyone caught falls asleep until struck.',
+        desc: 'A lullaby that settles over an area. Every enemy caught falls asleep for up to {turns}, or until struck.',
     },
     bewilder: {
         name: 'Bewilder', type: 'magic', range: 3, aoe: 0, mpCost: 16, actionCost: 45,
         targetType: 'enemy', basePower: 0, element: 'illusion', animType: 'cast',
         projectileColor: '#ff99dd', chargeTime: 0, applyStatus: 'charm', statusDuration: 2,
-        desc: 'Convinces an enemy that their friends are the foe. Charms them for 2 turns.',
+        desc: 'Convinces an enemy that their friends are the foe. Charms them for {duration} turns.',
     },
     nightmare: {
         name: 'Nightmare', type: 'magic', range: 4, aoe: 0, mpCost: 14, actionCost: 46,
@@ -1891,37 +1905,37 @@ export const ABILITY_DATA = {
     lull: {
         extends: 'brace', name: 'Lull', trigger: 'anyHit', chance: 0.3, selfStatus: null,
         attackerStatus: { status: 'sleep', duration: 2 },
-        desc: 'When hit, may whisper the attacker to sleep.',
+        desc: 'When hit, you may whisper the attacker to sleep for 2 turns.',
     },
     deep_dreams: {
         extends: 'mana_surge', name: 'Deep Dreams', passiveMpCost: 1, dmgDealt: null, statusDurationBonus: 1,
-        desc: 'The afflictions you inflict last a turn longer. Drains 1 MP per turn.',
+        desc: 'Your enchantments sink deeper. Statuses you inflict last 1 turn longer. Costs 1 MP per turn.',
     },
 
     // Mirage Oracle (Illusion + Divination)
     hall_of_mirrors: {
         extends: 'mirror_image', name: 'Hall of Mirrors', range: 3, mpCost: 20, summonCount: 2,
-        desc: 'Conjures two copies at once, which enemies would rather strike.',
+        desc: 'Conjures two copies of yourself at once. Enemies would rather strike them than you.',
     },
     mass_blur: {
         extends: 'blur', name: 'Mass Blur', aoe: 1, mpCost: 18, actionCost: 45,
         buffs: [{ stat: 'eva', value: 15, duration: 3 }],
-        desc: 'Blurs everyone around an ally: evasion +15 for 3 turns.',
+        desc: 'Blurs the target ally and everyone beside them. EVA +{buff:eva} for 3 turns.',
     },
     true_strike: {
         name: 'True Strike', type: 'magic', range: 4, aoe: 0, mpCost: 12, actionCost: 44,
         targetType: 'enemy', basePower: 1.1, element: 'illusion', animType: 'cast',
         projectileColor: '#ffffff', chargeTime: 0, mdfPierce: 0.5, ignoreReflect: true,
-        desc: 'Strikes where the target truly is: ignores half of its MDF, and can\'t be reflected.',
+        desc: 'Strikes where the target truly is. Ignores half their MDF and can\'t be reflected.',
     },
     shattered_image: {
         extends: 'brace', name: 'Shattered Image', trigger: 'decoyDown', chance: 1, selfStatus: null,
         attackerStatus: { status: 'slow', duration: 2 },
-        desc: 'Shards fly when your copies break: whoever destroys one of your copies is slowed.',
+        desc: 'Shards fly when one of your copies breaks. Whoever broke it is slowed for 2 turns.',
     },
     lasting_images: {
         extends: 'mana_surge', name: 'Lasting Images', passiveMpCost: 0, dmgDealt: null, summonBoost: 1,
-        desc: 'Your copies and creatures have twice their usual HP and power.',
+        desc: 'Your copies and creatures have twice their usual HP, ATK and MAT.',
     },
 
     // ============================================================
@@ -1931,13 +1945,13 @@ export const ABILITY_DATA = {
         name: 'Life Drain', type: 'magic', range: 3, aoe: 0, mpCost: 9, actionCost: 44,
         targetType: 'enemy', basePower: 0.85, element: 'necrotic', animType: 'cast',
         projectileColor: '#7acc7a', chargeTime: 0, drainFrac: 0.5,
-        desc: 'Draws the life out of a target: deals damage and heals you for half of it.',
+        desc: 'Draws the life out of the target. Deals damage and heals you for half of it.',
     },
     grave_chill: {
         name: 'Grave Chill', type: 'magic', range: 4, aoe: 0, mpCost: 10, actionCost: 44,
         targetType: 'enemy', basePower: 0.6, element: 'necrotic', animType: 'cast',
         projectileColor: '#99bbcc', chargeTime: 0, applyStatus: 'slow', statusDuration: 2,
-        desc: 'The cold of the grave seeps into the target: light damage, and slowed for 2 turns.',
+        desc: 'The cold of the grave seeps into the target. Light damage, and they are slowed for {duration} turns.',
     },
     raise_dead: {
         name: 'Raise Dead', type: 'magic', range: 3, aoe: 0, mpCost: 16, actionCost: 50,
@@ -1968,18 +1982,18 @@ export const ABILITY_DATA = {
     },
     wraithwalk: {
         extends: 'move_plus_1', name: 'Wraithwalk', moveBonus: 0, passThroughUnits: true,
-        desc: 'Walk half in the world of the dead: pass through other units.',
+        desc: 'Walk half in the world of the dead. You pass through other units.',
     },
 
     // Lich (Necromancy + Evocation)
     soul_nova: {
         extends: 'life_drain', name: 'Soul Nova', aoe: 1, mpCost: 20, actionCost: 50, basePower: 0.7,
         drainFrac: 0.3, chargeTime: 25, requiresLos: false,
-        desc: 'Tears the life from everyone in an area, healing you for part of it.',
+        desc: 'Tears the life from every enemy in an area and heals you for 30% of the damage.',
     },
     wither: {
         extends: 'life_drain', name: 'Wither', mpCost: 22, basePower: 1.6, chargeTime: 35,
-        desc: 'A long, terrible draining: heavy damage after a charge, half of it returned to you as HP.',
+        desc: 'A long, terrible draining. Heavy damage after a charge, and half of it returns to you as HP.',
     },
     bone_spear: {
         name: 'Bone Spear', type: 'magic', range: 5, aoe: 0, mpCost: 14, actionCost: 46,
@@ -1990,11 +2004,11 @@ export const ABILITY_DATA = {
     phylactery: {
         extends: 'brace', name: 'Phylactery', trigger: 'onDown', chance: 1, oncePerBattle: true,
         selfStatus: null, reviveFrac: 0.3,
-        desc: 'Your soul is kept elsewhere: the first time you are knocked out, you rise again with 30% HP.',
+        desc: 'Your soul is kept elsewhere. The first time you are knocked out, you rise again with 30% HP.',
     },
     necrotic_power: {
         extends: 'mana_surge', name: 'Necrotic Power', passiveMpCost: 1, dmgDealt: null, drainMult: 1.2,
-        desc: 'Your drains heal you 20% more. Drains 1 MP per turn.',
+        desc: 'Your drains heal you 20% more. Costs 1 MP per turn.',
     },
 
     // Gravewarden (Necromancy + Abjuration)
@@ -2002,7 +2016,7 @@ export const ABILITY_DATA = {
         name: 'Bone Ward', type: 'magic', range: 3, aoe: 1, mpCost: 14, actionCost: 44,
         targetType: 'corpse', corpseEffect: 'ward', applyStatus: 'protect', statusDuration: 3,
         element: 'necrotic', animType: 'cast', projectileColor: '#ddddcc', chargeTime: 0, requiresLos: false,
-        desc: 'Builds a barricade of bone from a knocked-out enemy: allies next to it gain Protect. The body is used up.',
+        desc: 'Builds a barricade of bone from a knocked-out enemy. Allies next to it gain Protect for {turns}. The body is used up.',
     },
     mass_raise: {
         extends: 'raise_dead', name: 'Mass Raise', aoe: 1, mpCost: 26, corpseCount: 2, chargeTime: 30,
@@ -2012,15 +2026,15 @@ export const ABILITY_DATA = {
         name: 'Soul Tether', type: 'magic', range: 3, aoe: 0, mpCost: 18, actionCost: 45,
         targetType: 'ally', basePower: 0, element: 'necrotic', animType: 'cast',
         projectileColor: '#bbffcc', chargeTime: 0, applyStatus: 'reraise', statusDuration: 4,
-        desc: 'Ties an ally\'s soul to their body: the next blow that would knock them out leaves them at 1 HP.',
+        desc: 'Ties an ally\'s soul to their body. For {turns}, the next blow that would knock them out leaves them at 1 HP.',
     },
     death_ward: {
         extends: 'brace', name: 'Death Ward', trigger: 'allyHit', chance: 0.35, selfStatus: null, saveFromDown: true,
-        desc: 'When an adjacent ally is knocked out, may hold their soul in place: they stay standing at 1 HP.',
+        desc: 'When an adjacent ally is knocked out, you may hold their soul in place. They stay standing at 1 HP.',
     },
     grave_legion: {
         extends: 'mana_surge', name: 'Grave Legion', passiveMpCost: 0, dmgDealt: null, summonBoost: 0.8,
-        desc: 'The dead you raise are tougher: 80% more HP and power.',
+        desc: 'The dead you raise grow tougher. They, and anything else you summon, get +80% HP, ATK and MAT.',
     },
 
     // ============================================================
@@ -2032,33 +2046,33 @@ export const ABILITY_DATA = {
         name: 'Healing Draught', type: 'magic', range: 4, aoe: 1, mpCost: 0, actionCost: 62,
         targetType: 'all', basePower: 0.6, isHeal: true, element: 'alchemy', animType: 'cast',
         projectileColor: '#66ff99', chargeTime: 0, requiresLos: false,
-        desc: 'A splash of healing that heals everyone it reaches, enemies included.',
+        desc: 'A splash of healing tonic. Heals everyone it reaches, enemies included.',
     },
     acid_flask: {
         name: 'Acid Flask', type: 'magic', range: 4, aoe: 1, mpCost: 0, actionCost: 58,
         targetType: 'all', basePower: 0.7, element: 'alchemy', animType: 'cast',
         projectileColor: '#ccff44', chargeTime: 0, requiresLos: false,
         buffs: [{ stat: 'def', value: -4, duration: 3 }],
-        desc: 'Burns everyone in the splash, allies included, and lowers their DEF by 4 for 3 turns.',
+        desc: 'Burns everyone in the splash, allies included, and lowers their DEF by {buff:def} for 3 turns.',
     },
     smoke_bomb: {
         name: 'Smoke Bomb', type: 'magic', range: 4, aoe: 1, mpCost: 0, actionCost: 50,
         targetType: 'all', basePower: 0, element: 'alchemy', animType: 'cast',
         projectileColor: '#aaaaaa', chargeTime: 0, requiresLos: false,
         applyStatus: 'slipped', statusDuration: 3,
-        desc: 'A cloud of smoke: everyone inside, on both sides, dodges the next physical attack against them.',
+        desc: 'A cloud of smoke. For {turns}, everyone inside, on both sides, dodges the next physical attack against them.',
     },
     quicksilver: {
         name: 'Quicksilver', type: 'magic', range: 4, aoe: 1, mpCost: 0, actionCost: 58,
         targetType: 'all', basePower: 0, element: 'alchemy', animType: 'cast',
         projectileColor: '#ddeeff', chargeTime: 0, requiresLos: false,
         applyStatus: 'haste', statusDuration: 2,
-        desc: 'A shimmering splash that hastes everyone it reaches, on both sides.',
+        desc: 'A shimmering splash that hastes everyone it reaches, on both sides, for {turns}.',
     },
     reflex_tonic: {
         extends: 'brace', name: 'Reflex Tonic', trigger: 'lowHp', chance: 1, oncePerBattle: true,
         selfStatus: null, selfCast: 'tonic_draught',
-        desc: 'The first time you drop below 30% HP, you gulp down a tonic and heal.',
+        desc: 'Once per battle, when a blow leaves you below 30% HP, you gulp down a tonic and heal.',
     },
     tonic_draught: {
         name: 'Tonic', type: 'magic', range: 0, aoe: 0, mpCost: 0, actionCost: 0,
@@ -2069,38 +2083,38 @@ export const ABILITY_DATA = {
     potent_brews: {
         extends: 'mana_surge', name: 'Potent Brews', passiveMpCost: 0,
         dmgDealt: { magic: 1.25, physical: 1.25 }, healMult: 1.25,
-        desc: 'Stronger mixtures: your flasks heal and hurt 25% more.',
+        desc: 'Stronger mixtures. All your damage and healing is 25% stronger.',
     },
     light_pack: {
         extends: 'move_plus_1', name: 'Light Pack', moveBonus: 1, climbBonus: 1,
-        desc: 'Travel light: +1 movement, and climb 1 extra level.',
+        desc: 'Travel light. Move +1, and climb 1 extra level of elevation.',
     },
 
     // Plaguewright (Alchemy + Transmutation)
     plague_flask: {
         extends: 'acid_flask', name: 'Plague Flask', aoe: 2, basePower: 0.35, actionCost: 60, buffs: null,
         applyStatus: 'poison', statusDuration: 3, projectileColor: '#99dd33',
-        desc: 'A wide splash of plague: everyone caught, on both sides, is poisoned.',
+        desc: 'A wide splash of plague. Everyone caught, on both sides, takes light damage and is poisoned for {turns}.',
     },
     miasma: {
         extends: 'acid_flask', name: 'Miasma', basePower: 0.2, buffs: null,
         applyStatus: 'poison', statusDuration: 5, projectileColor: '#77aa55',
-        desc: 'A slow, lingering poison that lasts 5 turns on everyone in the splash.',
+        desc: 'A thin, lingering poison. Everyone in the splash, on both sides, is poisoned for {duration} turns.',
     },
     catalyst: {
         name: 'Catalyst', type: 'magic', range: 4, aoe: 1, mpCost: 0, actionCost: 55,
         targetType: 'enemy', basePower: 0.8, element: 'alchemy', animType: 'cast',
         projectileColor: '#ffee55', chargeTime: 0, requiresLos: false, bonusVsStatus: { poison: 2 },
-        desc: 'A reagent that sets poison burning: hits enemies in an area, double damage to the poisoned. Spares your allies.',
+        desc: 'A reagent that sets poison burning. Hits every enemy in the area, with double damage to the poisoned. Spares your allies.',
     },
     toxic_blood: {
         extends: 'brace', name: 'Toxic Blood', trigger: 'physicalHit', chance: 0.5, adjacentOnly: true,
         selfStatus: null, attackerStatus: { status: 'poison', duration: 3 },
-        desc: 'Your blood is poison: when struck in melee, may poison the attacker.',
+        desc: 'Your blood is poison. When struck in melee, you may poison the attacker for 3 turns.',
     },
     virulence: {
         extends: 'mana_surge', name: 'Virulence', passiveMpCost: 0, dmgDealt: null, statusDurationBonus: 1,
-        desc: 'Your poisons and other afflictions last a turn longer.',
+        desc: 'Your poisons and other statuses last 1 turn longer.',
     },
 
     // Field Surgeon (Alchemy + Abjuration)
@@ -2108,25 +2122,25 @@ export const ABILITY_DATA = {
         name: 'Elixir', type: 'magic', range: 4, aoe: 0, mpCost: 0, actionCost: 55,
         targetType: 'ally', basePower: 1.0, isHeal: true, alsoCure: true, element: 'alchemy', animType: 'cast',
         projectileColor: '#88ffcc', chargeTime: 0,
-        desc: 'A carefully measured dose for one ally: a strong heal that also cures their afflictions.',
+        desc: 'A carefully measured dose for one ally. A strong heal that also cures their harmful statuses.',
     },
     panacea_mist: {
         name: 'Panacea Mist', type: 'magic', range: 4, aoe: 1, mpCost: 0, actionCost: 52,
         targetType: 'all', basePower: 0, isCure: true, element: 'alchemy', animType: 'cast',
         projectileColor: '#ccffee', chargeTime: 0, requiresLos: false,
-        desc: 'Cures the afflictions of everyone in the splash, on both sides.',
+        desc: 'A cleansing mist. Clears every harmful status from everyone in the splash, enemies included.',
     },
     stimulant: {
         name: 'Stimulant', type: 'magic', range: 4, aoe: 1, mpCost: 0, actionCost: 55,
         targetType: 'all', basePower: 0, element: 'alchemy', animType: 'cast',
         projectileColor: '#ffcc88', chargeTime: 0, requiresLos: false,
         ctGain: 15, applyStatus: 'regen', statusDuration: 3,
-        desc: 'A bracing splash: everyone caught acts a little sooner and regenerates HP for 3 turns.',
+        desc: 'A bracing splash. Everyone caught, on both sides, acts a little sooner and gains Regen for {duration} turns.',
     },
     triage: {
         extends: 'brace', name: 'Triage', trigger: 'allyHit', chance: 0.4, selfStatus: null,
         allyCast: 'triage_draught', whenAllyBelow: 0.35,
-        desc: 'When an adjacent ally is hit and left below 35% HP, may patch them up at once.',
+        desc: 'When an adjacent ally is hit and left below 35% HP, you may patch them up on the spot.',
     },
     triage_draught: {
         extends: 'elixir', name: 'Triage Draught', range: 1, basePower: 0.8, alsoCure: false,
@@ -2134,7 +2148,7 @@ export const ABILITY_DATA = {
     },
     steady_hands: {
         extends: 'mana_surge', name: 'Steady Hands', passiveMpCost: 0, dmgDealt: null, precise: true,
-        desc: 'Perfect aim: your splashes only reach the side you meant them for. Heals and boons skip enemies, and harm skips allies.',
+        desc: 'Perfect aim. Your splashes only reach the side you meant them for: heals and boons skip enemies, and harm skips allies.',
     },
 
     // ============================================================
@@ -2149,13 +2163,13 @@ export const ABILITY_DATA = {
         name: 'Rally', type: 'physical', range: 3, aoe: 0, mpCost: 6, actionCost: 35,
         targetType: 'ally', basePower: 0, element: 'command', animType: 'cast',
         projectileColor: '#ffcc66', chargeTime: 0, ctGain: 30, floatText: 'Rallied!',
-        desc: 'Calls an ally to action: their speed gauge jumps forward, so they act sooner.',
+        desc: 'Calls an ally to action. Their speed gauge jumps forward, so they act sooner.',
     },
     taunt: {
         name: 'Taunt', type: 'physical', range: 2, aoe: 1, mpCost: 6, actionCost: 38,
         targetType: 'enemy', basePower: 0, element: 'command', animType: 'cast',
         projectileColor: '#ff8844', chargeTime: 0, noEvade: true, applyStatus: 'taunted', statusDuration: 2,
-        desc: 'A challenge no one can ignore: enemies in the area must attack you for 2 turns.',
+        desc: 'A challenge no one can ignore. Enemies in the area must attack you for {duration} turns.',
     },
     reposition: {
         name: 'Reposition', type: 'physical', range: 3, aoe: 0, mpCost: 8, actionCost: 40,
@@ -2166,16 +2180,16 @@ export const ABILITY_DATA = {
     hold_the_line: {
         extends: 'brace', name: 'Hold the Line', trigger: 'allyHit', chance: 0.35, selfStatus: null,
         counterWith: 'attack', counterReach: 2,
-        desc: 'When an adjacent ally is hit, may lunge in and strike back at an attacker up to 2 tiles away.',
+        desc: 'When an adjacent ally is hit, you may lunge in and strike back at an attacker up to 2 tiles away.',
     },
     field_command: {
         extends: 'mana_surge', name: 'Field Command', passiveMpCost: 0, dmgDealt: null, partyStartCt: 15,
-        desc: 'Your orders are ready before the battle starts: the whole party opens with a head start on its speed gauges.',
+        desc: 'Your orders are given before the battle starts. The whole party opens with a head start on its speed gauges.',
     },
     vanguard_step: {
         extends: 'move_plus_1', name: 'Vanguard Step', moveBonus: 0,
         onMove: { selfBuff: { stat: 'def', value: 2, duration: 1 } },
-        desc: 'Advance with your guard up: after moving, DEF +2 until your next turn.',
+        desc: 'Advance with your guard up. After moving, DEF +2 for 1 turn.',
     },
 
     // Marshal (Command + Abjuration)
@@ -2183,44 +2197,44 @@ export const ABILITY_DATA = {
         name: 'Shield Wall', type: 'physical', range: 0, aoe: 1, mpCost: 8, actionCost: 45,
         targetType: 'ally', basePower: 0, element: 'command', animType: 'cast',
         projectileColor: '#ccccff', chargeTime: 0, noEvade: true, applyStatus: 'protect', statusDuration: 2,
-        desc: 'Lock shields: you and every adjacent ally gain Protect for 2 turns.',
+        desc: 'Lock shields. You and every adjacent ally gain Protect for {duration} turns.',
     },
     challenge: {
         name: 'Challenge', type: 'physical', range: 3, aoe: 0, mpCost: 8, actionCost: 40,
         targetType: 'enemy', basePower: 0, element: 'command', animType: 'cast',
         projectileColor: '#ff6644', chargeTime: 0, noEvade: true, applyStatus: 'taunted', statusDuration: 3,
         buffs: [{ stat: 'def', value: -4, duration: 3 }],
-        desc: 'Calls out one enemy: it must attack you for 3 turns, and its DEF falls by 4.',
+        desc: 'Calls out one enemy. They must attack you for {turns}, and their DEF falls by {buff:def} for 3 turns.',
     },
     bulwark_bash: {
         extends: 'attack', name: 'Bulwark Bash', basePower: 0.9, mpCost: 8, actionCost: 45,
         applyStatus: 'stun', statusDuration: 1,
-        desc: 'A blow with the shield\'s rim that stuns the target.',
+        desc: 'A blow with the shield\'s rim. Deals damage and stuns the target for {turns}.',
     },
     interpose: {
         extends: 'brace', name: 'Interpose', trigger: 'allyHit', chance: 0.35, selfStatus: null, shareDamageFrac: 1,
-        desc: 'When an adjacent ally is hit, may step in and take the whole blow yourself (never below 1 HP).',
+        desc: 'When an adjacent ally is hit, you may step in and take the whole blow yourself. It never drops you below 1 HP.',
     },
     iron_discipline: {
         extends: 'mana_surge', name: 'Iron Discipline', passiveMpCost: 0, dmgDealt: null,
         turnAlliesBuff: [{ stat: 'def', value: 3, duration: 1 }, { stat: 'mdf', value: 3, duration: 1 }],
-        desc: 'At the start of each of your turns, you and adjacent allies gain DEF and MDF +3 until your next turn.',
+        desc: 'At the start of each of your turns, you and adjacent allies gain DEF and MDF +3 for 1 turn.',
     },
 
     // Tactician (Command + Divination)
     seize_the_moment: {
         extends: 'rally', name: 'Seize the Moment', range: 4, mpCost: 12, ctGain: 55,
-        desc: 'Spots the perfect moment for an ally: their speed gauge jumps far forward.',
+        desc: 'You spot the perfect moment for an ally. Their speed gauge jumps far forward.',
     },
     delay: {
         name: 'Delay', type: 'physical', range: 4, aoe: 0, mpCost: 10, actionCost: 40,
         targetType: 'enemy', basePower: 0, element: 'command', animType: 'cast',
         projectileColor: '#aa88ff', chargeTime: 0, ctGain: -40, floatText: 'Delayed!',
-        desc: 'Feints the enemy into hesitation: their speed gauge falls back, so they act later.',
+        desc: 'A feint that makes the enemy hesitate. Their speed gauge falls back, so they act later.',
     },
     exploit_opening: {
         extends: 'attack', name: 'Exploit Opening', basePower: 0.9, mpCost: 6, actionCost: 38, selfCtGain: 25,
-        desc: 'A strike into a gap in the enemy\'s guard that puts you back in action sooner.',
+        desc: 'A strike into a gap in the enemy\'s guard. Your own next turn comes sooner.',
     },
     read_the_battle: {
         extends: 'brace', name: 'Read the Battle', trigger: 'enemyCharge', chance: 0.4, selfStatus: null,
@@ -2229,6 +2243,6 @@ export const ABILITY_DATA = {
     },
     initiative: {
         extends: 'mana_surge', name: 'Initiative', passiveMpCost: 0, dmgDealt: null, partyStartCt: 30,
-        desc: 'Every battle is planned in advance: the whole party opens with a big head start on its speed gauges.',
+        desc: 'Every battle is planned in advance. The whole party opens with a big head start on its speed gauges.',
     },
 };

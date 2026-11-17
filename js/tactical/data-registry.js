@@ -57,6 +57,29 @@ export function isUpgradeable(key) {
     return !!ab && ['action', 'reaction'].includes(ab.slot ?? 'action') && key !== 'attack';
 }
 
+// Descriptions may name numbers that change with rank, so each rank shows its own:
+//   {duration}  the status the ability inflicts lasts this many turns (statusDuration)
+//   {turns}     the same, with its unit: "1 turn", "3 turns"
+//   {buff:stat} the size of its buff or debuff to that stat, without the sign
+// The template is kept as descTemplate; desc is always the filled-in text.
+function fillDesc(template, ab) {
+    if (!template || !template.includes('{')) return template;
+    return template
+        .replace(/\{duration\}/g, () => String(ab.statusDuration ?? '?'))
+        .replace(/\{turns\}/g, () => (ab.statusDuration == null ? '?' : `${ab.statusDuration} turn${ab.statusDuration === 1 ? '' : 's'}`))
+        .replace(/\{buff:(\w+)\}/g, (_, stat) => {
+            const b = (ab.buffs || []).find(x => x.stat === stat);
+            return b ? String(Math.abs(b.value)) : '?';
+        });
+}
+
+for (const ab of Object.values(ABILITIES)) {
+    if (ab.desc?.includes('{')) {
+        ab.descTemplate = ab.desc;
+        ab.desc = fillDesc(ab.descTemplate, ab);
+    }
+}
+
 function rankedEntry(ab, rank) {
     const step = rank - 1;
     const out = { ...ab, name: `${ab.name} ${RANK_NUMERAL[rank]}`, rank };
@@ -65,12 +88,45 @@ function rankedEntry(ab, rank) {
     if (ab.chance != null) out.chance = Math.min(1, ab.chance + 0.1 * step);
     if (ab.applyStatus && ab.statusDuration && rank === MAX_RANK) out.statusDuration = ab.statusDuration + 1;
     if (ab.buffs) out.buffs = ab.buffs.map(b => ({ ...b, value: Math.round(b.value * (1 + 0.25 * step)) || b.value }));
+    if (ab.descTemplate) out.desc = fillDesc(ab.descTemplate, out);
     return out;
 }
 
 for (const [key, ab] of Object.entries({ ...ABILITIES })) {
     if (!isUpgradeable(key)) continue;
     for (let r = 2; r <= MAX_RANK; r++) ABILITIES[rankedKey(key, r)] = rankedEntry(ab, r);
+}
+
+const STAT_LABEL = { atk: 'ATK', def: 'DEF', mat: 'MAT', mdf: 'MDF', spd: 'SPD', move: 'Move', eva: 'EVA', maxHp: 'max HP', maxMp: 'max MP' };
+const STATUS_WORD = { taunted: 'Taunt', enfeebled: 'Enfeeble' };
+const titleWord = (k) => STATUS_WORD[k] ?? String(k).replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+const signed = (v) => (v > 0 ? `+${v}` : `${v}`.replace('-', '−'));
+
+/**
+ * What upgrading an ability from `rank` to the next rank changes, as short lines for a
+ * tooltip, e.g. ['Power 100% → 120%', 'MP cost 12 → 10', 'Slow lasts 2 → 3 turns'].
+ * Returns [] at the top rank or for an ability that can't be upgraded.
+ */
+export function rankChanges(key, rank) {
+    const base = baseKey(key);
+    if (!isUpgradeable(base) || rank >= MAX_RANK) return [];
+    const a = ABILITIES[rankedKey(base, rank)], b = ABILITIES[rankedKey(base, rank + 1)], r1 = ABILITIES[base];
+    if (!a || !b) return [];
+    const out = [];
+    if (r1.basePower && b.basePower !== a.basePower) {
+        const pct = (x) => `${Math.round((x / r1.basePower) * 100)}%`;
+        out.push(`${r1.isHeal ? 'Healing' : 'Power'} ${pct(a.basePower)} → ${pct(b.basePower)}`);
+    }
+    if (a.mpCost && b.mpCost !== a.mpCost) out.push(`MP cost ${a.mpCost} → ${b.mpCost}`);
+    if (a.chance != null && b.chance !== a.chance) out.push(`Trigger chance ${Math.round(a.chance * 100)}% → ${Math.round(b.chance * 100)}%`);
+    if (a.applyStatus && b.statusDuration !== a.statusDuration) {
+        out.push(`${titleWord(a.applyStatus)} lasts ${a.statusDuration} → ${b.statusDuration} turns`);
+    }
+    (a.buffs || []).forEach((buff, i) => {
+        const next = b.buffs?.[i];
+        if (next && next.value !== buff.value) out.push(`${STAT_LABEL[buff.stat] ?? buff.stat} ${signed(buff.value)} → ${signed(next.value)}`);
+    });
+    return out;
 }
 
 // The key a unit actually carries for an ability, whatever its rank (or null if it lacks it).

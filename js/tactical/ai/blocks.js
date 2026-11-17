@@ -33,10 +33,10 @@ export const STATUS_OPTIONS = [...new Set([
 
 // Pseudo-abilities that choose the best usable ability of a kind at run time.
 export const ABILITY_CATEGORIES = {
-    best_damage: 'Best damage ability',
+    best_damage: 'Best damage skill',
     best_heal:   'Best heal',
     best_cure:   'Best cure',
-    best_status: 'Best status ability',
+    best_status: 'Best status skill',
     best_buff:   'Best self-buff',
     best_support: 'Best ally buff',
     best_summon: 'Summon',
@@ -92,7 +92,7 @@ export const CONDITIONS = {
         test: (p, ctx) => Q.hasStatus(ctx.self, p.status),
     },
     self_lacks_status: {
-        group: 'Self', label: 'I lack status {status}', params: [{ name: 'status', type: 'status', default: 'defend' }],
+        group: 'Self', label: "I don't have status {status}", params: [{ name: 'status', type: 'status', default: 'defend' }],
         test: (p, ctx) => !Q.hasStatus(ctx.self, p.status),
     },
     can_afford: {
@@ -118,7 +118,7 @@ export const CONDITIONS = {
     },
 
     enemy_exists: {
-        group: 'Enemies', label: 'An enemy exists', params: [],
+        group: 'Enemies', label: 'An enemy is still standing', params: [],
         test: (p, ctx) => Q.enemiesOf(ctx.self, ctx.units).length > 0,
     },
     enemy_within: {
@@ -131,7 +131,7 @@ export const CONDITIONS = {
         test: (p, ctx) => compare(p.cmp, Q.enemiesOf(ctx.self, ctx.units).filter(e => Q.distance(ctx.self, e) <= p.range).length, p.value),
     },
     team_advantage: {
-        group: 'Enemies', label: 'My conscious team minus enemies {cmp} {value}',
+        group: 'Enemies', label: 'Our standing units minus theirs {cmp} {value}',
         params: [{ name: 'cmp', type: 'cmp', default: '<' }, { name: 'value', type: 'number', default: 2 }],
         test: (p, ctx) => {
             const mine = 1 + Q.alliesOf(ctx.self, ctx.units).filter(a => !Q.hasStatus(a, 'unconscious')).length;
@@ -139,13 +139,13 @@ export const CONDITIONS = {
         },
     },
     outnumbered: {
-        group: 'Enemies', label: 'My team is outnumbered', params: [],
+        group: 'Enemies', label: 'We are outnumbered', params: [],
         test: (p, ctx) => 1 + Q.alliesOf(ctx.self, ctx.units).filter(a => !Q.hasStatus(a, 'unconscious')).length
             < Q.enemiesOf(ctx.self, ctx.units).length,
     },
 
     ally_exists: {
-        group: 'Allies', label: 'A conscious ally exists', params: [],
+        group: 'Allies', label: 'An ally is still standing', params: [],
         test: (p, ctx) => Q.alliesOf(ctx.self, ctx.units).some(a => !Q.hasStatus(a, 'unconscious')),
     },
     ally_hp_below: {
@@ -181,7 +181,7 @@ export const CONDITIONS = {
         test: (p, ctx) => Q.hasStatus(ctx.target, p.status),
     },
     target_lacks_status: {
-        group: 'Target', label: 'Target lacks status {status}', needsTarget: true,
+        group: 'Target', label: "Target doesn't have status {status}", needsTarget: true,
         params: [{ name: 'status', type: 'status', default: 'slow' }],
         test: (p, ctx) => !Q.hasStatus(ctx.target, p.status),
     },
@@ -194,7 +194,7 @@ export const CONDITIONS = {
         test: (p, ctx) => (ctx.self.z ?? 0) > (ctx.target.z ?? 0),
     },
     aoe_hit_count: {
-        group: 'Target', label: '{ability} centred on target hits {cmp} {value} units', needsTarget: true,
+        group: 'Target', label: '{ability} aimed at the target hits {cmp} {value} units', needsTarget: true,
         params: [{ name: 'ability', type: 'ability', default: 'fire' }, { name: 'cmp', type: 'cmp', default: '>=' }, { name: 'value', type: 'number', default: 2 }],
         test: (p, ctx) => compare(p.cmp, Q.unitsAffected(ctx.self, Q.ownKey(ctx.self, p.ability) ?? p.ability, ctx.target, ctx.units, ctx.map).length, p.value),
     },
@@ -218,11 +218,11 @@ export function evalCond(cond, ctx) {
 export function describeCond(cond) {
     if (!cond) return 'Always';
     if (cond.op === 'and' || cond.op === 'or') {
-        return (cond.args || []).map(describeCond).join(cond.op === 'and' ? ' AND ' : ' OR ');
+        return (cond.args || []).map(describeCond).join(cond.op === 'and' ? ' and ' : ' or ');
     }
-    if (cond.op === 'not') return `NOT (${describeCond((cond.args || [])[0])})`;
+    if (cond.op === 'not') return `not (${describeCond((cond.args || [])[0])})`;
     const def = CONDITIONS[cond.test];
-    if (!def) return `unknown test "${cond.test}"`;
+    if (!def) return `unknown condition "${cond.test}"`;
     return def.label.replace(/\{(\w+)\}/g, (_, name) => {
         const spec = def.params.find(p => p.name === name);
         return String(cond.params?.[name] ?? spec?.default ?? '?');
@@ -243,12 +243,19 @@ export const PICKS = {
     last_target:    'my last target',
 };
 
+// What players see for a parameter: the names are saved in scripts, so they stay as they are
+// and only their display changes.
+const PARAM_LABEL = { ability: 'skill', cmp: 'compare', job: 'class' };
+export function paramLabel(name) {
+    return PARAM_LABEL[name] ?? name;
+}
+
 export const FILTER_KINDS = {
     status:   { label: 'status',        params: [{ name: 'status', type: 'status', default: 'slow' }, { name: 'has', type: 'bool', default: true }] },
     hp_below: { label: 'HP% below',     params: [{ name: 'value', type: 'number', default: 50 }] },
     hp_above: { label: 'HP% above',     params: [{ name: 'value', type: 'number', default: 50 }] },
-    job:      { label: 'job',           params: [{ name: 'job', type: 'job', default: 'mage' }] },
-    within:   { label: 'within tiles',  params: [{ name: 'range', type: 'number', default: 3 }] },
+    job:      { label: 'class',           params: [{ name: 'job', type: 'job', default: 'mage' }] },
+    within:   { label: 'within range',  params: [{ name: 'range', type: 'number', default: 3 }] },
 };
 
 export const MOVE_MODES = {
@@ -263,7 +270,7 @@ export const MOVE_MODES = {
 export const POSITIONING = { auto: 'Auto', careful: 'Careful', group: 'Stay with group', bold: 'Bold' };
 
 export const ACTION_KINDS = {
-    ability: 'Use ability',
+    ability: 'Use skill',
     move:    'Move',
     pivot:   'Turn to face',
     defend:  'Defend',

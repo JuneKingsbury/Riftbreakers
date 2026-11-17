@@ -13,9 +13,9 @@ export const REALM_EVENTS = [
         title: 'Overgrown Trail',
         text: 'Your scouts find a half-overgrown trail leading deeper into the wilds. A collapsed lean-to sits where it forks.',
         choices: [
-            { label: 'Search the lean-to', effect: { gold: 25, item: 'common' }, resultText: 'Under the fallen roof: 25 gold and {item}, left by an earlier traveller.' },
+            { label: 'Search the lean-to', effect: { gold: 25, item: 'common' }, resultText: 'Under the fallen roof: 25 gold and {item}, left by an earlier traveler.' },
             { label: 'Follow the game trail', outcomes: [
-                { weight: 2, effect: { healPct: 1, xp: 20 }, resultText: 'It ends in a quiet clearing by a stream. Everyone rests and recovers. Every member gains 20 XP.' },
+                { weight: 2, effect: { healPct: 1, xp: 20 }, resultText: 'It ends in a quiet clearing by a stream. Everyone rests, recovers and gains 20 XP.' },
                 { weight: 1, effect: { healPct: -0.1 }, resultText: 'A hunter\'s snare snaps shut on the lead walker. Nobody is badly hurt, but it stings.' },
             ] },
         ],
@@ -26,16 +26,16 @@ export const REALM_EVENTS = [
         text: 'Standing stones ring a patch of scorched earth. Amid the rubble, something glints.',
         choices: [
             { label: 'Dig through the rubble', effect: { relic: 'common' }, resultText: 'You uncover {relic}, still warm from whatever happened here.' },
-            { label: 'Leave it undisturbed', effect: { xp: 25 }, resultText: 'You study the carvings instead. Every member gains 25 XP.' },
+            { label: 'Leave it undisturbed', effect: { xp: 25 }, resultText: 'You study the carvings instead. Everyone gains 25 XP.' },
         ],
     },
 
     {
         id: 'wf_refugees', realms: ['wild_frontiers'],
         title: 'Displaced Family',
-        text: 'A family pushed from their home by the Crusade camps by the trail, with everything they own on one cart.',
+        text: 'A family driven from home by the Crusade has stopped by the trail, everything they own piled on one cart.',
         choices: [
-            { label: 'Share your supplies', effect: { healPct: -0.05, xp: 30 }, resultText: 'Lean rations tonight, but their stories of the Crusade are worth hearing. Every member gains 30 XP.' },
+            { label: 'Share your supplies', effect: { healPct: -0.05, xp: 30 }, resultText: 'Lean rations tonight, but their stories of the Crusade are worth hearing. 30 XP for every member.' },
             { label: 'Ask if anyone can fight', requires: { partyBelow: 6 }, effect: { recruit: true }, resultText: 'The eldest child is older than they look, and handy with a sling.' },
             { label: 'Point them to the settlement', effect: { gold: 20 }, resultText: 'They press 20 gold on you for the directions.' },
         ],
@@ -57,8 +57,8 @@ export const REALM_EVENTS = [
         title: 'Hedge Mages\' Camp',
         text: 'A circle of wagons painted with runes. The hedge mages inside eye your weapons, then your purses.',
         choices: [
-            { label: 'Buy a charm (50 gold)', requires: { gold: 50 }, effect: { gold: -50, relic: 'common' }, resultText: 'They hand over {relic}, still warm from the fire.' },
-            { label: 'Trade stories', effect: { xp: 25 }, resultText: 'They know a few tricks worth hearing. Every member gains 25 XP.' },
+            { label: 'Buy a charm (50 gold)', requires: { gold: 50 }, effect: { gold: -50, relic: 'common' }, resultText: 'They hand over {relic} and count your coins twice.' },
+            { label: 'Trade stories', effect: { xp: 25 }, resultText: 'They know a few tricks worth hearing. Everyone gains 25 XP.' },
         ],
     },
 
@@ -78,7 +78,7 @@ export const REALM_EVENTS = [
     {
         id: 'vd_fruit_grove', realms: ['verdant_depths'],
         title: 'Bursting Grove',
-        text: 'A grove heavy with ripe fruit, untouched by any bestiary. Bioluminescent flowers line the path.',
+        text: 'A grove heavy with ripe fruit that no bestiary has a name for. Bioluminescent flowers line the path.',
         choices: [
             { label: 'Eat your fill', effect: { healPct: 1 }, resultText: 'Sweet and strange. Everyone feels whole again.' },
             { label: 'Gather some to sell', effect: { gold: 45 }, resultText: 'Undocumented fruit fetches 45 gold from the right buyer.' },
@@ -91,7 +91,7 @@ export const REALM_EVENTS = [
         choices: [
             { label: 'Harvest the garden', outcomes: [
                 { weight: 1, effect: { gold: 60 }, resultText: 'Giant truffles. A fortune to the right cook: 60 gold.' },
-                { weight: 1, effect: { gold: 30, healPct: -0.15 }, resultText: 'A puffball bursts in your faces, choking spores! You still salvage 30 gold of fungi.' },
+                { weight: 1, effect: { gold: 30, healPct: -0.15 }, resultText: 'A puffball bursts in your faces and everyone chokes on spores. You still salvage 30 gold of fungi.' },
             ] },
             { label: 'Hold your breath and hurry past', resultText: 'You make it through without a cough.' },
         ],
@@ -99,10 +99,10 @@ export const REALM_EVENTS = [
     {
         id: 'fh_symbiote', realms: ['fungal_hollows'],
         title: 'Fungal Crown',
-        text: 'A ring of mushrooms grows visibly as you watch, forming a crown around a mossy skull.',
+        text: 'A ring of mushrooms grows as you watch, forming a crown around a mossy skull.',
         choices: [
             { label: 'Let someone wear it', effect: { memberStatMods: { mat: 2 } }, resultText: 'The crown takes root in {name}\'s hair. Their thoughts sharpen: +2 MAT.' },
-            { label: 'Burn it', effect: { xp: 30 }, resultText: 'It shrieks as it burns. Every member gains 30 XP.' },
+            { label: 'Burn it', effect: { xp: 30 }, resultText: 'It shrieks as it burns. Everyone gains 30 XP.' },
         ],
     },
     {
@@ -111,7 +111,7 @@ export const REALM_EVENTS = [
         text: 'Roots thicker than castle walls converge on a nexus of primal energy. Spores drift up from rotted patches.',
         choices: [
             { label: 'Draw on its power', effect: { memberStatMods: { maxHp: 8 } }, resultText: 'Living wood laces through {name}\'s skin. +8 max HP.' },
-            { label: 'Cut away the rot', effect: { healPct: -0.1, xp: 70 }, resultText: 'Hard, filthy work. The root breathes easier. Every member gains 70 XP.' },
+            { label: 'Cut away the rot', effect: { healPct: -0.1, xp: 70 }, resultText: 'Hard, filthy work, but the root breathes easier. 70 XP for every member.' },
         ],
     },
     {
@@ -123,7 +123,7 @@ export const REALM_EVENTS = [
                 { weight: 1, effect: { item: 'uncommon', healPct: -0.15 }, resultText: 'Stung everywhere, but inside the comb is {item}.' },
                 { weight: 1, effect: { battle: 'normal' }, resultText: 'The nest wakes, and so does everything nearby.' },
             ] },
-            { label: 'Sneak beneath it', effect: { xp: 20 }, resultText: 'Slow and silent. Every member gains 20 XP.' },
+            { label: 'Sneak beneath it', effect: { xp: 20 }, resultText: 'Slow and silent. Everyone gains 20 XP.' },
         ],
     },
 
@@ -137,7 +137,7 @@ export const REALM_EVENTS = [
                 { weight: 2, effect: { gold: 55 }, resultText: 'Raw runite inside. It sells for 55 gold.' },
                 { weight: 1, effect: { healPct: -0.15 }, resultText: 'It explodes in a spray of crystal shards.' },
             ] },
-            { label: 'Listen to it', effect: { xp: 30 }, resultText: 'The chime settles your minds. Every member gains 30 XP.' },
+            { label: 'Listen to it', effect: { xp: 30 }, resultText: 'The chime settles your minds. Everyone gains 30 XP.' },
         ],
     },
     {
@@ -162,7 +162,7 @@ export const REALM_EVENTS = [
     {
         id: 'cm_golem_battery', realms: ['crystal_mines', 'crystal_depths'],
         title: 'Golem Battery',
-        text: 'An ancient mining golem battery still hums with power, wired into a sleeping golem.',
+        text: 'A battery the size of a strongbox still hums with power, wired into the back of a sleeping mining golem.',
         choices: [
             { label: 'Pull the battery', outcomes: [
                 { weight: 2, effect: { relic: 'uncommon' }, resultText: 'It comes free with a spark. You now carry {relic}.' },
@@ -187,7 +187,7 @@ export const REALM_EVENTS = [
         title: 'Secret Shelf',
         text: 'A shelf clicks open behind two heavy tomes. Inside, a glowing codex rests on a lectern.',
         choices: [
-            { label: 'Read it together', effect: { xp: 55 }, resultText: 'It shares its knowledge with all who stand near. Every member gains 55 XP.' },
+            { label: 'Read it together', effect: { xp: 55 }, resultText: 'The pages turn themselves, and everyone who reads along gains 55 XP.' },
             { label: 'Take it', outcomes: [
                 { weight: 1, effect: { item: 'uncommon' }, resultText: 'Tucked in its back cover: {item}.' },
                 { weight: 1, effect: { healPct: -0.15 }, resultText: 'The book is warded. It shocks everyone in reach.' },
@@ -212,7 +212,7 @@ export const REALM_EVENTS = [
                 { weight: 2, effect: { relic: 'uncommon' }, resultText: 'Among the top marks: {relic}.' },
                 { weight: 1, effect: { healPct: -0.2 }, resultText: 'Lightning arcs through the party.' },
             ] },
-            { label: 'Study the ward instead', effect: { xp: 40 }, resultText: 'A clever bit of work. Every member gains 40 XP.' },
+            { label: 'Study the ward instead', effect: { xp: 40 }, resultText: 'A clever bit of work. Everyone gains 40 XP.' },
         ],
     },
     {
@@ -233,10 +233,10 @@ export const REALM_EVENTS = [
         text: 'A mutated specimen floats in a cracked stasis tank. Beside it, a researcher\'s emergency kit.',
         choices: [
             { label: 'Grab the kit', outcomes: [
-                { weight: 2, effect: { item: 'rare' }, resultText: 'Inside a condensed field manual: {item}.' },
+                { weight: 2, effect: { item: 'rare' }, resultText: 'Under the bandages and a field manual: {item}.' },
                 { weight: 1, effect: { battle: 'elite' }, resultText: 'The tank gives way.' },
             ] },
-            { label: 'Read the research notes', effect: { xp: 70 }, resultText: 'The researcher\'s work lives on in you. Every member gains 70 XP.' },
+            { label: 'Read the research notes', effect: { xp: 70 }, resultText: 'The researcher\'s work lives on in you. Everyone gains 70 XP.' },
         ],
     },
     {
@@ -255,7 +255,7 @@ export const REALM_EVENTS = [
         title: 'Fading Rift',
         text: 'A small rift flickers on the ledge, spilling residual energy as it collapses.',
         choices: [
-            { label: 'Absorb the energy', effect: { xp: 45, healPct: -0.1 }, resultText: 'It burns going in. Every member gains 45 XP.' },
+            { label: 'Absorb the energy', effect: { xp: 45, healPct: -0.1 }, resultText: 'It burns going in. 45 XP for every member.' },
             { label: 'Grab what falls out', effect: { item: 'uncommon' }, resultText: 'A pocket dimension collapses, dropping {item}.' },
         ],
     },
@@ -274,10 +274,10 @@ export const REALM_EVENTS = [
     {
         id: 'sa_drifting_wreck', realms: ['void_abyss'],
         title: 'Drifting Wreck',
-        text: 'The remains of another expedition float past on a broken raft, their supplies intact.',
+        text: 'The remains of another expedition drift past on a broken raft, their supplies still lashed down.',
         choices: [
             { label: 'Haul it in', effect: { gold: 40, item: 'common' }, resultText: 'Waterlogged but useful: 40 gold and {item}.' },
-            { label: 'Give them a burial at sea', effect: { xp: 35 }, resultText: 'A quiet moment on the black water. Every member gains 35 XP.' },
+            { label: 'Give them a burial at sea', effect: { xp: 35 }, resultText: 'A quiet moment on the black water. Everyone gains 35 XP.' },
         ],
     },
     {
@@ -285,7 +285,7 @@ export const REALM_EVENTS = [
         title: 'Isle Market',
         text: 'Bug-like islanders trade from ramshackle stalls. One offers a raft ride and a curious charm.',
         choices: [
-            { label: 'Buy the charm (70 gold)', requires: { gold: 70 }, effect: { gold: -70, relic: 'uncommon' }, resultText: 'It pulses with abyss energy, barely contained: {relic}.' },
+            { label: 'Buy the charm (70 gold)', requires: { gold: 70 }, effect: { gold: -70, relic: 'uncommon' }, resultText: '{relic}. It pulses with abyssal energy, barely contained.' },
             { label: 'Ride the raft', effect: { healPct: 1 }, resultText: 'Hours of gentle drifting. Everyone recovers.' },
         ],
     },
@@ -298,7 +298,7 @@ export const REALM_EVENTS = [
                 { weight: 1, effect: { relic: 'uncommon' }, resultText: 'You pull {relic} from the wreckage of another world.' },
                 { weight: 1, effect: { healPct: -0.25 }, resultText: 'Colliding fragments crush the ledge you stand on.' },
             ] },
-            { label: 'Stare into it', effect: { xp: 60, healPct: -0.1 }, resultText: 'For a moment you understand. It hurts. Every member gains 60 XP.' },
+            { label: 'Stare into it', effect: { xp: 60, healPct: -0.1 }, resultText: 'For a moment you understand. It hurts. Everyone gains 60 XP.' },
         ],
     },
     {
@@ -306,7 +306,7 @@ export const REALM_EVENTS = [
         title: 'A Silent Gaze',
         text: 'The Sovereign\'s attention turns briefly toward your party. Even partial focus is agony.',
         choices: [
-            { label: 'Endure it', effect: { healPct: -0.2, memberStatMods: { mdf: 2 } }, resultText: 'Everyone suffers, but {name} stares back, and comes away hardened. +2 MDF.' },
+            { label: 'Endure it', effect: { healPct: -0.2, memberStatMods: { mdf: 2 } }, resultText: 'Everyone suffers. {name} stares back and comes away hardened. +2 MDF.' },
             { label: 'Hide in the black stone', effect: { gold: 50 }, resultText: 'You wait it out in a collapsed vault and find 50 gold in the dark.' },
         ],
     },
@@ -315,10 +315,10 @@ export const REALM_EVENTS = [
     {
         id: 'vh_ledger', realms: ['void_hollow', 'void_sanctum'],
         title: 'Open Ledger',
-        text: 'A ledger lies open on a stone table. Every entry is a price. One line has your party\'s names, and a blank.',
+        text: 'A ledger lies open on a stone table. Every entry is a price. One line has your names on it, and a blank space beside them.',
         choices: [
             { label: 'Sign it', effect: { gold: 90, healPct: -0.2 }, resultText: 'Gold appears in your packs: 90 of it. Something is collected in return.' },
-            { label: 'Tear out the page', effect: { xp: 40 }, resultText: 'The ink screams. Every member gains 40 XP.' },
+            { label: 'Tear out the page', effect: { xp: 40 }, resultText: 'The ink screams. Everyone gains 40 XP.' },
         ],
     },
     {
@@ -330,7 +330,7 @@ export const REALM_EVENTS = [
                 { weight: 2, effect: { item: 'uncommon' }, resultText: 'Your fingers find a niche, and in it {item}.' },
                 { weight: 1, effect: { healPct: -0.15 }, resultText: 'Something brushes against you and drains a little life from everyone.' },
             ] },
-            { label: 'Light a magical flame', effect: { xp: 25 }, resultText: 'It barely helps, but you learn how the dark moves. Every member gains 25 XP.' },
+            { label: 'Light a magical flame', effect: { xp: 25 }, resultText: 'It barely helps, but you learn how the dark moves. Everyone gains 25 XP.' },
         ],
     },
     {
@@ -339,7 +339,7 @@ export const REALM_EVENTS = [
         text: 'A chest whose lock is a contract. The terms seem reasonable. That is what worries you.',
         choices: [
             { label: 'Accept the terms', effect: { relic: 'uncommon', loseItem: true }, resultText: 'One of your spare items vanishes. In the chest: {relic}.' },
-            { label: 'Read the fine print', effect: { xp: 45 }, resultText: 'Three hours of clauses. You walk away wiser. Every member gains 45 XP.' },
+            { label: 'Read the fine print', effect: { xp: 45 }, resultText: 'Three hours of clauses. You walk away wiser, and 45 XP richer each.' },
         ],
     },
     {
@@ -348,19 +348,19 @@ export const REALM_EVENTS = [
         text: 'Among the chattering penitents, one still remembers their name. They beg to be taken home.',
         choices: [
             { label: 'Take them with you', requires: { partyBelow: 6 }, effect: { recruit: true }, resultText: 'They have been here a long time. They know how to fight.' },
-            { label: 'Share your rations', effect: { xp: 30 }, resultText: 'They tell you which halls to avoid. Every member gains 30 XP.' },
+            { label: 'Share your rations', effect: { xp: 30 }, resultText: 'They tell you which halls to avoid. Everyone gains 30 XP.' },
         ],
     },
     {
         id: 'vheart_tribute', realms: ['void_heart'],
         title: 'Uncollected Tribute',
-        text: 'A tribute sits before a door with no lock. It was never collected.',
+        text: 'At the very heart of the void, a tribute sits uncollected before a door with no lock. Beside it lies the Pact\'s own ledger, every debt it is owed written in a careful hand.',
         choices: [
             { label: 'Collect it', outcomes: [
-                { weight: 2, effect: { gold: 80 }, resultText: 'You collect it: 80 gold.' },
-                { weight: 1, effect: { gold: 40, healPct: -0.2 }, resultText: 'A binding agreement activates, draining everyone. You still keep 40 gold.' },
+                { weight: 2, effect: { gold: 80 }, resultText: 'Nobody stops you. 80 gold.' },
+                { weight: 1, effect: { gold: 40, healPct: -0.2 }, resultText: 'A clause you never read takes effect and drains everyone. You keep 40 gold.' },
             ] },
-            { label: 'Burn a page of the ledger', effect: { memberStatMods: { atk: 2, mat: 2 } }, resultText: 'The flames leap to {name}, who feels lighter, freer. +2 ATK, +2 MAT.' },
+            { label: 'Burn a page of the ledger', effect: { memberStatMods: { atk: 2, mat: 2 } }, resultText: 'The flames leap to {name}, who feels lighter and freer. +2 ATK, +2 MAT.' },
         ],
     },
 
@@ -389,9 +389,9 @@ export const REALM_EVENTS = [
     {
         id: 'cb_training_dummy', realms: ['crusader_barracks'],
         title: 'Training Yard',
-        text: 'Racks of runic-forged steel stand beside rigged training dummies.',
+        text: 'Racks of rune-forged steel stand beside rigged training dummies.',
         choices: [
-            { label: 'Train with them', effect: { healPct: -0.15, xp: 75 }, resultText: 'One dummy swings a live blade. Bruised but sharper, every member gains 75 XP.' },
+            { label: 'Train with them', effect: { healPct: -0.15, xp: 75 }, resultText: 'One dummy swings a live blade. Bruised but sharper, everyone gains 75 XP.' },
             { label: 'Strip the weapons rack', effect: { item: 'rare' }, resultText: 'You take {item}.' },
         ],
     },
@@ -401,7 +401,7 @@ export const REALM_EVENTS = [
         text: 'A battle standard hangs on the barracks wall, its enchantments still potent.',
         choices: [
             { label: 'Tear it down', effect: { relic: 'uncommon' }, resultText: 'It is yours now: {relic}.' },
-            { label: 'Burn it', effect: { xp: 60 }, resultText: 'A blow to the Crusade. Every member gains 60 XP.' },
+            { label: 'Burn it', effect: { xp: 60 }, resultText: 'A small blow to the Crusade. Everyone gains 60 XP.' },
         ],
     },
     {
@@ -413,7 +413,7 @@ export const REALM_EVENTS = [
                 { weight: 2, effect: { relic: 'rare' }, resultText: 'Among the forbidden tomes: {relic}.' },
                 { weight: 1, effect: { healPct: -0.25 }, resultText: 'The royal ward lashes arcane fire at everyone.' },
             ] },
-            { label: 'Read the warding', effect: { xp: 60 }, resultText: 'Miracle working, indeed. Every member gains 60 XP.' },
+            { label: 'Read the warding', effect: { xp: 60 }, resultText: 'So this is how the priests work their miracles. Everyone gains 60 XP.' },
         ],
     },
     {
@@ -425,7 +425,7 @@ export const REALM_EVENTS = [
                 { weight: 1, effect: { item: 'rare' }, resultText: 'You take {item} before the guards arrive.' },
                 { weight: 1, effect: { battle: 'elite' }, resultText: 'The king\'s guard was closer than you thought.' },
             ] },
-            { label: 'Study the tapestries', effect: { xp: 45 }, resultText: 'Every battle the High King has fought, woven in thread. Every member gains 45 XP.' },
+            { label: 'Study the tapestries', effect: { xp: 45 }, resultText: 'Every battle the High King has fought, woven in thread. 45 XP for every member.' },
         ],
     },
 
@@ -447,7 +447,7 @@ export const REALM_EVENTS = [
         title: 'A Familiar Face',
         text: 'A shifting creature wears a face you swear you recognize. It doesn\'t attack. It waits.',
         choices: [
-            { label: 'Speak to it', effect: { xp: 60 }, resultText: 'It answers in your own voice, and teaches you something. Every member gains 60 XP.' },
+            { label: 'Speak to it', effect: { xp: 60 }, resultText: 'It answers in your own voice and teaches you something. Everyone gains 60 XP.' },
             { label: 'Strike first', effect: { battle: 'normal' }, resultText: 'Its face changes, and more come.' },
         ],
     },
@@ -456,7 +456,7 @@ export const REALM_EVENTS = [
         title: 'The Still Room',
         text: 'A perfectly calm room in the middle of the chaos. It wasn\'t here a moment ago.',
         choices: [
-            { label: 'Rest here', effect: { healPct: 1, xp: 20 }, resultText: 'For an hour, nothing moves. Every member gains 20 XP.' },
+            { label: 'Rest here', effect: { healPct: 1, xp: 20 }, resultText: 'For an hour, nothing moves. Everyone heals and gains 20 XP.' },
             { label: 'Search it', effect: { relic: 'uncommon' }, resultText: 'The labyrinth has been carrying {relic} around. Now you are.' },
         ],
     },
@@ -478,7 +478,7 @@ export const REALM_EVENTS = [
                 { weight: 1, effect: { relic: 'rare' }, resultText: 'It is still watching. You now carry {relic}.' },
                 { weight: 1, effect: { healPct: -0.2 }, resultText: 'The wall closes on your hands.' },
             ] },
-            { label: 'Stare back', effect: { xp: 50 }, resultText: 'It blinks first. Every member gains 50 XP.' },
+            { label: 'Stare back', effect: { xp: 50 }, resultText: 'It blinks first. Everyone gains 50 XP.' },
         ],
     },
 ];

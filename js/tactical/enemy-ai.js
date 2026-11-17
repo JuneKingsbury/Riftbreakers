@@ -1,4 +1,4 @@
-import { computeMoveRange, computeAoeArea, ABILITIES } from './abilities.js';
+import { computeMoveRange, computeAoeArea, ABILITIES, NEGATIVE_STATUSES } from './abilities.js';
 import { JOB_STATS } from './data-registry.js';
 import { isDead, isConscious, isUnconscious, faceToward } from './units.js';
 import { hasLineOfSight, columnCells, posKey, parseKey } from './battle-map.js';
@@ -127,7 +127,8 @@ function scoreAction(unit, abilityKey, targetUnit, from, battle, opponents) {
 
     // ── Cure ──
     if (ab.isCure) {
-        const debuffs = targetUnit.status.filter(s => s !== 'dead' && s !== 'unconscious' && s !== 'defend');
+        // Cures only clear harmful statuses, so only those make a cure worth casting.
+        const debuffs = targetUnit.status.filter(s => NEGATIVE_STATUSES.includes(s));
         if (debuffs.length === 0) return -Infinity;
         let score = 60 + debuffs.length * 20;
         // Curing a stun is urgent since the unit would lose their next turn.

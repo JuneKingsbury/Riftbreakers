@@ -10,7 +10,7 @@ import { Sound } from '../audio/sound.js';
 import { mapMusic, VICTORY_MUSIC } from '../audio/game-sounds.js';
 import { NodeScreens } from './node-screens.js';
 import { PartyMenu } from './party-menu.js';
-import { RunState } from './run-state.js';
+import { RunState, MAX_PARTY } from './run-state.js';
 import { RELICS } from './data/relics.js';
 import { CHAINS } from './data/realms.js';
 import { loadProfile, saveProfile, recordRun } from './profile.js';
@@ -126,7 +126,7 @@ export class RunMapScene {
     _changed() {
         if (this.run.status === 'active') {
             const bought = this.run.autoAllocate(loadPlans());
-            if (bought.length) this._toast?.show(`Auto: ${describePurchases(bought)}`, 3600);
+            if (bought.length) this._toast?.show(`Skill plan: ${describePurchases(bought)}`, 3600);
             this.run.save();
         }
         this._sidebarKey = null;
@@ -225,7 +225,7 @@ export class RunMapScene {
             case 'menu': this._openMenu(); break;
             case 'resume': this._screens.show(); break;
             case 'abandon':
-                if (window.confirm('Abandon this run? It will count as a defeat.')) {
+                if (window.confirm('Abandon this run? It counts as a defeat.')) {
                     this.run.status = 'lost';
                     this._modal.close();
                     this._endRun();
@@ -332,7 +332,7 @@ export class RunMapScene {
                 <span style="color:#fc8;">★ ${run.gold} gold</span><span style="color:#888;">${Object.values(run.inventory).reduce((s, n) => s + n, 0)} in bag</span>
             </div>`;
 
-        html += `<div style="color:#fc8;font-size:10px;text-transform:uppercase;margin-bottom:5px;">Party (${run.party.length}/6)</div>`;
+        html += `<div style="color:#fc8;font-size:10px;text-transform:uppercase;margin-bottom:5px;">Party (${run.party.length}/${MAX_PARTY})</div>`;
         for (const m of run.party) {
             const hp = run.hp(m), max = run.maxHp(m);
             const spend = canSpendPoints(m);

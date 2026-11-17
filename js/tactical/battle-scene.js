@@ -17,6 +17,13 @@ import { isPortrait } from '../ui/layout.js';
 const SPEEDS = { '1': 1, '2': 2, '3': 4 };
 const BASE_MS_PER_STEP = 180;
 
+
+// Settings > General > "Show tactics decisions in the battle log" (saved by core/main.js).
+function tacticsLogSetting() {
+    try { return JSON.parse(globalThis.localStorage?.getItem('riftbreakers_settings'))?.tacticsLog === true; }
+    catch { return false; }
+}
+
 export class BattleScene {
     // encounter              — the fight (see run/data/encounters.js); null for the default enemies
     // run                    — the RunState whose party fights and which receives the result; null in harnesses
@@ -60,6 +67,7 @@ export class BattleScene {
             playerSpawns, map.enemySpawns);
 
         this._battle = new TacticalBattle(map, units);
+        this._battle.logTactics = tacticsLogSetting();
         this._applySpeed();
         // What happens in the fight drives sounds and effects. Hits from an ability that is
         // still in flight (an arrow, a spell, a swing mid-lunge) wait until it lands.
@@ -381,7 +389,7 @@ export class BattleScene {
             const unit = this._battle.activeUnit;
             if (!unit) return;
             this._autoUnits.add(unit.id);
-            this._battle.logMsg(`${unit.name} is now acting automatically.`);
+            this._battle.logMsg(`${unit.name} will act on their own from now on.`);
             const cost = this._turnHasMoved ? 80 : 60;
             this._battle.endTurn(cost);
             this._scheduleNextTurn();
@@ -394,7 +402,7 @@ export class BattleScene {
                 this._abilityFromSkillMenu = this._ui._openSkillset;
                 this._battle.enterAbilityMode(abilityKey);
                 const ab = ABILITIES[abilityKey];
-                if (ab?.aoePattern) this._battle.logMsg(`${ab.name} ready — press R to rotate.`);
+                if (ab?.aoePattern) this._battle.logMsg(`${ab.name} is ready. Press R to rotate the area.`);
             }
         } else if (action === 'defend') {
             if (!this._turnHasActed) {
@@ -575,7 +583,7 @@ export class BattleScene {
                     this._ui.closeSkillMenu();
                     this._abilityFromSkillMenu = openIdx;
                     this._battle.enterAbilityMode(chosen);
-                    if (ABILITIES[chosen]?.aoePattern) this._battle.logMsg(`${ABILITIES[chosen].name} ready — press R to rotate.`);
+                    if (ABILITIES[chosen]?.aoePattern) this._battle.logMsg(`${ABILITIES[chosen].name} is ready. Press R to rotate the area.`);
                 }
                 return;
             }

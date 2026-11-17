@@ -28,11 +28,11 @@ export function wireSavePanel(onImported) {
         const { save, error } = readSaveText(raw);
         if (error) return say(error, false);
         const ok = window.confirm(`Replace your current progress with this save?\n\n${describeSave(save)}\n\n`
-            + 'Your current renown, unlocks and run in progress will be overwritten.');
+            + 'This overwrites your current renown, unlocks and any run in progress.');
         if (!ok) return say('Import cancelled. Nothing changed.');
-        if (!applySave(save)) return say('Couldn\'t save on this device (storage may be full or disabled).', false);
+        if (!applySave(save)) return say('Couldn\'t save on this device. Storage may be full or turned off.', false);
         box.style.display = 'none';
-        say(save.runDropped ? 'Progress imported, without the unreadable run.' : 'Progress imported.');
+        say(save.runDropped ? 'Progress imported. The unreadable run was left out.' : 'Progress imported.');
         onImported?.();
     };
 

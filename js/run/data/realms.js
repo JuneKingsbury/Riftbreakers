@@ -51,7 +51,7 @@ const REALM_LIST = [
     // ---- Verdant Wilds ----
     {
         id: 'verdant_depths', name: 'Verdant Depths',
-        blurb: 'A vast jungle truly untouched by man, its plants and animals missing from even the most complete bestiaries. The trees grow taller the further in you travel.',
+        blurb: 'A vast jungle no one has ever settled, its plants and animals missing from even the most complete bestiaries. The trees grow taller the further in you travel.',
         look: { sky: '#163024', mapBg: '#1b3324', blocks: { grass: [['moss', 3], ['grass', 1]], dirt: [['dirt', 2], ['verdant_tile', 1]], wall: 'hedge', rubble: 'rubble' } },
         maps: ['jungle_ruins', 'river_ford', 'crossroads', 'mountain_pass'],
         bosses: ['boss_thorn_warden', 'boss_ancient_treant'],
@@ -64,7 +64,7 @@ const REALM_LIST = [
     },
     {
         id: 'primeval_canopy', name: 'Primeval Canopy',
-        blurb: 'The deepest jungle, where the canopy blocks nearly all light and snarling beasts echo through the foliage. At its centre the withered Heartwood spreads spores through its roots.',
+        blurb: 'The deepest jungle, where the canopy blocks nearly all light and the snarls of beasts echo through the foliage. At its center, the withered Heartwood spreads spores through its roots.',
         look: { sky: '#102418', mapBg: '#16291c', blocks: { grass: [['moss', 3], ['swamp', 1], ['fungal', 1]], moss: [['moss', 3], ['swamp', 1], ['fungal', 1]], dirt: [['dirt', 1], ['verdant_tile', 1]], wall: 'hedge', water: 'bog' } },
         maps: ['jungle_ruins', 'river_ford', 'mountain_pass', 'ruined_temple'],
     },
@@ -72,7 +72,7 @@ const REALM_LIST = [
     // ---- Crystal Caverns ----
     {
         id: 'crystal_caves', name: 'Crystal Caves',
-        blurb: 'A network of tunnels full of great crystal deposits, mostly empty, if you can stomach a tight squeeze. There is no sign of an entrance, only a way down.',
+        blurb: 'A maze of tunnels full of great crystal deposits and little else, if you can stomach a tight squeeze. There is no sign of an entrance, only a way down.',
         look: { sky: '#161c2c', mapBg: '#1b2235', blocks: { grass: [['stone', 4], ['crystal_floor', 1]], dirt: 'gravel_path', wall: 'crystal', water: 'water' } },
         maps: ['crystal_grotto', 'mountain_pass', 'volcano_plateau', 'crossroads'],
         bosses: ['boss_crystal_warden', 'boss_crystal_colossus'],
@@ -100,13 +100,13 @@ const REALM_LIST = [
     },
     {
         id: 'ancient_university', name: 'Ancient University',
-        blurb: 'Once the cutting edge of magical research, now ruins garrisoned by Crusaders. Some halls are left untouched, holding secrets even the Crusaders would not touch.',
+        blurb: 'Once the cutting edge of magical research, now ruins garrisoned by Crusaders. A few halls stand sealed, holding secrets even the Crusaders won\'t touch.',
         look: { sky: '#1e2230', mapBg: '#232838', blocks: { grass: [['grass', 2], ['marble', 1]], dirt: 'cobble', wall: [['brick_wall', 2], ['bookshelf', 1]] } },
         maps: ['grand_hall', 'ruined_temple', 'crossroads', 'river_ford'],
     },
     {
         id: 'abandoned_laboratory', name: 'Abandoned Laboratory',
-        blurb: 'A laboratory trapped in time, its halls twisting in ways the outside doesn\'t add up to. Forms of pure chaos guard the research within.',
+        blurb: 'A laboratory trapped in time, its halls twisting in ways the building\'s outside can\'t explain. Forms of pure chaos guard the research within.',
         look: { sky: '#1e1830', mapBg: '#251d38', blocks: { grass: [['marble', 3], ['cobble', 1]], dirt: 'glyph', carpet: 'glyph', wall: [['warded_wall', 1], ['brick_wall', 1]], stone_wall: 'warded_wall', water: 'bog', lava: 'bog' } },
         maps: ['grand_hall', 'ruined_temple', 'crystal_grotto'],
     },
@@ -148,7 +148,7 @@ const REALM_LIST = [
     },
     {
         id: 'void_heart', name: 'Void Heart',
-        blurb: 'The Heart of the Void, guarded by penitents who are only skin and bones, remade into better tools for their creditor.',
+        blurb: 'The heart of the Void. Its penitents are nothing but skin and bone now, remade into better tools for their creditor.',
         look: { sky: '#160c22', mapBg: '#20142e', blocks: { grass: [['abyss_tile', 3], ['glyph', 1]], marble: 'abyss_tile', sand: 'abyss_tile', carpet: 'glyph', dirt: 'glyph', wall: 'warded_wall', stone_wall: 'warded_wall', bookshelf: 'void_wall', water: 'void_water' } },
         maps: ['grand_hall', 'sunken_isles', 'ruined_temple'],
     },
@@ -162,7 +162,7 @@ const REALM_LIST = [
     },
     {
         id: 'crusader_barracks', name: 'Crusader Barracks',
-        blurb: 'The training grounds of the Crusader forces, stocked with weapons and armor. Only a small reserve stands guard, and it is the only way into the castle.',
+        blurb: 'The training grounds of the Crusader forces, stocked with weapons and armor. Only a small reserve stands guard, and the barracks are the only way into the castle.',
         look: { sky: '#22222c', mapBg: '#292a36', blocks: { grass: [['cobble', 2], ['dirt', 1]], marble: 'cobble', dirt: 'planks', wall: [['kingdom_wall', 2], ['wood_wall', 1]], bookshelf: 'wood_wall', stone_wall: 'kingdom_wall' } },
         maps: ['crossroads', 'grand_hall', 'ruined_temple'],
     },
@@ -200,7 +200,7 @@ const REALM_LIST = [
     },
     {
         id: 'unraveling_core', name: 'Unraveling Core',
-        blurb: 'A core of pure chaos where the world changes at a moment\'s notice. A gargantuan eye floats at its centre, harvesting the core\'s energy.',
+        blurb: 'A core of pure chaos where the world changes at a moment\'s notice. A gargantuan eye floats at its center, harvesting the core\'s energy.',
         look: {
             sky: '#2a1238', mapBg: '#301a40',
             blocks: {

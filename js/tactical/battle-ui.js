@@ -235,12 +235,12 @@ export class BattleUI {
 
         const stats = [];
         if (ab.range > 0)    stats.push(`Range: <b>${ab.range}</b>`);
-        if (ab.aoe > 0)      stats.push(`AoE: <b>${ab.aoe}</b>`);
-        if (ab.mpCost > 0)   stats.push(`MP Cost: <b style="color:#88f;">${ab.mpCost}</b>`);
+        if (ab.aoe > 0)      stats.push(`Area: <b>${ab.aoe}</b>`);
+        if (ab.mpCost > 0)   stats.push(`MP cost: <b style="color:#88f;">${ab.mpCost}</b>`);
         if (stats.length) lines.push(stats.join('  '));
 
         if (ab.chargeTime > 0) {
-            lines.push(`<span style="color:#c8f;">Charge Time: ${ab.chargeTime} &mdash; fires on next CT tick</span>`);
+            lines.push(`<span style="color:#c8f;">Charges for ${ab.chargeTime} CT before it goes off</span>`);
         }
 
         if (ab.basePower) {
@@ -250,10 +250,10 @@ export class BattleUI {
         }
 
         if (ab.applyStatus) {
-            lines.push(`Applies: <b style="color:#fc6;">${ab.applyStatus}</b>${ab.statusDuration ? ` (${ab.statusDuration} turns)` : ''}`);
+            lines.push(`Inflicts <b style="color:#fc6;">${ab.applyStatus}</b>${ab.statusDuration ? ` for ${ab.statusDuration} turns` : ''}`);
         }
         if (ab.isHeal)  lines.push(`<span style="color:#8f8;">Restores HP</span>`);
-        if (ab.isCure)  lines.push(`<span style="color:#aff;">Removes all status effects</span>`);
+        if (ab.isCure)  lines.push(`<span style="color:#aff;">Removes harmful statuses</span>`);
 
         if (unit && ab.mpCost > 0 && unit.mp < ab.mpCost) {
             lines.push(`<span style="color:#f66;">Not enough MP</span>`);
@@ -316,7 +316,7 @@ export class BattleUI {
         const hdr = document.createElement('div');
         hdr.className = 'tac-roster-header';
         hdr.style.cssText = 'color:#ffcc44;font-weight:bold;margin-bottom:8px;font-size:11px;border-bottom:1px solid #335;padding-bottom:4px;';
-        hdr.textContent = 'CHARACTERS';
+        hdr.textContent = 'UNITS';
         insertBefore(hdr);
 
         const makeTeamSection = (units, label, col) => {
@@ -354,7 +354,7 @@ export class BattleUI {
             }
         };
 
-        makeTeamSection(players, 'Players', '#7bf');
+        makeTeamSection(players, 'Allies', '#7bf');
         makeTeamSection(enemies,  'Enemies', '#f76');
 
         // Draw portraits after browser layout.
@@ -417,7 +417,7 @@ export class BattleUI {
             const hpEl  = row.querySelector('.tac-hp');
             if (hpEl) { hpEl.textContent = `${unit.hp}/${unit.maxHp} HP`; hpEl.style.color = hpC; }
             const spdEl = row.querySelector('.tac-spd');
-            if (spdEl) spdEl.textContent = `spd:${unit.spd}`;
+            if (spdEl) spdEl.textContent = `SPD ${unit.spd}`;
 
             const ctBar   = row.querySelector('.tac-ct-bar');
             const ctGhost = row.querySelector('.tac-ct-ghost');
@@ -481,9 +481,9 @@ export class BattleUI {
                     <span style="color:#888;">MAT</span><span>${u.mat}</span>
                     <span style="color:#888;">MDF</span><span>${u.mdf}</span>
                     <span style="color:#888;">SPD</span><span>${u.spd}</span>
-                    <span style="color:#888;">MOV</span><span>${u.move}</span>
+                    <span style="color:#888;">Move</span><span>${u.move}</span>
                     <span style="color:#888;">EVA</span><span>${u.eva || 0}</span>
-                    <span style="color:#888;">DIR</span><span>${u.facing || 'south'}</span>
+                    <span style="color:#888;">Facing</span><span>${u.facing || 'south'}</span>
                 </div>
                 ${u.status.length ? `<div style="margin-top:5px;color:#fc6;font-size:10px;">Status: ${u.status.join(', ')}</div>` : ''}
             </div>`;
@@ -518,7 +518,7 @@ export class BattleUI {
                     <span style="color:#888;">MAT</span><span>${insp.mat}</span>
                     <span style="color:#888;">MDF</span><span>${insp.mdf}</span>
                     <span style="color:#888;">SPD</span><span>${insp.spd}</span>
-                    <span style="color:#888;">MOV</span><span>${insp.move}</span>
+                    <span style="color:#888;">Move</span><span>${insp.move}</span>
                 </div>
                 ${insp.status.length ? `<div style="margin-top:4px;color:#fc6;font-size:10px;">Status: ${insp.status.join(', ')}</div>` : ''}
             </div>`;
@@ -560,15 +560,15 @@ export class BattleUI {
             html += `<span class="tac-back" style="cursor:pointer;color:#888;margin-right:6px;">&lt; Back</span>${esc(skillset.name)}</div>`;
 
             if (skillAbs.length === 0) {
-                html += `<div style="font-size:11px;color:#666;padding:4px 0;">No skills available.</div>`;
+                html += `<div style="font-size:11px;color:#666;padding:4px 0;">No skills to use.</div>`;
             }
             skillAbs.forEach((k, i) => {
                 const ab  = ABILITIES[k];
                 const can = unit.mp >= ab.mpCost;
                 const dis = !can ? DISABLED : '';
                 const mp  = ab.mpCost > 0 ? ` <span style="color:#88f;font-size:10px;">(${ab.mpCost}MP)</span>` : '';
-                const rng = `<span style="color:#666;font-size:10px;"> rng:${ab.range}${ab.aoe > 0 ? '/aoe:' + ab.aoe : ''}</span>`;
-                const ct  = ab.chargeTime > 0 ? ` <span style="color:#c8f;font-size:10px;">[CT:${ab.chargeTime}]</span>` : '';
+                const rng = `<span style="color:#666;font-size:10px;"> range ${ab.range}${ab.aoe > 0 ? ', area ' + ab.aoe : ''}</span>`;
+                const ct  = ab.chargeTime > 0 ? ` <span style="color:#c8f;font-size:10px;">[charge ${ab.chargeTime}]</span>` : '';
                 html += `<button class="tac-btn" data-action="ability" data-key="${k}" style="${BASE}${dis}"><span style="color:#888;font-size:10px;">[${i + 1}] </span>${ab.name}${mp}${rng}${ct}</button>`;
             });
 
@@ -593,7 +593,7 @@ export class BattleUI {
         } else {
             const isAuto = autoUnits?.has(unit.id);
             const autoTag = isAuto ? ` <span style="color:#f8a;font-size:9px;letter-spacing:1px;">[AUTO]</span>` : '';
-            let html = `<div style="color:#ffcc44;font-size:11px;font-weight:bold;margin-bottom:5px;padding-bottom:4px;border-bottom:1px solid #335;">${unit.name}'s Turn${autoTag}</div>`;
+            let html = `<div style="color:#ffcc44;font-size:11px;font-weight:bold;margin-bottom:5px;padding-bottom:4px;border-bottom:1px solid #335;">${unit.name}'s turn${autoTag}</div>`;
 
             html += `<button class="tac-btn" data-action="move" style="${BASE}${hasMoved ? DISABLED : ''}">[M] Move${hasMoved ? ' <span style="color:#555;font-size:10px;">(done)</span>' : ''}</button>`;
 
@@ -614,13 +614,13 @@ export class BattleUI {
             const keepCt = hasMoved ? 20 : 40;
             html += `<button class="tac-btn" data-action="wait" style="${BASE.replace('#151528','#1a1008')};color:#fc8;">[W] Wait <span style="color:#a86;font-size:10px;">(keep ${keepCt} CT)</span></button>`;
 
-            html += `<button class="tac-btn" data-action="auto" style="${BASE.replace('#151528','#1a0a18')};color:#f8a;border-color:#744;margin-top:4px;">[U] Auto <span style="color:#a68;font-size:10px;">act automatically</span></button>`;
+            html += `<button class="tac-btn" data-action="auto" style="${BASE.replace('#151528','#1a0a18')};color:#f8a;border-color:#744;margin-top:4px;">[U] Auto <span style="color:#a68;font-size:10px;">acts on its own from now on</span></button>`;
 
             menu.innerHTML = html;
         }
 
         const STATIC_TOOLTIPS = {
-            defend: `<span style="color:#7bf;font-weight:bold;">Defend</span><br>Take a defensive stance until your next turn.<br><span style="color:#aaa;">Reduces physical damage taken. Increases evasion against attacks from the front.</span><br>CT Cost: <b style="color:#fc8;">${hasMoved ? 100 : 80}</b>`,
+            defend: `<span style="color:#7bf;font-weight:bold;">Defend</span><br>Brace until your next turn.<br><span style="color:#aaa;">Take less damage from attacks and spells, and dodge physical attacks more often.</span><br>CT cost: <b style="color:#fc8;">${hasMoved ? 100 : 80}</b>`,
             move:   null,
             skills: null,
             pivot:  null,
@@ -711,7 +711,7 @@ export class BattleUI {
             <div style="font-size:40px;font-weight:bold;color:${won ? '#ffcc44' : '#f44'};text-shadow:0 0 24px currentColor;letter-spacing:4px;">
                 ${won ? 'VICTORY!' : 'DEFEAT'}
             </div>
-            <div style="color:#aaa;font-size:13px;">${won ? 'All enemies defeated.' : 'Your party was wiped out. The run is over.'}</div>
+            <div style="color:#aaa;font-size:13px;">${won ? 'All enemies defeated.' : 'Your party has fallen. The run is over.'}</div>
             ${rewardHtml}
             <button id="tac-return-btn" style="margin-top:12px;padding:10px 28px;background:#1a1a30;border:1px solid #557;color:#ccc;font-family:inherit;font-size:14px;cursor:pointer;border-radius:4px;pointer-events:auto;">
                 ${won ? 'Continue' : 'Return'}

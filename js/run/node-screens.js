@@ -75,7 +75,7 @@ export class NodeScreens {
 
     _partyButton() {
         const spend = this.run.party.some(canSpendPoints);
-        return `<button data-party style="${BTN}color:#adf;border-color:#448;${spend ? GLOW : ''}">☰ Party (equipment &amp; skills)${spend ? ' <span style="color:#afa;">● skill points to spend</span>' : ''}</button>`;
+        return `<button data-party style="${BTN}color:#adf;border-color:#448;${spend ? GLOW : ''}">☰ Party · gear &amp; skills${spend ? ' <span style="color:#afa;">● skill points to spend</span>' : ''}</button>`;
     }
 
     _wireParty(on) {
@@ -92,8 +92,8 @@ export class NodeScreens {
         for (const r of enc.roster) counts[r.name] = (counts[r.name] || 0) + 1;
         let html = H1(`⚔ ${title}: ${esc(enc.name)}`, color);
         html += SUB(enc.kind === 'boss'
-            ? `${esc(REALMS[enc.realm]?.name ?? `Act ${enc.act}`)}: the guardian of this realm bars the way.`
-            : 'Your party will fight on its own, following each member\'s tactics. Winning heals everyone; losing ends the run.');
+            ? `The guardian of ${esc(REALMS[enc.realm]?.name ?? `Act ${enc.act}`)} bars the way.`
+            : 'Your party fights on its own, following each member\'s tactics. Win and everyone heals. Lose and the run ends.');
         html += SECTION('Enemy forces');
         for (const [name, n] of Object.entries(counts)) html += `<div style="color:#f99;margin-bottom:2px;">${esc(name)}${n > 1 ? ` ×${n}` : ''}</div>`;
         html += SECTION('Your party');
@@ -147,7 +147,7 @@ export class NodeScreens {
         const ready = run.party.filter(m => canPromote(m));
         if (ready.length) {
             html += SECTION('Promotion');
-            html += `<div style="color:#fc6;font-size:11px;margin-bottom:6px;">${esc(ready.map(m => m.name).join(', '))} can promote now, from the Party menu.</div>`;
+            html += `<div style="color:#fc6;font-size:11px;margin-bottom:6px;">${esc(ready.map(m => m.name).join(', '))} can promote now from the Party menu.</div>`;
         }
         html += `<div style="height:8px;"></div>${this._partyButton()}
             <button data-continue style="${BTN}${BTN_GOOD}text-align:center;">Continue ›</button>`;
@@ -167,7 +167,7 @@ export class NodeScreens {
 
     shop(p) {
         const run = this.run;
-        let html = H1('$ Travelling Merchant', '#fc6');
+        let html = H1('$ Traveling Merchant', '#fc6');
         html += `<div style="color:#fd8;margin-bottom:8px;">You have ${run.gold} gold</div>`;
         html += SECTION('Equipment');
         p.stock.forEach((e, i) => {
@@ -257,10 +257,10 @@ export class NodeScreens {
             return;
         }
         const wounded = run.party.some(m => m.hp != null);
-        html += SUB(`Choose one: train the whole company or enchant one item.${wounded ? ' Either also tends your wounds.' : ''}`);
-        html += `<button data-rest style="${BTN}${BTN_GOOD}">♨ Train: every member gains ${run.options.drillXp} XP</button>`;
+        html += SUB(`Train the party or enchant one item.${wounded ? ' Either choice also tends your wounds.' : ''}`);
+        html += `<button data-rest style="${BTN}${BTN_GOOD}">♨ Train: everyone gains ${run.options.drillXp} XP</button>`;
         const xp = run.options.enchantXp ?? (run.options.trainXp ? 25 : 0);
-        html += SECTION(`Enchant: an item gains a level (up to +${MAX_ENCHANT})${xp ? ` and everyone gains ${xp} XP` : ''}`);
+        html += SECTION(`Enchant: one item gains a level, up to +${MAX_ENCHANT}${xp ? `. Everyone gains ${xp} XP` : ''}`);
         const choices = [];
         const itemRow = (key, where, owner) => {
             const i = choices.push(where) - 1;
@@ -277,10 +277,10 @@ export class NodeScreens {
             }
         }
         for (const key of Object.keys(run.inventory)) if (EQUIPMENT[key]) rows += itemRow(key, { item: key }, 'in the bag');
-        html += rows || `<div style="color:#777;font-size:11px;margin-bottom:6px;">The company has no items to enchant.</div>`;
+        html += rows || `<div style="color:#777;font-size:11px;margin-bottom:6px;">Nothing to enchant yet.</div>`;
         const ready = run.party.filter(m => canPromote(m));
         if (ready.length) {
-            html += `<div style="color:#fc6;font-size:11px;margin:6px 0;">★ ${esc(ready.map(m => m.name).join(', '))} can promote any time, from the Party menu. It doesn't use up the rest.</div>`;
+            html += `<div style="color:#fc6;font-size:11px;margin:6px 0;">★ ${esc(ready.map(m => m.name).join(', '))} can promote from the Party menu at any time. It won't use up your rest.</div>`;
         }
         html += `<div style="height:6px;"></div>${this._partyButton()}`;
         this._show(html, (on) => {
@@ -319,7 +319,7 @@ export class NodeScreens {
             return;
         }
         if (p.full) {
-            html += SUB(`Your party is full (${MAX_PARTY}). The would-be recruits share what they know instead.`)
+            html += SUB(`Your party is full at ${MAX_PARTY}. The would-be recruits share what they know instead.`)
                 + `<button data-decline style="${BTN}${BTN_GOOD}">Train together: everyone gains 40 XP</button>`;
         } else {
             html += SUB('Fighters looking for a company. One may join you.');
@@ -332,7 +332,7 @@ export class NodeScreens {
                         <button data-recruit="${i}" style="padding:4px 12px;font-family:inherit;font-size:11px;background:#1a1028;border:1px solid #a8f;color:#daf;border-radius:3px;cursor:pointer;">Recruit</button>
                     </div>
                     <div style="color:#889;font-size:10px;line-height:1.4;margin-top:5px;">${esc(jobDesc(c.job))}</div>
-                    <div style="color:#99a;font-size:10px;margin-top:3px;">Kit: ${esc(kit.map(abilityName).join(', '))}</div>
+                    <div style="color:#99a;font-size:10px;margin-top:3px;">Skills: ${esc(kit.map(abilityName).join(', '))}</div>
                 </div>`;
             });
             html += `<button data-decline style="${BTN}">Turn them away (+40 gold)</button>`;
@@ -365,7 +365,7 @@ export class NodeScreens {
         let html = H1(won ? '♛ The Rift is Sealed' : '✝ The Company Falls', won ? '#fc6' : '#f66');
         html += SUB(won
             ? 'Against all odds, your company reached the end of the road.'
-            : `Your party was defeated in ${esc(run.realm.name)} (act ${run.act}).`);
+            : `Your party fell in ${esc(run.realm.name)}, act ${run.act}.`);
         html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:3px 12px;margin-bottom:10px;">
             <div>Floors climbed</div><div style="color:#ddd;">${s.floors}</div>
             <div>Battles won</div><div style="color:#ddd;">${s.battles}</div>

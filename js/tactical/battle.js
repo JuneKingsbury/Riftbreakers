@@ -28,6 +28,8 @@ export class TacticalBattle {
         // Milliseconds a unit takes per tile when walking. The scene lowers this at higher
         // playback speeds so movement keeps pace with the rest of the battle.
         this.moveMsPerStep = 180;
+        // Log which tactics rules each scripted unit followed (a setting, for script writers).
+        this.logTactics = false;
         this.state = STATES.ADVANCE_CT;
         this.activeUnit = null;
         this.selectedAbility = null;
@@ -134,15 +136,15 @@ export class TacticalBattle {
         }
         if (result.missed) {
             this._emit('miss', { source, target, ability: abKey });
-            this.logMsg(`${source.name} missed ${target.name}!`);
+            this.logMsg(`${source.name} misses ${target.name}.`);
             this._spawnFloat(target, 'Miss!', '#aaa');
             return;
         }
         if (result.damage > 0) {
             this._emit('hit', { source, target, damage: result.damage, ability: abKey });
             const highGround = (source.z ?? 0) > (target.z ?? 0);
-            const suffix = highGround ? ' (high gnd!)' : '';
-            this.logMsg(`${source.name} hits ${target.name} for ${result.damage} dmg${suffix}.`);
+            const suffix = highGround ? ' from the high ground' : '';
+            this.logMsg(`${source.name} hits ${target.name} for ${result.damage} damage${suffix}.`);
             this._spawnFloat(target, `-${result.damage}`, '#f88');
         }
         if (result.healing > 0) {
@@ -466,7 +468,7 @@ export class TacticalBattle {
         } else {
             moveEntity(unit, tx, ty, this.moveMsPerStep, tz);
         }
-        this.logMsg(`${unit.name} moved to (${tx}, ${ty}).`);
+        this.logMsg(`${unit.name} moves to (${tx}, ${ty}).`);
         this.afterMove(unit, path);
         // Pre-spend move CT so the bar drops immediately on move.
         const moveCost = 20;
@@ -554,7 +556,7 @@ export class TacticalBattle {
         this._emitArea(source, this.selectedAbility, affectedTiles, { x: tx, y: ty, z: tz });
 
         if (targets.length === 0 && !ab.isHeal && !ab.isCure && ab.targetType !== 'tile') {
-            this.logMsg(`${source.name} used ${ab.name} but hit nothing!`);
+            this.logMsg(`${source.name}'s ${ab.name} hits nothing.`);
         }
 
         for (const target of targets) {
@@ -738,7 +740,7 @@ export class TacticalBattle {
         const tile = getCell(this.map, tx, ty, tz);
         const occupied = tile && this.units.some(u => !isDead(u) && posKey(u) === posKey(tile));
         if (occupied || !tile || !tile.passable) {
-            this.logMsg(`${source.name}'s summon fizzles — no space!`);
+            this.logMsg(`${source.name}'s summon fizzles. There's no room for it!`);
             return null;
         }
 

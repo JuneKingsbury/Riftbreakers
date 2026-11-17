@@ -133,7 +133,7 @@ export function planTurn(unit, battle) {
     const intent = runScript(unit.script, unit, battle.livingUnits, battle.map);
     const fired = intent.trace.map(t => t.label).join(' > ');
     battle.lastDecision = { unitId: unit.id, name: unit.name, trace: intent.trace };
-    if (fired) battle.logMsg(`${unit.name} [${fired}]`);
+    if (fired && battle.logTactics) battle.logMsg(`${unit.name} follows: ${fired}`);
     return intent;
 }
 

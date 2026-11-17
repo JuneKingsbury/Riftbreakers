@@ -59,6 +59,7 @@ document.addEventListener('DOMContentLoaded', () => {
             musicVolume: sliderValue('start-music-vol', 50),
             sfxVolume:   sliderValue('start-sfx-vol', 80),
             colorblindMode: document.getElementById('start-colorblind')?.value || 'none',
+            tacticsLog: !!document.getElementById('start-tactics-log')?.checked,
         };
         localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
     }
@@ -74,6 +75,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (s.colorblindMode && s.colorblindMode !== 'none') {
             document.getElementById('start-colorblind').value = s.colorblindMode;
         }
+        const tacticsLog = document.getElementById('start-tactics-log');
+        if (tacticsLog) tacticsLog.checked = s.tacticsLog === true;
     }
     // The volume sliders drive the sound buses directly, so a change is heard at once.
     function applyVolumes() {
@@ -106,6 +109,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('start-sfx-vol').value = 80;
         document.getElementById('start-sfx-vol-val').textContent = '80';
         document.getElementById('start-colorblind').value = 'none';
+        document.getElementById('start-tactics-log').checked = false;
         saveSettings();
         applyVolumes();
     });
