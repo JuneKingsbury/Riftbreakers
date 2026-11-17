@@ -13,7 +13,7 @@ import { PartyMenu } from './party-menu.js';
 import { RunState, MAX_PARTY } from './run-state.js';
 import { RELICS } from './data/relics.js';
 import { CHAINS } from './data/realms.js';
-import { loadProfile, saveProfile, recordRun } from './profile.js';
+import { loadProfile, saveProfile, recordRun, noteItems, noteBosses } from './profile.js';
 import { loadPlans, describePurchases } from './skill-plans.js';
 import { Modal, Toast, BTN, BTN_GOOD, BTN_DANGER, GLOW, RARITY_COLOR, NODE_INFO, FONT, esc, jobLabel, hpBar, portraitHtml, drawSprites } from './ui-kit.js';
 import { DeployScene } from '../tactical/deploy-scene.js';
@@ -129,6 +129,11 @@ export class RunMapScene {
         if (this.run.status === 'active') {
             const bought = this.run.autoAllocate(loadPlans());
             if (bought.length) this._toast?.show(`Skill plan: ${describePurchases(bought)}`, 3600);
+            // Feats: remember every item the party has ever held and every boss it beats.
+            // (Bosses first: noting them marks the run, which is saved just after.)
+            const profile = loadProfile();
+            const newBosses = noteBosses(profile, this.run);
+            if (noteItems(profile, this.run) || newBosses) saveProfile(profile);
             this.run.save();
         }
         this._sidebarKey = null;

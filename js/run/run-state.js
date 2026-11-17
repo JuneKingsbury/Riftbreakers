@@ -405,7 +405,11 @@ export class RunState {
         this.gold += gold;
         this.stats.battles += 1;
         if (enc.kind === 'elite') this.stats.elites += 1;
-        if (enc.kind === 'boss') this.stats.bosses += 1;
+        if (enc.kind === 'boss') {
+            this.stats.bosses += 1;
+            // For the bestiary in Feats (profile.noteBosses counts them).
+            (this.bossesDefeated = this.bossesDefeated || []).push(enc.id);
+        }
 
         const choices = base.itemChoices + (relicsWith(this.relics, 'extraItemChoice').length ? 1 : 0);
         let relics = [];

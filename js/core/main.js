@@ -208,6 +208,9 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
     });
+    document.getElementById('start-feats')?.addEventListener('click', () => {
+        import('../run/feats.js').then(({ showFeats }) => showFeats(skinManager));
+    });
     document.getElementById('start-unlocks')?.addEventListener('click', () => {
         import('../run/start.js').then(({ showUnlocks }) => showUnlocks());
     });

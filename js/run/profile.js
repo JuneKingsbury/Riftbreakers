@@ -3,7 +3,17 @@
 // cleaned up on load (sanitizeProfile), so damaged or hand-edited data can't break the game.
 // Settings can export it, with the run in progress, to a file or code (save-transfer.js).
 
+import { EQUIPMENT, EQUIP_FIELDS, baseItemKey, enchantLevel } from '../tactical/data/equipment.js';
+import { JOB_DATA } from '../tactical/data/jobs.js';
+import { REALMS } from './data/realms.js';
+
 export const PROFILE_KEY = 'riftbreak.profile.v1';
+
+// Feats: how many winning runs the profile remembers (the most recent first).
+export const RECENT_WINS = 5;
+
+// Every boss fight in the game (each realm fields two), for the bestiary.
+export const BOSS_IDS = [...new Set(Object.values(REALMS).flatMap(r => r.bosses || []))];
 
 export const BASE_JOBS = ['warden', 'evoker', 'runebow'];
 
@@ -32,7 +42,12 @@ export function defaultStorage() {
 }
 
 export function newProfile() {
-    return { renown: 0, unlocked: [], stats: { runs: 0, wins: 0, bestAct: 0, bestFloor: 0 } };
+    return {
+        renown: 0, unlocked: [], stats: { runs: 0, wins: 0, bestAct: 0, bestFloor: 0 },
+        items: [],        // every item ever obtained, by base key (an enchanted find counts as its item)
+        recentWins: [],   // summaries of the latest winning runs, newest first (see winSummary)
+        bossKills: {},    // boss fight id → times defeated, across all runs
+    };
 }
 
 // A whole number at least 0, or the fallback.
@@ -53,7 +68,77 @@ export function sanitizeProfile(data) {
     const stats = data.stats && typeof data.stats === 'object' ? data.stats : {};
     for (const key of Object.keys(p.stats)) p.stats[key] = count(stats[key]);
     p.stats.wins = Math.min(p.stats.wins, p.stats.runs);
+    if (Array.isArray(data.items)) p.items = [...new Set(data.items.filter(isBaseItem))];
+    if (Array.isArray(data.recentWins)) p.recentWins = data.recentWins.map(sanitizeWin).filter(Boolean).slice(0, RECENT_WINS);
+    if (data.bossKills && typeof data.bossKills === 'object') {
+        for (const id of BOSS_IDS) if (Object.hasOwn(data.bossKills, id) && count(data.bossKills[id]) > 0) p.bossKills[id] = count(data.bossKills[id]);
+    }
     return p;
+}
+
+/**
+ * Counts the bosses the run has beaten since it was last noted (run.bossesDefeated, with
+ * run.bossesNoted marking how many are already counted). Returns true if any were new.
+ */
+export function noteBosses(profile, run) {
+    const list = Array.isArray(run.bossesDefeated) ? run.bossesDefeated : [];
+    const from = Math.min(run.bossesNoted ?? 0, list.length);
+    for (const id of list.slice(from)) if (BOSS_IDS.includes(id)) profile.bossKills[id] = (profile.bossKills[id] || 0) + 1;
+    run.bossesNoted = list.length;
+    return list.length > from;
+}
+
+const isBaseItem = (k) => typeof k === 'string' && Object.hasOwn(EQUIPMENT, k) && enchantLevel(k) === 0;
+const text = (v, max) => (typeof v === 'string' ? v.slice(0, max) : '');
+const isJob = (j) => typeof j === 'string' && Object.hasOwn(JOB_DATA, j);
+
+// One remembered member: enough to show their name, class and portrait.
+function sanitizeWinMember(m) {
+    if (!m || typeof m !== 'object' || !isJob(m.job)) return null;
+    const a = m.appearance && typeof m.appearance === 'object' ? m.appearance : {};
+    const appearance = {};
+    for (const k of ['race', 'nameColor']) if (typeof a[k] === 'string') appearance[k] = text(a[k], 20);
+    for (const k of ['bodyVariant', 'hairVariant', 'shirtVariant']) if (Number.isInteger(a[k])) appearance[k] = a[k];
+    for (const f of EQUIP_FIELDS) appearance[f] = typeof a[f] === 'string' && EQUIPMENT[a[f]] ? a[f] : null;
+    return { name: text(m.name, 24) || 'Unknown', job: m.job, origin: isJob(m.origin) ? m.origin : null, level: count(m.level, 1) || 1, appearance };
+}
+
+function sanitizeWin(w) {
+    if (!w || typeof w !== 'object') return null;
+    const party = (Array.isArray(w.party) ? w.party : []).map(sanitizeWinMember).filter(Boolean).slice(0, 6);
+    if (!party.length) return null;
+    return {
+        date: text(w.date, 40),
+        party,
+        realms: (Array.isArray(w.realms) ? w.realms : []).filter(r => typeof r === 'string' && Object.hasOwn(REALMS, r)).slice(0, 3),
+        floors: count(w.floors), battles: count(w.battles), elites: count(w.elites), bosses: count(w.bosses),
+        relics: count(w.relics), renown: count(w.renown),
+    };
+}
+
+/** What a won run is remembered by in Feats. */
+export function winSummary(run, renown, now = new Date()) {
+    return sanitizeWin({
+        date: now.toISOString(),
+        party: run.party.map(m => ({ name: m.name, job: m.job, origin: m.origin, level: m.level, appearance: m.appearance })),
+        realms: run.realms,
+        ...run.stats,
+        relics: run.relics.length,
+        renown,
+    });
+}
+
+/**
+ * Adds every item the run's party has (in the bag or worn) to the profile's found items.
+ * Returns true if anything was new.
+ */
+export function noteItems(profile, run) {
+    const seen = new Set(profile.items);
+    const before = seen.size;
+    for (const k of Object.keys(run.inventory || {})) if (run.inventory[k] > 0) seen.add(baseItemKey(k));
+    for (const m of run.party || []) for (const f of EQUIP_FIELDS) if (m.appearance?.[f]) seen.add(baseItemKey(m.appearance[f]));
+    profile.items = [...seen].filter(isBaseItem);
+    return profile.items.length > before;
 }
 
 export function loadProfile(storage = defaultStorage()) {
@@ -117,7 +202,7 @@ export function renownFor(stats, won) {
 }
 
 // Records a finished run in the profile. Returns the renown earned.
-export function recordRun(profile, run) {
+export function recordRun(profile, run, now = new Date()) {
     const won = run.status === 'won';
     const earned = renownFor(run.stats, won);
     profile.renown += earned;
@@ -125,5 +210,8 @@ export function recordRun(profile, run) {
     if (won) profile.stats.wins += 1;
     profile.stats.bestAct = Math.max(profile.stats.bestAct, run.act);
     profile.stats.bestFloor = Math.max(profile.stats.bestFloor, run.stats.floors || 0);
+    noteItems(profile, run);
+    noteBosses(profile, run);
+    if (won) profile.recentWins = [winSummary(run, earned, now), ...(profile.recentWins || [])].filter(Boolean).slice(0, RECENT_WINS);
     return earned;
 }

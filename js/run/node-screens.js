@@ -368,7 +368,7 @@ export class NodeScreens {
         const s = run.stats;
         let html = H1(won ? '♛ The Rift is Sealed' : '✝ The Company Falls', won ? '#fc6' : '#f66');
         html += SUB(won
-            ? 'Against all odds, your company reached the end of the road.'
+            ? 'Against all odds, your company closed the final rift.'
             : `Your party fell in ${esc(run.realm.name)}, act ${run.act}.`);
         html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:3px 12px;margin-bottom:10px;">
             <div>Floors climbed</div><div style="color:#ddd;">${s.floors}</div>

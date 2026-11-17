@@ -77,6 +77,11 @@ path through battles, elites, events, shops, rest sites, treasure and recruits, 
   Each ability or move rule has a positioning style (`positionStyle` in `ai/script-runtime.js`):
   ranged roles default to Careful (stay out of enemy reach, attack from near max range, don't run
   ahead of the group, melee only as a last resort); everyone else defaults to Bold.
+- **Feats:** a title-screen panel (`js/run/feats.js`) with three tabs: every item in the game,
+  found or not yet found, with a completion percentage; a bestiary of the 16 bosses with how
+  often each has been beaten; and the last 5 winning runs. The profile keeps `items` (noted
+  whenever the run changes), `bossKills` (counted from `run.bossesDefeated`) and `recentWins`
+  (added by `recordRun`), all cleaned on load and included in save exports.
 - **Splash:** the studio splash from Rifthold plays on load (`js/ui/splash.js`, with
   `icons/splash.gif`, `icons/splashBackgroundTile.png` and Pixelify Sans in `fonts/`). Any key
   or tap skips it.
