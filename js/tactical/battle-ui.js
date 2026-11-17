@@ -483,6 +483,7 @@ export class BattleUI {
                     <span style="color:#888;">SPD</span><span>${u.spd}</span>
                     <span style="color:#888;">Move</span><span>${u.move}</span>
                     <span style="color:#888;">EVA</span><span>${u.eva || 0}</span>
+                    <span style="color:#888;">CRIT</span><span>${u.crit ?? 5}%</span>
                     <span style="color:#888;">Facing</span><span>${u.facing || 'south'}</span>
                 </div>
                 ${u.status.length ? `<div style="margin-top:5px;color:#fc6;font-size:10px;">Status: ${u.status.join(', ')}</div>` : ''}

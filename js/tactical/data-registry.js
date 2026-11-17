@@ -30,6 +30,9 @@ function buildTable(rawData) {
 
 export const ABILITIES = buildTable(ABILITY_DATA);
 
+// Every unit's critical hit chance, in percent, before gear (see critChance in abilities.js).
+export const BASE_CRIT = 5;
+
 // ---- Skill ranks ----
 // Learned action skills and reactions can be upgraded to rank II and III with skill
 // points. Each rank is its own ability entry, keyed `<key>@<rank>` (e.g. 'fire@2'),

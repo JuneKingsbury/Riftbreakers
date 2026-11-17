@@ -4,7 +4,7 @@
 // (passives like divine_ward, reflect, reraise), so treat it as a ranking
 // heuristic and never as a promise of the exact damage dealt.
 import { ABILITIES } from '../data-registry.js';
-import { getEffectiveStat, directionEvasionMod } from '../abilities.js';
+import { getEffectiveStat, dodgeChance, critChance, CRIT_MULT } from '../abilities.js';
 
 // Expected { damage, healing } of `source` using `abilityKey` on `target`.
 // Physical damage is weighted by hit chance. Variance is taken as 1.0.
@@ -25,14 +25,14 @@ export function estimateAbilityEffect(source, target, abilityKey, map) {
     if (ab.type === 'physical') {
         raw = Math.max(1, getEffectiveStat(source, 'atk') * 2 - getEffectiveStat(target, 'def') * defMult) * ab.basePower * highGround;
         if (target.status.includes('protect')) raw *= 0.75;
-        const eva = ((getEffectiveStat(target, 'eva') || 0) / 100) * directionEvasionMod(source, target);
-        const defendBonus = target.status.includes('defend') ? 0.2 : 0;
-        hitChance = 1 - Math.min(0.9, eva + defendBonus);
+        hitChance = 1 - dodgeChance(source, target, ab);
     } else {
         raw = Math.max(1, getEffectiveStat(source, 'mat') * 2 - getEffectiveStat(target, 'mdf') * defMult) * ab.basePower * highGround;
         if (target.status.includes('shell')) raw *= 0.75;
     }
     // Nightmare, Catalyst: extra damage against a target with the named status.
     for (const [status, mult] of Object.entries(ab.bonusVsStatus ?? {})) if (target.status.includes(status)) raw *= mult;
-    return { damage: Math.round(raw * hitChance), healing: 0 };
+    // Expected damage: critical hits add CRIT_MULT - 1 extra, as often as they happen.
+    const critBonus = 1 + critChance(source, ab) * (CRIT_MULT - 1);
+    return { damage: Math.round(raw * hitChance * critBonus), healing: 0 };
 }

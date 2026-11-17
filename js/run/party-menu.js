@@ -22,7 +22,7 @@ import { renderSkillPlanEditor } from '../ui/skill-plan-panel.js';
 
 const NUMERAL = ['', 'I', 'II', 'III'];
 
-const SLOT_LABEL = { armorKey: 'Armor', helmetKey: 'Helmet', weaponKey: 'Weapon', toolKey: 'Tool' };
+const SLOT_LABEL = { armorKey: 'Armor', helmetKey: 'Helmet', weaponKey: 'Weapon', toolKey: 'Tool', bootsKey: 'Boots', trinketKey: 'Trinket' };
 // Kept for anything importing it from here.
 export { previewUnit };
 

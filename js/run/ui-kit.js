@@ -80,7 +80,8 @@ export function itemTitle(key) {
     const lv = item?.enchant || 0;
     const name = lv ? esc(itemLabel(key).replace(/ \+\d$/, '')) + ` <span style="color:#d9a6ff;font-weight:bold;">+${lv}</span>` : esc(itemLabel(key));
     return `<span style="color:${RARITY_COLOR[rarity]};">${name}</span>`
-        + ` <span style="color:#667;font-size:10px;">${esc(item?.slot)} · ${esc(titleCase(item?.type))}</span>`;
+        // Boots and trinkets have no sub-type, so just the slot ("boots", not "boots · Boots").
+        + ` <span style="color:#667;font-size:10px;">${esc(item?.slot)}${item?.type && item.type !== item.slot ? ` · ${esc(titleCase(item.type))}` : ''}</span>`;
 }
 
 export function abilityTooltip(key) {

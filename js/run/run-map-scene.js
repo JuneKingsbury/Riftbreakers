@@ -282,7 +282,7 @@ export class RunMapScene {
         const run = this.run;
         const portrait = isPortrait();
         const key = JSON.stringify([portrait, run.gold, run.act, run.currentNodeId, run.relics, run.status, !!run.pending,
-            run.party.map(m => [m.name, m.job, m.hp, m.level, m.xp, m.sp, m.learned.length, JSON.stringify(m.ranks), m.loadout?.support, m.appearance?.armorKey, m.appearance?.weaponKey, m.appearance?.helmetKey, m.appearance?.toolKey])]);
+            run.party.map(m => [m.name, m.job, m.hp, m.level, m.xp, m.sp, m.learned.length, JSON.stringify(m.ranks), m.loadout?.support, m.appearance?.armorKey, m.appearance?.weaponKey, m.appearance?.helmetKey, m.appearance?.toolKey, m.appearance?.bootsKey, m.appearance?.trinketKey])]);
         if (key === this._sidebarKey) return;
         this._sidebarKey = key;
         this._sidebar.style.display = portrait ? 'none' : '';

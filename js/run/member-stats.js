@@ -5,7 +5,7 @@ import { equipmentStatBonuses } from '../tactical/data/equipment.js';
 import { relicStatMods } from './data/relics.js';
 
 // The stats the menus list, in order, with their labels.
-export const STATS = [['maxHp', 'HP'], ['maxMp', 'MP'], ['atk', 'ATK'], ['def', 'DEF'], ['mat', 'MAT'], ['mdf', 'MDF'], ['spd', 'SPD'], ['move', 'Move'], ['eva', 'EVA']];
+export const STATS = [['maxHp', 'HP'], ['maxMp', 'MP'], ['atk', 'ATK'], ['def', 'DEF'], ['mat', 'MAT'], ['mdf', 'MDF'], ['spd', 'SPD'], ['move', 'Move'], ['eva', 'EVA'], ['crit', 'CRIT']];
 
 function addMods(...mods) {
     const out = {};

@@ -3,10 +3,11 @@
 // and describes the slot it occupies plus any stat bonuses granted when equipped.
 //
 // Stat fields (all optional, default 0 if absent):
-//   atk, def, mat, mdf, spd, move, eva, maxHp, maxMp
+//   atk, def, mat, mdf, spd, move, eva, crit (critical hit chance, percent points), maxHp, maxMp
 //
 // name          Display name
-// slot: 'armor' | 'helmet' | 'weapon' | 'tool'
+// slot: 'armor' | 'helmet' | 'weapon' | 'tool' | 'boots' | 'trinket'
+//   (boots and trinkets aren't drawn on the character, so they need only an items icon)
 // type          Equipment class; jobs restrict which types they can wear (allowedEquipment)
 // rarity        'common' (default) | 'uncommon' | 'rare': which loot and shop pools offer it
 // grants        string[] Action abilities the wearer can use while it is equipped
@@ -119,7 +120,7 @@ export const EQUIPMENT = {
     ashen_staff:          { name: 'Ashen Staff',           slot: 'weapon', type: 'magic',        mat: 14, atk:  4, maxMp: 10, rarity: 'uncommon' },
     heartwood_staff:      { name: 'Heartwood Staff',       slot: 'weapon', type: 'magic',        mat: 12, mdf:  5, maxMp: 14, rarity: 'uncommon', grants: ['spore_cloud'] },
     staff_of_regrowth:    { name: 'Staff of Regrowth',     slot: 'weapon', type: 'magic',        mat: 11, mdf:  6, maxMp: 16, rarity: 'uncommon', grants: ['purify'] },
-    staff_of_distortion:  { name: 'Staff of Distortion',   slot: 'weapon', type: 'magic',        mat: 14, spd:  1, maxMp: 12, rarity: 'rare', grants: ['unravel'] },
+    staff_of_distortion:  { name: 'Staff of Distortion',   slot: 'weapon', type: 'magic',        mat: 14, spd:  1, maxMp: 12, crit: 6, rarity: 'rare', grants: ['unravel'] },
     soulbond_scepter:     { name: 'Soulbond Scepter',      slot: 'weapon', type: 'magic',        mat: 13, mdf:  5, maxHp: 10, maxMp: 10, rarity: 'rare', grants: ['bind_will'] },
 
     tempered_blade:       { name: 'Tempered Blade',        slot: 'weapon', type: 'blade',        atk:  9 },
@@ -129,12 +130,12 @@ export const EQUIPMENT = {
     void_wand:            { name: 'Void Wand',             slot: 'weapon', type: 'magic',        mat:  9, maxMp: 8, rarity: 'uncommon' },
     abyssal_blade:        { name: 'Abyssal Blade',         slot: 'weapon', type: 'blade',        atk: 15, mat:  3, rarity: 'rare' },
     sovereign_blade:      { name: 'Sovereign Blade',       slot: 'weapon', type: 'blade',        atk: 16, def:  2, mdf:  2, rarity: 'rare' },
-    void_edge:            { name: 'Void Edge',             slot: 'weapon', type: 'blade',        atk: 14, eva:  4, spd:  1, rarity: 'rare' },
+    void_edge:            { name: 'Void Edge',             slot: 'weapon', type: 'blade',        atk: 14, eva:  4, spd:  1, crit: 8, rarity: 'rare' },
     void_glaive:          { name: 'Void Glaive',           slot: 'weapon', type: 'blade',        atk: 13, mat:  4, move: 1, rarity: 'rare' },
     abyssal_greatsword:   { name: 'Abyssal Greatsword',    slot: 'weapon', type: 'heavy_weapon', atk: 19, def: -3, spd: -1, rarity: 'rare' },
-    abyssal_piercer:      { name: 'Abyssal Piercer',       slot: 'weapon', type: 'heavy_weapon', atk: 14, eva:  2, move: 1, rarity: 'rare' },
+    abyssal_piercer:      { name: 'Abyssal Piercer',       slot: 'weapon', type: 'heavy_weapon', atk: 14, eva:  2, move: 1, crit: 8, rarity: 'rare' },
     abyssal_longbow:      { name: 'Abyssal Longbow',       slot: 'weapon', type: 'bow',          atk: 15, move: 1, rarity: 'rare' },
-    void_recurve:         { name: 'Void Recurve',          slot: 'weapon', type: 'bow',          atk: 13, eva:  3, spd:  1, rarity: 'rare', grantsPassive: ['concentrate'] },
+    void_recurve:         { name: 'Void Recurve',          slot: 'weapon', type: 'bow',          atk: 13, eva:  3, spd:  1, crit: 8, rarity: 'rare', grantsPassive: ['concentrate'] },
     abyssal_staff:        { name: 'Abyssal Staff',         slot: 'weapon', type: 'magic',        mat: 16, mdf:  4, maxMp: 14, rarity: 'rare', grants: ['gravity_well'] },
 
     // ============================================================
@@ -167,10 +168,44 @@ export const EQUIPMENT = {
     runic_mattock:        { name: 'Runic Mattock',         slot: 'tool',   type: 'offhand_weapon', atk:  8, rarity: 'uncommon' },
     void_mattock:         { name: 'Void Mattock',          slot: 'tool',   type: 'offhand_weapon', atk:  9, mat:  2, rarity: 'rare' },
     stone_pickaxe:        { name: 'Stone Pickaxe',         slot: 'tool',   type: 'offhand_weapon', atk:  3, def:  1 },
+
+    // ============================================================
+    // BOOTS
+    // Stats only (they don't show on the sprite), and any class can wear them. Light boots
+    // quicken the step, greaves protect; only the rarest add Move.
+    // ============================================================
+    leather_boots:        { name: 'Leather Boots',         slot: 'boots',  type: 'boots',  spd:  1, eva:  2 },
+    enchanted_sandals:    { name: 'Enchanted Sandals',     slot: 'boots',  type: 'boots',  spd:  1, eva:  3, maxMp: 4 },
+    iron_greaves:         { name: 'Iron Greaves',          slot: 'boots',  type: 'boots',  def:  3, maxHp: 6 },
+    emberstep_anklet:     { name: 'Emberstep Anklet',      slot: 'boots',  type: 'boots',  spd:  1, mdf:  2, maxHp: 8, rarity: 'uncommon' },
+    runic_striders:       { name: 'Runic Striders',        slot: 'boots',  type: 'boots',  spd:  2, eva:  3, rarity: 'uncommon' },
+    striders_greaves:     { name: "Strider's Greaves",     slot: 'boots',  type: 'boots',  spd:  1, def:  3, eva:  5, rarity: 'uncommon' },
+    void_treads:          { name: 'Void Treads',           slot: 'boots',  type: 'boots',  move: 1, spd:  1, def:  3, rarity: 'rare' },
+    boots_of_haste:       { name: 'Boots of Haste',        slot: 'boots',  type: 'boots',  move: 1, spd:  2, rarity: 'rare' },
+
+    // ============================================================
+    // TRINKETS
+    // Rings, charms and pendants: stats only, for any class.
+    // ============================================================
+    hearthstone_pendant:  { name: 'Hearthstone Pendant',   slot: 'trinket', type: 'trinket', maxHp: 8, mdf: 1 },
+    rabbits_paw:          { name: "Rabbit's Paw",          slot: 'trinket', type: 'trinket', eva:  2, crit: 4 },
+    sharpened_fang_necklace: { name: 'Sharpened Fang Necklace', slot: 'trinket', type: 'trinket', atk: 2 },
+    merchants_ring:       { name: "Merchant's Ring",       slot: 'trinket', type: 'trinket', mat:  2, maxMp: 4 },
+    jesters_bauble:       { name: "Jester's Bauble",       slot: 'trinket', type: 'trinket', mdf:  3, maxHp: 4 },
+    amulet_of_fortune:    { name: 'Amulet of Fortune',     slot: 'trinket', type: 'trinket', eva:  3, mdf:  3, rarity: 'uncommon' },
+    seedkeepers_locket:   { name: "Seedkeeper's Locket",   slot: 'trinket', type: 'trinket', mdf:  4, eva:  2, maxHp: 6, rarity: 'uncommon' },
+    charmweave_band:      { name: 'Charmweave Band',       slot: 'trinket', type: 'trinket', mat:  3, maxMp: 8, rarity: 'uncommon' },
+    healers_pendant:      { name: "Healer's Pendant",      slot: 'trinket', type: 'trinket', mat:  3, mdf:  3, rarity: 'uncommon' },
+    verdant_talisman:     { name: 'Verdant Talisman',      slot: 'trinket', type: 'trinket', mat:  2, maxHp: 10, rarity: 'uncommon' },
+    ghost_step_charm:     { name: 'Ghost-Step Charm',      slot: 'trinket', type: 'trinket', eva:  8, rarity: 'uncommon' },
+    strikers_band:        { name: "Striker's Band",        slot: 'trinket', type: 'trinket', atk:  3, crit: 5, rarity: 'uncommon' },
+    ember_sigil:          { name: 'Ember Sigil',           slot: 'trinket', type: 'trinket', mat:  6, rarity: 'rare' },
+    void_charm:           { name: 'Void Charm',            slot: 'trinket', type: 'trinket', atk:  5, def:  2, rarity: 'rare' },
+    bloodstone_pendant:   { name: 'Bloodstone Pendant',    slot: 'trinket', type: 'trinket', atk:  3, maxHp: 12, rarity: 'rare' },
 };
 
 // Stat fields that equipment can modify.
-export const EQUIP_STAT_KEYS = ['atk','def','mat','mdf','spd','move','eva','maxHp','maxMp'];
+export const EQUIP_STAT_KEYS = ['atk','def','mat','mdf','spd','move','eva','crit','maxHp','maxMp'];
 
 // ---- Enchanting ----
 // An item can be enchanted up to MAX_ENCHANT times (at rest sites, and very rarely an item is
@@ -231,7 +266,7 @@ export function equipmentStatBonuses(appearance) {
     return bonuses;
 }
 
-export const EQUIP_FIELDS = ['armorKey', 'helmetKey', 'weaponKey', 'toolKey'];
+export const EQUIP_FIELDS = ['armorKey', 'helmetKey', 'weaponKey', 'toolKey', 'bootsKey', 'trinketKey'];
 
 // Keys of the items equipped on an appearance, in slot order.
 export function equippedItems(appearance) {

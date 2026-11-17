@@ -1,6 +1,6 @@
 import { hasLineOfSight, MAX_CLIMB, settleZ, unitCell, stepNeighbors, columnCells, cellsNear, posKey, parseKey } from './battle-map.js';
 import { faceToward, isUnconscious, isDead } from './units.js';
-import { ABILITIES, JOB_STATS } from './data-registry.js';
+import { ABILITIES, JOB_STATS, BASE_CRIT } from './data-registry.js';
 import { moveEntity } from '../systems/movement-lerp.js';
 
 // Re-export so callers that import ABILITIES from this module keep working.
@@ -163,6 +163,34 @@ export function moveProfile(unit) {
         ignoreTerrainCost: abs.some(a => a.ignoreTerrainCost),
         passThroughUnits:  abs.some(a => a.passThroughUnits),
     };
+}
+
+// ---- Dodging and critical hits ----
+// Dodging: physical attacks only. EVA is a percent chance, halved from the side and lost
+// entirely from behind; Defend and evasion passives add to it. However it is stacked, it
+// never goes past MAX_DODGE, so nobody is unhittable.
+export const MAX_DODGE = 0.6;
+// Critical hits: any damaging skill, physical or magic. Every unit has CRIT (a percent chance,
+// 5 to start, raised by some gear); a critical hit deals CRIT_MULT damage. The chance never
+// goes past MAX_CRIT.
+export { BASE_CRIT };
+export const CRIT_MULT = 1.5;
+export const MAX_CRIT = 0.4;
+
+/** The chance a physical attack from `source` misses `target` (0 for a spell or an undodgeable skill). */
+export function dodgeChance(source, target, ab) {
+    if (!ab || ab.type !== 'physical') return 0;
+    if (supportOf(source)?.ignoreEvasion || ab.ignoreEvasion || ab.noEvade) return 0;
+    const eva = ((getEffectiveStat(target, 'eva') || 0) / 100) * directionEvasionMod(source, target)
+        + (supportOf(target)?.evaBonus ?? 0)
+        + (target.status.includes('defend') ? 0.2 : 0);
+    return Math.max(0, Math.min(MAX_DODGE, eva));
+}
+
+/** The chance a damaging skill from `source` lands as a critical hit. */
+export function critChance(source, ab) {
+    if (!ab?.basePower || ab.isHeal || ab.isCure) return 0;
+    return Math.max(0, Math.min(MAX_CRIT, (getEffectiveStat(source, 'crit') ?? BASE_CRIT) / 100));
 }
 
 export function directionEvasionMod(attacker, target) {
@@ -395,13 +423,8 @@ export function resolveAbility(source, target, ability, map) {
             return { damage: 0, healing: 0, statusApplied: null, missed: true };
         }
 
-        const evaMod = directionEvasionMod(source, target);
-        let effectiveEva = ((getEffectiveStat(target, 'eva') || 0) / 100) * evaMod;
-        const defBonus = target.status.includes('defend') ? 0.2 : 0;
-        effectiveEva += tgtSup?.evaBonus ?? 0;
-        // Orders (noEvade) and true strikes (ignoreEvasion) can't be dodged.
-        const finalEva = (srcSup?.ignoreEvasion || ab.ignoreEvasion || ab.noEvade) ? 0 : Math.min(0.9, effectiveEva + defBonus);
-        if (Math.random() < finalEva) {
+        // Orders (noEvade) and true strikes (ignoreEvasion) can't be dodged; see dodgeChance.
+        if (Math.random() < dodgeChance(source, target, ab)) {
             faceToward(source, target.x, target.y);
             return { damage: 0, healing: 0, statusApplied: null, missed: true };
         }
@@ -436,6 +459,8 @@ export function resolveAbility(source, target, ability, map) {
     // Nightmare, Catalyst: extra damage against a target with the named status.
     for (const [status, mult] of Object.entries(ab.bonusVsStatus ?? {})) if (target.status.includes(status)) raw *= mult;
     raw *= source._momentumMult ?? 1;
+    const crit = Math.random() < critChance(source, ab);
+    if (crit) raw *= CRIT_MULT;
     const variance = 0.9 + Math.random() * 0.2;
     const damage = Math.round(raw * variance);
 
@@ -457,14 +482,14 @@ export function resolveAbility(source, target, ability, map) {
             // Providence: once per battle, a killing blow leaves the unit at 1 HP.
             target.hp = 1;
             target._providenceUsed = true;
-            return { damage, healing: 0, statusApplied: null, killedInstantly: false, providence: true };
+            return { damage, crit, healing: 0, statusApplied: null, killedInstantly: false, providence: true };
         } else if (!isDead(target)) {
             // reraise: auto-revive at 1 HP when KO'd
             if (target.status.includes('reraise')) {
                 target.hp = 1;
                 target.status = target.status.filter(s => s !== 'reraise');
                 delete (target.statusTimers || {})['reraise'];
-                return { damage, healing: 0, statusApplied: null, killedInstantly: false, reraise: true };
+                return { damage, crit, healing: 0, statusApplied: null, killedInstantly: false, reraise: true };
             }
             if (!target.status.includes('unconscious')) target.status.push('unconscious');
             target.deathTimer = 3;
@@ -496,5 +521,5 @@ export function resolveAbility(source, target, ability, map) {
     if (ab.selfCtGain) source.ct = Math.max(0, Math.min(CT_GAIN_CAP, (source.ct ?? 0) + ab.selfCtGain));
 
     faceToward(source, target.x, target.y);
-    return { damage, healing: 0, statusApplied, killedInstantly, drained };
+    return { damage, crit, healing: 0, statusApplied, killedInstantly, drained };
 }

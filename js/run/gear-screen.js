@@ -11,7 +11,7 @@ import { EQUIPMENT, EQUIP_FIELDS } from '../tactical/data/equipment.js';
 import { STATS, equipDelta, previewUnit } from './member-stats.js';
 import { BTN, esc, jobLabel, titleCase, abilityName, itemTitle, itemSummary, itemIconHtml, portraitHtml, drawSprites, drawPortrait, FONT } from './ui-kit.js';
 
-const SLOT_LABEL = { weaponKey: 'Weapon', armorKey: 'Armor', helmetKey: 'Helmet', toolKey: 'Tool' };
+const SLOT_LABEL = { weaponKey: 'Weapon', armorKey: 'Armor', helmetKey: 'Helmet', toolKey: 'Tool', bootsKey: 'Boots', trinketKey: 'Trinket' };
 const fieldOf = (key) => `${EQUIPMENT[key]?.slot}Key`;
 const CHIP = `padding:3px 8px;font-family:${FONT};font-size:11px;border-radius:3px;cursor:pointer;width:auto;`;
 const UP = '#7e7', DOWN = '#f77';
@@ -122,7 +122,7 @@ export class GearScreen {
                 ${this._slotHtml(m, 'weaponKey')}
                 <canvas class="gear-doll" width="96" height="96" style="image-rendering:pixelated;width:96px;height:96px;background:#080818;border:1px solid #335;border-radius:4px;"></canvas>
                 ${this._slotHtml(m, 'toolKey')}
-                <div></div>${this._slotHtml(m, 'armorKey')}<div></div>
+                ${this._slotHtml(m, 'trinketKey')}${this._slotHtml(m, 'armorKey')}${this._slotHtml(m, 'bootsKey')}
             </div>
             <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:3px 8px;font-size:11px;margin-top:10px;padding-top:8px;border-top:1px solid #223;">`;
         for (const [s, label] of STATS) {

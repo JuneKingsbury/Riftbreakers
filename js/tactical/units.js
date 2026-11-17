@@ -1,4 +1,4 @@
-import { JOB_STATS, ABILITIES } from './data-registry.js';
+import { JOB_STATS, ABILITIES, BASE_CRIT } from './data-registry.js';
 import { buildLoadout, scaledLoadout, isPartyMember, levelStatMods } from './loadout.js';
 import { viewState } from './view-state.js';
 
@@ -43,6 +43,8 @@ export function createUnit(name, job, team, x, y, { statMods = {}, extraAbilitie
         mdf:  base.mdf  + mod('mdf'),
         move: base.move + mod('move') + moveBonus,
         eva:  base.eva  + mod('eva'),
+        // Critical hit chance in percent (see critChance in abilities.js).
+        crit: (base.crit ?? BASE_CRIT) + mod('crit'),
         ct,
         char: base.char,
         color: base.color,

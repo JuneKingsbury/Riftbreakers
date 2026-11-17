@@ -141,11 +141,16 @@ export class TacticalBattle {
             return;
         }
         if (result.damage > 0) {
-            this._emit('hit', { source, target, damage: result.damage, ability: abKey });
+            this._emit('hit', { source, target, damage: result.damage, ability: abKey, crit: !!result.crit });
             const highGround = (source.z ?? 0) > (target.z ?? 0);
             const suffix = highGround ? ' from the high ground' : '';
-            this.logMsg(`${source.name} hits ${target.name} for ${result.damage} damage${suffix}.`);
-            this._spawnFloat(target, `-${result.damage}`, '#f88');
+            if (result.crit) {
+                this.logMsg(`${source.name} lands a critical hit on ${target.name} for ${result.damage} damage${suffix}!`);
+                this._spawnFloat(target, `Critical! -${result.damage}`, '#ffd24a');
+            } else {
+                this.logMsg(`${source.name} hits ${target.name} for ${result.damage} damage${suffix}.`);
+                this._spawnFloat(target, `-${result.damage}`, '#f88');
+            }
         }
         if (result.healing > 0) {
             this._emit(result.revived ? 'revive' : 'heal', { source, target, amount: result.healing, ability: abKey });
