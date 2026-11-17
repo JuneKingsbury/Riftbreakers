@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { Rng } from '../../js/run/rng.js';
-import { generateActMap, reachableIds, BOSS_FLOOR, TREASURE_FLOOR, LANES } from '../../js/run/map-gen.js';
+import { generateActMap, reachableIds, BOSS_FLOOR, TREASURE_FLOOR, RECRUIT_FLOOR, LANES } from '../../js/run/map-gen.js';
 
 const SEEDS = Array.from({ length: 60 }, (_, i) => i + 1);
 
@@ -75,16 +75,19 @@ test('floor rules: combat first, treasure mid-act, rest before the boss, no earl
     }
 });
 
-test('every route meets a recruit on floors 3-12, but not many more', () => {
-    let total = 0;
-    for (const seed of SEEDS) {
-        const m = generateActMap(new Rng(seed), 1);
-        for (const route of allRoutes(m)) {
-            assert.ok(route.some(n => n.type === 'recruit' && n.floor >= 3 && n.floor <= 12), `seed ${seed}: a route has no recruit`);
+test('every route to the boss meets exactly one recruit, on the mid-act recruit floor', () => {
+    assert.equal(RECRUIT_FLOOR, 7);
+    for (const act of [1, 2, 3]) {
+        for (const seed of SEEDS) {
+            const m = generateActMap(new Rng(seed), act);
+            for (const n of Object.values(m.nodes)) {
+                assert.equal(n.type === 'recruit', n.floor === 7, `seed ${seed} act ${act}: ${n.type} on floor ${n.floor}`);
+            }
+            for (const route of allRoutes(m)) {
+                assert.equal(route.filter(n => n.type === 'recruit').length, 1, `seed ${seed} act ${act}: route recruit count`);
+            }
         }
-        total += Object.values(m.nodes).filter(n => n.type === 'recruit').length;
     }
-    assert.ok(total / SEEDS.length <= 4.5, `about ${total / SEEDS.length} recruits per act`);
 });
 
 test('the player starts on any floor 1 node and then follows edges', () => {

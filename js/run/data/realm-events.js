@@ -36,7 +36,6 @@ export const REALM_EVENTS = [
         text: 'A family driven from home by the Crusade has stopped by the trail, everything they own piled on one cart.',
         choices: [
             { label: 'Share your supplies', effect: { healPct: -0.05, xp: 30 }, resultText: 'Lean rations tonight, but their stories of the Crusade are worth hearing. 30 XP for every member.' },
-            { label: 'Ask if anyone can fight', requires: { partyBelow: 6 }, effect: { recruit: true }, resultText: 'The eldest child is older than they look, and handy with a sling.' },
             { label: 'Point them to the settlement', effect: { gold: 20 }, resultText: 'They press 20 gold on you for the directions.' },
         ],
     },
@@ -155,7 +154,6 @@ export const REALM_EVENTS = [
         text: 'A voice calls from behind a collapsed tunnel. A miner, alive, pinned under a cart.',
         choices: [
             { label: 'Dig them out', effect: { healPct: -0.1, gold: 60 }, resultText: 'It takes hours. The grateful miner hands over a pouch of 60 gold.' },
-            { label: 'Offer them a place', requires: { partyBelow: 6 }, effect: { recruit: true }, resultText: 'Once free, they pick up a pick and fall in line.' },
             { label: 'Leave them', resultText: 'Their calls fade behind you.' },
         ],
     },
@@ -347,7 +345,7 @@ export const REALM_EVENTS = [
         title: 'Lucid Prisoner',
         text: 'Among the chattering penitents, one still remembers their name. They beg to be taken home.',
         choices: [
-            { label: 'Take them with you', requires: { partyBelow: 6 }, effect: { recruit: true }, resultText: 'They have been here a long time. They know how to fight.' },
+            { label: 'Lead them to the gate', effect: { healPct: -0.1, relic: 'common' }, resultText: 'The way out is hard going. At the gate they press {relic} into your hands and walk on alone.' },
             { label: 'Share your rations', effect: { xp: 30 }, resultText: 'They tell you which halls to avoid. Everyone gains 30 XP.' },
         ],
     },

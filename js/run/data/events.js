@@ -8,9 +8,8 @@
 //   chains   Realm chains (data/realms.js) the event fits, for events set outdoors on the
 //            road (default: all)
 //   choice:  { label, requires?, effect?, resultText?, outcomes? }
-//     requires  { gold?: n, partyBelow?: n, items?: n }: the choice is disabled unless met
-//               (gold: at least n gold; partyBelow: fewer than n members; items: at least
-//               n unequipped items)
+//     requires  { gold?: n, items?: n }: the choice is disabled unless met
+//               (gold: at least n gold; items: at least n unequipped items)
 //     outcomes  [{ weight, effect, resultText }]: one is rolled instead of effect/resultText
 //
 // effect fields (all optional; see RunState.applyEffect):
@@ -23,7 +22,6 @@
 //   relic        Rarity of a random relic to gain
 //   loseItem     true: lose a random unequipped item
 //   memberStatMods  Permanent stat bonus for one random member ({name} in resultText)
-//   recruit      true: meet recruits (as on a recruit node)
 //   battle       'normal' | 'elite': fight before moving on
 // resultText may use {name} (the member chosen by memberStatMods), {item} and {relic}.
 
@@ -116,17 +114,6 @@ const GENERAL_EVENTS = [
               resultText: 'They take the gold and vanish. Bitter, but nobody bleeds.' },
             { label: 'Fight back', effect: { battle: 'normal' },
               resultText: 'The party draws steel.' },
-        ],
-    },
-    {
-        id: 'lost_sellsword',
-        title: 'Lost Sellsword',
-        text: 'A lone fighter sits by a dying fire. Their company is dead, and they need work.',
-        choices: [
-            { label: 'Offer them a place', requires: { partyBelow: 6 }, effect: { recruit: true },
-              resultText: 'They size up your party and nod.' },
-            { label: 'Share your food', effect: { healPct: -0.05, xp: 30 },
-              resultText: 'They trade war stories for supper. 30 XP for every member.' },
         ],
     },
     {
@@ -244,17 +231,6 @@ const GENERAL_EVENTS = [
             { label: 'Pay in coin (120 gold)', requires: { gold: 120 }, effect: { gold: -120, relic: 'rare' },
               resultText: 'The coins vanish mid-air. In your palm: {relic}.' },
             { label: 'Refuse', resultText: 'The figure is gone when you blink.' },
-        ],
-    },
-    {
-        id: 'mercenary_captain',
-        title: 'Mercenary Captain',
-        text: 'A captain is selling off the contract of a recruit who "isn\'t working out".',
-        acts: [2, 3],
-        choices: [
-            { label: 'Buy the contract (60 gold)', requires: { gold: 60, partyBelow: 6 }, effect: { gold: -60, recruit: true },
-              resultText: 'The captain counts the coin and points at the waiting recruits.' },
-            { label: 'Not today', resultText: 'You keep your coin.' },
         ],
     },
     {

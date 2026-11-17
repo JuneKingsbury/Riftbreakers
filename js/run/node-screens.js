@@ -246,7 +246,7 @@ export class NodeScreens {
         });
     }
 
-    // The event's outcome text, then the battle or recruit screen it leads to.
+    // The event's outcome text, then the battle it leads to.
     _eventFollowUp(ev, res) {
         const html = H1(`? ${esc(ev.title)}`, '#9cf')
             + `<div style="color:#dda;line-height:1.7;margin-bottom:12px;">${esc(res.text)}</div>

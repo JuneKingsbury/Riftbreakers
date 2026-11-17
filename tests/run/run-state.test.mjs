@@ -203,7 +203,7 @@ test("a gear passive works on top of the member's chosen slot, and goes with the
     assert.equal(warden.loadout.reaction, 'guardian_ward', 'the learned choice is untouched');
 });
 
-test('events apply their effects and can lead to a battle or recruits', () => {
+test('events apply their effects and can lead to a battle', () => {
     const run = newRun(4);
     enter(run, 'event');
     run.pending.eventId = 'training_grounds';
@@ -222,10 +222,9 @@ test('events apply their effects and can lead to a battle or recruits', () => {
     run.completeBattle(true);
     run.leaveNode();
 
-    enter(run, 'event');
-    run.pending.eventId = 'lost_sellsword';
-    assert.equal(run.chooseEvent(0).next, 'recruit');
-    assert.equal(run.pending.kind, 'recruit');
+    // Recruits come only from the map's recruit floor, never from events.
+    const offersRecruit = c => [c.effect, ...(c.outcomes || []).map(o => o.effect)].some(e => e?.recruit);
+    for (const ev of EVENTS) assert.ok(!ev.choices.some(offersRecruit), `${ev.id} offers a recruit`);
 
     for (const ev of EVENTS) assert.ok(ev.choices.length >= 1 && ev.choices.length <= 3, ev.id);
 });
@@ -325,6 +324,19 @@ test('off-hand items are tools, and a save with one equipped as a weapon puts it
     const lm = loaded.member(blade.name);
     assert.equal(lm.appearance.weaponKey, null);
     assert.equal(loaded.inventory.parrying_dagger, before + 1, 'returned to the bag, not lost');
+});
+
+test('a save made at an event that no longer exists resumes at a real event', () => {
+    const run = newRun(9);
+    enter(run, 'event');
+    const saved = JSON.parse(run.serialize());
+    saved.pending.eventId = 'lost_sellsword';   // removed when recruits moved to the map
+
+    const loaded = RunState.deserialize(saved);
+
+    assert.ok(loaded.currentEvent, 'a current event is found');
+    assert.notEqual(loaded.pending.eventId, 'lost_sellsword');
+    assert.equal(loaded.pending.resolved, false);
 });
 
 test('a run can start with one, two or three roles; asking for none gives the default three', async () => {

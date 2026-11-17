@@ -148,6 +148,8 @@ export class RunState {
         run.rng.state = data.rngState >>> 0;
         delete run.rngState;
         run._unequipMisfits();
+        // A save made at an event that has since been removed rolls a fresh one.
+        if (run.pending?.kind === 'event' && !run.currentEvent) run.pending.eventId = run._rollEvent();
         return run;
     }
 
@@ -671,13 +673,12 @@ export class RunState {
     choiceAvailable(choice) {
         const r = choice.requires || {};
         if (r.gold != null && this.gold < r.gold) return false;
-        if (r.partyBelow != null && this.party.length >= r.partyBelow) return false;
         if (r.items != null && Object.keys(this.inventory).length < r.items) return false;
         return true;
     }
 
-    // Resolves an event choice. Returns { text, next } where next is 'battle', 'recruit' or null;
-    // for those the pending state becomes the battle or recruit screen.
+    // Resolves an event choice. Returns { text, next } where next is 'battle' or null;
+    // for a battle the pending state becomes the fight.
     chooseEvent(index) {
         const ev = this.currentEvent;
         const choice = ev?.choices[index];
@@ -695,7 +696,6 @@ export class RunState {
         this.pending.result = text;
         let next = null;
         if (effect?.battle) { this._startEventBattle(effect.battle); next = 'battle'; }
-        else if (effect?.recruit && this.party.length < MAX_PARTY) { this.pending = this._recruitPending(); next = 'recruit'; }
         return { text, next };
     }
 
