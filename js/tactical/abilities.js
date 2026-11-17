@@ -196,6 +196,19 @@ export function critChance(source, ab) {
     return Math.max(0, Math.min(MAX_CRIT, (getEffectiveStat(source, 'crit') ?? BASE_CRIT) / 100));
 }
 
+// ---- Summon limits ----
+// A summon with summonLimit can't be cast while the caster already has that many of its
+// creatures standing (e.g. one wolf at a time). Summoners keep their creatures in
+// unit.summoned[summonJob]; battle.js adds to it when a summon appears.
+export function standingSummons(unit, summonJob) {
+    return (unit.summoned?.[summonJob] ?? []).filter(u => !isDead(u) && !isUnconscious(u) && u.hp > 0);
+}
+
+export function summonCapped(unit, key) {
+    const ab = ABILITIES[key];
+    return !!ab?.isSummon && ab.summonLimit != null && standingSummons(unit, ab.summonJob).length >= ab.summonLimit;
+}
+
 export function directionEvasionMod(attacker, target) {
     const dx = attacker.x - target.x;
     const dy = attacker.y - target.y;

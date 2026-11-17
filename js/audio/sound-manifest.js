@@ -18,6 +18,7 @@ export const SOUND_MANIFEST = {
         enemy_down:     { file: 'audio/sfx/combat/enemy_death.ogg', gain: 0.8 },
         arrow_fire:     { file: 'audio/sfx/combat/arrow_fire.ogg', gain: 0.7 },
         battle_alert:   { file: 'audio/sfx/ui/wave_alert.ogg', gain: 0.7, pitch: 0 },
+        rift_travel:    { file: 'audio/sfx/spells/spell_teleport.ogg', gain: 0.9, pitch: 0 },   // the portal between acts
 
         // Spells
         spell_cast:     { file: 'audio/sfx/spells/spell_cast.ogg', gain: 0.7 },

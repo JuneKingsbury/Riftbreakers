@@ -1765,6 +1765,10 @@ export const ABILITY_DATA = {
     // =====================================================================
     // --- Summon abilities ---
     // isSummon: true  — targets an empty tile; places a new allied unit there.
+    // summonLimit: n  — can't be cast while the caster has n of its creatures standing.
+    // summonScale: x  — the creature's HP, ATK and MAT times x (only summons, not wild ones).
+    // summonMods: {}  — flat stat changes for the creature, e.g. { spd: -3 }.
+    // summonLure: x   — enemy attack priority on it: -0.5 halves it, +1 doubles it.
     // summonJob / summonName define what creature appears.
     // =====================================================================
 
@@ -1773,7 +1777,11 @@ export const ABILITY_DATA = {
         type: 'magic',
         range: 2,
         aoe: 0,
-        mpCost: 16,
+        mpCost: 24,
+        summonLimit: 1,   // one wolf at a time
+        // Slower than a wild wolf (SPD 13 → 7): its quick, slowing bites were what made
+        // Beastcallers so strong (balance study, 2026-11-17). Its other stats are a wolf's.
+        summonMods: { spd: -6 },
         actionCost: 50,
         targetType: 'tile',
         isSummon: true,
@@ -1784,7 +1792,7 @@ export const ABILITY_DATA = {
         projectileColor: '#aaaacc',
         chargeTime: 0,
         requiresLos: false,
-        desc: 'Calls a wolf spirit to fight beside you. Fast and hard to hit.',
+        desc: 'Calls a wolf spirit to fight beside you. Hard to hit, and its bite slows. Only one answers at a time.',
     },
 
     call_boar: {

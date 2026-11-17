@@ -60,6 +60,7 @@ once, so busy fights stay clear.
 | `equip` | `sfx/work/craft_complete.ogg` | Equipment changes |
 | `rest` | `sfx/spells/spell_heal.ogg` | Train or enchant at a rest site |
 | `travel` | `sfx/environment/footstep.ogg` | Moving to a node |
+| `rift_travel` | `sfx/spells/spell_teleport.ogg` | Stepping through the portal into a new run or act (the file is currently a copy of `magic_levelup`; a whoosh would suit it better) |
 | `event` | `sfx/ui/notification.ogg` | An event choice resolves, or a recruit joins |
 | `click` | `sfx/ui/button_click.ogg` | Any button |
 | `panel` | `sfx/ui/open_close_click.ogg` | A panel opens or closes |

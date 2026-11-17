@@ -14,6 +14,23 @@ html, body {
     touch-action: none;
 }
 
+/* A game, not a web page: no text selection by click-and-drag or double-click, no long-press
+   callout on phones, and no dragging images or sprites around. Text fields stay selectable
+   (the save code has to be copied, and tactics rules can be named). */
+html, body, body * {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+}
+img, canvas {
+    -webkit-user-drag: none;
+}
+input, textarea, select, [contenteditable="true"] {
+    -webkit-user-select: text;
+    user-select: text;
+    -webkit-touch-callout: default;
+}
+
 :root {
     --ui-font-scale: 1;
     --ui-font-size: calc(12px * var(--ui-font-scale));

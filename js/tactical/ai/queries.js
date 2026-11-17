@@ -1,7 +1,7 @@
 // Pure battlefield queries for the scripted-AI layer. Nothing here mutates a
 // unit or the battle, and nothing animates. `units` is always the list of
 // non-dead units (battle.livingUnits), `map` is the battle map.
-import { computeMoveRange, computeAttackRange, computeAoeArea, abilityAffects } from '../abilities.js';
+import { computeMoveRange, computeAttackRange, computeAoeArea, abilityAffects, summonCapped } from '../abilities.js';
 import { ABILITIES, baseKey, ownKey } from '../data-registry.js';
 import { hasLineOfSight, unitCell, stepNeighbors, posKey, parseKey, cellKey } from '../battle-map.js';
 import { isConscious, isAlive } from '../units.js';
@@ -77,6 +77,7 @@ export function canUse(unit, abilityKey) {
     if (!ab || ab.passive) return false;
     if (unit.mp < ab.mpCost) return false;
     if (ab.type === 'magic' && hasStatus(unit, 'silence')) return false;
+    if (summonCapped(unit, abilityKey)) return false;   // e.g. a wolf is already out
     return !hasStatus(unit, 'charging');
 }
 

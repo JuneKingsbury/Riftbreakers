@@ -1,4 +1,4 @@
-import { computeMoveRange, computeMovePath, computeAttackRange, computeAoeArea, computePatternArea, resolveAbility, ABILITIES, supportOf, passivesOf, inflictStatus, cleanseStatuses, abilityAffects } from './abilities.js';
+import { computeMoveRange, computeMovePath, computeAttackRange, computeAoeArea, computePatternArea, resolveAbility, ABILITIES, supportOf, passivesOf, inflictStatus, cleanseStatuses, abilityAffects, summonCapped } from './abilities.js';
 import { JOB_STATS } from './data-registry.js';
 import { viewState } from './view-state.js';
 import { isDead, isAlive, isConscious, isUnconscious, isStunned, faceToward, setFacing, createUnit } from './units.js';
@@ -378,7 +378,7 @@ export class TacticalBattle {
         const ab = ABILITIES[abilityKey];
         if (!ab) return;
         if (ab.passive) return;
-        if (ab.mpCost > this.activeUnit.mp) return;
+        if (ab.mpCost > this.activeUnit.mp || summonCapped(this.activeUnit, abilityKey)) return;
         this.selectedAbility = abilityKey;
         this.abilityRotation = 0;
         this._lastHoverTile = null;
@@ -751,6 +751,20 @@ export class TacticalBattle {
 
         const summon = createUnit(ab.summonName, ab.summonJob, source.team, tx, ty, { ct: 0, z: tile.z });
         summon.summonerId = source.id;
+        // For summonLimit (see summonCapped): the summoner's creatures, by kind.
+        source.summoned = source.summoned || {};
+        source.summoned[ab.summonJob] = [...(source.summoned[ab.summonJob] ?? []), summon];
+        // summonScale: a summoned creature weaker (or stronger) than one of its kind met in the
+        // wild, e.g. Call Wolf's wolf against the Pack Wolves enemies field.
+        if (ab.summonScale != null) {
+            for (const k of ['maxHp', 'atk', 'mat']) summon[k] = Math.max(1, Math.round(summon[k] * ab.summonScale));
+            summon.hp = summon.maxHp;
+        }
+        // summonMods: flat stat changes for the summoned creature (e.g. a slower wolf).
+        for (const [k, v] of Object.entries(ab.summonMods ?? {})) if (typeof summon[k] === 'number') summon[k] = Math.max(k === 'move' || k === 'spd' ? 1 : 0, summon[k] + v);
+        if (ab.summonMods?.maxHp) summon.hp = summon.maxHp;
+        // summonLure: how much enemies want to attack it (negative: less than its stats suggest).
+        if (ab.summonLure != null) summon.lure = ab.summonLure;
         // Spirit Pact: the summoner's support strengthens the creature.
         const boost = supportOf(source)?.summonBoost;
         if (boost) {

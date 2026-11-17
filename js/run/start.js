@@ -9,6 +9,7 @@ import {
 import { jobsOfTier } from '../tactical/data-registry.js';
 import { JOB_DATA } from '../tactical/data/jobs.js';
 import { Modal, BTN, BTN_DISABLED, BTN_GOOD, BTN_GOLD, esc, jobLabel, abilityName } from './ui-kit.js';
+import { riftTransition } from '../ui/rift-transition.js';
 
 // One-line role summaries for the starting picks.
 const ROLE = {
@@ -106,9 +107,12 @@ export function newRun(containerEl, skinManager, { onStart, onExit, onCancel }) 
             if (picked.length < MIN_START_PARTY || picked.length > START_PARTY) return;
             const run = RunState.create({ jobs: [...picked], options: { ...options, tier } });
             run.save();
-            modal.destroy();
-            onStart?.();
-            requestAnimationFrame(() => launch(containerEl, skinManager, run, onExit));
+            // Step through the rift into the first act.
+            riftTransition({ skinManager, onMidpoint: () => {
+                modal.destroy();
+                onStart?.();
+                launch(containerEl, skinManager, run, onExit);
+            } });
         });
     };
     render();

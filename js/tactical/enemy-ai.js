@@ -1,4 +1,4 @@
-import { computeMoveRange, computeAoeArea, ABILITIES, NEGATIVE_STATUSES } from './abilities.js';
+import { computeMoveRange, computeAoeArea, ABILITIES, NEGATIVE_STATUSES, summonCapped } from './abilities.js';
 import { JOB_STATS } from './data-registry.js';
 import { isDead, isConscious, isUnconscious, faceToward } from './units.js';
 import { hasLineOfSight, columnCells, posKey, parseKey } from './battle-map.js';
@@ -168,8 +168,9 @@ function scoreAction(unit, abilityKey, targetUnit, from, battle, opponents) {
     // Healer / support priority: eliminating the enemy healer is critical.
     if (isHealer(targetUnit)) score *= 1.5;
 
-    // Lures (Mirror Image's copies) draw attacks: they look like the real thing.
-    score *= 1 + (JOB_STATS[targetUnit.job]?.lure ?? 0);
+    // Lures (Mirror Image's copies) draw attacks: they look like the real thing. A summon can
+    // carry its own lure (summonLure), which wins over its kind's.
+    score *= Math.max(0.05, 1 + (targetUnit.lure ?? JOB_STATS[targetUnit.job]?.lure ?? 0));
 
     // Status value (don't stack the same status that already applies).
     if (ab.applyStatus && !targetUnit.status.includes(ab.applyStatus)) {
@@ -275,7 +276,7 @@ export function planEnemyTurn(unit, battle) {
 
     for (const abilityKey of unit.abilities) {
         const ab = ABILITIES[abilityKey];
-        if (!ab || ab.passive || unit.mp < ab.mpCost) continue;
+        if (!ab || ab.passive || unit.mp < ab.mpCost || summonCapped(unit, abilityKey)) continue;
         // Splashes that hit both sides, corpse rites and orders are for scripted characters only.
         if (ab.targetType === 'all' || ab.targetType === 'corpse' || ab.ctGain != null || ab.swapPlaces) continue;
 

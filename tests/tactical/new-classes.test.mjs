@@ -411,3 +411,22 @@ test('Hall of Mirrors makes two copies, and the automatic Illusionist only makes
     for (const c of copies) { c.hp = 0; c.status.push('dead'); }
     assert.equal(runScript(script, oracle, battle.livingUnits, map).act.ability, 'hall_of_mirrors', 'both gone: make more');
 });
+
+test('a Beastcaller has one wolf out at a time, and can call another once it falls', async () => {
+    const { summonCapped } = await import('../../js/tactical/abilities.js');
+    const { canUse } = await import('../../js/tactical/ai/queries.js');
+    const caller = mk('Bea', 'beastcaller', 'player', 2, 3, { abilities: ['attack', 'call_wolf'], mp: 999, maxMp: 999 });
+    const foe = mk('Gob', 'goblin', 'enemy', 12, 3);
+    const battle = new TacticalBattle(map, [caller, foe]);
+    assert.ok(canUse(caller, 'call_wolf'));
+    battle._resolveSummon(caller, ABILITIES.call_wolf, 3, 3);
+    const wolf = battle.units.find(u => u.job === 'wolf');
+    assert.ok(wolf, 'a wolf answers');
+    assert.ok(summonCapped(caller, 'call_wolf') && !canUse(caller, 'call_wolf'), 'no second wolf while the first stands');
+    knockOut(wolf);
+    assert.ok(canUse(caller, 'call_wolf'), 'once it falls, another can be called');
+    assert.equal(ABILITIES.call_wolf.summonLimit, 1);
+    assert.equal(wolf.spd, JOB_STATS.wolf.spd - 6, 'a summoned wolf is slower than a wild one');
+    assert.equal(wolf.maxHp, JOB_STATS.wolf.maxHp, 'its other stats are a wolf\'s');
+    assert.ok(ABILITIES.call_wolf.mpCost >= 24);
+});

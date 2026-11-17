@@ -23,6 +23,7 @@ import { openScriptEditor } from '../tactical/ai/script-editor.js';
 import { setScriptBacking } from '../tactical/ai/script-store.js';
 import { canPromote, canSpendPoints } from '../tactical/loadout.js';
 import { isPortrait } from '../ui/layout.js';
+import { riftTransition } from '../ui/rift-transition.js';
 
 const SIDEBAR_W = 230;
 const DRAG_THRESHOLD = 6;
@@ -155,11 +156,17 @@ export class RunMapScene {
     }
 
     _leaveNode() {
+        const act = this.run.act;
         this.run.leaveNode();
-        this._modal.close();
-        // Keep the next choices in view.
-        this._renderer.focusFloor((this.run.currentNode?.floor ?? 0) + 1);
-        this._afterChange();
+        const arrive = () => {
+            this._modal.close();
+            // Keep the next choices in view.
+            this._renderer.focusFloor((this.run.currentNode?.floor ?? 0) + 1);
+            this._afterChange();
+        };
+        // A new act: travel through the rift to its realm (the act card shows on arrival).
+        if (this.run.act > act && this.run.status === 'active') riftTransition({ skinManager: this._skin, onMidpoint: arrive });
+        else arrive();
     }
 
     // A card naming the act's realm, once per act, before its first step.
