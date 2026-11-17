@@ -1,5 +1,7 @@
 // Meta progression between runs: renown earned at the end of each run buys
-// permanent unlocks. Stored in localStorage, separate from the run save.
+// permanent unlocks. Stored in localStorage, separate from the run save. A saved profile is
+// cleaned up on load (sanitizeProfile), so damaged or hand-edited data can't break the game.
+// Settings can export it, with the run in progress, to a file or code (save-transfer.js).
 
 export const PROFILE_KEY = 'riftbreak.profile.v1';
 
@@ -21,7 +23,7 @@ export const UNLOCKS = {
     second_wind:     { name: 'Second Wind', cost: 55, desc: 'Every member gains 50 XP at the start of each new act.' },
 };
 
-function storage() {
+export function defaultStorage() {
     try { return globalThis.localStorage ?? null; } catch { return null; }
 }
 
@@ -29,19 +31,38 @@ export function newProfile() {
     return { renown: 0, unlocked: [], stats: { runs: 0, wins: 0, bestAct: 0, bestFloor: 0 } };
 }
 
-export function loadProfile() {
+// A whole number at least 0, or the fallback.
+const count = (v, fallback = 0) => (Number.isFinite(v) && v >= 0 ? Math.floor(v) : fallback);
+
+/**
+ * A valid profile from anything (parsed save data, possibly damaged or edited): known
+ * unlocks only, each once; renown and stats as whole numbers at least 0. Unknown fields are
+ * dropped. Never throws.
+ */
+export function sanitizeProfile(data) {
+    const p = newProfile();
+    if (!data || typeof data !== 'object') return p;
+    p.renown = count(data.renown);
+    if (Array.isArray(data.unlocked)) {
+        p.unlocked = [...new Set(data.unlocked.filter(k => typeof k === 'string' && Object.hasOwn(UNLOCKS, k)))];
+    }
+    const stats = data.stats && typeof data.stats === 'object' ? data.stats : {};
+    for (const key of Object.keys(p.stats)) p.stats[key] = count(stats[key]);
+    p.stats.wins = Math.min(p.stats.wins, p.stats.runs);
+    return p;
+}
+
+export function loadProfile(storage = defaultStorage()) {
     try {
-        const raw = storage()?.getItem(PROFILE_KEY);
-        if (!raw) return newProfile();
-        const p = JSON.parse(raw);
-        return { ...newProfile(), ...p, stats: { ...newProfile().stats, ...(p.stats || {}) } };
+        const raw = storage?.getItem(PROFILE_KEY);
+        return raw ? sanitizeProfile(JSON.parse(raw)) : newProfile();
     } catch {
         return newProfile();
     }
 }
 
-export function saveProfile(profile) {
-    try { storage()?.setItem(PROFILE_KEY, JSON.stringify(profile)); return true; } catch { return false; }
+export function saveProfile(profile, storage = defaultStorage()) {
+    try { storage?.setItem(PROFILE_KEY, JSON.stringify(sanitizeProfile(profile))); return !!storage; } catch { return false; }
 }
 
 export function hasUnlock(profile, key) {

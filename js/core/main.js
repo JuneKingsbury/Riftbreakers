@@ -2,6 +2,7 @@ import { SkinManager } from '../ui/skin-manager.js';
 import { watchLayout } from '../ui/layout.js';
 import { Sound } from '../audio/sound.js';
 import { TITLE_MUSIC } from '../audio/game-sounds.js';
+import { wireSavePanel } from '../ui/save-panel.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     watchLayout();
@@ -179,6 +180,8 @@ document.addEventListener('DOMContentLoaded', () => {
         import('../run/start.js').then(({ hasSavedRun }) => { continueBtn.disabled = !hasSavedRun(); });
     };
     refreshContinue();
+    // Importing a save can add or remove a run in progress, so Continue follows it.
+    wireSavePanel(refreshContinue);
 
     document.getElementById('new-run')?.addEventListener('click', () => {
         import('../run/start.js').then(({ newRun }) => {

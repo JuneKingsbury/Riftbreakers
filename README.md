@@ -47,7 +47,13 @@ path through battles, elites, events, shops, rest sites, treasure and recruits, 
   ahead of the group, melee only as a last resort); everyone else defaults to Bold.
 - **State:** `RunState` (`run-state.js`) holds the whole run as plain data and autosaves to
   localStorage, so a run can be continued from the title screen. Between runs, renown buys
-  unlocks (`profile.js`).
+  unlocks (`profile.js`). The profile is saved separately, and loading cleans up damaged or
+  edited data (`sanitizeProfile`).
+- **Backups:** Settings > Save Data exports progress (the profile and any run in progress) to a
+  `.json` file or a copyable save code, and imports it back on any device (`save-transfer.js`).
+  Importing checks the save and asks before replacing current progress. Browsers can clear
+  local storage, mobile Safari after about a week of not visiting, so a backup is the only
+  way to keep progress safe.
 - **Content:** encounters, events, relics and recruits live in `js/run/data/`.
 
 ## Audio

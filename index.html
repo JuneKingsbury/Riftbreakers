@@ -77,6 +77,23 @@
                 </div>
             </div>
 
+            <div class="settings-section" data-start-tab="general">
+                <div class="settings-section-title">Save Data</div>
+                <div style="color:#999; font-size:11px; line-height:1.4; margin-bottom:6px;">Progress saves on this device automatically. Export a backup to keep it safe, or to move it to another device. It includes your renown, unlocks and any run in progress.</div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
+                    <button id="save-export-file" style="padding:5px 8px; font-size:11px; background:#1a1a2e; border:1px solid #446; color:#cde; border-radius:4px; cursor:pointer; font-family:inherit;">Export save file</button>
+                    <button id="save-import-file" style="padding:5px 8px; font-size:11px; background:#1a1a2e; border:1px solid #446; color:#cde; border-radius:4px; cursor:pointer; font-family:inherit;">Import save file</button>
+                    <button id="save-copy-code" style="padding:5px 8px; font-size:11px; background:#1a1a2e; border:1px solid #446; color:#cde; border-radius:4px; cursor:pointer; font-family:inherit;">Copy save code</button>
+                    <button id="save-paste-code" style="padding:5px 8px; font-size:11px; background:#1a1a2e; border:1px solid #446; color:#cde; border-radius:4px; cursor:pointer; font-family:inherit;">Load save code</button>
+                </div>
+                <input type="file" id="save-import-input" accept=".json,application/json,text/plain" style="display:none">
+                <div id="save-code-box" style="display:none; margin-top:6px;">
+                    <textarea id="save-code-text" rows="3" spellcheck="false" style="width:100%; box-sizing:border-box; background:#111122; color:#cde; border:1px solid #446; border-radius:3px; font-family:monospace; font-size:10px; padding:4px; resize:vertical;"></textarea>
+                    <button id="save-code-load" style="padding:5px 8px; font-size:11px; background:#1a1a2e; border:1px solid #446; color:#cde; border-radius:4px; cursor:pointer; font-family:inherit; margin-top:4px; width:100%; display:none;">Load this code</button>
+                </div>
+                <div id="save-status" role="status" style="font-size:11px; margin-top:6px; min-height:1em;"></div>
+            </div>
+
             <div class="settings-section" data-start-tab="general" style="border-bottom:none; text-align:center;">
                 <button id="start-reset-defaults" style="padding:6px 16px; font-size:11px; background:#442222; border:1px solid #664444; color:#ff8888; border-radius:4px; cursor:pointer;">Reset to Defaults</button>
             </div>
