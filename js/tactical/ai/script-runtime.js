@@ -160,10 +160,15 @@ const CATEGORY_FILTERS = {
     best_cure:   ab => !!ab.isCure,
     best_status: ab => ab.targetType === 'enemy' && !!ab.applyStatus,
     best_buff:   ab => ab.targetType === 'self' && !ab.isHeal && !ab.isCure && !ab.isSummon,
-    best_support: ab => ab.targetType === 'ally' && !ab.isHeal && !ab.isCure && !!ab.applyStatus,
+    best_support: ab => ab.targetType === 'ally' && !ab.isHeal && !ab.isCure && (!!ab.applyStatus || isAllyBuff(ab)),
     best_summon: ab => !!ab.isSummon,
 };
 
+
+// Stat buffs cast on allies (Rallying Beat), as opposed to status buffs like haste.
+function isAllyBuff(ab) {
+    return ab.targetType === 'ally' && !!ab.buffs && !ab.basePower && !ab.isHeal && !ab.applyStatus;
+}
 
 // Whether using the ability on this target could accomplish anything, so a
 // script never wastes a turn healing a full-HP ally or curing a clean one.
@@ -171,6 +176,8 @@ function usefulOn(ab, key, target, ctx) {
     if (ab.isHeal) return target.hp < target.maxHp || Q.hasStatus(target, 'unconscious');
     if (ab.isCure) return target.status.some(s => NEGATIVE_STATUSES.includes(s));
     if (ab.targetType === 'ally' && ab.applyStatus) return !Q.hasStatus(target, ab.applyStatus);
+    // Buffs from the same ability don't stack usefully: skip a target that still has it.
+    if (isAllyBuff(ab)) return !Q.hasBuff(target, key);
     if (ab.targetType === 'self' && !ab.isSummon) {
         if (Q.hasBuff(ctx.self, key)) return false;
         if (ab.applyStatus && Q.hasStatus(ctx.self, ab.applyStatus)) return false;

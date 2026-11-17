@@ -2,8 +2,8 @@
 // briefing, rewards, shop, event, rest site, treasure, recruits, and the end of
 // the run. Every action goes through RunState; `hooks` tell the scene what to do next.
 import { RELICS } from './data/relics.js';
-import { ENCOUNTERS } from './data/encounters.js';
-import { canPromote, promotionOptions, canSpendPoints, PROMOTION_LEVEL } from '../tactical/loadout.js';
+import { REALMS } from './data/realms.js';
+import { canPromote, canSpendPoints } from '../tactical/loadout.js';
 import { JOB_DATA } from '../tactical/data/jobs.js';
 import { MAX_PARTY } from './run-state.js';
 import {
@@ -77,7 +77,7 @@ export class NodeScreens {
         for (const r of enc.roster) counts[r.name] = (counts[r.name] || 0) + 1;
         let html = H1(`⚔ ${title}: ${esc(enc.name)}`, color);
         html += SUB(enc.kind === 'boss'
-            ? `${esc(ENCOUNTERS[enc.act].name)}: the guardian of this act bars the way.`
+            ? `${esc(REALMS[enc.realm]?.name ?? `Act ${enc.act}`)}: the guardian of this realm bars the way.`
             : 'Your party will fight on its own, following each member\'s tactics. Winning heals everyone; losing ends the run.');
         html += SECTION('Enemy forces');
         for (const [name, n] of Object.entries(counts)) html += `<div style="color:#f99;margin-bottom:2px;">${esc(name)}${n > 1 ? ` ×${n}` : ''}</div>`;
@@ -126,12 +126,10 @@ export class NodeScreens {
                 html += `<div style="padding:6px 8px;border:1px solid #335;border-radius:4px;">${relicHtml(p.relics[0])}</div>`;
             }
         }
-        if (p.boss) {
-            const ready = run.party.filter(m => canPromote(m));
+        const ready = run.party.filter(m => canPromote(m));
+        if (ready.length) {
             html += SECTION('Promotion');
-            html += `<div style="color:#999;font-size:11px;margin-bottom:6px;">${ready.length
-                ? `${esc(ready.map(m => m.name).join(', '))} can promote now, from the Party menu.`
-                : `Members who reach level ${PROMOTION_LEVEL} may promote here or at a rest site.`}</div>`;
+            html += `<div style="color:#fc6;font-size:11px;margin-bottom:6px;">${esc(ready.map(m => m.name).join(', '))} can promote now, from the Party menu.</div>`;
         }
         html += `<div style="height:8px;"></div>${this._partyButton()}
             <button data-continue style="${BTN}${BTN_GOOD}text-align:center;">Continue ›</button>`;
@@ -240,7 +238,7 @@ export class NodeScreens {
             return;
         }
         const wounded = run.party.some(m => m.hp != null);
-        html += SUB(`Choose one: drill the whole company, train one member, or promote one who is ready.${wounded ? ' Any of them also tends your wounds.' : ''}`);
+        html += SUB(`Choose one: drill the whole company or train one member.${wounded ? ' Either also tends your wounds.' : ''}`);
         html += `<button data-rest style="${BTN}${BTN_GOOD}">♨ Drill: every member gains ${run.options.drillXp} XP</button>`;
         html += SECTION(`Train: one member gains a skill point${run.options.trainXp ? ` and ${run.options.trainXp} XP` : ''}`);
         for (const m of run.party) {
@@ -250,23 +248,13 @@ export class NodeScreens {
         }
         const ready = run.party.filter(m => canPromote(m));
         if (ready.length) {
-            html += SECTION('Promote');
-            for (const m of ready) {
-                for (const job of promotionOptions(m)) {
-                    html += `<button data-promote="${esc(m.name)}|${job}" style="${BTN}${BTN_GOLD}">★ ${esc(m.name)}: ${jobLabel(m.job)} → ${jobLabel(job)}
-                        <div style="color:#889;font-size:10px;line-height:1.4;">${esc(jobDesc(job))}</div></button>`;
-                }
-            }
+            html += `<div style="color:#fc6;font-size:11px;margin:6px 0;">★ ${esc(ready.map(m => m.name).join(', '))} can promote any time, from the Party menu. It doesn't use up the rest.</div>`;
         }
         html += `<div style="height:6px;"></div>${this._partyButton()}`;
         this._show(html, (on) => {
             this._wireParty(on);
             on('[data-rest]', () => this._act(run.drill()));
             on('[data-train]', (el) => this._act(run.train(el.dataset.train)));
-            on('[data-promote]', (el) => {
-                const [name, job] = el.dataset.promote.split('|');
-                this._act(run.promote(name, job));
-            });
         });
     }
 
@@ -345,7 +333,7 @@ export class NodeScreens {
         let html = H1(won ? '♛ The Rift is Sealed' : '✝ The Company Falls', won ? '#fc6' : '#f66');
         html += SUB(won
             ? 'Against every odd, your company reached the end of the road.'
-            : `Your party was defeated in ${esc(ENCOUNTERS[run.act].name)} (act ${run.act}).`);
+            : `Your party was defeated in ${esc(run.realm.name)} (act ${run.act}).`);
         html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:3px 12px;margin-bottom:10px;">
             <div>Floors climbed</div><div style="color:#ddd;">${s.floors}</div>
             <div>Battles won</div><div style="color:#ddd;">${s.battles}</div>

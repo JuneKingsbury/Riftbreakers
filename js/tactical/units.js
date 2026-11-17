@@ -14,7 +14,9 @@ export { JOB_STATS };
 // which spells it has.
 // z is the elevation of the cell the unit stands on. Left null, the battle settles it from
 // the map (the column's standing cell).
-export function createUnit(name, job, team, x, y, { statMods = {}, extraAbilities = [], ct = 0, appearance = null, loadout = null, level = 1, z = null } = {}) {
+// spriteKey replaces the job's sprite (encounter roster entries dress a job as a realm creature),
+// and tint (a CSS color) multiplies it, to set a unit apart from others sharing its sprite.
+export function createUnit(name, job, team, x, y, { statMods = {}, extraAbilities = [], ct = 0, appearance = null, loadout = null, level = 1, z = null, spriteKey = null, tint = null } = {}) {
     const base    = JOB_STATS[job];
     if (!loadout && !base.abilities) loadout = scaledLoadout(job, level);
     // Movement passives' extra Move adds up: the chosen one plus any from equipment.
@@ -44,7 +46,8 @@ export function createUnit(name, job, team, x, y, { statMods = {}, extraAbilitie
         ct,
         char: base.char,
         color: base.color,
-        spriteKey: base.spriteKey,
+        spriteKey: spriteKey ?? base.spriteKey,
+        tint,
         abilities: [...(loadout ? loadout.abilities : base.abilities), ...extraAbilities],
         skillsets: loadout?.skillsets ?? null,
         reaction:  loadout?.reaction ?? null,
@@ -74,6 +77,8 @@ export function createUnitFromCharData(charData) {
         appearance:     charData.appearance ?? null,
         loadout,
         level:          charData.level      ?? 1,
+        spriteKey:      charData.spriteKey  ?? null,
+        tint:           charData.tint       ?? null,
     });
     return unit;
 }

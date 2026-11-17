@@ -1,5 +1,5 @@
 import { loadMapData, posKey } from './battle-map.js';
-import { MAP_DATA } from './data/maps/index.js';
+import { pickRealmMap, realmLook } from '../run/data/realms.js';
 import { TacticalBattle, STATES } from './battle.js';
 import { BattleView3D, showViewError } from './battle-view3d.js';
 import { BattleUI, unitSkillsets, SKILLSET_KEYS } from './battle-ui.js';
@@ -48,8 +48,9 @@ export class BattleScene {
         this._sm        = sceneManager;
         this._stopped   = false;
 
-        const mapDef = this._presetMapDef ?? MAP_DATA[Math.floor(Math.random() * MAP_DATA.length)];
+        const mapDef = this._presetMapDef ?? pickRealmMap(this._encounter?.zone ?? this._encounter?.realm);
         const map    = loadMapData(mapDef);
+        map.look     = realmLook(this._encounter?.zone ?? this._encounter?.realm);
         const playerSpawns = this._customPlayerSpawns ?? map.playerSpawns;
         const units  = buildUnits({ party: this._run?.party, encounter: this._encounter, relics: this._run?.relics },
             playerSpawns, map.enemySpawns);

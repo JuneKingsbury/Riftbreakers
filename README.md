@@ -11,12 +11,29 @@ Run the headless logic tests with `npm test` (Node 22+).
 A run is three acts (`js/run/`). Each act is a generated map of 15 floors (`map-gen.js`): pick a
 path through battles, elites, events, shops, rest sites, treasure and recruits, ending in a boss.
 
+- **Realms:** each act is set in a realm from Rifthold (`data/realms.js`), picked at random from that
+  act's list (`ACT_REALMS`), never two from the same chain. Act 1: The Wild Frontiers, Verdant Depths
+  or Crystal Caves. Act 2: Arcane Library, Sunken Abyss or Void Sanctum. Act 3: Palace Fortress or
+  Shifting Labyrinth. The other realms of each chain are folded into the listed one
+  (`realmSources`): Crystal Caves also fields Crystal Mines and Crystal Depths fights and events.
+  Folded-in fights keep their rosters and their own look and maps, but are retuned for the act
+  (`retuneEncounter` in `data/encounters.js`): levels move to the act's, and stats scale so the
+  roster's power matches the home realm's own fights, with small per-realm corrections
+  (`RETUNE_BIAS`) measured in simulated battles. Putting a realm back in a list stops folding it.
+  An act ends at the heart of its realm: each listed realm names its two bosses (`bosses`), so a
+  boss from a realm's outer reaches isn't fielded as its finale.
+  The realm decides the act's
+  enemies (`data/encounters.js`, keyed by realm; a roster entry's `sprite` dresses a job as a realm
+  creature), about half of its events (`data/realm-events.js`), which battle maps its fights use, and
+  how they look: a realm's `look` swaps map materials for ones with the same rules (moss for grass,
+  bookshelves for walls) and sets the battle and act map backgrounds.
+
 - **Party:** start with three Tier 1 roles and recruit up to six. Battles are automatic, so the
   party fully heals after every win; damage from events lasts until then. Losing a battle ends the run.
 - **Growth:** wins give XP; every level gives a skill point. Each role has a small skill tree
   (`data/jobs.js`: cost and prerequisite per skill), and learned skills can be upgraded to rank II
   and III (`data-registry.js` generates the ranked versions). At level 5 a member can promote once
-  into one of two Tier 2 jobs, at a rest site or after a boss. Equipment adds stats and can grant
+  into one of two Tier 2 jobs, at any time from the Party menu (it costs nothing). Equipment adds stats and can grant
   abilities (`data/equipment.js`): actions join the skill list, and passives (e.g. Ghost Step) are
   always on, on top of the reaction/support/movement the character chose, and relics are party-wide modifiers (`js/run/data/relics.js`).
 - **Real time:** battles run in real time (`js/tactical/realtime.js`). Everyone acts at the
@@ -43,7 +60,8 @@ which follows the acting unit.
 Game rules never depend on the view: per-unit animation state lives in `js/tactical/view-state.js`.
 
 `tests/harness/view3d.html` and `tests/harness/scenes.html` are manual pages for looking at the view
-(serve the repo root, then open `/tests/harness/view3d.html?map=0` or `?map=<map id>`).
+(serve the repo root, then open `/tests/harness/view3d.html?map=0` or `?map=<map id>`). Add
+`&realm=<realm id>` to see a map in a realm's look with that realm's boss fight.
 
 ## Battle maps
 
@@ -53,18 +71,18 @@ and underneath it. A unit needs two empty levels above a block to stand on it, s
 layer 3 or higher for units to pass under. Positions in the rules are cells `{x, y, z}`, and
 range/occupancy sets use `"x,y,z"` keys.
 
-Materials only set gameplay and look:
+Materials only set gameplay and look (`MATERIALS` in `battle-map.js`, looks in `tile-render.js`):
 
-| Material | Standable | Move cost | Blocks sight |
-|----------|-----------|-----------|--------------|
-| grass    | yes       | 1         | yes          |
-| dirt     | yes       | 1         | yes          |
-| rubble   | yes       | 2         | yes          |
-| water    | no        | -         | no           |
-| wall     | no        | -         | yes          |
+| Kind     | Materials | Standable | Move cost | Blocks sight |
+|----------|-----------|-----------|-----------|--------------|
+| Ground   | grass, dirt, sand, moss, autumn, swamp, fungal, stone, redrock | yes | 1 | yes |
+| Rough    | rubble, snow, mud, shallows | yes | 2 | yes |
+| Floors   | cobble, brick, planks, marble, carpet, gravel_path, verdant_tile, crystal_floor, abyss_tile, glyph | yes | 1 | yes |
+| Walls    | wall, stone_wall, brick_wall, wood_wall, kingdom_wall, bookshelf, hedge, crystal, abyss_wall, void_wall, warded_wall | no | - | yes |
+| Liquids  | water, bog, void_water, lava | no | - | no |
 
 Each map is a JSON file in `js/tactical/data/maps/`. `index.js` in that folder imports them all and
-is generated (don't edit it by hand). Every battle picks one of the maps at random.
+is generated (don't edit it by hand). A battle picks one of its realm's maps (the realm's `maps` list) at random. A new map only shows up in runs once a realm lists it.
 
 ## Map editor
 

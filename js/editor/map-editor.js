@@ -3,7 +3,7 @@ import {
     MATERIALS, MAX_Z, createEmptyMap, loadMapData, serializeMap, validateMap, validateMapJson,
     blockAt, setBlock, buildCells, columnTop, posKey,
 } from '../tactical/battle-map.js';
-import { TILE_RENDER, blockTopY, blockBottomY } from '../tactical/tile-render.js';
+import { TILE_RENDER, tileSprite, blockTopY, blockBottomY } from '../tactical/tile-render.js';
 import { buildTerrainMesh, decodeOwner, cellForBlock, FACE_NORMAL } from '../tactical/terrain-mesh.js';
 
 /**
@@ -51,8 +51,8 @@ const CSS = `
 .me-right{width:250px;border-right:none;border-left:1px solid #334;}
 .me-title{color:#fc0;font-weight:bold;margin-bottom:4px;}
 .me-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px;}
-.me-swatch{display:flex;align-items:center;gap:6px;text-align:left;}
-.me-swatch canvas{width:18px;height:18px;image-rendering:pixelated;border:1px solid #000;}
+.me-swatch{display:flex;align-items:center;gap:5px;text-align:left;font-size:10px !important;padding:3px 4px !important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}
+.me-swatch canvas{flex:none;width:18px;height:18px;image-rendering:pixelated;border:1px solid #000;}
 .me-row{display:flex;align-items:center;gap:6px;justify-content:space-between;}
 .me-row input[type=range]{flex:1;}
 .me-help{color:#99a;line-height:1.4;}
@@ -239,7 +239,8 @@ class MapEditor {
             b.dataset.material = type;
             const c = document.createElement('canvas');
             c.width = c.height = 16;
-            b.append(c, document.createTextNode(type));
+            b.title = type;
+            b.append(c, document.createTextNode(TILE_RENDER[type]?.label ?? type));
             b.addEventListener('click', () => this._setMaterial(type));
             this.refs.materials.appendChild(b);
         }
@@ -281,8 +282,20 @@ class MapEditor {
             const g = b.querySelector('canvas').getContext('2d');
             g.fillStyle = def.color;
             g.fillRect(0, 0, 16, 16);
-            const img = sm && sm.isActive ? sm.getSprite('terrain', def.spriteKey) : null;
-            if (img) { g.imageSmoothingEnabled = false; g.drawImage(img, 0, 0, 16, 16); }
+            const img = tileSprite(sm, def.tex);
+            if (img) {
+                g.imageSmoothingEnabled = false;
+                g.drawImage(img, 0, 0, 16, 16);
+                if (def.tint) {
+                    // Same recolor the 3D view applies: multiply, then keep the sprite's alpha.
+                    g.globalCompositeOperation = 'multiply';
+                    g.fillStyle = def.tint;
+                    g.fillRect(0, 0, 16, 16);
+                    g.globalCompositeOperation = 'destination-in';
+                    g.drawImage(img, 0, 0, 16, 16);
+                    g.globalCompositeOperation = 'source-over';
+                }
+            }
         }
     }
 

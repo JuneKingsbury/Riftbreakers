@@ -1,6 +1,6 @@
 import * as THREE from '../../lib/three/three.module.js';
 import { MAX_Z, columnCells } from './battle-map.js';
-import { getTileRender, blockTopY, blockBottomY, WATER_DROP } from './tile-render.js';
+import { getTileRender, tileSprite, lookType, blockTopY, blockBottomY, WATER_DROP } from './tile-render.js';
 
 /**
  * Builds the three.js terrain for a block map (see battle-map.js). Shared by the battle
@@ -33,7 +33,11 @@ const WATER_ALPHA_VARIATION = 0.22;
 const WATER_PHASE_BUCKETS = 4;        // one InstancedMesh opacity per bucket, so tiles ripple out of step
 const TERRAIN_FX_LIFT = 0.004;        // keeps overlays just above the tile top
 
-const TYPE_INDEX = { grass: 1, dirt: 2, water: 3, wall: 4, rubble: 5 };
+function strHash(str) {
+    let h = 7;
+    for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) | 0;
+    return h;
+}
 
 /** Face directions used in owner ids. */
 export const FACE = { TOP: 0, BOTTOM: 1, EAST: 2, WEST: 3, SOUTH: 4, NORTH: 5 };
@@ -98,10 +102,11 @@ export function shadeColor(hex, shade, tint = [1, 1, 1]) {
 /** Cheap fingerprint of a map's blocks, to tell when the terrain must be rebuilt. */
 export function terrainSignature(map) {
     let h = map.width * 131 + map.height;
+    if (map.look) h = (h * 31 + strHash(JSON.stringify(map.look.blocks ?? {}))) | 0;
     for (const col of map.columns) {
         for (let z = 0; z <= MAX_Z; z++) {
             const t = col[z];
-            if (t) h = (h * 31 + (TYPE_INDEX[t] || 7) * 17 + z) | 0;
+            if (t) h = (h * 31 + strHash(t) * 17 + z) | 0;
         }
         h = (h * 7 + 1) | 0;
     }
@@ -110,7 +115,7 @@ export function terrainSignature(map) {
 
 /**
  * Builds the terrain group for a map.
- * @param {object} map  A loaded block map.
+ * @param {object} map  A loaded block map. map.look, when set, re-dresses its blocks (tile-render.js).
  * @param {object|null} skinManager  Source of terrain images.
  * @param {(image) => THREE.Texture} textureFor  Shared texture cache owned by the caller.
  * @param {{cutAbove?: number}} [opts]  Blocks above this level are left out (editor x-ray).
@@ -118,10 +123,10 @@ export function terrainSignature(map) {
  */
 export function buildTerrainMesh(map, skinManager, textureFor, { cutAbove = Infinity } = {}) {
     const W = map.width, H = map.height;
-    const topsByType = new Map();   // type -> QuadBatch
+    const topsByType = new Map();   // drawn type -> QuadBatch
+    const sideTexByType = new Map(); // drawn type -> QuadBatch, for textured (sideTex) sides
     const sides = new QuadBatch();
-    const grassTiles = [];          // tops that get the swaying tuft overlay
-    const waterTiles = [];          // tops that get the wave overlay
+    const fxTiles = new Map();      // overlay sprite ref -> { kind, tint, tiles: [...] }
 
     const typeAt = (x, y, z) => {
         if (x < 0 || y < 0 || x >= W || y >= H || z < 0 || z > cutAbove) return null;
@@ -131,14 +136,22 @@ export function buildTerrainMesh(map, skinManager, textureFor, { cutAbove = Infi
         for (let z = Math.min(MAX_Z, cutAbove); z >= 0; z--) if (typeAt(x, y, z)) return z;
         return -1;
     };
+    const batchFor = (table, type) => {
+        let batch = table.get(type);
+        if (!batch) { batch = new QuadBatch(); table.set(type, batch); }
+        return batch;
+    };
+    const isLiquid = t => !!(t && getTileRender(t).liquid);
 
     for (let y = 0; y < H; y++) {
         for (let x = 0; x < W; x++) {
             for (let z = 0; z <= Math.min(MAX_Z, cutAbove); z++) {
                 const type = typeAt(x, y, z);
                 if (!type) continue;
-                const isWater = type === 'water';
-                const top = blockTopY(z) - (isWater ? WATER_DROP : 0);
+                const shown = lookType(map.look, type, x, y, z);
+                const def = getTileRender(shown);
+                const liquid = isLiquid(type);
+                const top = blockTopY(z) - (liquid ? WATER_DROP : 0);
                 const bottom = blockBottomY(z);
                 const x0 = x - 0.5, x1 = x + 0.5, z0 = y - 0.5, z1 = y + 0.5;
                 const owner = face => encodeOwner(map, x, y, z, face);
@@ -155,27 +168,33 @@ export function buildTerrainMesh(map, skinManager, textureFor, { cutAbove = Infi
                     const dim = 1 - shadow * 0.9;
                     const topColor = [SHADE_TOP * dim, SHADE_TOP * dim, SHADE_TOP * (1 - shadow * 0.6)];
 
-                    let batch = topsByType.get(type);
-                    if (!batch) { batch = new QuadBatch(); topsByType.set(type, batch); }
                     const id = owner(FACE.TOP);
-                    batch.quad([x0, top, z0], [x0, top, z1], [x1, top, z1], [x1, top, z0], topColor, id);
+                    batchFor(topsByType, shown).quad([x0, top, z0], [x0, top, z1], [x1, top, z1], [x1, top, z0], topColor, id);
 
-                    if (type === 'grass') grassTiles.push({ x, z: y, top, index: id, topColor });
-                    else if (isWater) waterTiles.push({ x, z: y, top, index: id, topColor });
+                    if (def.fx) {
+                        let entry = fxTiles.get(def.fx.tex);
+                        if (!entry) { entry = { kind: def.fx.kind, tint: def.fx.tint ?? null, tiles: [] }; fxTiles.set(def.fx.tex, entry); }
+                        entry.tiles.push({ x, z: y, top, index: id, topColor });
+                    }
                 }
 
-                const sideHex = getTileRender(type).side;
+                // Textured sides use one batch per material; the rest share the flat batch.
+                const sideBatch = def.sideTex ? batchFor(sideTexByType, shown) : sides;
+                const sideColor = shade => def.sideTex ? [shade, shade, shade] : shadeColor(def.side, shade);
+                // Crop the texture to the face height so wall art isn't squashed.
+                const vSpan = Math.min(1, top - bottom);
+                const sideUv = [[0, 1], [1, 1], [1, 1 - vSpan], [0, 1 - vSpan]];
                 if (z > 0 && !typeAt(x, y, z - 1)) {
                     sides.quad([x0, bottom, z1], [x0, bottom, z0], [x1, bottom, z0], [x1, bottom, z1],
-                        shadeColor(sideHex, SHADE_BOTTOM), owner(FACE.BOTTOM));
+                        shadeColor(def.side, SHADE_BOTTOM), owner(FACE.BOTTOM));
                 }
-                // A side shows wherever the neighbour at this level is open. Water does not hide
-                // the side of solid ground next to it, since its surface sits lower.
+                // A side shows wherever the neighbour at this level is open. A liquid does not
+                // hide the side of solid ground next to it, since its surface sits lower.
                 const face = (nx, ny, shade, a, b, f) => {
                     const n = typeAt(nx, ny, z);
-                    if (n && (n !== 'water' || isWater)) return;
-                    const c = shadeColor(sideHex, shade);
-                    sides.quad([a[0], top, a[1]], [b[0], top, b[1]], [b[0], bottom, b[1]], [a[0], bottom, a[1]], c, owner(f));
+                    if (n && (!isLiquid(n) || liquid)) return;
+                    sideBatch.quad([a[0], top, a[1]], [b[0], top, b[1]], [b[0], bottom, b[1]], [a[0], bottom, a[1]],
+                        sideColor(shade), owner(f), sideUv);
                 };
                 face(x + 1, y, SHADE_EAST,  [x1, z1], [x1, z0], FACE.EAST);
                 face(x - 1, y, SHADE_WEST,  [x0, z0], [x0, z1], FACE.WEST);
@@ -188,32 +207,37 @@ export function buildTerrainMesh(map, skinManager, textureFor, { cutAbove = Infi
     const group = new THREE.Group();
     const pickMeshes = [];
     const sm = skinManager;
-    for (const [type, batch] of topsByType) {
-        const def = getTileRender(type);
-        const image = sm && sm.isActive ? (sm.getSprite('terrain', def.spriteKey) || sm.getSprite('terrain', 'grass')) : null;
-        const mat = new THREE.MeshBasicMaterial({
-            vertexColors: true,
-            map: image ? textureFor(image) : null,
-            color: image ? 0xffffff : new THREE.Color(def.color),
-        });
-        const mesh = new THREE.Mesh(batch.toGeometry(), mat);
-        mesh.userData.owners = batch.owners;
+    const addMesh = (geometry, material, owners) => {
+        const mesh = new THREE.Mesh(geometry, material);
+        mesh.userData.owners = owners;
         group.add(mesh);
         pickMeshes.push(mesh);
+    };
+    // A textured material when the skin has the sprite, else the flat color.
+    const surfaceMaterial = (def, flatHex, opts = {}) => {
+        const image = def.tex ? tileSprite(sm, def.tex) || (sm?.isActive ? sm.getSprite('terrain', 'grass') : null) : null;
+        return new THREE.MeshBasicMaterial({
+            vertexColors: true,
+            map: image ? textureFor(image) : null,
+            color: image ? new THREE.Color(def.tint ?? 0xffffff) : new THREE.Color(flatHex),
+            ...opts,
+        });
+    };
+    for (const [type, batch] of topsByType) {
+        const def = getTileRender(type);
+        addMesh(batch.toGeometry(), surfaceMaterial(def, def.color), batch.owners);
     }
-    const sideMesh = new THREE.Mesh(
-        sides.toGeometry(),
-        new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide })
-    );
-    sideMesh.userData.owners = sides.owners;
-    group.add(sideMesh);
-    pickMeshes.push(sideMesh);
-    const fx = buildTerrainFx(group, grassTiles, waterTiles, sm, textureFor);
+    for (const [type, batch] of sideTexByType) {
+        const def = getTileRender(type);
+        addMesh(batch.toGeometry(), surfaceMaterial(def, def.side, { side: THREE.DoubleSide }), batch.owners);
+    }
+    addMesh(sides.toGeometry(), new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide }), sides.owners);
+    const fx = buildTerrainFx(group, fxTiles, sm, textureFor);
 
     const dispose = () => {
         for (const mesh of pickMeshes) { mesh.geometry.dispose(); mesh.material.dispose(); }
         if (fx) {
-            const meshes = [fx.grass, ...fx.water.map(w => w.mesh)].filter(Boolean);
+            const meshes = [...fx.tufts.map(t => t.mesh), ...fx.water.map(w => w.mesh)];
             for (const mesh of meshes) { mesh.material.dispose(); mesh.dispose(); }
             fx.geometry.dispose();
         }
@@ -221,16 +245,15 @@ export function buildTerrainMesh(map, skinManager, textureFor, { cutAbove = Infi
     return { group, pickMeshes, fx, dispose };
 }
 
-// Overlay quads for the skin's animated grass and water sprites. Only built when the
-// skin supplies the sprites, so ascii mode and skins without them simply skip it.
-function buildTerrainFx(group, grassTiles, waterTiles, sm, textureFor) {
+// Overlay quads for the skin's animated sprites: swaying tufts on grassy tops, shimmering
+// waves on liquids. Only built for sprites the skin supplies, so ascii mode and skins
+// without them simply skip it.
+function buildTerrainFx(group, fxTiles, sm, textureFor) {
     if (!sm || !sm.isActive) return null;
-    const tuft  = sm.getSprite('effects', 'grass_tuft');
-    const waves = sm.getSprite('effects', 'water_waves');
     const quad = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
-    const fx = { geometry: quad, grass: null, grassTiles, water: [] };
+    const fx = { geometry: quad, tufts: [], water: [] };
 
-    const makeMesh = (image, tiles) => {
+    const makeMesh = (image, tiles, tint) => {
         const mat = new THREE.MeshBasicMaterial({
             map: textureFor(image), transparent: true, depthWrite: false,
             polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1,
@@ -240,24 +263,30 @@ function buildTerrainFx(group, grassTiles, waterTiles, sm, textureFor) {
         mesh.frustumCulled = false;
         mesh.renderOrder = 2;
         const color = new THREE.Color();
-        tiles.forEach((t, i) => mesh.setColorAt(i, color.setRGB(t.topColor[0], t.topColor[1], t.topColor[2])));
+        const t = tint ? new THREE.Color(tint) : new THREE.Color(1, 1, 1);
+        tiles.forEach((tile, i) => mesh.setColorAt(i, color.setRGB(tile.topColor[0] * t.r, tile.topColor[1] * t.g, tile.topColor[2] * t.b)));
         group.add(mesh);
         return mesh;
     };
 
-    if (tuft && grassTiles.length) fx.grass = makeMesh(tuft, grassTiles);
-    if (waves && waterTiles.length) {
-        // Split the water tiles by phase so each bucket can have its own opacity.
+    for (const [ref, { kind, tint, tiles }] of fxTiles) {
+        const image = tileSprite(sm, ref);
+        if (!image || !tiles.length) continue;
+        if (kind === 'tuft') {
+            fx.tufts.push({ mesh: makeMesh(image, tiles, tint), tiles });
+            continue;
+        }
+        // Split the liquid tiles by phase so each bucket can have its own opacity.
         const buckets = Array.from({ length: WATER_PHASE_BUCKETS }, () => []);
-        for (const t of waterTiles) {
+        for (const t of tiles) {
             const phase = (t.index % 1000) / 1000;
             buckets[Math.min(WATER_PHASE_BUCKETS - 1, Math.floor(phase * WATER_PHASE_BUCKETS))].push(t);
         }
-        buckets.forEach((tiles, b) => {
-            if (!tiles.length) return;
-            const mesh = makeMesh(waves, tiles);
+        buckets.forEach((bucket, b) => {
+            if (!bucket.length) return;
+            const mesh = makeMesh(image, bucket, tint);
             const m = new THREE.Matrix4();
-            tiles.forEach((t, i) => mesh.setMatrixAt(i, m.makeTranslation(t.x, t.top + TERRAIN_FX_LIFT, t.z)));
+            bucket.forEach((t, i) => mesh.setMatrixAt(i, m.makeTranslation(t.x, t.top + TERRAIN_FX_LIFT, t.z)));
             mesh.instanceMatrix.needsUpdate = true;
             fx.water.push({ mesh, phase: ((b + 0.5) / WATER_PHASE_BUCKETS) * Math.PI * 2 });
         });
@@ -274,14 +303,14 @@ const _up = new THREE.Vector3(0, 1, 0);
 /** Animates grass sway and water shimmer. fx is the value from buildTerrainMesh. */
 export function updateTerrainFx(fx, now) {
     if (!fx) return;
-    if (fx.grass) {
-        const t = (now / GRASS_SWAY_PERIOD_MS) * Math.PI * 2;
-        fx.grassTiles.forEach((tile, i) => {
+    const t = (now / GRASS_SWAY_PERIOD_MS) * Math.PI * 2;
+    for (const tuft of fx.tufts) {
+        tuft.tiles.forEach((tile, i) => {
             const sway = Math.sin(t + ((tile.index % 1000) / 1000) * 6.28) * GRASS_SWAY_AMPLITUDE;
             _q.setFromAxisAngle(_up, sway);
-            fx.grass.setMatrixAt(i, _m.compose(_pos.set(tile.x, tile.top + TERRAIN_FX_LIFT, tile.z), _q, _scl));
+            tuft.mesh.setMatrixAt(i, _m.compose(_pos.set(tile.x, tile.top + TERRAIN_FX_LIFT, tile.z), _q, _scl));
         });
-        fx.grass.instanceMatrix.needsUpdate = true;
+        tuft.mesh.instanceMatrix.needsUpdate = true;
     }
     for (const w of fx.water) {
         const a = WATER_ALPHA_BASE + WATER_ALPHA_VARIATION * Math.cos((now / WATER_PERIOD_MS) * Math.PI * 2 + w.phase);

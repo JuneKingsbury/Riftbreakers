@@ -23,7 +23,8 @@ import { Rng, randomSeed } from './rng.js';
 import { generateActMap, reachableIds } from './map-gen.js';
 import { rollEncounter, battleRewards, ACT_COUNT, EASY_FIGHTS } from './data/encounters.js';
 import { RELICS, relicStatMods, relicMult, relicsWith } from './data/relics.js';
-import { eventsForAct, EVENTS } from './data/events.js';
+import { eventsFor, EVENTS } from './data/events.js';
+import { rollRealms, REALMS } from './data/realms.js';
 import { createMember, recruitCandidates } from './data/recruits.js';
 import { runOptions, BASE_JOBS } from './profile.js';
 import { EQUIPMENT, EQUIP_FIELDS, equipmentStatBonuses, itemPrice, itemRarity, itemName } from '../tactical/data/equipment.js';
@@ -31,7 +32,7 @@ import { JOB_STATS, ABILITIES, allowedEquipTypes, jobsOfTier } from '../tactical
 import { sanitizeLoadout, learnAbility, upgradeAbility, canPromote, promote, promotionOptions, addXp, levelStatMods } from '../tactical/loadout.js';
 
 export const SAVE_KEY = 'riftbreak.run.v1';
-export const SAVE_VERSION = 3;
+export const SAVE_VERSION = 4;
 export const MAX_PARTY = 6;
 export const TRAIN_SP = 1;
 // Extra skill points the starting party begins with, so each member opens with a choice.
@@ -58,6 +59,7 @@ export class RunState {
         run.rng = new Rng(seed);
         run.options = options;
         run.act = 1;
+        run.realms = RunState.realmsForSeed(seed);
         run.gold = options.startGold;
         run.inventory = {};
         run.relics = [];
@@ -77,6 +79,11 @@ export class RunState {
         return run;
     }
 
+    // The realm of each act. Rolled from its own stream so it doesn't shift the run's rolls.
+    static realmsForSeed(seed) {
+        return rollRealms(new Rng((seed ^ 0x9E3779B9) >>> 0), ACT_COUNT);
+    }
+
     // ---- Save / load ----
 
     serialize() {
@@ -86,11 +93,17 @@ export class RunState {
 
     static deserialize(json) {
         const data = typeof json === 'string' ? JSON.parse(json) : json;
-        if (data?.version !== SAVE_VERSION) return null;
+        // Version 3 saves predate realms: they keep playing, with realms rolled from the seed.
+        if (data?.version === 3) {
+            data.version = SAVE_VERSION;
+            data.realms = RunState.realmsForSeed(data.seed);
+        }
+        if (data?.version !== SAVE_VERSION || !data.realms?.every(id => REALMS[id])) return null;
         const run = Object.assign(new RunState(), data);
         run.rng = new Rng(0);
         run.rng.state = data.rngState >>> 0;
         delete run.rngState;
+        run._unequipMisfits();
         return run;
     }
 
@@ -118,6 +131,15 @@ export class RunState {
         this.currentNodeId = null;
         this.visited = [];
         this.pending = null;
+    }
+
+    // The realm the current act is set in (data/realms.js).
+    get realmId() {
+        return this.realms[this.act - 1];
+    }
+
+    get realm() {
+        return REALMS[this.realmId];
     }
 
     get currentNode() {
@@ -165,6 +187,22 @@ export class RunState {
         return true;
     }
 
+    // Items can change slot or type between versions (the Parrying Dagger moved from weapon to
+    // tool). Anything equipped where it no longer fits goes back to the bag.
+    _unequipMisfits() {
+        for (const m of this.party) {
+            for (const field of EQUIP_FIELDS) {
+                const key = m.appearance?.[field];
+                if (!key) continue;
+                if (EQUIPMENT[key] && `${EQUIPMENT[key].slot}Key` === field && this.canEquip(m, key)) continue;
+                m.appearance[field] = null;
+                if (EQUIPMENT[key]) this.addItem(key);
+            }
+            if (m.hp != null) m.hp = Math.max(1, Math.min(this.maxHp(m), m.hp));
+            sanitizeLoadout(m);
+        }
+    }
+
     // ---- Party ----
 
     member(name) {
@@ -208,21 +246,16 @@ export class RunState {
         return !!m && learnAbility(m, key);
     }
 
-    // Promotion happens at a rest site (instead of resting) or on a boss's reward screen.
-    canPromoteHere() {
-        const p = this.pending;
-        return (p?.kind === 'rest' && !p.used) || (p?.kind === 'reward' && p.boss);
-    }
-
+    // A member who is ready (see canPromote) may promote at any time during the run, from the
+    // Party menu. It is free: it doesn't use up a rest or any other node.
     promote(memberName, job) {
         const m = this.member(memberName);
-        if (!m || !this.canPromoteHere() || !canPromote(m) || !promotionOptions(m).includes(job)) return false;
+        if (!m || this.status !== 'active' || !canPromote(m) || !promotionOptions(m).includes(job)) return false;
         const before = this.maxHp(m);
         promote(m, job);
         // Keep the same wounds when the new job's base HP differs.
         if (m.hp != null) m.hp = Math.max(1, m.hp + this.maxHp(m) - before);
         sanitizeLoadout(m);
-        if (this.pending.kind === 'rest') this._useRest();
         return true;
     }
 
@@ -309,7 +342,7 @@ export class RunState {
 
     _rollEncounter(kind) {
         const easy = kind === 'normal' && this.act === 1 && this.stats.battles < EASY_FIGHTS;
-        const enc = rollEncounter(this.rng, this.act, kind, this.party.length, this.seenEncounters, easy);
+        const enc = rollEncounter(this.rng, this.realmId, this.act, kind, this.party.length, this.seenEncounters, easy);
         this.seenEncounters.push(enc.id);
         return enc;
     }
@@ -434,8 +467,8 @@ export class RunState {
 
     // ---- Rest ----
 
-    // A rest site offers one of: drill (XP for everyone), train (a skill point for one
-    // member) or promote. Resting also tends any wounds from events.
+    // A rest site offers one of: drill (XP for everyone) or train (a skill point for one
+    // member). Resting also tends any wounds from events.
     drill() {
         if (this.pending?.kind !== 'rest' || this.pending.used) return false;
         for (const m of this.party) this._grantXp(m, this.options.drillXp);
@@ -502,9 +535,14 @@ export class RunState {
     // ---- Events ----
 
     _rollEvent() {
-        const pool = eventsForAct(this.act);
-        const fresh = pool.filter(e => !this.seenEvents.includes(e.id));
-        const ev = this.rng.pick(fresh.length ? fresh : pool);
+        // Realm events come up about half the time while fresh ones remain.
+        const { realm, general } = eventsFor(this.act, this.realmId);
+        const fresh = list => list.filter(e => !this.seenEvents.includes(e.id));
+        const freshRealm = fresh(realm), freshGeneral = fresh(general);
+        let pool;
+        if (freshRealm.length && (!freshGeneral.length || this.rng.chance(0.5))) pool = freshRealm;
+        else pool = freshGeneral.length ? freshGeneral : [...realm, ...general];
+        const ev = this.rng.pick(pool);
         this.seenEvents.push(ev.id);
         return ev.id;
     }

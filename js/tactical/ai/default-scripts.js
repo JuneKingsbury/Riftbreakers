@@ -76,7 +76,7 @@ const HEALER_JOBS = new Set(['warden', 'sanctifier', 'lifeseer', 'paladin']);
 const statusFilter = (status) => [{ kind: 'status', status, has: false }];
 
 // A script that uses every kind of ability in `abilities` (unit ability keys, any rank),
-// in priority order: revive and heal, cure, summon, ally support, self buffs, control
+// in priority order: revive and heal, cure, summon, ally support (status, then stat buffs), self buffs, control
 // spells on healthy enemies, then the best attack. Ranged jobs regroup when cut off and keep
 // their distance; melee jobs brace when nearly dead. Every rule uses 'auto' positioning
 // (see positionStyle in script-runtime.js): careful for ranged attackers, bold otherwise.
@@ -110,6 +110,11 @@ export function autoScriptFor(job, abilities = []) {
                 ? [test('ally_hp_below', { value: 70 }), `${ab.name} on a hurt ally`, target('lowest_hp_pct', [{ kind: 'hp_below', value: 70 }])]
                 : [test('first_turn'), `${ab.name} on an ally at the start`, target('nearest')];
         rules.push(rule(id(), label, when, { do: 'ability', ability: k, target: tgt, approach: true }));
+    }
+    // Stat buffs for allies (Rallying Beat) go on the thickest group once the fight is close.
+    for (const k of of(a => a.targetType === 'ally' && a.buffs && !a.basePower && !a.isHeal && !a.applyStatus)) {
+        rules.push(rule(id(), `${ABILITIES[k].name} on the main group when enemies are near`, test('enemy_within', { range: 5 }),
+            { do: 'ability', ability: k, target: ally('most_clustered'), approach: true }));
     }
     for (const k of of(a => a.targetType === 'self' && !a.isHeal && !a.isSummon)) {
         rules.push(rule(id(), `${ABILITIES[k].name} when enemies are close`, test('enemy_within', { range: 2 }),

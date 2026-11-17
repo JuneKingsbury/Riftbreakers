@@ -10,9 +10,9 @@ import { NodeScreens } from './node-screens.js';
 import { PartyMenu } from './party-menu.js';
 import { RunState } from './run-state.js';
 import { RELICS } from './data/relics.js';
-import { ENCOUNTERS } from './data/encounters.js';
+import { CHAINS } from './data/realms.js';
 import { loadProfile, saveProfile, recordRun } from './profile.js';
-import { Modal, Toast, BTN, BTN_DANGER, GLOW, RARITY_COLOR, NODE_INFO, FONT, esc, jobLabel, hpBar, portraitHtml, drawSprites } from './ui-kit.js';
+import { Modal, Toast, BTN, BTN_GOOD, BTN_DANGER, GLOW, RARITY_COLOR, NODE_INFO, FONT, esc, jobLabel, hpBar, portraitHtml, drawSprites } from './ui-kit.js';
 import { DeployScene } from '../tactical/deploy-scene.js';
 import { BattleScene } from '../tactical/battle-scene.js';
 import { openScriptEditor } from '../tactical/ai/script-editor.js';
@@ -127,20 +127,37 @@ export class RunMapScene {
     _afterChange() {
         this._changed();
         if (this.run.status !== 'active') return this._endRun();
+        if (this._needsActIntro()) return this._showActIntro();
         this._screens.show();
     }
 
     _leaveNode() {
-        const wasBoss = this.run.currentNode?.type === 'boss';
-        const act = this.run.act;
         this.run.leaveNode();
         this._modal.close();
         // Keep the next choices in view.
         this._renderer.focusFloor((this.run.currentNode?.floor ?? 0) + 1);
-        if (wasBoss && this.run.status === 'active' && this.run.act !== act) {
-            this._toast.show(`Act ${this.run.act}: ${ENCOUNTERS[this.run.act].name}`, 4000);
-        }
         this._afterChange();
+    }
+
+    // A card naming the act's realm, once per act, before its first step.
+    _needsActIntro() {
+        const run = this.run;
+        return !run.pending && !run.currentNodeId && run.actIntro !== run.act;
+    }
+
+    _showActIntro() {
+        const run = this.run, realm = run.realm;
+        const body = this._modal.show(`
+            <div style="color:#888;font-size:11px;text-transform:uppercase;letter-spacing:2px;">Act ${run.act} of 3 · ${esc(CHAINS[realm.chain].name)}</div>
+            <div style="color:#ffcc44;font-weight:bold;font-size:20px;margin:4px 0 10px;">${esc(realm.name)}</div>
+            <div style="color:#bbc;line-height:1.5;margin-bottom:14px;">${esc(realm.blurb)}</div>
+            <button data-begin style="${BTN}${BTN_GOOD}text-align:center;padding:10px;">Set out</button>`,
+            { dismissible: false, width: 420 });
+        body.querySelector('[data-begin]').addEventListener('click', () => {
+            run.actIntro = run.act;
+            this._modal.close();
+            this._changed();
+        });
     }
 
     _endRun() {
@@ -261,7 +278,7 @@ export class RunMapScene {
         const floor = run.currentNode?.floor ?? 0;
         const spend = run.party.some(canSpendPoints);
         let top = `<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:5px;">
-            <span style="color:#ffcc44;font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Act ${run.act} · Floor ${floor}/15</span>
+            <span style="color:#ffcc44;font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Act ${run.act}: ${esc(run.realm.name)} · ${floor}/15</span>
             <span style="white-space:nowrap;"><span style="color:#fc8;">★ ${run.gold}</span>
             <span data-action="menu" style="color:#7bf;margin-left:8px;cursor:pointer;">◆ ${run.relics.length}</span></span>
         </div>
@@ -295,8 +312,9 @@ export class RunMapScene {
         const run = this.run;
 
         const floor = run.currentNode?.floor ?? 0;
-        let html = `<div style="color:#ffcc44;font-weight:bold;font-size:13px;">Act ${run.act}: ${esc(ENCOUNTERS[run.act].name)}</div>
-            <div style="color:#888;font-size:10px;margin-bottom:8px;">Floor ${floor} of 15</div>
+        let html = `<div style="color:#ffcc44;font-weight:bold;font-size:13px;">Act ${run.act}: ${esc(run.realm.name)}</div>
+            <div style="color:#888;font-size:10px;">${esc(CHAINS[run.realm.chain].name)} · Floor ${floor} of 15</div>
+            <div style="color:#99a;font-size:10px;line-height:1.4;margin:5px 0 8px;">${esc(run.realm.blurb)}</div>
             <div style="display:flex;justify-content:space-between;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid #335;">
                 <span style="color:#fc8;">★ ${run.gold} gold</span><span style="color:#888;">${Object.values(run.inventory).reduce((s, n) => s + n, 0)} in bag</span>
             </div>`;

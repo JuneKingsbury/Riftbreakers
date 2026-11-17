@@ -6,6 +6,15 @@ import { NODE_INFO, FONT } from './ui-kit.js';
 const ROW_H = 74;
 const MARGIN_Y = 70;
 
+// Colors. Kept fairly light so the map stays readable on a dim phone screen.
+const DEFAULT_BG = '#1d2233';         // when the realm has no mapBg
+const BAND = 'rgba(255,255,255,0.045)';
+const EDGE = 'rgba(190,200,245,0.62)';
+const EDGE_ROUTE = '#e8c878';
+const EDGE_LIVE = '#8cf';
+const NODE_FILL = '#272b46';
+const NODE_FILL_DONE = '#3a3422';
+
 // Small deterministic offset per node so the grid doesn't look rigid.
 function jitter(id, salt) {
     let h = 2166136261 ^ salt;
@@ -83,11 +92,11 @@ export class RunMapRenderer {
     render(run, now) {
         const { ctx } = this;
         const map = run.map;
-        ctx.fillStyle = '#0b0b16';
+        ctx.fillStyle = run.realm?.look?.mapBg ?? DEFAULT_BG;
         ctx.fillRect(0, 0, this.w, this.h);
 
         // Faint floor bands
-        ctx.fillStyle = 'rgba(255,255,255,0.02)';
+        ctx.fillStyle = BAND;
         for (let f = 1; f <= BOSS_FLOOR; f += 2) {
             const y = this.h - this.insets.bottom - MARGIN_Y - (f - 1) * ROW_H + this.scrollY;
             ctx.fillRect(0, y - ROW_H / 2, this.mapWidth, ROW_H);
@@ -105,9 +114,9 @@ export class RunMapRenderer {
                 const b = this.nodePos(map.nodes[id]);
                 const onRoute = routeEdges.has(`${n.id}>${id}`);
                 const live = n.id === run.currentNodeId && reachable.has(id);
-                ctx.strokeStyle = onRoute ? '#ccb070' : live ? '#7bf' : 'rgba(120,120,170,0.35)';
-                ctx.lineWidth = onRoute || live ? 3 : 1.5;
-                ctx.setLineDash(onRoute || live ? [] : [4, 5]);
+                ctx.strokeStyle = onRoute ? EDGE_ROUTE : live ? EDGE_LIVE : EDGE;
+                ctx.lineWidth = onRoute || live ? 3.5 : 2;
+                ctx.setLineDash(onRoute || live ? [] : [5, 5]);
                 ctx.beginPath();
                 ctx.moveTo(a.x, a.y);
                 ctx.lineTo(b.x, b.y);
@@ -135,14 +144,14 @@ export class RunMapRenderer {
             }
             ctx.beginPath();
             ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-            ctx.fillStyle = done ? '#2a2618' : '#15152a';
+            ctx.fillStyle = done ? NODE_FILL_DONE : NODE_FILL;
             ctx.fill();
             ctx.lineWidth = isCurrent ? 3 : n.id === this.hoveredId ? 2.5 : 1.5;
-            ctx.strokeStyle = isCurrent ? '#fff' : done ? '#ccb070' : info.color;
-            ctx.globalAlpha = past ? 0.3 : 1;
+            ctx.strokeStyle = isCurrent ? '#fff' : done ? EDGE_ROUTE : info.color;
+            ctx.globalAlpha = past ? 0.4 : 1;
             ctx.stroke();
 
-            ctx.fillStyle = done ? '#a98' : info.color;
+            ctx.fillStyle = done ? '#cba' : info.color;
             ctx.font = `bold ${Math.round(p.r * (n.type === 'boss' ? 1 : 1.07))}px ${FONT}`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';

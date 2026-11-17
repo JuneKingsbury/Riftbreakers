@@ -37,7 +37,6 @@ export const EQUIPMENT = {
     thornweave_vest:      { name: 'Thornweave Vest',       slot: 'armor',  type: 'light',  def:  6, mdf:  4, eva:  3, rarity: 'uncommon' },
     ashwalkers_cloak:     { name: "Ashwalker's Cloak",     slot: 'armor',  type: 'light',  def:  5, mdf:  3, eva:  5, spd:  1, rarity: 'uncommon', grantsPassive: ['pilgrim_step'] },
     cloak_of_shadows:     { name: 'Cloak of Shadows',      slot: 'armor',  type: 'light',  def:  4, eva: 10, spd:  2, rarity: 'rare', grantsPassive: ['ghost_step'] },
-    aegis_of_the_vanguard:{ name: 'Aegis of the Vanguard', slot: 'armor',  type: 'heavy',  def: 13, maxHp: 24, spd: -2 },
     armor_of_the_abyss:   { name: 'Armor of the Abyss',    slot: 'armor',  type: 'heavy',  def: 11, mdf: 11, mat:  5, maxHp: 12, rarity: 'rare' },
 
     cotton_tunic:         { name: 'Cotton Tunic',          slot: 'armor',  type: 'cloth',  def:  2, mdf:  1 },
@@ -103,7 +102,6 @@ export const EQUIPMENT = {
     crystalline_hammer:   { name: 'Crystalline Hammer',    slot: 'weapon', type: 'heavy_weapon', atk: 15, mat:  5, spd: -1, rarity: 'uncommon' },
     void_blade:           { name: 'Void Blade',            slot: 'weapon', type: 'blade',        atk: 14, mat:  4, rarity: 'rare' },
     void_dagger:          { name: 'Void Dagger',           slot: 'weapon', type: 'blade',        atk:  9, eva:  5, spd:  1, rarity: 'uncommon', grants: ['draining_edge'] },
-    parrying_dagger:      { name: 'Parrying Dagger',       slot: 'weapon', type: 'blade',        atk:  6, def:  4, eva:  4, rarity: 'uncommon', grantsPassive: ['brace'] },
     barbed_blade:         { name: 'Barbed Blade',          slot: 'weapon', type: 'blade',        atk: 11, eva:  3, rarity: 'uncommon' },
     sweeping_glaive:      { name: 'Sweeping Glaive',       slot: 'weapon', type: 'blade',        atk: 13, move:  1, rarity: 'uncommon' },
     enchanted_glaive:     { name: 'Enchanted Glaive',      slot: 'weapon', type: 'blade',        atk: 12, mat:  4, move:  1, rarity: 'uncommon', grantsPassive: ['quake_step'] },
@@ -123,7 +121,6 @@ export const EQUIPMENT = {
     staff_of_regrowth:    { name: 'Staff of Regrowth',     slot: 'weapon', type: 'magic',        mat: 11, mdf:  6, maxMp: 16, rarity: 'uncommon', grants: ['purify'] },
     staff_of_distortion:  { name: 'Staff of Distortion',   slot: 'weapon', type: 'magic',        mat: 14, spd:  1, maxMp: 12, rarity: 'rare', grants: ['unravel'] },
     soulbond_scepter:     { name: 'Soulbond Scepter',      slot: 'weapon', type: 'magic',        mat: 13, mdf:  5, maxHp: 10, maxMp: 10, rarity: 'rare', grants: ['bind_will'] },
-    drum_of_rallying:     { name: 'Drum of Rallying',      slot: 'weapon', type: 'magic',        mat:  6, mdf:  4, maxMp: 8, move:  1, rarity: 'uncommon', grants: ['focus'] },
 
     tempered_blade:       { name: 'Tempered Blade',        slot: 'weapon', type: 'blade',        atk:  9 },
     war_axe:              { name: 'War Axe',               slot: 'weapon', type: 'heavy_weapon', atk: 12, def: -1, rarity: 'uncommon' },
@@ -142,16 +139,21 @@ export const EQUIPMENT = {
 
     // ============================================================
     // TOOLS / OFF-HAND
+    // Anything held alongside the main weapon: shields, quivers, lanterns and off-hand
+    // weapons (a parrying dagger, a sickle), so its bonuses stack with the weapon's.
     // ============================================================
     lantern:              { name: 'Lantern',               slot: 'tool',   type: 'implement',      eva:  2, grants: ['first_aid'] },
+    drum_of_rallying:     { name: 'Drum of Rallying',      slot: 'tool',   type: 'implement',      mdf:  2, rarity: 'uncommon', grants: ['rallying_beat'] },
     iron_shield:          { name: 'Iron Shield',           slot: 'tool',   type: 'shield',         def:  7, eva:  3, grantsPassive: ['martyr'] },
     crystal_aegis:        { name: 'Crystal Aegis',         slot: 'tool',   type: 'shield',         def:  6, mdf:  7, rarity: 'rare', grants: ['aegis_ward'] },
     runic_buckler:        { name: 'Runic Buckler',         slot: 'tool',   type: 'shield',         def:  5, eva:  5, rarity: 'uncommon' },
+    aegis_of_the_vanguard:{ name: 'Aegis of the Vanguard', slot: 'tool',   type: 'shield',         def: 10, maxHp: 14, spd: -1, rarity: 'rare', grantsPassive: ['martyr'] },
     hunters_quiver:       { name: "Hunter's Quiver",       slot: 'tool',   type: 'quiver',         atk:  3 },
     bottomless_quiver:    { name: 'Bottomless Quiver',     slot: 'tool',   type: 'quiver',         atk:  5, move:  1, rarity: 'uncommon', grantsPassive: ['move_plus_1'] },
     void_hammer:          { name: 'Void Hammer',           slot: 'tool',   type: 'offhand_weapon', atk:  8, spd: -1, rarity: 'uncommon' },
     void_axe:             { name: 'Void Axe',              slot: 'tool',   type: 'offhand_weapon', atk:  7, def: -1, rarity: 'uncommon' },
     void_sickle:          { name: 'Void Sickle',           slot: 'tool',   type: 'offhand_weapon', atk:  5, eva:  3, rarity: 'uncommon' },
+    parrying_dagger:      { name: 'Parrying Dagger',       slot: 'tool',   type: 'offhand_weapon', atk:  3, def:  3, eva:  5, rarity: 'uncommon', grantsPassive: ['brace'] },
     iron_pickaxe:         { name: 'Iron Pickaxe',          slot: 'tool',   type: 'offhand_weapon', atk:  6 },
     runic_pickaxe:        { name: 'Runic Pickaxe',         slot: 'tool',   type: 'offhand_weapon', atk:  9, mat:  2, rarity: 'uncommon' },
     void_pickaxe:         { name: 'Void Pickaxe',          slot: 'tool',   type: 'offhand_weapon', atk: 10, mat:  3, rarity: 'rare' },

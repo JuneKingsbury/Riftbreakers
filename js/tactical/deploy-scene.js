@@ -1,5 +1,6 @@
 import { loadMapData, posKey } from './battle-map.js';
 import { MAP_DATA } from './data/maps/index.js';
+import { pickRealmMap, realmLook } from '../run/data/realms.js';
 import { viewState } from './view-state.js';
 import { BattleView3D, showViewError } from './battle-view3d.js';
 import { STATES } from './battle.js';
@@ -75,12 +76,13 @@ export class DeployScene {
         // deployment doesn't reroll the battlefield.
         const enc = this._encounter;
         this._mapDef = MAP_DATA.find(m => m.id === (enc?.map ?? enc?.mapId))
-            ?? MAP_DATA[Math.floor(Math.random() * MAP_DATA.length)];
+            ?? pickRealmMap(enc?.zone ?? enc?.realm);
         if (enc && !enc.map) {
             enc.mapId = this._mapDef.id;
             this._run?.save();
         }
         const map    = loadMapData(this._mapDef);
+        map.look     = realmLook(enc?.zone ?? enc?.realm);
 
         this._playerSpawns = map.playerSpawns.map(s => ({ ...s }));
 

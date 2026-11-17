@@ -7,6 +7,7 @@ import { battleRewards } from '../../js/run/data/encounters.js';
 import { runOptions, newProfile, buyUnlock, recordRun, renownFor } from '../../js/run/profile.js';
 import { EVENTS } from '../../js/run/data/events.js';
 import { PROMOTION_LEVEL, XP_PER_LEVEL, buildLoadout } from '../../js/tactical/loadout.js';
+import { EQUIPMENT } from '../../js/tactical/data/equipment.js';
 
 const totalXp = (m) => (m.level - 1) * XP_PER_LEVEL + m.xp;
 
@@ -68,7 +69,7 @@ test('losing a battle ends the run', () => {
     assert.deepEqual(run.reachable(), []);
 });
 
-test('elites give a relic; bosses offer a relic choice and a promotion, then the next act', () => {
+test('elites give a relic; bosses offer a relic choice, then the next act', () => {
     const run = newRun(2);
     enter(run, 'elite');
     run.completeBattle(true);
@@ -77,16 +78,11 @@ test('elites give a relic; bosses offer a relic choice and a promotion, then the
 
     run.currentNodeId = run.map.floors[13][0].id;    // skip to the boss
     run.pending = null;
-    const m = run.party[0];
-    m.level = PROMOTION_LEVEL;
-    assert.ok(!run.promote(m.name, 'paladin'), 'not at an ordinary node');
     run.enterNode(run.map.bossId);
     const reward = run.completeBattle(true);
     assert.ok(reward.boss && reward.relicPick && reward.relics.length === 3);
     assert.ok(run.claimRewardRelic(reward.relics[1]));
     assert.ok(run.relics.includes(reward.relics[1]));
-    assert.ok(run.promote(m.name, 'paladin'));
-    assert.equal(m.job, 'paladin');
     run.leaveNode();
     assert.equal(run.act, 2);
     assert.equal(run.currentNodeId, null);
@@ -103,7 +99,7 @@ test('winning the act 3 boss wins the run', () => {
     assert.equal(run.status, 'won');
 });
 
-test('rest drills everyone, or trains one member, or promotes; only one per visit, and it tends wounds', () => {
+test('rest drills everyone or trains one member; only one per visit, and it tends wounds', () => {
     const run = newRun();
     const [a, b] = run.party;
     a.hp = 10;
@@ -125,7 +121,33 @@ test('rest drills everyone, or trains one member, or promotes; only one per visi
     b.level = PROMOTION_LEVEL;
     assert.ok(run.promote(b.name, 'riftcaller'));
     assert.equal(b.origin, 'evoker');
-    assert.ok(!run.drill(), 'promoting used the rest');
+    assert.ok(run.drill(), 'promoting does not use up the rest');
+});
+
+test('a member who is ready can promote anywhere, at no cost, but only once and only while the run lasts', () => {
+    const run = newRun();
+    const [a, b, c] = run.party;
+    assert.ok(!run.promote(a.name, 'paladin'), 'not ready below the promotion level');
+
+    a.level = PROMOTION_LEVEL;
+    assert.equal(run.pending, null, 'on the map, between nodes');
+    const gold = run.gold;
+    assert.ok(run.promote(a.name, 'paladin'));
+    assert.equal(a.job, 'paladin');
+    assert.equal(run.gold, gold, 'free');
+    assert.ok(!run.promote(a.name, 'lifeseer'), 'only once, even into the other option');
+
+    enter(run, 'combat');                       // waiting for a fight
+    b.level = PROMOTION_LEVEL;
+    assert.equal(run.pending.kind, 'battle');
+    assert.ok(run.promote(b.name, 'riftcaller'), 'just before a battle');
+    assert.ok(!run.promote(b.name, 'nowhere'), 'not a promotion of that job');
+
+    c.level = PROMOTION_LEVEL;
+    run.completeBattle(false);
+    assert.equal(run.status, 'lost');
+    assert.ok(!run.promote(c.name, 'beastcaller'), 'not after the run ends');
+    assert.equal(c.job, 'runebow');
 });
 
 test('recruits join up to six; a full party gets JP instead', () => {
@@ -281,4 +303,24 @@ test('the Heirloom unlock starts the run with a relic choice', () => {
     assert.ok(run.chooseStartingRelic(run.pending.relics[0]));
     assert.equal(run.relics.length, 1);
     assert.ok(run.reachable().length > 0);
+});
+
+test('off-hand items are tools, and a save with one equipped as a weapon puts it back in the bag', () => {
+    assert.equal(EQUIPMENT.parrying_dagger.slot, 'tool');
+    assert.equal(EQUIPMENT.aegis_of_the_vanguard.slot, 'tool');
+    assert.equal(EQUIPMENT.aegis_of_the_vanguard.type, 'shield');
+
+    const run = newRun();
+    const blade = run.party.find(m => m.job === 'warden');
+    run.addItem('parrying_dagger');
+    assert.ok(!run.equip(blade.name, 'weaponKey', 'parrying_dagger'), 'no longer a weapon');
+
+    const saved = JSON.parse(run.serialize());
+    const m = saved.party.find(x => x.name === blade.name);
+    m.appearance.weaponKey = 'parrying_dagger';   // equipped before the move
+    const before = saved.inventory.parrying_dagger ?? 0;
+    const loaded = RunState.deserialize(saved);
+    const lm = loaded.member(blade.name);
+    assert.equal(lm.appearance.weaponKey, null);
+    assert.equal(loaded.inventory.parrying_dagger, before + 1, 'returned to the bag, not lost');
 });

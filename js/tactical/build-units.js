@@ -18,6 +18,8 @@ export function encounterEnemies(encounter) {
         statMods:       r.statMods ?? {},
         extraAbilities: r.extraAbilities ?? [],
         appearance:     r.appearance ?? null,
+        spriteKey:      r.sprite ?? null,
+        tint:           r.tint ?? null,
     }));
 }
 

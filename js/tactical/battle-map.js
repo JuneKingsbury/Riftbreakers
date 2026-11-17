@@ -20,12 +20,54 @@ export const TILE_TYPES = {
 //   standable  units can stand on top of the block
 //   moveCost   cost of stepping onto the block's top
 //   opaque     the block stops line of sight
+// Listed in the order the map editor shows them: ground, built floors, walls, liquids.
+const GROUND = { standable: true, moveCost: 1, opaque: true };
+const ROUGH  = { standable: true, moveCost: 2, opaque: true };
+const SOLID  = { standable: false, moveCost: 99, opaque: true };
+const LIQUID = { standable: false, moveCost: 99, opaque: false };
 export const MATERIALS = {
-    grass:  { standable: true,  moveCost: 1,  opaque: true  },
-    dirt:   { standable: true,  moveCost: 1,  opaque: true  },
-    water:  { standable: false, moveCost: 99, opaque: false },
-    wall:   { standable: false, moveCost: 99, opaque: true  },
-    rubble: { standable: true,  moveCost: 2,  opaque: true  },
+    // Natural ground
+    grass:   GROUND,
+    dirt:    GROUND,
+    rubble:  ROUGH,
+    sand:    GROUND,
+    moss:    GROUND,
+    autumn:  GROUND,
+    swamp:   GROUND,
+    fungal:  GROUND,
+    stone:   GROUND,
+    redrock: GROUND,
+    snow:    ROUGH,
+    mud:     ROUGH,
+    shallows: ROUGH,
+    // Built floors
+    cobble:  GROUND,
+    brick:   GROUND,
+    planks:  GROUND,
+    marble:  GROUND,
+    carpet:  GROUND,
+    gravel_path: GROUND,
+    verdant_tile: GROUND,
+    crystal_floor: GROUND,
+    abyss_tile: GROUND,
+    glyph:   GROUND,
+    // Walls
+    wall:    SOLID,
+    stone_wall: SOLID,
+    brick_wall: SOLID,
+    wood_wall: SOLID,
+    kingdom_wall: SOLID,
+    bookshelf: SOLID,
+    hedge:   SOLID,
+    crystal: SOLID,
+    abyss_wall: SOLID,
+    void_wall: SOLID,
+    warded_wall: SOLID,
+    // Liquids
+    water:   LIQUID,
+    bog:     LIQUID,
+    void_water: LIQUID,
+    lava:    LIQUID,
 };
 
 export function getMaterial(type) {

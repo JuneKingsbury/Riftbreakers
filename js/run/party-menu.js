@@ -121,19 +121,18 @@ export class PartyMenu {
 
     _promotionHtml(m) {
         if (m.origin || JOB_DATA[m.job]?.tier !== 1) return '';
-        const ready = canPromote(m);
-        const here = this.run.canPromoteHere();
+        const ready = canPromote(m) && this.run.status === 'active';
         let html = `<div style="margin-bottom:10px;padding:8px;border:1px solid ${ready ? '#664' : '#223'};border-radius:4px;background:#0c0c18;">
             <div style="color:#fc8;font-size:10px;text-transform:uppercase;margin-bottom:4px;">Promotion</div>`;
         if (!ready) {
             html += `<div style="color:#888;font-size:11px;">Reach level ${PROMOTION_LEVEL} (now ${m.level}) to promote into a Tier 2 job. You keep every skill you know.</div>`;
-        } else if (!here) {
-            html += `<div style="color:#aaa;font-size:11px;">Ready! Promote at a rest site or after defeating a boss.</div>`;
+        } else {
+            html += `<div style="color:#fc6;font-size:11px;">Ready! Choose a Tier 2 job. You keep every skill you know.</div>`;
         }
         for (const job of promotionOptions(m)) {
             const kit = Object.keys(JOB_DATA[job].learnable).map(abilityName).join(', ');
             html += `<div style="margin-top:6px;">
-                <button data-promote="${job}" style="${BTN}${ready && here ? BTN_GOLD : BTN_DISABLED}margin-bottom:2px;" ${ready && here ? '' : 'disabled'}>★ ${jobLabel(job)}</button>
+                <button data-promote="${job}" style="${BTN}${ready ? BTN_GOLD : BTN_DISABLED}margin-bottom:2px;" ${ready ? '' : 'disabled'}>★ ${jobLabel(job)}</button>
                 <div style="color:#888;font-size:10px;line-height:1.4;">${esc(jobDesc(job))}<br><span style="color:#99a;">Skills: ${esc(kit)}</span></div>
             </div>`;
         }

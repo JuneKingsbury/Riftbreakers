@@ -1,7 +1,12 @@
 // Random events met on '?' nodes.
 //
-// event: { id, title, text, acts?, choices: [choice] }
+// These are the general events, met in any realm. Realm-only events live in
+// data/realm-events.js; EVENTS holds both.
+//
+// event: { id, title, text, acts?, chains?, choices: [choice] }
 //   acts     Acts the event can appear in (default: all)
+//   chains   Realm chains (data/realms.js) the event fits, for events set outdoors on the
+//            road (default: all)
 //   choice:  { label, requires?, effect?, resultText?, outcomes? }
 //     requires  { gold?: n, partyBelow?: n, items?: n }: the choice is disabled unless met
 //               (gold: at least n gold; partyBelow: fewer than n members; items: at least
@@ -22,9 +27,16 @@
 //   battle       'normal' | 'elite': fight before moving on
 // resultText may use {name} (the member chosen by memberStatMods), {item} and {relic}.
 
-export const EVENTS = [
+import { REALMS, realmSources } from './realms.js';
+import { REALM_EVENTS } from './realm-events.js';
+
+// Chains with open country and roads.
+const ROADS = ['wild_frontiers', 'verdant_wilds', 'the_kingdom'];
+
+const GENERAL_EVENTS = [
     {
         id: 'wounded_traveller',
+        chains: ROADS,
         title: 'Wounded Traveller',
         text: 'A wounded merchant slumps against a mile-marker, their saddlebag still intact.',
         choices: [
@@ -58,6 +70,7 @@ export const EVENTS = [
     },
     {
         id: 'wandering_mage',
+        chains: ROADS,
         title: 'Wandering Mage',
         text: 'An eccentric old mage offers to share battle knowledge, for a price.',
         choices: [
@@ -68,6 +81,7 @@ export const EVENTS = [
     },
     {
         id: 'old_shrine',
+        chains: ROADS,
         title: 'Old Shrine',
         text: 'A roadside shrine to a forgotten deity. Copper offerings sit undisturbed.',
         choices: [
@@ -93,6 +107,7 @@ export const EVENTS = [
     },
     {
         id: 'ambush',
+        chains: ROADS,
         title: 'Ambush!',
         text: 'Armed bandits step out from behind the trees. "Your gold or your lives."',
         acts: [1, 2],
@@ -151,6 +166,7 @@ export const EVENTS = [
     },
     {
         id: 'gambler',
+        chains: ROADS,
         title: 'Riverside Gambler',
         text: 'A grinning stranger shuffles a deck. "Double or nothing, friend?"',
         choices: [
@@ -163,6 +179,7 @@ export const EVENTS = [
     },
     {
         id: 'fallen_knight',
+        chains: ROADS,
         title: 'Fallen Knight',
         text: 'A knight\'s body lies under a tree, armour intact. A pendant glints at their throat.',
         choices: [
@@ -206,6 +223,7 @@ export const EVENTS = [
     },
     {
         id: 'pilgrims',
+        chains: ROADS,
         title: 'Pilgrims',
         text: 'A band of pilgrims asks for an escort to the next shrine.',
         acts: [1, 2],
@@ -251,6 +269,17 @@ export const EVENTS = [
     },
 ];
 
-export function eventsForAct(act) {
-    return EVENTS.filter(e => !e.acts || e.acts.includes(act));
+export const EVENTS = [...GENERAL_EVENTS, ...REALM_EVENTS];
+
+// Events for a '?' node in `act`, set in `realmId`: { realm: [...], general: [...] }.
+// `realm` also holds the events of the realms folded into it (realmSources).
+export function eventsFor(act, realmId) {
+    const chain = REALMS[realmId]?.chain;
+    const sources = realmSources(realmId);
+    const inAct = e => !e.acts || e.acts.includes(act);
+    return {
+        // The realm's own events and those of the realms folded into it.
+        realm: REALM_EVENTS.filter(e => inAct(e) && e.realms.some(r => sources.includes(r))),
+        general: GENERAL_EVENTS.filter(e => inAct(e) && (!e.chains || e.chains.includes(chain))),
+    };
 }

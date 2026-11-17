@@ -27,6 +27,8 @@ const BASE_AZIMUTH = 45 * DEG;   // camera sits south-east of the target: north 
 const DEFAULT_TILE_SIZE = 48;
 const PX_PER_UNIT_FACTOR = 0.85; // zoom (tileSize) -> pixels per world unit
 const SPRITE_HEIGHT = 1.0;
+// Background behind the map when its realm look doesn't set one.
+const DEFAULT_SKY = 0x161a26;
 const PAN_SPEED = 6;             // tiles per second at tileSize 48
 const CAMERA_DISTANCE = 60;
 const ROTATE_EASE_MS = 70;
@@ -136,7 +138,7 @@ export class BattleView3D {
 
         this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: false, alpha: false });
         this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-        this.renderer.setClearColor(0x0a0a12, 1);
+        this.renderer.setClearColor(DEFAULT_SKY, 1);
 
         this.scene  = new THREE.Scene();
         this.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, CAMERA_DISTANCE * 3);
@@ -572,6 +574,7 @@ export class BattleView3D {
         const sig = `${terrainSignature(map)}:${sm && sm.isActive ? sm.activeSkin : ''}`;
         if (this._terrain && this._terrainSig === sig && this._terrain.map === map) return;
         this._clearTerrain();
+        this.renderer.setClearColor(new THREE.Color(map.look?.sky ?? DEFAULT_SKY), 1);
         this._terrain = buildTerrainMesh(map, this.skinManager, image => this._textureFor(image));
         this._terrain.map = map;
         this._terrainSig = sig;

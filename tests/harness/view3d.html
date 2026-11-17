@@ -1,6 +1,7 @@
 <!doctype html>
 <!-- Manual/visual harness for BattleView3D. Serve the repo root (e.g. python3 -m http.server)
-     and open /tests/harness/view3d.html?map=0 (or ?map=<map id>). Exposes window.harness for scripted checks. -->
+     and open /tests/harness/view3d.html?map=0 (or ?map=<map id>). Add &realm=<realm id> to dress the map
+     in that realm's look and field its boss fight (js/run/data/realms.js), or &boss=<boss id> for another of its bosses. Exposes window.harness for scripted checks. -->
 <html>
 <head>
 <meta charset="utf-8">
@@ -18,6 +19,8 @@ import { TacticalBattle } from '/js/tactical/battle.js';
 import { loadMapData } from '/js/tactical/battle-map.js';
 import { MAP_DATA } from '/js/tactical/data/maps/index.js';
 import { buildUnits } from '/js/tactical/build-units.js';
+import { realmLook } from '/js/run/data/realms.js';
+import { ENCOUNTERS } from '/js/run/data/encounters.js';
 
 const params = new URLSearchParams(location.search);
 const sm = new SkinManager();
@@ -28,7 +31,11 @@ if (params.get('skin') !== 'ascii') {
 const mapParam = params.get('map') || '0';
 const mapDef = MAP_DATA.find(d => d.id === mapParam) ?? MAP_DATA[Number(mapParam) || 0];
 const map = loadMapData(mapDef);
-const units = buildUnits(null, map.playerSpawns, map.enemySpawns);
+const realm = params.get('realm');
+map.look = realmLook(realm);
+const bossId = params.get('boss');
+const encounter = (bossId ? ENCOUNTERS[realm]?.boss.find(b => b.id === bossId) : null) ?? ENCOUNTERS[realm]?.boss[0] ?? null;
+const units = buildUnits(encounter ? { encounter } : null, map.playerSpawns, map.enemySpawns);
 const battle = new TacticalBattle(map, units);
 const first = battle.advanceCT();
 battle.startTurn(first);

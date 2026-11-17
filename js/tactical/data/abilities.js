@@ -1127,6 +1127,15 @@ export const ABILITY_DATA = {
         floatText: 'Focus!',
         desc: 'Steady your breath and remember your training: ATK and MAT +3 for 3 turns.',
     },
+    rallying_beat: {
+        name: 'Rallying Beat',
+        type: 'physical',
+        range: 3, aoe: 1, mpCost: 0, actionCost: 35,
+        targetType: 'ally', animType: 'cast', projectileColor: '#ffcc66', chargeTime: 0,
+        buffs: [{ stat: 'atk', value: 2, duration: 3 }, { stat: 'mat', value: 2, duration: 3 }],
+        floatText: 'Rallied!',
+        desc: 'Pound out a war beat that steadies everyone near an ally: ATK and MAT +2 for 3 turns.',
+    },
     rush: {
         extends: 'attack',
         name: 'Rush',

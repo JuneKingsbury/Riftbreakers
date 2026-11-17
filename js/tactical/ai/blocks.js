@@ -4,7 +4,7 @@
 //
 // A condition is { test, params } or { op: 'and'|'or'|'not', args: [...] }.
 // Label templates use {param} placeholders, which the editor renders as inputs.
-import { unitCell } from '../battle-map.js';
+import { unitCell, MATERIALS } from '../battle-map.js';
 import { ABILITIES } from '../data-registry.js';
 import * as Q from './queries.js';
 import { isConscious } from '../units.js';
@@ -22,7 +22,8 @@ export function compare(op, a, b) {
     }
 }
 
-export const TILE_TYPES = ['grass', 'dirt', 'water', 'wall', 'rubble'];
+// Materials a unit can stand on (the 'I am standing on' condition).
+export const TILE_TYPES = Object.keys(MATERIALS).filter(t => MATERIALS[t].standable);
 
 // Statuses a script may reference: the ones the engine uses plus any an ability can inflict.
 export const STATUS_OPTIONS = [...new Set([
