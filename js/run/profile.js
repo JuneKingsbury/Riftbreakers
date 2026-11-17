@@ -6,6 +6,7 @@
 import { EQUIPMENT, EQUIP_FIELDS, baseItemKey, enchantLevel } from '../tactical/data/equipment.js';
 import { JOB_DATA } from '../tactical/data/jobs.js';
 import { REALMS } from './data/realms.js';
+import { BACKDROPS } from './data/backdrops.js';
 
 export const PROFILE_KEY = 'riftbreak.profile.v1';
 
@@ -35,6 +36,15 @@ export const UNLOCKS = {
     fine_wares:      { name: 'Fine Wares', cost: 40, desc: 'Shops stock one more item and carry uncommon gear more often.' },
     relic_lore:      { name: 'Relic Lore', cost: 60, desc: 'Elites can drop rare relics.' },
     second_wind:     { name: 'Second Wind', cost: 55, desc: 'Everyone in the party gains 50 XP when a new act begins.' },
+    travelers_pack:  { name: "Traveler's Pack", cost: 35, desc: 'Start each run with a common pair of boots and a common trinket in the bag.' },
+    masterwork:      { name: 'Masterwork', cost: 45, desc: 'Items you find come already enchanted twice as often.' },
+    haggler:         { name: 'Haggler', cost: 40, desc: 'Each shop restocks its wares once for free.' },
+    relic_codex:     { name: 'Relic Codex', cost: 70, requires: 'heirloom', desc: 'Your starting relic choice also offers an uncommon relic.' },
+    scouts_report:   { name: "Scout's Report", cost: 30, desc: 'Each act opens with word of the boss waiting at its end.' },
+    tacticians_codex: { name: "Tactician's Codex", cost: 35, desc: 'Tactics hold 8 more rules, and you can save a template to load onto any character.' },
+    // Title screen backdrops (data/backdrops.js). The free ones need no unlock.
+    ...Object.fromEntries(Object.entries(BACKDROPS).filter(([, b]) => b.cost > 0)
+        .map(([id, b]) => [`backdrop_${id}`, { name: `Backdrop: ${b.name}`, cost: b.cost, backdrop: id, desc: 'A new tile for the title screen. Pick it in Settings > Graphics.' }])),
 };
 
 export function defaultStorage() {
@@ -42,11 +52,13 @@ export function defaultStorage() {
 }
 
 export function newProfile() {
+    // stats.riftTier: the highest Rift Tier the profile may choose (see RIFT_TIERS).
     return {
-        renown: 0, unlocked: [], stats: { runs: 0, wins: 0, bestAct: 0, bestFloor: 0 },
+        renown: 0, unlocked: [], stats: { runs: 0, wins: 0, bestAct: 0, bestFloor: 0, riftTier: 0 },
         items: [],        // every item ever obtained, by base key (an enchanted find counts as its item)
         recentWins: [],   // summaries of the latest winning runs, newest first (see winSummary)
         bossKills: {},    // boss fight id → times defeated, across all runs
+        rewards: [],      // collection rewards earned (COLLECTION_REWARDS ids)
     };
 }
 
@@ -68,6 +80,10 @@ export function sanitizeProfile(data) {
     const stats = data.stats && typeof data.stats === 'object' ? data.stats : {};
     for (const key of Object.keys(p.stats)) p.stats[key] = count(stats[key]);
     p.stats.wins = Math.min(p.stats.wins, p.stats.runs);
+    p.stats.riftTier = Math.min(MAX_RIFT_TIER, p.stats.riftTier);
+    // Profiles from before Rift Tiers: a past win opens the first tier.
+    if (p.stats.wins > 0 && p.stats.riftTier === 0) p.stats.riftTier = 1;
+    if (Array.isArray(data.rewards)) p.rewards = [...new Set(data.rewards.filter(r => Object.hasOwn(COLLECTION_REWARDS, r)))];
     if (Array.isArray(data.items)) p.items = [...new Set(data.items.filter(isBaseItem))];
     if (Array.isArray(data.recentWins)) p.recentWins = data.recentWins.map(sanitizeWin).filter(Boolean).slice(0, RECENT_WINS);
     if (data.bossKills && typeof data.bossKills === 'object') {
@@ -179,6 +195,57 @@ export function unlockedJobs(profile) {
     return jobs;
 }
 
+// ---- Rift Tiers ----
+// Optional difficulty for a run, chosen on the New Run screen. Each tier keeps the ones below
+// it and adds one more twist, for more renown. Winning at a tier opens the next one; the first
+// tier opens with the first win.
+export const RIFT_TIERS = [
+    { name: 'No tier', desc: 'The rifts as you know them.', renown: 0 },
+    { name: 'Tier I: Hardened', desc: 'Elites and bosses are tougher: +10 HP, +2 ATK and +2 MAT each.', renown: 0.25 },
+    { name: 'Tier II: Rift Tax', desc: 'Shop prices are 25% higher.', renown: 0.5 },
+    { name: 'Tier III: Slim Pickings', desc: 'Battle rewards offer one fewer item to choose from.', renown: 0.75 },
+    { name: 'Tier IV: Gathering Storm', desc: 'Every enemy gains +8 HP and +1 to ATK, DEF, MAT and MDF, and bosses bring one more ally.', renown: 1 },
+];
+export const MAX_RIFT_TIER = RIFT_TIERS.length - 1;
+
+// Challenge runs: starting with fewer than three members earns extra renown.
+export const SMALL_PARTY_RENOWN = { 1: 0.5, 2: 0.25 };
+
+/** The renown multiplier for a run: its Rift Tier and its starting party size, added up. */
+export function renownMultiplier(tier = 0, startPartySize = 3) {
+    return 1 + (RIFT_TIERS[tier]?.renown ?? 0) + (SMALL_PARTY_RENOWN[startPartySize] ?? 0);
+}
+
+// ---- Collection rewards (Feats) ----
+// Finding a share of every item earns a reward, once: renown at 33%, and at 66% the Collector's
+// Loupe, a trinket that can only be found once it is earned.
+export const COLLECTION_REWARDS = {
+    collect_33: { at: 33, renown: 50, label: '+50 renown' },
+    collect_66: { at: 66, item: 'jewelers_loupe', label: "Collector's Loupe" },
+};
+
+/** The share of all items found, as a whole percent (rounded down). */
+export function collectionPercent(profile) {
+    const total = Object.keys(EQUIPMENT).length;
+    return total ? Math.floor((profile.items.length / total) * 100) : 0;
+}
+
+/**
+ * Grants any collection reward the profile has newly reached. Returns those rewards
+ * ([{ id, label }]) so the game can announce them.
+ */
+export function claimCollectionRewards(profile) {
+    const pct = collectionPercent(profile);
+    const out = [];
+    for (const [id, r] of Object.entries(COLLECTION_REWARDS)) {
+        if (pct < r.at || profile.rewards.includes(id)) continue;
+        profile.rewards.push(id);
+        if (r.renown) profile.renown += r.renown;
+        out.push({ id, label: r.label });
+    }
+    return out;
+}
+
 // Run options implied by a profile's unlocks (see RunState).
 export function runOptions(profile) {
     const has = (k) => hasUnlock(profile, k);
@@ -193,6 +260,15 @@ export function runOptions(profile) {
         fineWares:     has('fine_wares'),
         relicLore:     has('relic_lore'),
         secondWind:    has('second_wind'),
+        travelersPack: has('travelers_pack'),
+        masterwork:    has('masterwork'),
+        haggler:       has('haggler'),
+        relicCodex:    has('relic_codex'),
+        scoutsReport:  has('scouts_report'),
+        tacticsCodex:  has('tacticians_codex'),
+        // Items that can only be found once a collection reward has been earned.
+        featItems:     Object.entries(COLLECTION_REWARDS).filter(([id, r]) => r.item && profile?.rewards?.includes(id)).map(([, r]) => r.item),
+        tier:          0,   // set on the New Run screen (RIFT_TIERS)
     };
 }
 
@@ -204,10 +280,13 @@ export function renownFor(stats, won) {
 // Records a finished run in the profile. Returns the renown earned.
 export function recordRun(profile, run, now = new Date()) {
     const won = run.status === 'won';
-    const earned = renownFor(run.stats, won);
+    const tier = run.options?.tier ?? 0;
+    const earned = Math.round(renownFor(run.stats, won) * renownMultiplier(tier, run.startPartySize ?? 3));
     profile.renown += earned;
     profile.stats.runs += 1;
     if (won) profile.stats.wins += 1;
+    // A win opens the next Rift Tier.
+    if (won) profile.stats.riftTier = Math.max(profile.stats.riftTier ?? 0, Math.min(MAX_RIFT_TIER, tier + 1));
     profile.stats.bestAct = Math.max(profile.stats.bestAct, run.act);
     profile.stats.bestFloor = Math.max(profile.stats.bestFloor, run.stats.floors || 0);
     noteItems(profile, run);

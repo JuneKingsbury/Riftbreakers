@@ -32,7 +32,8 @@ function relicHtml(key) {
 }
 
 export class NodeScreens {
-    // hooks: { fight(), leave(), openParty(onClose), openGear(onClose), changed(), finish() }
+    // hooks: { fight(), leave(), openParty(onClose), openGear(onClose), changed(), proceed(), finish() }
+    //   proceed: save and show whatever comes next (an act's opening card, or the pending screen)
     constructor(modal, run, skinManager, hooks) {
         this._chimed = new WeakSet();   // reward screens whose level-up chime has played
         this.modal = modal;
@@ -198,6 +199,9 @@ export class NodeScreens {
                     <span style="flex:1;">${itemTitle(k)} <span style="color:#888;">×${n}</span></span><span style="color:#fd8;">+${run.sellPrice(k)}g</span></button>`;
             }
         }
+        if (run.canRestock()) {
+            html += `<button data-restock style="${BTN}${BTN_GOLD}text-align:center;margin-top:6px;">↻ Haggle for fresh stock (free, once)</button>`;
+        }
         html += `<div style="height:8px;"></div>${this._partyButton()}
             <button data-continue style="${BTN}${BTN_GOOD}text-align:center;">Leave shop ›</button>`;
         this._show(html, (on) => {
@@ -205,6 +209,7 @@ export class NodeScreens {
             on('[data-buy]', (el) => this._act(run.buy(Number(el.dataset.buy)), 'loot'));
             on('[data-relic]', () => this._act(run.buyRelic(), 'loot'));
             on('[data-sell]', (el) => this._act(run.sell(el.dataset.sell), 'loot'));
+            on('[data-restock]', () => this._act(run.restockShop(), 'loot'));
             on('[data-continue]', () => this.hooks.leave());
         }, 520);
     }
@@ -356,7 +361,8 @@ export class NodeScreens {
         let html = H1('Heirloom') + SUB('Before you set out, choose one keepsake to carry.');
         for (const k of p.relics) html += `<button data-relic="${k}" style="${BTN}">${relicHtml(k)}</button>`;
         this._show(html, (on) => on('[data-relic]', (el) => {
-            if (this.run.chooseStartingRelic(el.dataset.relic)) { this.hooks.changed(); this.modal.close(); }
+            // Then on to whatever comes next (the act's opening card), not just a closed window.
+            if (this.run.chooseStartingRelic(el.dataset.relic)) { this.modal.close(); this.hooks.proceed(); }
         }));
     }
 

@@ -5,7 +5,7 @@
 import { EQUIPMENT, EQUIP_FIELDS } from '../tactical/data/equipment.js';
 import { REALMS, ACT_REALMS } from './data/realms.js';
 import { ENCOUNTERS } from './data/encounters.js';
-import { loadProfile, RECENT_WINS, BOSS_IDS } from './profile.js';
+import { loadProfile, RECENT_WINS, BOSS_IDS, COLLECTION_REWARDS } from './profile.js';
 import {
     Modal, FONT, RARITY_COLOR, esc, jobLabel, itemLabel, itemSummary, itemIconHtml, portraitHtml, drawSprites, wireTips,
 } from './ui-kit.js';
@@ -66,8 +66,21 @@ export function showFeats(skinManager = globalThis._sharedSkinManager, onClose) 
         <div style="height:100%;width:${percent(have, all)}%;background:${color};"></div></div>`;
 
     const itemsHtml = () => {
-        let html = `<div style="margin-top:10px;font-size:11px;color:#ccd;">Collection: <b style="color:#8d8;">${percent(found.size, total)}%</b>
-            <span style="color:#778;">(${found.size} of ${total} items found)</span></div>${bar(found.size, total, '#6c6')}`;
+        const pct = percent(found.size, total);
+        // The bar, with a bag over each reward's threshold (claimed: bright, ahead: dim).
+        let markers = '';
+        for (const [id, r] of Object.entries(COLLECTION_REWARDS)) {
+            const got = profile.rewards.includes(id);
+            const tip = `${r.at}% of items: ${r.label}\n${got ? 'Earned!' : r.item ? 'A unique trinket that can then be found in any run.' : 'A one-time bonus.'}`;
+            markers += `<div data-tip="${esc(tip)}" style="position:absolute;left:${r.at}%;top:-20px;transform:translateX(-50%);text-align:center;">
+                <canvas class="rk-item" data-item="wanderers_rations_pouch" width="18" height="18" style="image-rendering:pixelated;${got ? '' : 'filter:grayscale(0.8) brightness(0.6);'}"></canvas>
+                <div style="width:2px;height:8px;margin:-2px auto 0;background:${got ? '#fc6' : '#556'};"></div></div>`;
+        }
+        let html = `<div style="margin-top:10px;font-size:11px;color:#ccd;">Collection: <b style="color:#8d8;">${pct}%</b>
+            <span style="color:#778;">(${found.size} of ${total} items found)</span></div>
+            <div style="position:relative;margin-top:22px;">${markers}${bar(found.size, total, '#6c6')}</div>
+            <div style="display:flex;gap:12px;flex-wrap:wrap;font-size:10px;color:#889;margin-top:4px;">${Object.entries(COLLECTION_REWARDS).map(([id, r]) =>
+                `<span>${profile.rewards.includes(id) ? '<span style="color:#fc6;">✓</span>' : '·'} ${r.at}%: ${esc(r.label)}</span>`).join('')}</div>`;
         for (const [slot, label] of SLOTS) {
             const keys = catalog[slot];
             const have = keys.filter(k => found.has(k)).length;

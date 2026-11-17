@@ -13,7 +13,8 @@ import { PartyMenu } from './party-menu.js';
 import { RunState, MAX_PARTY } from './run-state.js';
 import { RELICS } from './data/relics.js';
 import { CHAINS } from './data/realms.js';
-import { loadProfile, saveProfile, recordRun, noteItems, noteBosses } from './profile.js';
+import { SCOUTING } from './data/scouting.js';
+import { loadProfile, saveProfile, recordRun, noteItems, noteBosses, claimCollectionRewards } from './profile.js';
 import { loadPlans, describePurchases } from './skill-plans.js';
 import { Modal, Toast, BTN, BTN_GOOD, BTN_DANGER, GLOW, RARITY_COLOR, NODE_INFO, FONT, esc, jobLabel, hpBar, portraitHtml, drawSprites } from './ui-kit.js';
 import { DeployScene } from '../tactical/deploy-scene.js';
@@ -74,6 +75,7 @@ export class RunMapScene {
             openParty: (onClose) => this._openParty(onClose),
             openGear: (onClose) => this._openGear(onClose),
             changed: () => this._changed(),
+            proceed: () => this._afterChange(),
             finish: () => this._finish(),
         });
 
@@ -133,7 +135,10 @@ export class RunMapScene {
             // (Bosses first: noting them marks the run, which is saved just after.)
             const profile = loadProfile();
             const newBosses = noteBosses(profile, this.run);
-            if (noteItems(profile, this.run) || newBosses) saveProfile(profile);
+            if (noteItems(profile, this.run) || newBosses) {
+                for (const r of claimCollectionRewards(profile)) this._toast?.show(`Collection reward: ${r.label}! See Feats.`, 4200);
+                saveProfile(profile);
+            }
             this.run.save();
         }
         this._sidebarKey = null;
@@ -169,6 +174,9 @@ export class RunMapScene {
             <div style="color:#888;font-size:11px;text-transform:uppercase;letter-spacing:2px;">Act ${run.act} of 3 · ${esc(CHAINS[realm.chain].name)}</div>
             <div style="color:#ffcc44;font-weight:bold;font-size:20px;margin:4px 0 10px;">${esc(realm.name)}</div>
             <div style="color:#bbc;line-height:1.5;margin-bottom:14px;">${esc(realm.blurb)}</div>
+            ${run.options.scoutsReport && SCOUTING[run.actBoss] ? `<div style="border-left:2px solid #c84;padding:4px 10px;margin:-4px 0 14px;background:#140e08;">
+                <div style="color:#c96;font-size:10px;text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;">Scout's report</div>
+                <div style="color:#dcb;line-height:1.5;font-size:11px;">${esc(SCOUTING[run.actBoss])}</div></div>` : ''}
             <button data-begin style="${BTN}${BTN_GOOD}text-align:center;padding:10px;">Set out</button>`,
             { dismissible: false, width: 420 });
         body.querySelector('[data-begin]').addEventListener('click', () => {
@@ -219,6 +227,7 @@ export class RunMapScene {
 
     _openTactics() {
         openScriptEditor(this.run.party, {
+            codex: !!this.run.options.tacticsCodex,
             onSaved: (name) => { this._changed(); this._toast.show(`${name}'s tactics saved.`); },
         });
     }

@@ -4,6 +4,8 @@ import { Sound } from '../audio/sound.js';
 import { TITLE_MUSIC } from '../audio/game-sounds.js';
 import { wireSavePanel } from '../ui/save-panel.js';
 import { mountStartBackdrop } from '../ui/start-backdrop.js';
+import { BACKDROPS, DEFAULT_BACKDROP } from '../run/data/backdrops.js';
+import { loadProfile, hasUnlock } from '../run/profile.js';
 import { renderSkillPlanEditor } from '../ui/skill-plan-panel.js';
 import { runSplash } from '../ui/splash.js';
 
@@ -18,33 +20,30 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Skin manager (shared with tactical scenes) ---
     const skinManager = new SkinManager();
     window._sharedSkinManager = skinManager;
-    const redrawBackdrop = mountStartBackdrop(document.getElementById('start-bg-canvas'), skinManager);
+    // Title backdrops: the free ones, plus any bought in Unlocks. The pick is saved with the
+    // other settings (backdrop); a pick no longer owned falls back to the default.
+    const ownedBackdrops = () => {
+        const profile = loadProfile();
+        return Object.keys(BACKDROPS).filter(id => BACKDROPS[id].cost === 0 || hasUnlock(profile, `backdrop_${id}`));
+    };
+    const chosenBackdrop = () => {
+        let id = DEFAULT_BACKDROP;
+        try { id = JSON.parse(localStorage.getItem('riftbreakers_settings'))?.backdrop ?? id; } catch { /* default */ }
+        return ownedBackdrops().includes(id) ? id : DEFAULT_BACKDROP;
+    };
+    const redrawBackdrop = mountStartBackdrop(document.getElementById('start-bg-canvas'), skinManager, () => BACKDROPS[chosenBackdrop()].tile);
+    const fillBackdropSelect = () => {
+        const sel = document.getElementById('start-backdrop');
+        if (!sel) return;
+        const current = chosenBackdrop();
+        sel.innerHTML = ownedBackdrops().map(id => `<option value="${id}"${id === current ? ' selected' : ''}>${BACKDROPS[id].name}</option>`).join('');
+    };
+    fillBackdropSelect();
 
-    // Load skin preference and populate selector
-    const savedSkin = localStorage.getItem('convocation_skin') || '16x16_tiny_world';
-    const skinSelect = document.getElementById('start-skin');
-    fetch('skins/index.json')
-        .then(r => r.json())
-        .then(index => {
-            const skins = index.skins || index;
-            for (const s of skins) {
-                const opt = document.createElement('option');
-                opt.value = s.id || s;
-                opt.textContent = s.name || s;
-                if (opt.value === savedSkin) opt.selected = true;
-                skinSelect.appendChild(opt);
-            }
-            if (savedSkin !== 'ascii') {
-                skinManager.switchSkin(savedSkin).then(redrawBackdrop);
-            }
-        })
-        .catch(() => {});
-
-    skinSelect?.addEventListener('change', () => {
-        const val = skinSelect.value;
-        localStorage.setItem('convocation_skin', val);
-        skinManager.switchSkin(val).then(redrawBackdrop);
-    });
+    // The game always uses its own tile skin (skins/16x16_tiny_world.skin.zip). Players can't
+    // change it; an old saved choice from earlier builds (convocation_skin) is ignored.
+    const GAME_SKIN = '16x16_tiny_world';
+    skinManager.switchSkin(GAME_SKIN).then(redrawBackdrop).catch(() => {});
 
     // --- Settings persistence ---
     const SETTINGS_KEY = 'riftbreakers_settings';
@@ -62,6 +61,7 @@ document.addEventListener('DOMContentLoaded', () => {
             sfxVolume:   sliderValue('start-sfx-vol', 80),
             colorblindMode: document.getElementById('start-colorblind')?.value || 'none',
             tacticsLog: !!document.getElementById('start-tactics-log')?.checked,
+            backdrop: document.getElementById('start-backdrop')?.value || DEFAULT_BACKDROP,
         };
         localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
     }
@@ -105,14 +105,15 @@ document.addEventListener('DOMContentLoaded', () => {
     Sound.playMusic(TITLE_MUSIC);
 
     document.getElementById('start-reset-defaults')?.addEventListener('click', () => {
-        document.getElementById('start-skin').value = 'ascii';
         document.getElementById('start-music-vol').value = 50;
         document.getElementById('start-music-vol-val').textContent = '50';
         document.getElementById('start-sfx-vol').value = 80;
         document.getElementById('start-sfx-vol-val').textContent = '80';
         document.getElementById('start-colorblind').value = 'none';
         document.getElementById('start-tactics-log').checked = false;
+        document.getElementById('start-backdrop').value = DEFAULT_BACKDROP;
         saveSettings();
+        redrawBackdrop();
         applyVolumes();
     });
 
@@ -142,7 +143,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (panel) panel.style.display = 'block';
         if (modalBackdrop) modalBackdrop.style.display = 'block';
     }
-    document.getElementById('start-settings')?.addEventListener('click', () => openModal(settingsPanel));
+    document.getElementById('start-settings')?.addEventListener('click', () => { fillBackdropSelect(); openModal(settingsPanel); });
+    document.getElementById('start-backdrop')?.addEventListener('change', () => { saveSettings(); redrawBackdrop(); });
     document.getElementById('start-credits')?.addEventListener('click',  () => openModal(creditsPanel));
     document.querySelectorAll('[data-modal-close]').forEach(btn => {
         btn.addEventListener('click', closeModals);

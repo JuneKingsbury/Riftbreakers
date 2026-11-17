@@ -31,7 +31,7 @@ test('renown, unlocks and stats survive a save and a load', () => {
     const profile = newProfile();
     profile.renown = 120;
     assert.ok(buyUnlock(profile, 'purse_1') && buyUnlock(profile, 'job_seer'));
-    profile.stats = { runs: 4, wins: 1, bestAct: 3, bestFloor: 40 };
+    profile.stats = { runs: 4, wins: 1, bestAct: 3, bestFloor: 40, riftTier: 1 };
     assert.ok(saveProfile(profile, storage));
 
     const loaded = loadProfile(storage);
@@ -69,7 +69,7 @@ test('damaged or hand-edited profiles load as something valid instead of breakin
     }));
     assert.equal(p.renown, 0);
     assert.deepEqual(p.unlocked, ['purse_1', 'veterans'], 'only real unlocks, each once');
-    assert.deepEqual(p.stats, { runs: 3, wins: 3, bestAct: 0, bestFloor: 0 }, 'whole numbers; no more wins than runs');
+    assert.deepEqual(p.stats, { runs: 3, wins: 3, bestAct: 0, bestFloor: 0, riftTier: 1 }, 'whole numbers; no more wins than runs; a past win opens Rift Tier I');
     assert.ok(!('cheat' in p));
     assert.deepEqual(load(JSON.stringify({ renown: 10, unlocked: 'purse_1' })).unlocked, []);
     assert.equal(sanitizeProfile({ renown: 12.9 }).renown, 12);

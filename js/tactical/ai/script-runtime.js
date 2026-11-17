@@ -18,6 +18,8 @@ import { RANGED_ROLES } from './default-scripts.js';
 import { JOB_DATA } from '../data/jobs.js';
 
 export const MAX_RULES = 16;
+// With the Tactician's Codex unlock a script holds more rules; this is the most any script can.
+export const CODEX_RULES = 24;
 
 const DEFAULT_TARGET = { side: 'enemy', pick: 'nearest' };
 
@@ -475,7 +477,7 @@ function withPosition(unit, x, y, z, facing) {
 export function runScript(script, unit, units, map) {
     const intent = { move: null, pivot: null, act: null, trace: [] };
     settleZ(map, units);
-    const rules = (script?.rules ?? []).slice(0, MAX_RULES);
+    const rules = (script?.rules ?? []).slice(0, CODEX_RULES);
 
     let self = unit;
     let list = units;

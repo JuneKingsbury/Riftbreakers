@@ -1,8 +1,9 @@
-// The title screen's backdrop: the skin's abyss floor tile repeated across the screen, tinted
+// The title screen's backdrop: a skin tile (the player's pick from run/data/backdrops.js,
+// abyss floor by default) repeated across the screen, tinted
 // dark so the menu stays readable, with a soft vignette. Without a sprite (ASCII skin, or the
 // skin still loading) the canvas is left clear and the plain page color shows.
 
-// The sprite to tile, as [category, key] in the skin (was buildings:stone_wall).
+// The default sprite to tile, as [category, key] in the skin.
 const BACKDROP_TILE = ['floors', 'abyss_floor'];
 const TILE_PX = 16 * 4;                 // sprite drawn at 4x, crisp
 const TINT = 'rgba(14, 14, 30, 0.4)';  // darkening wash, close to the page color #1a1a2e
@@ -47,11 +48,15 @@ export function drawStartBackdrop(canvas, sprite) {
  * Keeps the title backdrop drawn: now, on resize, and whenever the skin changes.
  * @param {HTMLCanvasElement} canvas
  * @param {{ getSprite(category: string, key: string): HTMLImageElement|null }} skinManager
- * @returns {() => void} Redraw, to call after a skin switch finishes loading.
+ * @param {() => [string, string]} [getTile]  The tile to use, read on every redraw.
+ * @returns {() => void} Redraw, to call after a skin switch or backdrop change.
  */
-export function mountStartBackdrop(canvas, skinManager) {
+export function mountStartBackdrop(canvas, skinManager, getTile = () => BACKDROP_TILE) {
     if (!canvas) return () => {};
-    const redraw = () => drawStartBackdrop(canvas, skinManager.getSprite(BACKDROP_TILE[0], BACKDROP_TILE[1]));
+    const redraw = () => {
+        const [cat, key] = getTile() ?? BACKDROP_TILE;
+        drawStartBackdrop(canvas, skinManager.getSprite(cat, key) ?? skinManager.getSprite(...BACKDROP_TILE));
+    };
     let pending = 0;
     window.addEventListener('resize', () => {
         cancelAnimationFrame(pending);

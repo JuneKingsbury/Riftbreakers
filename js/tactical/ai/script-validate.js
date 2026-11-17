@@ -2,7 +2,7 @@
 // problems live and by the store so a corrupted save can never reach the interpreter.
 import { ABILITIES } from '../data-registry.js';
 import { CONDITIONS, ABILITY_CATEGORIES, ACTION_KINDS, MOVE_MODES, SIDES, PICKS, FILTER_KINDS, FACINGS, POSITIONING } from './blocks.js';
-import { MAX_RULES } from './script-runtime.js';
+import { CODEX_RULES } from './script-runtime.js';
 
 const MAX_COND_DEPTH = 6;
 
@@ -34,7 +34,8 @@ export function validateScript(script, unit = null) {
         add(-1, 'rules', 'Script has no rule list.');
         return problems;
     }
-    if (script.rules.length > MAX_RULES) add(-1, 'rules', `Too many rules. The limit is ${MAX_RULES}.`);
+    // The editor holds most players to MAX_RULES; Tactician's Codex scripts may go up to CODEX_RULES.
+    if (script.rules.length > CODEX_RULES) add(-1, 'rules', `Too many rules. The limit is ${CODEX_RULES}.`);
 
     script.rules.forEach((rule, i) => {
         const sub = [];

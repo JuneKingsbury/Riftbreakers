@@ -10,12 +10,12 @@ import {
     CONDITIONS, COMPARATORS, STATUS_OPTIONS, TILE_TYPES, ABILITY_CATEGORIES,
     SIDES, PICKS, FILTER_KINDS, MOVE_MODES, ACTION_KINDS, FACINGS, POSITIONING, sideForAbility, scriptUsable, paramLabel,
 } from './blocks.js';
-import { MAX_RULES } from './script-runtime.js';
+import { MAX_RULES, CODEX_RULES } from './script-runtime.js';
 
 // A class id as players see it: 'field_surgeon' → "Field Surgeon".
 const classLabel = (job) => String(job || '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 import { validateScript, hasErrors } from './script-validate.js';
-import { getScriptFor, saveScript, resetScript, hasCustomScript, defaultBehaviorFor } from './script-store.js';
+import { getScriptFor, saveScript, resetScript, hasCustomScript, defaultBehaviorFor, saveTemplate, loadTemplate } from './script-store.js';
 import { abilitiesForMember } from './party.js';
 
 const FONT = "'Courier New',monospace";
@@ -76,9 +76,12 @@ function setPath(obj, path, value) {
 
 export class ScriptEditor {
     // characters: the live party (worldMap.party): { name, job, jp, learned, loadout, ... } (see loadout.js).
-    constructor(characters, { onSaved } = {}) {
+    // codex: the Tactician's Codex unlock (more rules, and a shared template).
+    constructor(characters, { onSaved, codex = false } = {}) {
         this._chars = characters;
         this._onSaved = onSaved || null;
+        this._codex = codex;
+        this._maxRules = codex ? CODEX_RULES : MAX_RULES;
         this._drafts = {};
         this._saved = {};
         this._selected = characters[0]?.name ?? null;
@@ -319,13 +322,15 @@ export class ScriptEditor {
                         <div style="color:#aab;margin-bottom:8px;"><b>${esc(cd.name)}</b> knows: ${abilities.filter(k => ABILITIES[k] && !ABILITIES[k].passive).map(k => esc(ABILITIES[k].name)).join(', ')}</div>
                         ${draft.rules.map((r, i) => this._rule(r, i, problems, ctx)).join('') || '<div style="color:#888;">No rules. This character will just wait each turn.</div>'}
                         ${problems.filter(p => p.rule === -1).map(p => `<div style="color:#f66;">${esc(p.message)}</div>`).join('')}
-                        <button data-act="add-rule" style="${BTN}"${draft.rules.length >= MAX_RULES ? ' disabled' : ''}>+ Add rule (${draft.rules.length}/${MAX_RULES})</button>
+                        <button data-act="add-rule" style="${BTN}"${draft.rules.length >= this._maxRules ? ' disabled' : ''}>+ Add rule (${draft.rules.length}/${this._maxRules})</button>
                     </div>
                 </div>
                 <div class="se-footer" style="display:flex;gap:8px;align-items:center;padding:10px 16px;border-top:1px solid #335;">
                     <button data-act="save" style="${BTN}color:#8f8;border-color:#464;"${blocked || !dirty ? ' disabled' : ''}>Save ${esc(cd.name)}</button>
                     <button data-act="revert" style="${BTN}"${dirty ? '' : ' disabled'}>Revert changes</button>
                     <button data-act="reset" style="${BTN}"${hasCustomScript(cd.name) || dirty ? '' : ' disabled'}>Use default behavior</button>
+                    ${this._codex ? `<button data-act="save-template" style="${BTN}color:#fc8;border-color:#664;"${blocked ? ' disabled' : ''} title="Keep these rules as a template for any character">Save as template</button>
+                    <button data-act="load-template" style="${BTN}color:#fc8;border-color:#664;"${loadTemplate() ? '' : ' disabled'} title="Replace these rules with your template">Load template</button>` : ''}
                     <span style="color:#8c8;">${esc(this._message)}</span>
                     <span style="margin-left:auto;color:#778;font-size:11px;">${blocked ? 'Fix the problems above to save.' : ''}</span>
                 </div>
@@ -402,7 +407,19 @@ export class ScriptEditor {
         switch (act) {
             case 'close': this.close(); return;
             case 'select-char': this._selected = el.dataset.name; break;
+            case 'save-template':
+                this._message = saveTemplate(this._finalized(this._selected)) ? 'Template saved. Load it onto any character.' : "Couldn't save the template.";
+                break;
+            case 'load-template': {
+                const t = loadTemplate();
+                if (!t) break;
+                this._drafts[this._selected] = t;
+                this._prepare(t);
+                this._message = `Template loaded. Rules ${this._char().name} can't use are marked. Save to keep it.`;
+                break;
+            }
             case 'add-rule': {
+                if (rules.length >= this._maxRules) break;
                 const n = rules.reduce((m, r) => Math.max(m, Number(String(r.id).replace(/\D/g, '')) || 0), 0) + 1;
                 rules.push({ id: `r${n}`, enabled: true, when: { op: 'and', args: [] }, then: defaultAction('ability') });
                 break;

@@ -21,7 +21,7 @@
 //   relicChoice { relics }                      Heirloom pick at the start of a run
 import { Rng, randomSeed } from './rng.js';
 import { generateActMap, reachableIds } from './map-gen.js';
-import { rollEncounter, battleRewards, ACT_COUNT, EASY_FIGHTS } from './data/encounters.js';
+import { rollEncounter, realmEncounters, battleRewards, ACT_COUNT, EASY_FIGHTS } from './data/encounters.js';
 import { RELICS, relicStatMods, relicMult, relicsWith } from './data/relics.js';
 import { eventsFor, EVENTS } from './data/events.js';
 import { rollRealms, REALMS } from './data/realms.js';
@@ -54,6 +54,26 @@ const ITEM_RARITY = {
     3: { normal: { common: 10, uncommon: 55, rare: 35 }, elite: { uncommon: 35, rare: 65 },            boss: { rare: 100 } },
 };
 
+// ---- Rift Tiers (profile RIFT_TIERS) ----
+export const RIFT_TAX = 0.25;   // Tier II: shop prices
+const TIER1_TOUGH = { maxHp: 10, atk: 2, mat: 2 };                  // Tier I: elites and bosses
+const TIER4_STORM = { maxHp: 8, atk: 1, def: 1, mat: 1, mdf: 1 };   // Tier IV: every enemy
+
+function addStatMods(...mods) {
+    const out = {};
+    for (const m of mods) for (const [k, v] of Object.entries(m || {})) out[k] = (out[k] || 0) + v;
+    return out;
+}
+
+/** Extra enemy stats a Rift Tier adds to a fight of `kind`, or null. */
+export function riftTierMods(tier, kind) {
+    const mods = addStatMods(
+        tier >= 1 && (kind === 'elite' || kind === 'boss') ? TIER1_TOUGH : null,
+        tier >= 4 ? TIER4_STORM : null,
+    );
+    return Object.keys(mods).length ? mods : null;
+}
+
 export class RunState {
     // opts.jobs     The starting roles: MIN_START_PARTY to START_PARTY of them (none: BASE_JOBS)
     // opts.options  runOptions(profile); defaults to a fresh profile
@@ -81,8 +101,24 @@ export class RunState {
             m.sp += START_BONUS_SP;
             run.party.push(m);
         }
+        run.startPartySize = run.party.length;   // for the small-party renown bonus
         run._startAct();
-        if (options.heirloom) run.pending = { kind: 'relicChoice', relics: run._rollRelics(['common'], 3) };
+        if (options.heirloom) {
+            // Relic Codex swaps one of the three common choices for an uncommon relic.
+            const relics = options.relicCodex
+                ? [...run._rollRelics(['common'], 2), ...run._rollRelics(['uncommon'], 1)]
+                : run._rollRelics(['common'], 3);
+            run.pending = { kind: 'relicChoice', relics };
+        }
+        // Traveler's Pack: a common pair of boots and a common trinket. Rolled on their own
+        // stream, so the rest of the run plays out as it would without them.
+        if (options.travelersPack) {
+            const pack = new Rng((seed ^ 0x51ED7A11) >>> 0);
+            for (const slot of ['boots', 'trinket']) {
+                const keys = Object.keys(EQUIPMENT).filter(k => EQUIPMENT[k].slot === slot && itemRarity(k) === 'common' && !EQUIPMENT[k].featOnly);
+                if (keys.length) run.addItem(pack.pick(keys));
+            }
+        }
         return run;
     }
 
@@ -134,6 +170,10 @@ export class RunState {
     // ---- Map ----
 
     _startAct() {
+        // The act's boss is chosen now (on its own stream, so other rolls don't shift), so the
+        // act intro can name it (Scout's Report) and the boss node fields that same fight.
+        const bosses = realmEncounters(this.realmId, 'boss').map(e => e.def.id);
+        this.actBoss = bosses.length ? new Rng((this.seed ^ (0xB055 * this.act)) >>> 0).pick(bosses) : null;
         this.map = generateActMap(this.rng, this.act);
         this.currentNodeId = null;
         this.visited = [];
@@ -327,7 +367,8 @@ export class RunState {
         const out = [];
         for (let i = 0; i < count * 6 && out.length < count; i++) {
             const rarity = this.rng.weighted(weights);
-            const keys = Object.keys(EQUIPMENT).filter(k => itemRarity(k) === rarity && !out.includes(k));
+            const keys = Object.keys(EQUIPMENT).filter(k => itemRarity(k) === rarity && !out.includes(k)
+                && (!EQUIPMENT[k].featOnly || this.options.featItems?.includes(k)));
             const usable = keys.filter(k => this.usableByParty(k));
             const pool = usable.length ? usable : keys;
             if (pool.length) out.push(this.rng.pick(pool));
@@ -336,7 +377,7 @@ export class RunState {
     }
 
     _maybeEnchant(key, kind = 'normal') {
-        const mult = kind === 'elite' || kind === 'boss' ? ELITE_ENCHANT_MULT : 1;
+        const mult = (kind === 'elite' || kind === 'boss' ? ELITE_ENCHANT_MULT : 1) * (this.options.masterwork ? 2 : 1);
         const r = this.rng.next();
         if (r < FOUND_ENCHANT_CHANCE.plus2 * mult) return enchantedKey(key, 2);
         if (r < (FOUND_ENCHANT_CHANCE.plus2 + FOUND_ENCHANT_CHANCE.plus1) * mult) return enchantedKey(key, 1);
@@ -368,8 +409,16 @@ export class RunState {
 
     _rollEncounter(kind) {
         const easy = kind === 'normal' && this.act === 1 && this.stats.battles < EASY_FIGHTS;
-        const enc = rollEncounter(this.rng, this.realmId, this.act, kind, this.party.length, this.seenEncounters, easy);
+        const tier = this.options.tier ?? 0;
+        // Bosses: the fight chosen when the act began (the others count as already seen).
+        let seen = this.seenEncounters;
+        if (kind === 'boss' && this.actBoss) seen = [...seen, ...realmEncounters(this.realmId, 'boss').map(e => e.def.id).filter(id => id !== this.actBoss)];
+        // Rift Tier IV: bosses bring one more ally (as if the party were one larger).
+        const size = this.party.length + (kind === 'boss' && tier >= 4 ? 1 : 0);
+        const enc = rollEncounter(this.rng, this.realmId, this.act, kind, size, seen, easy);
         this.seenEncounters.push(enc.id);
+        const mods = riftTierMods(tier, enc.kind);
+        if (mods) for (const r of enc.roster) r.statMods = addStatMods(r.statMods, mods);
         return enc;
     }
 
@@ -411,7 +460,8 @@ export class RunState {
             (this.bossesDefeated = this.bossesDefeated || []).push(enc.id);
         }
 
-        const choices = base.itemChoices + (relicsWith(this.relics, 'extraItemChoice').length ? 1 : 0);
+        const choices = Math.max(1, base.itemChoices + (relicsWith(this.relics, 'extraItemChoice').length ? 1 : 0)
+            - ((this.options.tier ?? 0) >= 3 ? 1 : 0));   // Rift Tier III
         let relics = [];
         if (enc.kind === 'boss') relics = this._rollRelics(['rare'], 3);
         else if (enc.kind === 'elite') relics = this._rollRelics(this.options.relicLore ? ['common', 'uncommon', 'rare'] : ['common', 'uncommon'], 1);
@@ -457,7 +507,8 @@ export class RunState {
 
     _discount(price) {
         const off = relicsWith(this.relics, 'shopDiscount').reduce((s, k) => s + RELICS[k].shopDiscount, 0);
-        return Math.round(price * (1 - Math.min(0.5, off)));
+        const tax = (this.options.tier ?? 0) >= 2 ? RIFT_TAX : 0;   // Rift Tier II
+        return Math.round(price * (1 + tax) * (1 - Math.min(0.5, off)));
     }
 
     _rollShop() {
@@ -467,7 +518,25 @@ export class RunState {
             .map(key => ({ key, price: this._discount(itemPrice(key)), sold: false }));
         const relicKey = this._rollRelics(['common', 'uncommon'], 1)[0] ?? null;
         const relic = relicKey ? { key: relicKey, price: this._discount(RELICS[relicKey].rarity === 'common' ? 150 : 220), sold: false } : null;
-        return { kind: 'shop', stock, relic };
+        return { kind: 'shop', stock, relic, restocked: false };
+    }
+
+    // Haggler: once per shop, replace the unsold items with fresh stock for free.
+    canRestock() {
+        const p = this.pending;
+        return !!this.options.haggler && p?.kind === 'shop' && !p.restocked;
+    }
+
+    restockShop() {
+        if (!this.canRestock()) return false;
+        const p = this.pending;
+        const weights = { ...ITEM_RARITY[this.act].normal };
+        if (this.options.fineWares) weights.uncommon = (weights.uncommon || 0) + 25;
+        const unsold = p.stock.filter(e => !e.sold).length;
+        const fresh = this._rollItems(weights, unsold).map(key => ({ key, price: this._discount(itemPrice(key)), sold: false }));
+        p.stock = [...p.stock.filter(e => e.sold), ...fresh];
+        p.restocked = true;
+        return true;
     }
 
     buy(index) {

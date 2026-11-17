@@ -77,6 +77,17 @@ path through battles, elites, events, shops, rest sites, treasure and recruits, 
   Each ability or move rule has a positioning style (`positionStyle` in `ai/script-runtime.js`):
   ranged roles default to Careful (stay out of enemy reach, attack from near max range, don't run
   ahead of the group, melee only as a last resort); everyone else defaults to Bold.
+- **Rift Tiers and renown bonuses:** after a first win, the New Run screen offers Rift Tiers
+  (`RIFT_TIERS` in `profile.js`): each keeps the ones below and adds a twist (tougher elites and
+  bosses, dearer shops, fewer reward choices, then tougher enemies everywhere and bigger boss
+  fights), for +25% to +100% renown. Winning at a tier opens the next. Starting with one or two
+  members adds +50% or +25%. The enemy and shop effects live in `run-state.js` (`riftTierMods`).
+- **More unlocks:** Traveler's Pack, Masterwork, Haggler, Relic Codex (after Heirloom), Scout's
+  Report (`data/scouting.js`: a line on each act's boss, chosen when the act begins), Tactician's
+  Codex (24 rules and a shared template, `script-store.js`) and title backdrops
+  (`data/backdrops.js`, picked in Settings > Graphics). The tile skin is fixed to the game's own.
+- **Collection rewards:** in Feats, finding 33% of all items pays 50 renown once, and 66% earns
+  the Collector's Loupe, a trinket that only drops once earned (`COLLECTION_REWARDS`).
 - **Feats:** a title-screen panel (`js/run/feats.js`) with three tabs: every item in the game,
   found or not yet found, with a completion percentage; a bestiary of the 16 bosses with how
   often each has been beaten; and the last 5 winning runs. The profile keeps `items` (noted

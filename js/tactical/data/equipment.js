@@ -10,6 +10,7 @@
 //   (boots and trinkets aren't drawn on the character, so they need only an items icon)
 // type          Equipment class; jobs restrict which types they can wear (allowedEquipment)
 // rarity        'common' (default) | 'uncommon' | 'rare': which loot and shop pools offer it
+// featOnly      true: only drops once earned in Feats (run option featItems)
 // grants        string[] Action abilities the wearer can use while it is equipped
 // grantsPassive string[] Reaction/support/movement abilities that are active while it is
 //               equipped, on top of the wearer's chosen reaction/support/movement
@@ -202,6 +203,8 @@ export const EQUIPMENT = {
     ember_sigil:          { name: 'Ember Sigil',           slot: 'trinket', type: 'trinket', mat:  6, rarity: 'rare' },
     void_charm:           { name: 'Void Charm',            slot: 'trinket', type: 'trinket', atk:  5, def:  2, rarity: 'rare' },
     bloodstone_pendant:   { name: 'Bloodstone Pendant',    slot: 'trinket', type: 'trinket', atk:  3, maxHp: 12, rarity: 'rare' },
+    // A Feats reward (profile COLLECTION_REWARDS): drops only once 66% of all items are found.
+    jewelers_loupe:       { name: "Collector's Loupe",     slot: 'trinket', type: 'trinket', atk:  3, mat:  3, eva:  3, crit: 6, rarity: 'rare', featOnly: true },
 };
 
 // Stat fields that equipment can modify.

@@ -3,7 +3,9 @@
 import { SceneManager } from '../tactical/scene-manager.js';
 import { RunMapScene } from './run-map-scene.js';
 import { RunState, START_PARTY, MIN_START_PARTY } from './run-state.js';
-import { loadProfile, saveProfile, runOptions, UNLOCKS, canBuyUnlock, buyUnlock, hasUnlock } from './profile.js';
+import {
+    loadProfile, saveProfile, runOptions, UNLOCKS, canBuyUnlock, buyUnlock, hasUnlock, RIFT_TIERS, renownMultiplier, SMALL_PARTY_RENOWN,
+} from './profile.js';
 import { jobsOfTier } from '../tactical/data-registry.js';
 import { JOB_DATA } from '../tactical/data/jobs.js';
 import { Modal, BTN, BTN_DISABLED, BTN_GOOD, BTN_GOLD, esc, jobLabel, abilityName } from './ui-kit.js';
@@ -47,6 +49,8 @@ export function newRun(containerEl, skinManager, { onStart, onExit, onCancel }) 
     const options = runOptions(profile);
     const modal = new Modal(1200);
     const picked = [];
+    const maxTier = profile.stats.riftTier ?? 0;
+    let tier = 0;
 
     const render = () => {
         let html = `<div style="color:#ffcc44;font-weight:bold;font-size:16px;margin-bottom:4px;">New Run</div>
@@ -65,8 +69,25 @@ export function newRun(containerEl, skinManager, { onStart, onExit, onCancel }) 
         }
         const ready = picked.length >= MIN_START_PARTY;
         if (ready && picked.length < START_PARTY) {
-            html += `<div style="color:#fc8;font-size:11px;margin-top:6px;">Challenge run: starting with ${picked.length === 1 ? 'a lone hero' : `${picked.length} members`} makes the road a lot harder.</div>`;
+            html += `<div style="color:#fc8;font-size:11px;margin-top:6px;">Challenge run: starting with ${picked.length === 1 ? 'a lone hero' : `${picked.length} members`} makes the road a lot harder, and earns +${Math.round(SMALL_PARTY_RENOWN[picked.length] * 100)}% renown.</div>`;
         }
+        // Rift Tiers: open once the profile has won a run (each win opens the next tier).
+        if (maxTier > 0) {
+            html += `<div style="color:#fc8;font-size:10px;text-transform:uppercase;margin:10px 0 4px;">Rift Tier</div>
+                <div style="display:flex;gap:4px;flex-wrap:wrap;">`;
+            for (let t = 0; t < RIFT_TIERS.length; t++) {
+                const open = t <= maxTier, on = t === tier;
+                html += `<button data-tier="${t}" ${open ? '' : 'disabled'} style="${BTN}width:auto;margin:0;padding:4px 10px;text-align:center;
+                    ${on ? 'border:2px solid #f96;background:#2a1408;color:#fc9;' : ''}${open ? '' : BTN_DISABLED}">${t === 0 ? 'None' : ['I', 'II', 'III', 'IV'][t - 1]}${open ? '' : ' 🔒'}</button>`;
+            }
+            html += `</div><div style="color:#aab;font-size:11px;margin-top:5px;line-height:1.5;">`;
+            if (tier === 0) html += 'No extra twists.';
+            else html += RIFT_TIERS.slice(1, tier + 1).map(t => `<div><span style="color:#f96;">${esc(t.name)}</span>: ${esc(t.desc)}</div>`).join('');
+            html += `</div>`;
+            if (maxTier < RIFT_TIERS.length - 1) html += `<div style="color:#667;font-size:10px;margin-top:3px;">Win a run at Tier ${maxTier === 0 ? 'None' : ['I', 'II', 'III', 'IV'][maxTier - 1]} to open the next one.</div>`;
+        }
+        const mult = renownMultiplier(tier, ready ? picked.length : START_PARTY);
+        if (mult > 1) html += `<div style="color:#fc6;font-size:11px;margin-top:6px;">Renown this run: ×${mult.toFixed(2).replace(/\.?0+$/, '')}</div>`;
         html += `<div style="height:6px;"></div>
             <button data-begin ${ready ? '' : 'disabled'} style="${BTN}${ready ? BTN_GOOD : BTN_DISABLED}text-align:center;font-weight:bold;">${ready ? `Set out (${picked.length}/${START_PARTY})` : `Choose a class to begin (0/${START_PARTY})`}</button>`;
         const body = modal.show(html, { width: 480, onClose: () => { modal.destroy(); onCancel?.(); }, view: 'new-run' });
@@ -77,9 +98,13 @@ export function newRun(containerEl, skinManager, { onStart, onExit, onCancel }) 
             else if (picked.length < START_PARTY) picked.push(job);
             render();
         }));
+        body.querySelectorAll('[data-tier]').forEach(b => b.addEventListener('click', () => {
+            const t = Number(b.dataset.tier);
+            if (t <= maxTier) { tier = t; render(); }
+        }));
         body.querySelector('[data-begin]')?.addEventListener('click', () => {
             if (picked.length < MIN_START_PARTY || picked.length > START_PARTY) return;
-            const run = RunState.create({ jobs: [...picked], options });
+            const run = RunState.create({ jobs: [...picked], options: { ...options, tier } });
             run.save();
             modal.destroy();
             onStart?.();
@@ -97,7 +122,18 @@ export function showUnlocks(onClose) {
         let html = `<div style="color:#ffcc44;font-weight:bold;font-size:16px;margin-bottom:4px;">Unlocks</div>
             <div style="color:#fc6;margin-bottom:2px;">${profile.renown} renown</div>
             <div style="color:#777;font-size:10px;margin-bottom:10px;">Runs ${s.runs} · Wins ${s.wins} · Best: act ${s.bestAct || '-'}, ${s.bestFloor} floors<br>Earn renown by climbing floors, beating elites and bosses, and winning runs.</div>`;
-        for (const [key, u] of Object.entries(UNLOCKS)) {
+        const tier = profile.stats.riftTier ?? 0;
+        html += `<div style="color:#f96;font-size:11px;margin-bottom:8px;">${tier
+            ? `Rift Tiers open: up to ${RIFT_TIERS[tier].name}. Win at your highest tier to open the next.`
+            : 'Win a run to open Rift Tiers: harder runs for more renown.'}</div>`;
+        const groups = [
+            ['Classes', ([, u]) => u.job],
+            ['Run perks', ([, u]) => !u.job && !u.backdrop],
+            ['Title backdrops', ([, u]) => u.backdrop],
+        ];
+        for (const [title, test] of groups) {
+        html += `<div style="color:#fc8;font-size:10px;text-transform:uppercase;margin:10px 0 4px;">${title}</div>`;
+        for (const [key, u] of Object.entries(UNLOCKS).filter(test)) {
             const owned = hasUnlock(profile, key);
             const can = canBuyUnlock(profile, key);
             const needs = u.requires && !hasUnlock(profile, u.requires) ? ` · needs ${UNLOCKS[u.requires].name}` : '';
@@ -106,6 +142,7 @@ export function showUnlocks(onClose) {
                 <span style="font-size:10px;">${owned ? 'owned' : `${u.cost} renown${needs}`}</span></div>
                 <div style="color:#889;font-size:10px;margin-top:2px;">${esc(u.desc)}</div>
             </button>`;
+        }
         }
         const body = modal.show(html, { width: 480, onClose: () => { modal.destroy(); onClose?.(); }, view: 'unlocks' });
         body.querySelectorAll('[data-buy]').forEach(b => b.addEventListener('click', () => {

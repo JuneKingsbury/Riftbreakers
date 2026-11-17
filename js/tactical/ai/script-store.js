@@ -69,6 +69,25 @@ export function saveScript(name, script) {
     return writeAll(all);
 }
 
+// ---- Template (Tactician's Codex) ----
+// One script saved apart from any character, to load onto any of them. Rules naming a skill
+// the character lacks are flagged in the editor and skipped in battle.
+export const TEMPLATE_KEY = 'riftbreak.tactical.template.v1';
+
+export function saveTemplate(script) {
+    const clean = sanitizeScript(script);
+    const s = storage();
+    if (!clean || !s) return false;
+    try { s.setItem(TEMPLATE_KEY, JSON.stringify(clean)); return true; } catch { return false; }
+}
+
+export function loadTemplate() {
+    try {
+        const raw = storage()?.getItem(TEMPLATE_KEY);
+        return raw ? sanitizeScript(JSON.parse(raw)) : null;
+    } catch { return null; }
+}
+
 export function resetScript(name) {
     const all = readAll();
     delete all[name];
