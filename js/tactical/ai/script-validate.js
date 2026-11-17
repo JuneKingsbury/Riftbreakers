@@ -61,7 +61,9 @@ export function validateScript(script, unit = null) {
                 add(i, 'then.ability', `${ab.name} targets a tile and is not supported by scripts yet.`);
             }
             const side = a.target?.side;
-            const sideOk = !side || ab?.isSummon || ab?.targetType === side || (side === 'self' && ab?.targetType === 'ally');
+            // A splash ('all') may be aimed at anyone; corpse rites aim at a fallen enemy.
+            const sideOk = !side || ab?.isSummon || ab?.targetType === side || ab?.targetType === 'all'
+                || (side === 'self' && ab?.targetType === 'ally') || (side === 'enemy' && ab?.targetType === 'corpse');
             if (ab && !sideOk && ab.targetType !== 'tile') {
                 add(i, 'then.target', `${ab.name} targets "${ab.targetType}", not "${side}".`);
             }

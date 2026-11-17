@@ -51,7 +51,7 @@ export class DeployScene {
         this._run         = run;
         this._skinManager = skinManager;
         this._sm          = sceneManager;
-        this._onLaunch    = onLaunch;  // (mapDef, customPlayerSpawns) => void
+        this._onLaunch    = onLaunch;  // (mapDef, customPlayerSpawns, cameraState) => void
         this._stopped     = false;
         this._container   = null;
         this._renderer    = null;
@@ -475,6 +475,7 @@ export class DeployScene {
 
     _launchBattle() {
         this._closeEditor(false);
-        if (this._onLaunch) this._onLaunch(this._mapDef, this._playerSpawns);
+        // The battle keeps the camera where the player left it while deploying.
+        if (this._onLaunch) this._onLaunch(this._mapDef, this._playerSpawns, this._renderer?.getCameraState() ?? null);
     }
 }

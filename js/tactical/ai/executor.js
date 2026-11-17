@@ -4,6 +4,7 @@
 // between; executeIntent() runs both at once for the turn-by-turn flow. Either way the
 // turn economy matches a player commanding the unit by hand in BattleScene.
 import { computeMovePath } from '../abilities.js';
+import { JOB_STATS } from '../data-registry.js';
 import { ABILITIES } from '../data-registry.js';
 import { faceToward, setFacing } from '../units.js';
 import { moveEntity, moveEntityAlongPath } from '../../systems/movement-lerp.js';
@@ -125,6 +126,8 @@ export function executeIntent(unit, intent, battle, onAbility) {
 // Everyone else, and any unit acting against its own side (charm), uses the scoring
 // AI in enemy-ai.js.
 export function planTurn(unit, battle) {
+    // Mirror Image's copies never act.
+    if (JOB_STATS[unit.job]?.inert) return { move: null, pivot: null, trace: [], act: { kind: 'wait' } };
     const useScript = unit.script && !unit.status.includes('charm');
     if (!useScript) return planEnemyTurn(unit, battle);
     const intent = runScript(unit.script, unit, battle.livingUnits, battle.map);

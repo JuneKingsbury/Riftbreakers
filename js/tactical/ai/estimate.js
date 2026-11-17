@@ -32,5 +32,7 @@ export function estimateAbilityEffect(source, target, abilityKey, map) {
         raw = Math.max(1, getEffectiveStat(source, 'mat') * 2 - getEffectiveStat(target, 'mdf') * defMult) * ab.basePower * highGround;
         if (target.status.includes('shell')) raw *= 0.75;
     }
+    // Nightmare, Catalyst: extra damage against a target with the named status.
+    for (const [status, mult] of Object.entries(ab.bonusVsStatus ?? {})) if (target.status.includes(status)) raw *= mult;
     return { damage: Math.round(raw * hitChance), healing: 0 };
 }

@@ -1,4 +1,5 @@
 import { computeMoveRange, computeAoeArea, ABILITIES } from './abilities.js';
+import { JOB_STATS } from './data-registry.js';
 import { isDead, isConscious, isUnconscious, faceToward } from './units.js';
 import { hasLineOfSight, columnCells, posKey, parseKey } from './battle-map.js';
 
@@ -166,6 +167,9 @@ function scoreAction(unit, abilityKey, targetUnit, from, battle, opponents) {
     // Healer / support priority: eliminating the enemy healer is critical.
     if (isHealer(targetUnit)) score *= 1.5;
 
+    // Lures (Mirror Image's copies) draw attacks: they look like the real thing.
+    score *= 1 + (JOB_STATS[targetUnit.job]?.lure ?? 0);
+
     // Status value (don't stack the same status that already applies).
     if (ab.applyStatus && !targetUnit.status.includes(ab.applyStatus)) {
         if      (ab.applyStatus === 'stun')    score *= 1.8;
@@ -250,7 +254,11 @@ export function planEnemyTurn(unit, battle) {
     // Charmed units attack their own team.
     const charmed      = unit.status.includes('charm');
     const opponentTeam = charmed ? unit.team : (unit.team === 'enemy' ? 'player' : 'enemy');
-    const opponents    = living.filter(u => u.team === opponentTeam && isConscious(u) && u !== unit);
+    // Hidden units (Vanish) can't be picked. A taunted unit (Taunt, Challenge) attacks its
+    // taunter while it can.
+    const visible      = living.filter(u => u.team === opponentTeam && isConscious(u) && u !== unit && !u.status.includes('hidden'));
+    const taunter      = unit.status.includes('taunted') ? visible.find(u => u.id === unit._tauntedBy) : null;
+    const opponents    = taunter ? [taunter] : visible;
     if (opponents.length === 0) return { move: null, act: { kind: 'wait' }, trace: [] };
 
     const moveRange = computeMoveRange(unit, battle.map, living);
@@ -267,6 +275,8 @@ export function planEnemyTurn(unit, battle) {
     for (const abilityKey of unit.abilities) {
         const ab = ABILITIES[abilityKey];
         if (!ab || ab.passive || unit.mp < ab.mpCost) continue;
+        // Splashes that hit both sides, corpse rites and orders are for scripted characters only.
+        if (ab.targetType === 'all' || ab.targetType === 'corpse' || ab.ctGain != null || ab.swapPlaces) continue;
 
         // Summon abilities: find a free tile within range adjacent to the unit.
         if (ab.isSummon) {

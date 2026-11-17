@@ -25,6 +25,8 @@
 //   desc          string   Player-facing class description shown in selection UI
 //   schools       string[] Magic schools this job draws from (flavour + future filtering)
 //   tier          number  Player jobs: 1 = starting role, 2 = promotion
+//   inert         bool     Summons only: never acts (Mirror Image's copies)
+//   lure          number   Summons only: how strongly enemies prefer to attack it (see enemy-ai.js)
 //   promotions    string[] Tier 1 only: the Tier 2 jobs this role can promote into once per run.
 //                 A promoted character keeps everything learned in their Tier 1 job and adds
 //                 the Tier 2 skillset (see loadout.js).
@@ -191,6 +193,101 @@ export const JOB_DATA = {
         schools: ['divination'],
         desc: 'A mage who reads time and probability, foreseeing attacks before they happen and guiding allies away from harm. The Seer has the highest evasion of any starting role.',
         allowedEquipment: { armor: ['cloth', 'light'], helmet: ['cloth', 'light'], weapon: ['magic'], tool: ['implement'] },
+    },
+
+
+    // ---- Tier 1: added classes (unlocked with renown, see run/profile.js) ----
+
+    illusionist: {
+        maxHp: 34, maxMp: 48,
+        spd: 9, atk: 5, def: 3, mat: 13, mdf: 10,
+        move: 4, eva: 18,
+        skillsetName: 'Illusion',
+        tier: 1,
+        promotions: ['dreamweaver', 'mirage_oracle'],
+        learnable: {
+            phantasm: { sp: 1 },
+            mirror_image: { sp: 1, requires: 'phantasm' },
+            blur: { sp: 1, requires: 'phantasm' },
+            vanish: { sp: 2, requires: 'blur' },
+            displacement: { sp: 1, requires: 'phantasm' },
+            glamour: { sp: 2, requires: 'mirror_image' },
+            mirage_step: { sp: 1 },
+        },
+        spriteKey: 'mirror_shade',
+        char: 'I', color: '#e0a0ff',
+        schools: ['illusion'],
+        desc: 'A mage who bends what enemies see. The Illusionist wins by misdirection: copies that enemies would rather strike, allies blurred or hidden from view, and phantasms only the target can see. Fast and slippery, but frail.',
+        allowedEquipment: { armor: ['cloth'], helmet: ['cloth'], weapon: ['magic'], tool: ['implement'] },
+    },
+
+    gravecaller: {
+        maxHp: 42, maxMp: 44,
+        spd: 7, atk: 6, def: 5, mat: 13, mdf: 9,
+        move: 3, eva: 10,
+        skillsetName: 'Necromancy',
+        tier: 1,
+        promotions: ['lich', 'gravewarden'],
+        learnable: {
+            life_drain: { sp: 1 },
+            grave_chill: { sp: 1, requires: 'life_drain' },
+            raise_dead: { sp: 1, requires: 'life_drain' },
+            corpse_burst: { sp: 2, requires: 'raise_dead' },
+            lingering_spite: { sp: 1, requires: 'life_drain' },
+            soul_harvest: { sp: 2, requires: 'grave_chill' },
+            wraithwalk: { sp: 1 },
+        },
+        spriteKey: 'void_acolyte',
+        char: 'N', color: '#7acc7a',
+        schools: ['necromancy'],
+        desc: 'A mage who bargains with the dead. The Gravecaller drains life to stay standing, and treats every knocked-out enemy as a resource: raise it as a skeleton, or burst it among its friends. Grows stronger as the battle wears on.',
+        allowedEquipment: { armor: ['cloth', 'light'], helmet: ['cloth', 'light'], weapon: ['magic'], tool: ['implement'] },
+    },
+
+    alchemist: {
+        maxHp: 44, maxMp: 0,
+        spd: 8, atk: 8, def: 5, mat: 11, mdf: 6,
+        move: 4, eva: 12,
+        skillsetName: 'Alchemy',
+        tier: 1,
+        promotions: ['plaguewright', 'field_surgeon'],
+        learnable: {
+            healing_draught: { sp: 1 },
+            acid_flask: { sp: 1, requires: 'healing_draught' },
+            smoke_bomb: { sp: 1, requires: 'healing_draught' },
+            quicksilver: { sp: 2, requires: 'smoke_bomb' },
+            reflex_tonic: { sp: 1, requires: 'healing_draught' },
+            potent_brews: { sp: 2, requires: 'acid_flask' },
+            light_pack: { sp: 1 },
+        },
+        spriteKey: 'raider_poisoner',
+        char: 'L', color: '#ccff66',
+        schools: [],
+        desc: 'Not a mage at all: an alchemist whose flasks splash everyone in reach, friend and foe alike. Heals, acid, smoke and quicksilver need no MP, only time to throw and a good eye for where everyone is standing.',
+        allowedEquipment: { armor: ['light'], helmet: ['light'], weapon: ['blade', 'magic'], tool: ['implement'] },
+    },
+
+    warlord: {
+        maxHp: 52, maxMp: 20,
+        spd: 8, atk: 11, def: 8, mat: 4, mdf: 6,
+        move: 3, eva: 10,
+        skillsetName: 'Command',
+        tier: 1,
+        promotions: ['marshal', 'tactician'],
+        learnable: {
+            cleave: { sp: 1 },
+            rally: { sp: 1, requires: 'cleave' },
+            taunt: { sp: 1, requires: 'cleave' },
+            reposition: { sp: 2, requires: 'rally' },
+            hold_the_line: { sp: 1, requires: 'cleave' },
+            field_command: { sp: 2, requires: 'rally' },
+            vanguard_step: { sp: 1 },
+        },
+        spriteKey: 'knight',
+        char: 'W', color: '#ffbb55',
+        schools: [],
+        desc: 'A commander who wins with orders rather than spells. The Warlord sets the pace of the fight: rallying allies to act sooner, taunting enemies into attacking them, and swapping places to pull a friend out of danger.',
+        allowedEquipment: { armor: ['light', 'medium'], helmet: ['light', 'medium'], weapon: ['blade', 'heavy_weapon'], tool: ['shield', 'implement'] },
     },
 
     // ============================================================
@@ -388,6 +485,160 @@ export const JOB_DATA = {
         desc: 'A shapeshifting fighter who battles with the ferocity of the beasts they call. Wild Surge delivers heavy physical hits that leave targets staggered, while Savage Howl disrupts entire groups at short range. Fast and mobile, the Beastcaller wants to be in the thick of the enemy formation rather than hanging back.',
     },
 
+    // ---- Tier 2: promotions of the added classes ----
+
+    dreamweaver: {
+        maxHp: 36, maxMp: 54,
+        spd: 8, atk: 5, def: 4, mat: 14, mdf: 11,
+        move: 4, eva: 16,
+        skillsetName: 'Dreamcraft',
+        tier: 2,
+        learnable: {
+            mass_sleep: { sp: 1 },
+            bewilder: { sp: 1, requires: 'mass_sleep' },
+            nightmare: { sp: 2, requires: 'mass_sleep' },
+            lull: { sp: 1, requires: 'mass_sleep' },
+            deep_dreams: { sp: 2, requires: 'bewilder' },
+        },
+        spriteKey: 'mirror_shade',
+        char: 'D', color: '#cc88ff',
+        schools: ['illusion', 'enchantment'],
+        desc: 'An illusionist who weaves dreams into weapons. The Dreamweaver puts whole groups to sleep, turns enemies against each other with Bewilder, and makes sleepers pay with Nightmare. Controls a fight rather than ending it.',
+    },
+
+    mirage_oracle: {
+        maxHp: 38, maxMp: 50,
+        spd: 9, atk: 5, def: 4, mat: 13, mdf: 12,
+        move: 4, eva: 20,
+        skillsetName: 'Mirrors',
+        tier: 2,
+        learnable: {
+            hall_of_mirrors: { sp: 1 },
+            mass_blur: { sp: 1, requires: 'hall_of_mirrors' },
+            true_strike: { sp: 2, requires: 'hall_of_mirrors' },
+            shattered_image: { sp: 1, requires: 'hall_of_mirrors' },
+            lasting_images: { sp: 2, requires: 'mass_blur' },
+        },
+        spriteKey: 'mirror_twin',
+        char: 'M', color: '#ddddff',
+        schools: ['illusion', 'divination'],
+        desc: 'An illusionist who foresees where blows will fall and puts a copy there first. The Mirage Oracle fills the field with mirrors, blurs the whole line, and strikes past every defense with True Strike.',
+    },
+
+    lich: {
+        maxHp: 38, maxMp: 58,
+        spd: 7, atk: 5, def: 4, mat: 16, mdf: 10,
+        move: 3, eva: 10,
+        skillsetName: 'Undeath',
+        tier: 2,
+        learnable: {
+            soul_nova: { sp: 1 },
+            wither: { sp: 1, requires: 'soul_nova' },
+            bone_spear: { sp: 2, requires: 'soul_nova' },
+            phylactery: { sp: 1, requires: 'soul_nova' },
+            necrotic_power: { sp: 2, requires: 'wither' },
+        },
+        spriteKey: 'void_herald',
+        char: 'X', color: '#88ee99',
+        schools: ['necromancy', 'evocation'],
+        desc: 'A gravecaller who has stopped fearing death. The Lich drains whole groups with Soul Nova, withers single foes to husks, and rises again once when struck down. The strongest sustained damage of the necromancers.',
+    },
+
+    gravewarden: {
+        maxHp: 50, maxMp: 46,
+        spd: 7, atk: 7, def: 9, mat: 12, mdf: 12,
+        move: 3, eva: 10,
+        skillsetName: 'Bone Rites',
+        tier: 2,
+        learnable: {
+            bone_ward: { sp: 1 },
+            mass_raise: { sp: 1, requires: 'bone_ward' },
+            soul_tether: { sp: 2, requires: 'bone_ward' },
+            death_ward: { sp: 1, requires: 'bone_ward' },
+            grave_legion: { sp: 2, requires: 'mass_raise' },
+        },
+        spriteKey: 'crypt_warden',
+        char: 'G', color: '#ccddcc',
+        schools: ['necromancy', 'abjuration'],
+        desc: "A gravecaller who guards the living with the dead. The Gravewarden builds barricades of bone, raises skeletons in pairs, and holds allies' souls in their bodies when they should have fallen.",
+    },
+
+    plaguewright: {
+        maxHp: 46, maxMp: 0,
+        spd: 8, atk: 8, def: 6, mat: 13, mdf: 7,
+        move: 4, eva: 12,
+        skillsetName: 'Plaguecraft',
+        tier: 2,
+        learnable: {
+            plague_flask: { sp: 1 },
+            miasma: { sp: 1, requires: 'plague_flask' },
+            catalyst: { sp: 2, requires: 'plague_flask' },
+            toxic_blood: { sp: 1, requires: 'plague_flask' },
+            virulence: { sp: 2, requires: 'miasma' },
+        },
+        spriteKey: 'raider_poisoner',
+        char: 'Q', color: '#99dd33',
+        schools: ['transmutation'],
+        desc: "An alchemist who brews disease. The Plaguewright poisons wide areas, keeps the poison lingering, then sets it burning with Catalyst. Poison doesn't care whose side you are on, so mind your allies.",
+    },
+
+    field_surgeon: {
+        maxHp: 48, maxMp: 0,
+        spd: 8, atk: 8, def: 7, mat: 12, mdf: 10,
+        move: 4, eva: 12,
+        skillsetName: 'Field Medicine',
+        tier: 2,
+        learnable: {
+            elixir: { sp: 1 },
+            panacea_mist: { sp: 1, requires: 'elixir' },
+            stimulant: { sp: 2, requires: 'elixir' },
+            triage: { sp: 1, requires: 'elixir' },
+            steady_hands: { sp: 2, requires: 'panacea_mist' },
+        },
+        spriteKey: 'npc_wandering_druid',
+        char: 'F', color: '#88ffcc',
+        schools: ['abjuration'],
+        desc: 'An alchemist who has learned precision. The Field Surgeon doses single allies with Elixir, cures and hastens whole groups, and patches up a falling friend on the spot. Steady Hands finally keeps every splash on the right side.',
+    },
+
+    marshal: {
+        maxHp: 64, maxMp: 24,
+        spd: 7, atk: 13, def: 13, mat: 4, mdf: 10,
+        move: 3, eva: 10,
+        skillsetName: 'Defense Orders',
+        tier: 2,
+        learnable: {
+            shield_wall: { sp: 1 },
+            challenge: { sp: 1, requires: 'shield_wall' },
+            bulwark_bash: { sp: 2, requires: 'shield_wall' },
+            interpose: { sp: 1, requires: 'shield_wall' },
+            iron_discipline: { sp: 2, requires: 'challenge' },
+        },
+        spriteKey: 'palace_champion',
+        char: 'K', color: '#ccccff',
+        schools: ['abjuration'],
+        desc: 'A warlord who holds the line in person. The Marshal locks shields with the party, calls out the most dangerous enemy, and steps in front of blows meant for others. The toughest frontliner in the roster.',
+    },
+
+    tactician: {
+        maxHp: 50, maxMp: 34,
+        spd: 9, atk: 11, def: 8, mat: 6, mdf: 9,
+        move: 4, eva: 14,
+        skillsetName: 'Battle Plans',
+        tier: 2,
+        learnable: {
+            seize_the_moment: { sp: 1 },
+            delay: { sp: 1, requires: 'seize_the_moment' },
+            exploit_opening: { sp: 2, requires: 'seize_the_moment' },
+            read_the_battle: { sp: 1, requires: 'seize_the_moment' },
+            initiative: { sp: 2, requires: 'delay' },
+        },
+        spriteKey: 'royal_mage',
+        char: 'T', color: '#aa88ff',
+        schools: ['divination'],
+        desc: 'A warlord who fights the clock. The Tactician sends allies into action at the perfect moment, sets enemies back, and disrupts spells before they land. Every battle starts already a step ahead.',
+    },
+
     // ============================================================
     // ---- Enemy jobs ----
     // ============================================================
@@ -537,5 +788,28 @@ export const JOB_DATA = {
         abilities: ['attack', 'shield_bash'],
         spriteKey: 'kingdom_guard',
         char: 'G', color: '#8888cc',
+    },
+
+    // ---- Summoned helpers of the added classes ----
+
+    // Mirror Image: a copy that enemies would rather strike (lure). It doesn't act (inert).
+    decoy: {
+        maxHp: 40, maxMp: 0,
+        spd: 1, atk: 0, def: 2, mat: 0, mdf: 2,
+        move: 0, eva: 25,
+        abilities: ['attack'],
+        inert: true, lure: 2,
+        spriteKey: 'decoy',
+        char: 'i', color: '#e0c0ff',
+    },
+
+    // Raised by the Gravecaller from a knocked-out enemy.
+    skeleton: {
+        maxHp: 34, maxMp: 0,
+        spd: 8, atk: 11, def: 6, mat: 2, mdf: 4,
+        move: 4, eva: 8,
+        abilities: ['attack'],
+        spriteKey: 'bone_sentinel',
+        char: 'k', color: '#ddddcc',
     },
 };

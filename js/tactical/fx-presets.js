@@ -86,6 +86,7 @@ const STATUS_SPRITES = {
     haste: 'speed_trail', regen: 'health_regen', reraise: 'spell_divination',
     slow: 'freezing', stun: 'mental_break', sleep: 'mental_break', charm: 'mental_break',
     berserk: 'mental_break', doom: 'death', frog: 'spell_teleport',
+    hidden: 'spell_teleport', taunted: 'danger',
 };
 
 /** The sprite shown when a status lands on a unit, or null. */

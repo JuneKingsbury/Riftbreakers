@@ -5,7 +5,8 @@
 // returns a fresh copy so callers may mutate the result.
 // Enemies do not use these: they keep the scoring AI in enemy-ai.js.
 import { ABILITIES, baseKey } from '../data-registry.js';
-import { POSITIVE_STATUSES } from '../abilities.js';
+import { POSITIVE_STATUSES, isHelpful } from '../abilities.js';
+import { JOB_DATA } from '../data/jobs.js';
 
 const always = () => ({ test: 'always', params: {} });
 const test = (name, params = {}) => ({ test: name, params });
@@ -67,13 +68,19 @@ export function defaultScriptFor(job) {
 
 // Jobs that fight from range and should keep out of harm's way (see positionStyle in
 // script-runtime.js). Healers aren't listed: holding them back lost fights.
-export const RANGED_ROLES = new Set(['evoker', 'runebow', 'riftcaller', 'fatebinder', 'seer', 'spiritbinder', 'worldsinger']);
+export const RANGED_ROLES = new Set(['evoker', 'runebow', 'riftcaller', 'fatebinder', 'seer', 'spiritbinder', 'worldsinger',
+    'illusionist', 'dreamweaver', 'mirage_oracle', 'gravecaller', 'lich', 'alchemist', 'plaguewright']);
 
-const RANGED_KEEP = { evoker: 3, runebow: 4, riftcaller: 4, fatebinder: 3, seer: 3, spiritbinder: 3, worldsinger: 3, sanctifier: 3, lifeseer: 3, warden: 3 };
-const MELEE_JOBS = new Set(['novice', 'spellblade', 'battlemage', 'earthshaker', 'stoneshaper', 'paladin', 'beastcaller']);
-const HEALER_JOBS = new Set(['warden', 'sanctifier', 'lifeseer', 'paladin']);
+const RANGED_KEEP = { evoker: 3, runebow: 4, riftcaller: 4, fatebinder: 3, seer: 3, spiritbinder: 3, worldsinger: 3, sanctifier: 3, lifeseer: 3, warden: 3,
+    illusionist: 3, dreamweaver: 3, mirage_oracle: 3, gravecaller: 3, lich: 3, gravewarden: 3, alchemist: 3, plaguewright: 3, field_surgeon: 3 };
+const MELEE_JOBS = new Set(['novice', 'spellblade', 'battlemage', 'earthshaker', 'stoneshaper', 'paladin', 'beastcaller',
+    'warlord', 'marshal', 'tactician']);
+const HEALER_JOBS = new Set(['warden', 'sanctifier', 'lifeseer', 'paladin', 'field_surgeon']);
 
 const statusFilter = (status) => [{ kind: 'status', status, has: false }];
+
+// Order of control spells in automatic behavior (higher first); unlisted statuses count 1.
+const CONTROL_VALUE = { charm: 6, stun: 5, silence: 4, slow: 3, poison: 2, sleep: 0 };
 
 // A script that uses every kind of ability in `abilities` (unit ability keys, any rank),
 // in priority order: revive and heal, cure, summon, ally support (status, then stat buffs), self buffs, control
@@ -97,34 +104,98 @@ export function autoScriptFor(job, abilities = []) {
         rules.push(rule(id(), 'Cure an afflicted ally', always(),
             { do: 'ability', ability: 'best_cure', target: ally('lowest_hp_pct'), approach: true }));
     }
+    // Corpse rites (the Gravecaller line) go to work on knocked-out enemies. Each only fires where
+    // it has something to do (a burst needs enemies by the body, a ward needs allies), so the
+    // situational ones come first and plain raising is the fallback.
+    const CORPSE_ORDER = { burst: 0, ward: 1, raise: 2 };
+    const rites = of(a => a.targetType === 'corpse')
+        .sort((a, b) => CORPSE_ORDER[ABILITIES[a].corpseEffect] - CORPSE_ORDER[ABILITIES[b].corpseEffect]
+            || (ABILITIES[b].corpseCount ?? 1) - (ABILITIES[a].corpseCount ?? 1));
+    for (const k of rites) {
+        rules.push(rule(id(), `${ABILITIES[k].name} on a fallen enemy`, always(),
+            { do: 'ability', ability: k, target: enemy('nearest', [{ kind: 'status', status: 'unconscious', has: true }]), approach: true }));
+    }
+    // Reposition: swap into danger to pull out a badly hurt ally.
+    for (const k of of(a => a.swapPlaces)) {
+        rules.push(rule(id(), `${ABILITIES[k].name} to rescue a badly hurt ally`, test('ally_hp_below', { value: 35 }),
+            { do: 'ability', ability: k, target: ally('lowest_hp_pct', [{ kind: 'hp_below', value: 35 }]), approach: true }));
+    }
     if (MELEE_JOBS.has(job)) rules.push(brace(id()));
-    if (of(a => a.isSummon).length) rules.push(summon(id()));
+    const summons = of(a => a.isSummon);
+    if (summons.length && summons.every(k => JOB_DATA[ABILITIES[k].summonJob]?.inert)) {
+        // Copies (Mirror Image) are a shield, not an army: make one once enemies close in.
+        rules.push(rule(id(), 'Make a copy once enemies close in',
+            { op: 'and', args: [test('enemy_within', { range: 4 }), test('self_hp_pct', { cmp: '>=', value: 25 })] },
+            { do: 'ability', ability: 'best_summon' }));
+    } else if (summons.length) rules.push(summon(id()));
+    // Delaying an enemy who is charging a spell is worth more than anything but healing.
+    const orders = of(a => a.ctGain != null && !a.basePower && !a.swapPlaces && a.targetType !== 'all');
+    for (const k of orders.filter(k => ABILITIES[k].ctGain < 0)) {
+        rules.push(rule(id(), `${ABILITIES[k].name} an enemy who is charging a spell`, always(),
+            { do: 'ability', ability: k, target: enemy('nearest', [{ kind: 'status', status: 'charging', has: true }]), approach: true }));
+    }
+    // Helpful splashes that reach both sides (Smoke Bomb, Quicksilver, Stimulant) go on the
+    // thickest group of allies once the party is taking hits; they are only thrown where they
+    // do more good than harm. The rest of the time the Alchemist attacks.
+    for (const k of of(a => a.targetType === 'all' && isHelpful(a) && !a.isHeal && !a.isCure)) {
+        rules.push(rule(id(), `${ABILITIES[k].name} on the group once it is taking hits`, test('ally_hp_below', { value: 80 }),
+            { do: 'ability', ability: k, target: ally('most_clustered'), approach: true }));
+    }
     // Haste is always worth it; protective buffs go on allies who are getting hurt;
     // anything else (reflect, reraise) is cast once at the start.
-    for (const k of of(a => a.targetType === 'ally' && !a.isHeal && !a.isCure && a.applyStatus)) {
+    for (const k of of(a => a.targetType === 'ally' && !a.isHeal && !a.isCure && a.applyStatus && a.ctGain == null)) {
         const ab = ABILITIES[k];
+        // Shield Wall and the like only reach the caster and those beside it.
+        if (ab.range === 0) {
+            rules.push(rule(id(), `${ab.name} when enemies are close`, test('enemy_within', { range: 2 }),
+                { do: 'ability', ability: k, target: { side: 'self', pick: 'nearest' } }));
+            continue;
+        }
         const target = (pick, extra = []) => ally(pick, [...statusFilter(ab.applyStatus), ...extra]);
         const [when, label, tgt] = ab.applyStatus === 'haste'
             ? [test('enemy_within', { range: 7 }), `${ab.name} on an ally without haste`, target('nearest')]
+            : ab.applyStatus === 'hidden'
+                // Vanish is an escape: only for an ally in real trouble.
+                ? [test('ally_hp_below', { value: 40 }), `${ab.name} on a badly hurt ally`, target('lowest_hp_pct', [{ kind: 'hp_below', value: 40 }])]
             : ['protect', 'shell', 'regen'].includes(ab.applyStatus)
                 ? [test('ally_hp_below', { value: 70 }), `${ab.name} on a hurt ally`, target('lowest_hp_pct', [{ kind: 'hp_below', value: 70 }])]
                 : [test('first_turn'), `${ab.name} on an ally at the start`, target('nearest')];
         rules.push(rule(id(), label, when, { do: 'ability', ability: k, target: tgt, approach: true }));
     }
-    // Stat buffs for allies (Rallying Beat) go on the thickest group once the fight is close.
+    // Stat buffs for allies. Offensive ones (Rallying Beat) go on the thickest group once the
+    // fight is close; defensive ones (Blur) wait until someone is taking hits, then go on them.
+    const DEFENSIVE = new Set(['def', 'mdf', 'eva']);
     for (const k of of(a => a.targetType === 'ally' && a.buffs && !a.basePower && !a.isHeal && !a.applyStatus)) {
-        rules.push(rule(id(), `${ABILITIES[k].name} on the main group when enemies are near`, test('enemy_within', { range: 5 }),
-            { do: 'ability', ability: k, target: ally('most_clustered'), approach: true }));
+        const ab = ABILITIES[k];
+        const defensive = ab.buffs.every(b => DEFENSIVE.has(b.stat));
+        rules.push(defensive
+            ? rule(id(), `${ab.name} on an ally taking hits`, test('ally_hp_below', { value: 80 }),
+                { do: 'ability', ability: k, target: ab.aoe ? ally('most_clustered') : ally('lowest_hp_pct', [{ kind: 'hp_below', value: 80 }]), approach: true })
+            : rule(id(), `${ab.name} on the main group when enemies are near`, test('enemy_within', { range: 5 }),
+                { do: 'ability', ability: k, target: ally('most_clustered'), approach: true }));
     }
     for (const k of of(a => a.targetType === 'self' && !a.isHeal && !a.isSummon)) {
         rules.push(rule(id(), `${ABILITIES[k].name} when enemies are close`, test('enemy_within', { range: 2 }),
             { do: 'ability', ability: k }));
     }
-    // Control spells are saved for healthy enemies; weakened ones just get finished off.
-    for (const k of of(a => a.targetType === 'enemy' && a.applyStatus && !a.basePower && !POSITIVE_STATUSES.includes(a.applyStatus))) {
+    // Control spells are saved for healthy enemies; weakened ones just get finished off. The most
+    // telling go first. Sleep comes last: in a running fight, the next blow wakes the sleeper.
+    const controlValue = (k) => CONTROL_VALUE[ABILITIES[k].applyStatus] ?? 1;
+    const control = of(a => a.targetType === 'enemy' && a.applyStatus && !a.basePower && !POSITIVE_STATUSES.includes(a.applyStatus));
+    for (const k of control.sort((a, b) => controlValue(b) - controlValue(a))) {
         const ab = ABILITIES[k];
         rules.push(rule(id(), `${ab.name} on a healthy enemy without ${ab.applyStatus}`, test('target_hp_pct', { cmp: '>=', value: 60 }),
             { do: 'ability', ability: k, target: enemy('nearest', statusFilter(ab.applyStatus)), approach: true }));
+    }
+    // Orders that move speed gauges come after control (so a Warlord taunts before it rallies):
+    // the biggest rally first, then delaying the nearest enemy.
+    for (const k of orders.sort((a, b) => ABILITIES[b].ctGain - ABILITIES[a].ctGain)) {
+        const ab = ABILITIES[k];
+        rules.push(ab.ctGain > 0
+            ? rule(id(), `${ab.name} an ally when enemies are near`, test('enemy_within', { range: 6 }),
+                { do: 'ability', ability: k, target: ally('nearest'), approach: true })
+            : rule(id(), `${ab.name} the nearest enemy`, test('enemy_within', { range: 6 }),
+                { do: 'ability', ability: k, target: enemy('nearest'), approach: true }));
     }
     const keep = RANGED_KEEP[job];
     if (keep && !MELEE_JOBS.has(job)) {

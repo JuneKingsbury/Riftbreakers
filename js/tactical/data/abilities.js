@@ -1828,4 +1828,407 @@ export const ABILITY_DATA = {
         requiresLos: false,
         desc: 'Binds a spectral wisp and directs it to drain life from enemies.',
     },
+
+    // ============================================================
+    // ---- Illusionist line (Illusion) ----
+    // ============================================================
+    phantasm: {
+        name: 'Phantasm', type: 'magic', range: 4, aoe: 0, mpCost: 8, actionCost: 42,
+        targetType: 'enemy', basePower: 1.05, element: 'illusion', animType: 'cast',
+        projectileColor: '#e0a0ff', chargeTime: 0,
+        desc: 'A terror only the target can see. Cheap magic damage from a distance.',
+    },
+    mirror_image: {
+        extends: 'call_wisp', name: 'Mirror Image', range: 3, mpCost: 12, actionCost: 32,
+        summonJob: 'decoy', summonName: 'Mirror Image', element: 'illusion', projectileColor: '#e0c0ff',
+        desc: 'Conjures a copy of yourself up to 3 tiles away, out toward the enemy. Enemies would rather strike the copy, which breaks after a few hits.',
+    },
+    blur: {
+        name: 'Blur', type: 'magic', range: 3, aoe: 0, mpCost: 10, actionCost: 38,
+        targetType: 'ally', basePower: 0, element: 'illusion', animType: 'cast',
+        projectileColor: '#ccbbff', chargeTime: 0,
+        buffs: [{ stat: 'eva', value: 20, duration: 3 }], floatText: 'Blurred!',
+        desc: 'Smears an ally\'s outline in the air: evasion +20 for 3 turns.',
+    },
+    vanish: {
+        name: 'Vanish', type: 'magic', range: 3, aoe: 0, mpCost: 14, actionCost: 42,
+        targetType: 'ally', basePower: 0, element: 'illusion', animType: 'cast',
+        projectileColor: '#9988cc', chargeTime: 0, applyStatus: 'hidden', statusDuration: 2,
+        desc: 'Hides an ally from enemy eyes. Enemies can\'t pick them as a target until they act or 2 turns pass.',
+    },
+    displacement: {
+        extends: 'phase_shift', name: 'Displacement', chance: 0.3, phaseAway: 2,
+        desc: 'You were never quite where they struck: when hit, may reappear up to 2 tiles away.',
+    },
+    glamour: {
+        extends: 'mana_surge', name: 'Glamour', passiveMpCost: 0, dmgDealt: null, summonBoost: 0.6,
+        desc: 'More convincing illusions: the copies and creatures you summon have 60% more HP and power.',
+    },
+    mirage_step: {
+        extends: 'move_plus_1', name: 'Mirage Step', moveBonus: 0,
+        onMove: { selfBuff: { stat: 'eva', value: 15, duration: 1 } },
+        desc: 'Leave an afterimage behind: after moving, evasion +15 until your next turn.',
+    },
+
+    // Dreamweaver (Illusion + Enchantment)
+    mass_sleep: {
+        extends: 'dream_veil', name: 'Mass Sleep', aoe: 1, mpCost: 20, actionCost: 50, chargeTime: 25,
+        statusDuration: 2, requiresLos: false, element: 'illusion',
+        desc: 'A lullaby that settles over an area: everyone caught falls asleep until struck.',
+    },
+    bewilder: {
+        name: 'Bewilder', type: 'magic', range: 3, aoe: 0, mpCost: 16, actionCost: 45,
+        targetType: 'enemy', basePower: 0, element: 'illusion', animType: 'cast',
+        projectileColor: '#ff99dd', chargeTime: 0, applyStatus: 'charm', statusDuration: 2,
+        desc: 'Convinces an enemy that their friends are the foe. Charms them for 2 turns.',
+    },
+    nightmare: {
+        name: 'Nightmare', type: 'magic', range: 4, aoe: 0, mpCost: 14, actionCost: 46,
+        targetType: 'enemy', basePower: 1.2, element: 'illusion', animType: 'cast',
+        projectileColor: '#8844aa', chargeTime: 0, bonusVsStatus: { sleep: 2 },
+        desc: 'Turns a dream against the dreamer: deals double damage to a sleeping target.',
+    },
+    lull: {
+        extends: 'brace', name: 'Lull', trigger: 'anyHit', chance: 0.3, selfStatus: null,
+        attackerStatus: { status: 'sleep', duration: 2 },
+        desc: 'When hit, may whisper the attacker to sleep.',
+    },
+    deep_dreams: {
+        extends: 'mana_surge', name: 'Deep Dreams', passiveMpCost: 1, dmgDealt: null, statusDurationBonus: 1,
+        desc: 'The afflictions you inflict last a turn longer. Drains 1 MP per turn.',
+    },
+
+    // Mirage Oracle (Illusion + Divination)
+    hall_of_mirrors: {
+        extends: 'mirror_image', name: 'Hall of Mirrors', range: 3, mpCost: 20, summonCount: 2,
+        desc: 'Conjures two copies at once, which enemies would rather strike.',
+    },
+    mass_blur: {
+        extends: 'blur', name: 'Mass Blur', aoe: 1, mpCost: 18, actionCost: 45,
+        buffs: [{ stat: 'eva', value: 15, duration: 3 }],
+        desc: 'Blurs everyone around an ally: evasion +15 for 3 turns.',
+    },
+    true_strike: {
+        name: 'True Strike', type: 'magic', range: 4, aoe: 0, mpCost: 12, actionCost: 44,
+        targetType: 'enemy', basePower: 1.1, element: 'illusion', animType: 'cast',
+        projectileColor: '#ffffff', chargeTime: 0, mdfPierce: 0.5, ignoreReflect: true,
+        desc: 'Strikes where the target truly is: ignores half of its MDF, and can\'t be reflected.',
+    },
+    shattered_image: {
+        extends: 'brace', name: 'Shattered Image', trigger: 'decoyDown', chance: 1, selfStatus: null,
+        attackerStatus: { status: 'slow', duration: 2 },
+        desc: 'Shards fly when your copies break: whoever destroys one of your copies is slowed.',
+    },
+    lasting_images: {
+        extends: 'mana_surge', name: 'Lasting Images', passiveMpCost: 0, dmgDealt: null, summonBoost: 1,
+        desc: 'Your copies and creatures have twice their usual HP and power.',
+    },
+
+    // ============================================================
+    // ---- Gravecaller line (Necromancy) ----
+    // ============================================================
+    life_drain: {
+        name: 'Life Drain', type: 'magic', range: 3, aoe: 0, mpCost: 9, actionCost: 44,
+        targetType: 'enemy', basePower: 0.85, element: 'necrotic', animType: 'cast',
+        projectileColor: '#7acc7a', chargeTime: 0, drainFrac: 0.5,
+        desc: 'Draws the life out of a target: deals damage and heals you for half of it.',
+    },
+    grave_chill: {
+        name: 'Grave Chill', type: 'magic', range: 4, aoe: 0, mpCost: 10, actionCost: 44,
+        targetType: 'enemy', basePower: 0.6, element: 'necrotic', animType: 'cast',
+        projectileColor: '#99bbcc', chargeTime: 0, applyStatus: 'slow', statusDuration: 2,
+        desc: 'The cold of the grave seeps into the target: light damage, and slowed for 2 turns.',
+    },
+    raise_dead: {
+        name: 'Raise Dead', type: 'magic', range: 3, aoe: 0, mpCost: 16, actionCost: 50,
+        targetType: 'corpse', corpseEffect: 'raise', summonJob: 'skeleton', summonName: 'Skeleton',
+        element: 'necrotic', animType: 'cast', projectileColor: '#ccddcc', chargeTime: 20, requiresLos: false,
+        desc: 'A knocked-out enemy rises as a skeleton that fights for you. The body is used up.',
+    },
+    corpse_burst: {
+        name: 'Corpse Burst', type: 'magic', range: 4, aoe: 1, mpCost: 14, actionCost: 46,
+        targetType: 'corpse', corpseEffect: 'burst', basePower: 1.2, element: 'necrotic', animType: 'cast',
+        projectileColor: '#aa66aa', chargeTime: 0, requiresLos: false,
+        desc: 'Detonates a knocked-out enemy, damaging every enemy next to it. The body is used up.',
+    },
+    lingering_spite: {
+        extends: 'brace', name: 'Lingering Spite', trigger: 'onDown', chance: 1, selfStatus: null,
+        downBurst: 'spite_burst',
+        desc: 'When you are knocked out, your spite bursts out and hurts every adjacent enemy.',
+    },
+    spite_burst: {
+        name: 'Spite Burst', type: 'magic', range: 1, aoe: 0, mpCost: 0, actionCost: 0,
+        targetType: 'enemy', basePower: 0.9, element: 'necrotic', animType: 'cast',
+        projectileColor: '#aa66aa', chargeTime: 0,
+        desc: 'The burst of Lingering Spite.',
+    },
+    soul_harvest: {
+        extends: 'mana_surge', name: 'Soul Harvest', passiveMpCost: 0, dmgDealt: null, mpOnFall: 8,
+        desc: 'Whenever anyone on the field falls, friend or foe, you regain 8 MP.',
+    },
+    wraithwalk: {
+        extends: 'move_plus_1', name: 'Wraithwalk', moveBonus: 0, passThroughUnits: true,
+        desc: 'Walk half in the world of the dead: pass through other units.',
+    },
+
+    // Lich (Necromancy + Evocation)
+    soul_nova: {
+        extends: 'life_drain', name: 'Soul Nova', aoe: 1, mpCost: 20, actionCost: 50, basePower: 0.7,
+        drainFrac: 0.3, chargeTime: 25, requiresLos: false,
+        desc: 'Tears the life from everyone in an area, healing you for part of it.',
+    },
+    wither: {
+        extends: 'life_drain', name: 'Wither', mpCost: 22, basePower: 1.6, chargeTime: 35,
+        desc: 'A long, terrible draining: heavy damage after a charge, half of it returned to you as HP.',
+    },
+    bone_spear: {
+        name: 'Bone Spear', type: 'magic', range: 5, aoe: 0, mpCost: 14, actionCost: 46,
+        targetType: 'enemy', basePower: 1.15, element: 'necrotic', animType: 'cast',
+        projectileColor: '#eeeedd', chargeTime: 0,
+        desc: 'Hurls a lance of sharpened bone a long way.',
+    },
+    phylactery: {
+        extends: 'brace', name: 'Phylactery', trigger: 'onDown', chance: 1, oncePerBattle: true,
+        selfStatus: null, reviveFrac: 0.3,
+        desc: 'Your soul is kept elsewhere: the first time you are knocked out, you rise again with 30% HP.',
+    },
+    necrotic_power: {
+        extends: 'mana_surge', name: 'Necrotic Power', passiveMpCost: 1, dmgDealt: null, drainMult: 1.2,
+        desc: 'Your drains heal you 20% more. Drains 1 MP per turn.',
+    },
+
+    // Gravewarden (Necromancy + Abjuration)
+    bone_ward: {
+        name: 'Bone Ward', type: 'magic', range: 3, aoe: 1, mpCost: 14, actionCost: 44,
+        targetType: 'corpse', corpseEffect: 'ward', applyStatus: 'protect', statusDuration: 3,
+        element: 'necrotic', animType: 'cast', projectileColor: '#ddddcc', chargeTime: 0, requiresLos: false,
+        desc: 'Builds a barricade of bone from a knocked-out enemy: allies next to it gain Protect. The body is used up.',
+    },
+    mass_raise: {
+        extends: 'raise_dead', name: 'Mass Raise', aoe: 1, mpCost: 26, corpseCount: 2, chargeTime: 30,
+        desc: 'Up to two knocked-out enemies in an area rise as skeletons that fight for you.',
+    },
+    soul_tether: {
+        name: 'Soul Tether', type: 'magic', range: 3, aoe: 0, mpCost: 18, actionCost: 45,
+        targetType: 'ally', basePower: 0, element: 'necrotic', animType: 'cast',
+        projectileColor: '#bbffcc', chargeTime: 0, applyStatus: 'reraise', statusDuration: 4,
+        desc: 'Ties an ally\'s soul to their body: the next blow that would knock them out leaves them at 1 HP.',
+    },
+    death_ward: {
+        extends: 'brace', name: 'Death Ward', trigger: 'allyHit', chance: 0.35, selfStatus: null, saveFromDown: true,
+        desc: 'When an adjacent ally is knocked out, may hold their soul in place: they stay standing at 1 HP.',
+    },
+    grave_legion: {
+        extends: 'mana_surge', name: 'Grave Legion', passiveMpCost: 0, dmgDealt: null, summonBoost: 0.8,
+        desc: 'The dead you raise are tougher: 80% more HP and power.',
+    },
+
+    // ============================================================
+    // ---- Alchemist line (no school) ----
+    // Flasks cost no MP (alchemists have none) but take longer to throw. Most splash
+    // everyone in the area, friend and foe alike (targetType 'all').
+    // ============================================================
+    healing_draught: {
+        name: 'Healing Draught', type: 'magic', range: 4, aoe: 1, mpCost: 0, actionCost: 62,
+        targetType: 'all', basePower: 0.6, isHeal: true, element: 'alchemy', animType: 'cast',
+        projectileColor: '#66ff99', chargeTime: 0, requiresLos: false,
+        desc: 'A splash of healing that heals everyone it reaches, enemies included.',
+    },
+    acid_flask: {
+        name: 'Acid Flask', type: 'magic', range: 4, aoe: 1, mpCost: 0, actionCost: 58,
+        targetType: 'all', basePower: 0.7, element: 'alchemy', animType: 'cast',
+        projectileColor: '#ccff44', chargeTime: 0, requiresLos: false,
+        buffs: [{ stat: 'def', value: -4, duration: 3 }],
+        desc: 'Burns everyone in the splash, allies included, and lowers their DEF by 4 for 3 turns.',
+    },
+    smoke_bomb: {
+        name: 'Smoke Bomb', type: 'magic', range: 4, aoe: 1, mpCost: 0, actionCost: 50,
+        targetType: 'all', basePower: 0, element: 'alchemy', animType: 'cast',
+        projectileColor: '#aaaaaa', chargeTime: 0, requiresLos: false,
+        applyStatus: 'slipped', statusDuration: 3,
+        desc: 'A cloud of smoke: everyone inside, on both sides, dodges the next physical attack against them.',
+    },
+    quicksilver: {
+        name: 'Quicksilver', type: 'magic', range: 4, aoe: 1, mpCost: 0, actionCost: 58,
+        targetType: 'all', basePower: 0, element: 'alchemy', animType: 'cast',
+        projectileColor: '#ddeeff', chargeTime: 0, requiresLos: false,
+        applyStatus: 'haste', statusDuration: 2,
+        desc: 'A shimmering splash that hastes everyone it reaches, on both sides.',
+    },
+    reflex_tonic: {
+        extends: 'brace', name: 'Reflex Tonic', trigger: 'lowHp', chance: 1, oncePerBattle: true,
+        selfStatus: null, selfCast: 'tonic_draught',
+        desc: 'The first time you drop below 30% HP, you gulp down a tonic and heal.',
+    },
+    tonic_draught: {
+        name: 'Tonic', type: 'magic', range: 0, aoe: 0, mpCost: 0, actionCost: 0,
+        targetType: 'ally', basePower: 1, isHeal: true, element: 'alchemy', animType: 'cast',
+        projectileColor: '#66ff99', chargeTime: 0,
+        desc: 'The tonic of Reflex Tonic.',
+    },
+    potent_brews: {
+        extends: 'mana_surge', name: 'Potent Brews', passiveMpCost: 0,
+        dmgDealt: { magic: 1.25, physical: 1.25 }, healMult: 1.25,
+        desc: 'Stronger mixtures: your flasks heal and hurt 25% more.',
+    },
+    light_pack: {
+        extends: 'move_plus_1', name: 'Light Pack', moveBonus: 1, climbBonus: 1,
+        desc: 'Travel light: +1 movement, and climb 1 extra level.',
+    },
+
+    // Plaguewright (Alchemy + Transmutation)
+    plague_flask: {
+        extends: 'acid_flask', name: 'Plague Flask', aoe: 2, basePower: 0.35, actionCost: 60, buffs: null,
+        applyStatus: 'poison', statusDuration: 3, projectileColor: '#99dd33',
+        desc: 'A wide splash of plague: everyone caught, on both sides, is poisoned.',
+    },
+    miasma: {
+        extends: 'acid_flask', name: 'Miasma', basePower: 0.2, buffs: null,
+        applyStatus: 'poison', statusDuration: 5, projectileColor: '#77aa55',
+        desc: 'A slow, lingering poison that lasts 5 turns on everyone in the splash.',
+    },
+    catalyst: {
+        name: 'Catalyst', type: 'magic', range: 4, aoe: 1, mpCost: 0, actionCost: 55,
+        targetType: 'enemy', basePower: 0.8, element: 'alchemy', animType: 'cast',
+        projectileColor: '#ffee55', chargeTime: 0, requiresLos: false, bonusVsStatus: { poison: 2 },
+        desc: 'A reagent that sets poison burning: hits enemies in an area, double damage to the poisoned. Spares your allies.',
+    },
+    toxic_blood: {
+        extends: 'brace', name: 'Toxic Blood', trigger: 'physicalHit', chance: 0.5, adjacentOnly: true,
+        selfStatus: null, attackerStatus: { status: 'poison', duration: 3 },
+        desc: 'Your blood is poison: when struck in melee, may poison the attacker.',
+    },
+    virulence: {
+        extends: 'mana_surge', name: 'Virulence', passiveMpCost: 0, dmgDealt: null, statusDurationBonus: 1,
+        desc: 'Your poisons and other afflictions last a turn longer.',
+    },
+
+    // Field Surgeon (Alchemy + Abjuration)
+    elixir: {
+        name: 'Elixir', type: 'magic', range: 4, aoe: 0, mpCost: 0, actionCost: 55,
+        targetType: 'ally', basePower: 1.0, isHeal: true, alsoCure: true, element: 'alchemy', animType: 'cast',
+        projectileColor: '#88ffcc', chargeTime: 0,
+        desc: 'A carefully measured dose for one ally: a strong heal that also cures their afflictions.',
+    },
+    panacea_mist: {
+        name: 'Panacea Mist', type: 'magic', range: 4, aoe: 1, mpCost: 0, actionCost: 52,
+        targetType: 'all', basePower: 0, isCure: true, element: 'alchemy', animType: 'cast',
+        projectileColor: '#ccffee', chargeTime: 0, requiresLos: false,
+        desc: 'Cures the afflictions of everyone in the splash, on both sides.',
+    },
+    stimulant: {
+        name: 'Stimulant', type: 'magic', range: 4, aoe: 1, mpCost: 0, actionCost: 55,
+        targetType: 'all', basePower: 0, element: 'alchemy', animType: 'cast',
+        projectileColor: '#ffcc88', chargeTime: 0, requiresLos: false,
+        ctGain: 15, applyStatus: 'regen', statusDuration: 3,
+        desc: 'A bracing splash: everyone caught acts a little sooner and regenerates HP for 3 turns.',
+    },
+    triage: {
+        extends: 'brace', name: 'Triage', trigger: 'allyHit', chance: 0.4, selfStatus: null,
+        allyCast: 'triage_draught', whenAllyBelow: 0.35,
+        desc: 'When an adjacent ally is hit and left below 35% HP, may patch them up at once.',
+    },
+    triage_draught: {
+        extends: 'elixir', name: 'Triage Draught', range: 1, basePower: 0.8, alsoCure: false,
+        desc: 'The quick patch of Triage.',
+    },
+    steady_hands: {
+        extends: 'mana_surge', name: 'Steady Hands', passiveMpCost: 0, dmgDealt: null, precise: true,
+        desc: 'Perfect aim: your splashes only reach the side you meant them for. Heals and boons skip enemies, and harm skips allies.',
+    },
+
+    // ============================================================
+    // ---- Warlord line (no school) ----
+    // Commands are orders, not spells: they can't be dodged (noEvade).
+    // ============================================================
+    cleave: {
+        extends: 'attack', name: 'Cleave', aoe: 1, basePower: 0.8, actionCost: 42,
+        desc: 'A wide swing that hits the target and every enemy next to it.',
+    },
+    rally: {
+        name: 'Rally', type: 'physical', range: 3, aoe: 0, mpCost: 6, actionCost: 35,
+        targetType: 'ally', basePower: 0, element: 'command', animType: 'cast',
+        projectileColor: '#ffcc66', chargeTime: 0, ctGain: 30, floatText: 'Rallied!',
+        desc: 'Calls an ally to action: their speed gauge jumps forward, so they act sooner.',
+    },
+    taunt: {
+        name: 'Taunt', type: 'physical', range: 2, aoe: 1, mpCost: 6, actionCost: 38,
+        targetType: 'enemy', basePower: 0, element: 'command', animType: 'cast',
+        projectileColor: '#ff8844', chargeTime: 0, noEvade: true, applyStatus: 'taunted', statusDuration: 2,
+        desc: 'A challenge no one can ignore: enemies in the area must attack you for 2 turns.',
+    },
+    reposition: {
+        name: 'Reposition', type: 'physical', range: 3, aoe: 0, mpCost: 8, actionCost: 40,
+        targetType: 'ally', basePower: 0, element: 'command', animType: 'cast',
+        projectileColor: '#ffdd88', chargeTime: 0, swapPlaces: true,
+        desc: 'Swap places with an ally up to 3 tiles away, pulling them out of danger or into the fight.',
+    },
+    hold_the_line: {
+        extends: 'brace', name: 'Hold the Line', trigger: 'allyHit', chance: 0.35, selfStatus: null,
+        counterWith: 'attack', counterReach: 2,
+        desc: 'When an adjacent ally is hit, may lunge in and strike back at an attacker up to 2 tiles away.',
+    },
+    field_command: {
+        extends: 'mana_surge', name: 'Field Command', passiveMpCost: 0, dmgDealt: null, partyStartCt: 15,
+        desc: 'Your orders are ready before the battle starts: the whole party opens with a head start on its speed gauges.',
+    },
+    vanguard_step: {
+        extends: 'move_plus_1', name: 'Vanguard Step', moveBonus: 0,
+        onMove: { selfBuff: { stat: 'def', value: 2, duration: 1 } },
+        desc: 'Advance with your guard up: after moving, DEF +2 until your next turn.',
+    },
+
+    // Marshal (Command + Abjuration)
+    shield_wall: {
+        name: 'Shield Wall', type: 'physical', range: 0, aoe: 1, mpCost: 8, actionCost: 45,
+        targetType: 'ally', basePower: 0, element: 'command', animType: 'cast',
+        projectileColor: '#ccccff', chargeTime: 0, noEvade: true, applyStatus: 'protect', statusDuration: 2,
+        desc: 'Lock shields: you and every adjacent ally gain Protect for 2 turns.',
+    },
+    challenge: {
+        name: 'Challenge', type: 'physical', range: 3, aoe: 0, mpCost: 8, actionCost: 40,
+        targetType: 'enemy', basePower: 0, element: 'command', animType: 'cast',
+        projectileColor: '#ff6644', chargeTime: 0, noEvade: true, applyStatus: 'taunted', statusDuration: 3,
+        buffs: [{ stat: 'def', value: -4, duration: 3 }],
+        desc: 'Calls out one enemy: it must attack you for 3 turns, and its DEF falls by 4.',
+    },
+    bulwark_bash: {
+        extends: 'attack', name: 'Bulwark Bash', basePower: 0.9, mpCost: 8, actionCost: 45,
+        applyStatus: 'stun', statusDuration: 1,
+        desc: 'A blow with the shield\'s rim that stuns the target.',
+    },
+    interpose: {
+        extends: 'brace', name: 'Interpose', trigger: 'allyHit', chance: 0.35, selfStatus: null, shareDamageFrac: 1,
+        desc: 'When an adjacent ally is hit, may step in and take the whole blow yourself (never below 1 HP).',
+    },
+    iron_discipline: {
+        extends: 'mana_surge', name: 'Iron Discipline', passiveMpCost: 0, dmgDealt: null,
+        turnAlliesBuff: [{ stat: 'def', value: 3, duration: 1 }, { stat: 'mdf', value: 3, duration: 1 }],
+        desc: 'At the start of each of your turns, you and adjacent allies gain DEF and MDF +3 until your next turn.',
+    },
+
+    // Tactician (Command + Divination)
+    seize_the_moment: {
+        extends: 'rally', name: 'Seize the Moment', range: 4, mpCost: 12, ctGain: 55,
+        desc: 'Spots the perfect moment for an ally: their speed gauge jumps far forward.',
+    },
+    delay: {
+        name: 'Delay', type: 'physical', range: 4, aoe: 0, mpCost: 10, actionCost: 40,
+        targetType: 'enemy', basePower: 0, element: 'command', animType: 'cast',
+        projectileColor: '#aa88ff', chargeTime: 0, ctGain: -40, floatText: 'Delayed!',
+        desc: 'Feints the enemy into hesitation: their speed gauge falls back, so they act later.',
+    },
+    exploit_opening: {
+        extends: 'attack', name: 'Exploit Opening', basePower: 0.9, mpCost: 6, actionCost: 38, selfCtGain: 25,
+        desc: 'A strike into a gap in the enemy\'s guard that puts you back in action sooner.',
+    },
+    read_the_battle: {
+        extends: 'brace', name: 'Read the Battle', trigger: 'enemyCharge', chance: 0.4, selfStatus: null,
+        delayCharge: 30, chargeRange: 4,
+        desc: 'When an enemy within 4 tiles starts charging a spell, may disrupt it and set the charge back.',
+    },
+    initiative: {
+        extends: 'mana_surge', name: 'Initiative', passiveMpCost: 0, dmgDealt: null, partyStartCt: 30,
+        desc: 'Every battle is planned in advance: the whole party opens with a big head start on its speed gauges.',
+    },
 };

@@ -1,7 +1,7 @@
 // Pure battlefield queries for the scripted-AI layer. Nothing here mutates a
 // unit or the battle, and nothing animates. `units` is always the list of
 // non-dead units (battle.livingUnits), `map` is the battle map.
-import { computeMoveRange, computeAttackRange, computeAoeArea } from '../abilities.js';
+import { computeMoveRange, computeAttackRange, computeAoeArea, abilityAffects } from '../abilities.js';
 import { ABILITIES, baseKey, ownKey } from '../data-registry.js';
 import { hasLineOfSight, unitCell, stepNeighbors, posKey, parseKey, cellKey } from '../battle-map.js';
 import { isConscious, isAlive } from '../units.js';
@@ -96,7 +96,8 @@ export function inAbilityRange(from, target, abilityKey, map = null) {
     if (ab.targetType === 'self') return from.x === target.x && from.y === target.y && from.z === target.z;
     const d = distance(from, target);
     if (d > ab.range) return false;
-    if (d === 0) return ab.targetType === 'ally';
+    // Ally abilities may be used on oneself, and a splash may land at one's own feet.
+    if (d === 0) return ab.targetType === 'ally' || ab.targetType === 'all';
     if (map && ab.requiresLos !== false && !hasLineOfSight(map, from, target)) return false;
     return true;
 }
@@ -124,12 +125,7 @@ export function unitsAffected(caster, abilityKey, center, units, map) {
     const ab = ABILITIES[abilityKey];
     if (!ab) return [];
     const tiles = ab.aoe > 0 ? computeAoeArea(map, center, ab.aoe) : new Set([posKey(center)]);
-    return units.filter(u => {
-        const sameTeam = u.team === caster.team;
-        if (ab.targetType === 'ally' && !sameTeam) return false;
-        if (ab.targetType === 'enemy' && sameTeam) return false;
-        return tiles.has(posKey(u));
-    });
+    return units.filter(u => tiles.has(posKey(u)) && abilityAffects(caster, ab, u));
 }
 
 // Longest range among the unit's offensive abilities (it can pay for), min 1 for a basic strike.

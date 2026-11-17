@@ -245,6 +245,57 @@ export class BattleView3D {
     /** Re-frames the whole map (the free camera's starting view). */
     fitToMap() { this._desired = null; this._fitPending = true; }
 
+    // Screen pixel the camera target is drawn at: the middle of the area the HUD leaves free.
+    _targetScreen() {
+        const offX = (this._insets.left - this._insets.right) / 2;
+        const offY = ((this._insets.bottom || 0) - (this._insets.top || 0)) / 2;
+        return { x: this._width / 2 + offX, y: this._height / 2 - offY };
+    }
+
+    /**
+     * The camera as it is now: target, zoom, orbit, and where on screen the target sits. Hand
+     * it to another view's setCameraState to carry the view across (deploy to battle).
+     */
+    getCameraState() {
+        return {
+            target: { x: this._target.x, y: this._target.y, z: this._target.z },
+            tileSize: this._tileSize,
+            azSteps: this._azTargetSteps,
+            tracking: this._tracking,
+            screen: this._targetScreen(),
+        };
+    }
+
+    /**
+     * Takes over a camera from getCameraState instead of framing the whole map. The map stays
+     * on the same pixels even if this view's HUD panels differ: on the first frame the target
+     * is shifted so the old target lands where it was drawn before.
+     */
+    setCameraState(state) {
+        if (!state?.target) return;
+        this._tracking = !!state.tracking;
+        this._target.set(state.target.x, state.target.y, state.target.z);
+        this._tileSize = Math.max(this._tracking ? 24 : 8, Math.min(80, state.tileSize ?? this._tileSize));
+        this._azSteps = this._azTargetSteps = state.azSteps ?? 0;
+        this._fitPending = false;
+        this._desired = null;
+        this._autoCenterNext = false;
+        this._restoreScreen = state.screen ?? null;
+    }
+
+    // Moves the target so the point now drawn at the target pixel ends up at `screen` instead:
+    // recentering on the ground point under pixel 2p - q carries what is at p over to q.
+    _alignToScreen(screen) {
+        const p = this._targetScreen();
+        const px = 2 * p.x - screen.x, py = 2 * p.y - screen.y;
+        if (Math.abs(px - p.x) < 0.5 && Math.abs(py - p.y) < 0.5) return;
+        const ndc = new THREE.Vector2((px / this._width) * 2 - 1, -(py / this._height) * 2 + 1);
+        this._ray.setFromCamera(ndc, this.camera);
+        const ground = new THREE.Plane(new THREE.Vector3(0, 1, 0), -this._target.y);
+        const hit = new THREE.Vector3();
+        if (this._ray.ray.intersectPlane(ground, hit)) { this._target.x = hit.x; this._target.z = hit.z; }
+    }
+
     /** Shows or hides the free camera button (the deploy screen has nothing to track). */
     showFreeCameraButton(visible) {
         if (this._freeButton) this._freeButton.style.display = visible ? '' : 'none';
@@ -645,6 +696,17 @@ export class BattleView3D {
         if (Math.abs(diff) < 0.001) this._azSteps = this._azTargetSteps;
         else this._azSteps += diff * (1 - Math.exp(-dt / ROTATE_EASE_MS));
 
+        this._poseCamera();
+        // A camera handed over from another view (setCameraState) lands where it was on screen.
+        if (this._restoreScreen) {
+            this._alignToScreen(this._restoreScreen);
+            this._restoreScreen = null;
+            this._poseCamera();
+        }
+    }
+
+    // Places the camera for the current target, orbit, zoom and shake.
+    _poseCamera() {
         const az = this._azimuth();
         const cam = this.camera;
         cam.position.set(
@@ -1058,8 +1120,9 @@ export class BattleView3D {
             for (const m of [uv.sprite.material, uv.ghost.material]) {
                 if (m.map !== uv.texture) { m.map = uv.texture; m.needsUpdate = true; }
             }
-            // Grey when down; a cold blue cast while slowed.
-            const tint = ko ? 0x777777 : unit.status.includes('slow') ? 0xc4d8ff : 0xffffff;
+            // Grey when down; a cold blue cast while slowed; faded and dim while hidden.
+            const tint = ko ? 0x777777 : unit.status.includes('hidden') ? 0x7f86a8
+                : unit.status.includes('slow') ? 0xc4d8ff : 0xffffff;
             uv.sprite.material.color.setHex(tint);
             uv.ghost.material.color.setHex(tint);
 
@@ -1275,6 +1338,8 @@ export class BattleView3D {
         if (unit.status.includes('slow'))     marks.push('S');
         if (unit.status.includes('defend'))   marks.push('D');
         if (unit.status.includes('charging')) marks.push('!');
+        if (unit.status.includes('hidden'))   marks.push('H');
+        if (unit.status.includes('taunted'))  marks.push('T');
         if (ko) marks.push('KO');
         set('marks', marks.join(' '), v => { els.status.textContent = v; });
 

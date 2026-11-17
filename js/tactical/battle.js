@@ -1,9 +1,10 @@
-import { computeMoveRange, computeMovePath, computeAttackRange, computeAoeArea, computePatternArea, resolveAbility, ABILITIES, supportOf, passivesOf, inflictStatus, cleanseStatuses } from './abilities.js';
+import { computeMoveRange, computeMovePath, computeAttackRange, computeAoeArea, computePatternArea, resolveAbility, ABILITIES, supportOf, passivesOf, inflictStatus, cleanseStatuses, abilityAffects } from './abilities.js';
+import { JOB_STATS } from './data-registry.js';
 import { viewState } from './view-state.js';
 import { isDead, isAlive, isConscious, isUnconscious, isStunned, faceToward, setFacing, createUnit } from './units.js';
-import { getCell, applyTerrainEffect, settleZ, posKey, parseKey, cellKey } from './battle-map.js';
+import { getCell, applyTerrainEffect, settleZ, posKey, parseKey, cellKey, columnCells } from './battle-map.js';
 import { moveEntity, moveEntityAlongPath } from '../systems/movement-lerp.js';
-import { tryReaction, tryAllyReactions } from './reactions.js';
+import { tryReaction, tryAllyReactions, tryDownReactions, tryChargeReactions } from './reactions.js';
 
 export const STATES = {
     ADVANCE_CT:            'ADVANCE_CT',
@@ -87,6 +88,10 @@ export class TacticalBattle {
             if (amt > 0) { unit.mp += amt; this._spawnFloat(unit, `+${amt} MP`, '#88aaff'); }
         }
         if (fx.cleanse && cleanseStatuses(unit).length) this.logMsg(`${unit.name} walks off their afflictions.`);
+        if (fx.selfBuff) {
+            unit.buffs = unit.buffs || [];
+            unit.buffs.push({ key, ...fx.selfBuff });
+        }
         const allies = [unit, ...this._adjacent(unit, u => u.team === unit.team)];
         if (fx.alliesHealPct) for (const a of allies) heal(a, fx.alliesHealPct);
         if (fx.alliesBuff) {
@@ -173,6 +178,7 @@ export class TacticalBattle {
         } else if (isUnconscious(target)) {
             this.logMsg(`${target.name} is knocked unconscious!`);
         }
+        if (result.damage > 0 && target.hp === 0) this._onDown(target, source);
         if (!isReaction) {
             tryReaction(this, target, source, abKey, result);
             tryAllyReactions(this, target, source, abKey, result);
@@ -248,11 +254,21 @@ export class TacticalBattle {
                     unit.deathTimer = 3;
                     this.logMsg(`${unit.name}'s doom comes to pass!`);
                     this._spawnFloat(unit, 'Doom', '#c06');
+                    this._onDown(unit, null);
                     this._checkVictory();
                 }
             }
         }
         unit.statusTimers = timers;
+
+        // Iron Discipline: the unit and adjacent allies brace for the coming turn.
+        const turnBuffs = isConscious(unit) ? supportOf(unit)?.turnAlliesBuff : null;
+        if (turnBuffs) {
+            for (const a of [unit, ...this._adjacent(unit, u => u.team === unit.team && isConscious(u))]) {
+                a.buffs = a.buffs || [];
+                for (const b of turnBuffs) a.buffs.push({ key: 'iron_discipline', ...b });
+            }
+        }
 
         // Support start-of-turn healing (Regen Aura)
         const regenHp = supportOf(unit)?.turnRegenHp;
@@ -277,6 +293,7 @@ export class TacticalBattle {
             if (unit.hp <= 0) {
                 if (!unit.status.includes('unconscious')) unit.status.push('unconscious');
                 unit.deathTimer = 3;
+                this._onDown(unit, null);
             }
         }
 
@@ -417,13 +434,9 @@ export class TacticalBattle {
         const source = this.activeUnit;
         this.hitPreview = new Set();
         for (const key of this.aoePreview) {
-            const hit = this.livingUnits.some(u => {
-                if (posKey(u) !== key) return false;
-                const sameTeam = u.team === source.team;
-                if (ab.targetType === 'ally'  && !sameTeam) return false;
-                if (ab.targetType === 'enemy' &&  sameTeam) return false;
-                return true;
-            });
+            const hit = ab.targetType === 'corpse'
+                ? this._bodiesIn(source, new Set([key])).length > 0
+                : this.livingUnits.some(u => posKey(u) === key && abilityAffects(source, ab, u));
             if (hit) this.hitPreview.add(key);
         }
     }
@@ -492,6 +505,8 @@ export class TacticalBattle {
             };
             if (!source.status.includes('charging')) source.status.push('charging');
             this.logMsg(`${source.name} begins channeling ${ab.name}!`);
+            this._revealOnAct(source);
+            tryChargeReactions(this, source);
             this.selectedAbility = null;
             this.abilityRotation = 0;
             this.abilityRange = new Set();
@@ -507,6 +522,7 @@ export class TacticalBattle {
         const actCost = ab.actionCost ?? 60;
         source.ct = Math.max(0, source.ct - actCost);
         this._ctPreSpent += actCost;
+        this._revealOnAct(source);
 
         // Summon abilities: place a new creature on the target tile.
         if (ab.isSummon) {
@@ -520,14 +536,20 @@ export class TacticalBattle {
             return true;
         }
 
-        const affectedTiles = this._affectedCells(ab, tx, ty, tz, this.abilityRotation);
+        if (ab.targetType === 'corpse') {
+            this._resolveCorpse(source, this.selectedAbility, tx, ty, tz);
+            this.selectedAbility = null;
+            this.abilityRotation = 0;
+            this.abilityRange = new Set();
+            this.aoePreview = new Set();
+            this.hitPreview = new Set();
+            this.setState(STATES.PLAYER_TURN);
+            this._checkVictory();
+            return true;
+        }
 
-        const targets = this.livingUnits.filter(u => {
-            const sameTeam = u.team === source.team;
-            if (ab.targetType === 'ally' && !sameTeam) return false;
-            if (ab.targetType === 'enemy' && sameTeam) return false;
-            return affectedTiles.has(posKey(u));
-        });
+        const affectedTiles = this._affectedCells(ab, tx, ty, tz, this.abilityRotation);
+        const targets = this._targetsIn(source, ab, affectedTiles);
 
         if (targets.length === 0 && !ab.isHeal && !ab.isCure && ab.targetType !== 'tile') {
             this.logMsg(`${source.name} used ${ab.name} but hit nothing!`);
@@ -575,13 +597,13 @@ export class TacticalBattle {
                     continue;
                 }
 
+                if (ab.targetType === 'corpse') {
+                    this._resolveCorpse(unit, ability, targetX, targetY, targetZ);
+                    fired.push({ unit, targetX, targetY, ability });
+                    continue;
+                }
                 const affectedTiles = this._affectedCells(ab, targetX, targetY, targetZ, rotation);
-                const targets = this.livingUnits.filter(u => {
-                    const sameTeam = u.team === unit.team;
-                    if (ab.targetType === 'ally' && !sameTeam) return false;
-                    if (ab.targetType === 'enemy' && sameTeam) return false;
-                    return affectedTiles.has(posKey(u));
-                });
+                const targets = this._targetsIn(unit, ab, affectedTiles);
 
                 for (const target of targets) {
                     const result = resolveAbility(unit, target, ability, this.map);
@@ -614,21 +636,24 @@ export class TacticalBattle {
             unit._charging = { ability: abilityKey, targetX: tx, targetY: ty, targetZ: tz, ct: 0, needed: this._chargeTime(unit, ab) };
             if (!unit.status.includes('charging')) unit.status.push('charging');
             this.logMsg(`${unit.name} begins channeling ${ab.name}!`);
+            this._revealOnAct(unit);
+            tryChargeReactions(this, unit);
             return;
         }
+        this._revealOnAct(unit);
 
         if (ab.isSummon) {
             this._resolveSummon(unit, ab, tx, ty, tz);
             return;
         }
 
+        if (ab.targetType === 'corpse') {
+            this._resolveCorpse(unit, abilityKey, tx, ty, tz);
+            this._checkVictory();
+            return;
+        }
         const affectedTiles = ab.aoe > 0 ? computeAoeArea(this.map, { x: tx, y: ty, z: tz }, ab.aoe) : new Set([cellKey(tx, ty, tz)]);
-        const targets = this.livingUnits.filter(u => {
-            const sameTeam = u.team === unit.team;
-            if (ab.targetType === 'ally' && !sameTeam) return false;
-            if (ab.targetType === 'enemy' && sameTeam) return false;
-            return affectedTiles.has(posKey(u));
-        });
+        const targets = this._targetsIn(unit, ab, affectedTiles);
 
         for (const target of targets) {
             const result = resolveAbility(unit, target, abilityKey, this.map);
@@ -714,6 +739,7 @@ export class TacticalBattle {
         }
 
         const summon = createUnit(ab.summonName, ab.summonJob, source.team, tx, ty, { ct: 0, z: tile.z });
+        summon.summonerId = source.id;
         // Spirit Pact: the summoner's support strengthens the creature.
         const boost = supportOf(source)?.summonBoost;
         if (boost) {
@@ -727,7 +753,121 @@ export class TacticalBattle {
 
         // Player-team summons are tracked so battle-scene can add them to _autoUnits.
         if (source.team === 'player') this._pendingSummons.push(summon.id);
+        // Hall of Mirrors: more than one at a time, on free cells next to the first.
+        for (let i = 1; i < (ab.summonCount ?? 1); i++) {
+            const free = this._freeCellsAround(summon, 1)[0];
+            if (free) this._resolveSummon(source, { ...ab, summonCount: 1 }, free.x, free.y, free.z);
+        }
         return summon;
+    }
+
+    // Standing cells within `radius` of a unit that nobody occupies, nearest first.
+    _freeCellsAround(around, radius) {
+        const taken = new Set(this.units.filter(u => !isDead(u)).map(posKey));
+        const out = [];
+        for (let dx = -radius; dx <= radius; dx++) {
+            for (let dy = -radius; dy <= radius; dy++) {
+                const d = Math.abs(dx) + Math.abs(dy);
+                if (d === 0 || d > radius) continue;
+                for (const c of columnCells(this.map, around.x + dx, around.y + dy)) {
+                    if (c.passable && !taken.has(posKey(c)) && Math.abs(c.z - (around.z ?? 0)) <= 1) out.push({ ...c, d });
+                }
+            }
+        }
+        return out.sort((a, b) => a.d - b.d);
+    }
+
+    // ---- Targets ---------------------------------------------------------------------
+
+    // The units an ability touches inside its affected cells (see abilityAffects).
+    _targetsIn(source, ab, affectedTiles) {
+        return this.livingUnits.filter(u => affectedTiles.has(posKey(u)) && abilityAffects(source, ab, u));
+    }
+
+    // Knocked-out enemies of `source` lying in the given cells: the bodies corpse abilities use.
+    _bodiesIn(source, cells) {
+        return this.units.filter(u => u.team !== source.team && isUnconscious(u) && cells.has(posKey(u)));
+    }
+
+    // A body is used up: the knocked-out unit is gone for good.
+    _consumeBody(body) {
+        body.status = body.status.filter(s => s !== 'unconscious');
+        if (!body.status.includes('dead')) body.status.push('dead');
+        body._consumed = true;
+    }
+
+    /**
+     * Corpse abilities (the Gravecaller line) act through knocked-out enemies at the target:
+     *   raise  up to corpseCount bodies rise as summons (summonJob) for the caster
+     *   burst  one body explodes, hitting the caster's enemies around it
+     *   ward   one body becomes a barricade: the caster's allies around it gain applyStatus
+     * The bodies are used up. With no body there, the ability fizzles.
+     */
+    _resolveCorpse(source, key, tx, ty, tz) {
+        const ab = ABILITIES[key];
+        const center = { x: tx, y: ty, z: tz ?? 0 };
+        const area = ab.aoe > 0 ? computeAoeArea(this.map, center, ab.aoe) : new Set([cellKey(tx, ty, center.z)]);
+        // The body on the target cell goes first.
+        const bodies = this._bodiesIn(source, area).sort((a, b) => (posKey(a) === cellKey(tx, ty, center.z) ? -1 : 0) - (posKey(b) === cellKey(tx, ty, center.z) ? -1 : 0));
+        if (bodies.length === 0) {
+            this.logMsg(`${source.name}'s ${ab.name} finds no fallen body and fizzles.`);
+            return;
+        }
+        if (ab.corpseEffect === 'raise') {
+            for (const body of bodies.slice(0, ab.corpseCount ?? 1)) {
+                this._consumeBody(body);
+                this.logMsg(`${body.name} rises again for ${source.name}!`);
+                this._resolveSummon(source, ab, body.x, body.y, body.z);
+            }
+            return;
+        }
+        const body = bodies[0];
+        this._consumeBody(body);
+        const around = computeAoeArea(this.map, body, Math.max(1, ab.aoe));
+        if (ab.corpseEffect === 'burst') {
+            this.logMsg(`${body.name}'s body bursts!`);
+            for (const target of this.livingUnits.filter(u => u.team !== source.team && isConscious(u) && around.has(posKey(u)))) {
+                this._applyResult(source, target, key, resolveAbility(source, target, key, this.map));
+            }
+        } else if (ab.corpseEffect === 'ward') {
+            this.logMsg(`${source.name} raises a ward of bone from ${body.name}.`);
+            for (const ally of this.livingUnits.filter(u => u.team === source.team && isConscious(u) && around.has(posKey(u)))) {
+                if (ab.applyStatus && inflictStatus(ally, ab.applyStatus, ab.statusDuration ?? 2, source)) {
+                    this._emit('status', { source, target: ally, status: ab.applyStatus, ability: key });
+                }
+            }
+        }
+    }
+
+    // A hidden unit (Vanish) shows itself the moment it acts.
+    _revealOnAct(unit) {
+        if (!unit.status.includes('hidden')) return;
+        unit.status = unit.status.filter(s => s !== 'hidden');
+        delete (unit.statusTimers || {}).hidden;
+        this.logMsg(`${unit.name} steps out of hiding.`);
+    }
+
+    /**
+     * Called whenever a unit drops to 0 HP, from any cause (`source` may be null, e.g. poison).
+     * Its own knockout reactions (Lingering Spite, Phylactery) and everyone's fall effects
+     * (Soul Harvest, Shattered Image) happen here.
+     */
+    _onDown(unit, source = null) {
+        // A copy (Mirror Image) shatters: there is no body to revive or raise.
+        if (JOB_STATS[unit.job]?.inert && !isDead(unit)) {
+            unit.status = unit.status.filter(s => s !== 'unconscious');
+            unit.status.push('dead');
+            this.logMsg(`${unit.name} shatters!`);
+        }
+        tryDownReactions(this, unit, source);
+        for (const u of this.livingUnits) {
+            const mp = isConscious(u) ? supportOf(u)?.mpOnFall : 0;
+            if (mp && u.mp < u.maxMp) {
+                const amt = Math.min(u.maxMp - u.mp, mp);
+                u.mp += amt;
+                this._spawnFloat(u, `+${amt} MP`, '#88aaff');
+            }
+        }
     }
 
     _checkVictory() {

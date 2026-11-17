@@ -6,6 +6,7 @@
 // never trigger another counter.
 import { ABILITIES, resolveAbility, inflictStatus, cleanseStatuses, passivesOf, NEGATIVE_STATUSES } from './abilities.js';
 import { isConscious, isDead, isUnconscious } from './units.js';
+import { JOB_STATS } from './data-registry.js';
 import { columnCells, posKey } from './battle-map.js';
 import { moveEntity } from '../systems/movement-lerp.js';
 
@@ -68,6 +69,7 @@ function dealDamage(battle, target, amt) {
         target.status.push('unconscious');
         target.deathTimer = 3;
         battle.logMsg(`${target.name} is knocked unconscious!`);
+        battle._onDown?.(target, null);
     }
 }
 
@@ -88,7 +90,7 @@ export function tryReaction(battle, reactor, attacker, abKey, result) {
 function tryOneReaction(battle, reactor, key, attacker, abKey, result) {
     const rx = ABILITIES[key];
     const hit = ABILITIES[abKey];
-    if (!rx || !hit || rx.trigger === 'allyHit') return false;
+    if (!rx || !hit || ['allyHit', 'onDown', 'decoyDown', 'enemyCharge'].includes(rx.trigger)) return false;
     // Status reactions answer any affliction; everything else needs damage.
     if (rx.trigger === 'statusHit' ? !result.statusApplied : !(result.damage > 0)) return false;
     if (!canReact(reactor, attacker)) return false;
@@ -150,27 +152,46 @@ function tryOneReaction(battle, reactor, key, attacker, abKey, result) {
 
 // 'allyHit' reactions: units adjacent to the victim, on the victim's side.
 export function tryAllyReactions(battle, victim, attacker, abKey, result) {
-    if (!(result.damage > 0) || isDead(victim)) return;
+    // Nobody shields or patches up a copy (Mirror Image): it isn't really there.
+    if (!(result.damage > 0) || isDead(victim) || JOB_STATS[victim.job]?.inert) return;
     for (const reactor of battle.livingUnits) {
         if (reactor === victim || reactor.team !== victim.team) continue;
         if (dist(reactor, victim) !== 1 || !canReact(reactor, attacker)) continue;
         for (const key of passivesOf(reactor, 'reaction')) {
-            if (tryAllyReaction(battle, reactor, key, victim, result)) break;
+            if (tryAllyReaction(battle, reactor, key, victim, result, attacker)) break;
         }
     }
 }
 
 // Returns true if the reaction fired.
-function tryAllyReaction(battle, reactor, key, victim, result) {
+function tryAllyReaction(battle, reactor, key, victim, result, attacker) {
     const rx = ABILITIES[key];
     if (rx?.trigger !== 'allyHit') return false;
     if (rx.allyCast && !canCast(reactor, rx.allyCast)) return false;
+    // Triage: only for an ally left badly hurt (but still standing).
+    if (rx.whenAllyBelow != null && !(victim.hp > 0 && victim.hp < victim.maxHp * rx.whenAllyBelow)) return false;
+    // Death Ward: only for an ally the blow knocked out.
+    if (rx.saveFromDown && !isUnconscious(victim)) return false;
+    // Hold the Line: strike back at the attacker, if it is in reach. The reactor stands beside the
+    // ally and the attacker beside the ally, so they are 2 apart: counterReach lets it lunge in.
+    if (rx.counterWith) {
+        const ab = ABILITIES[rx.counterWith];
+        const reach = rx.counterReach ?? (ab.range || 1);
+        if (!attacker || !isConscious(attacker) || !canCast(reactor, rx.counterWith) || dist(reactor, attacker) > reach) return false;
+    }
     const share = rx.shareDamageFrac ? Math.min(reactor.hp - 1, Math.round(result.damage * rx.shareDamageFrac)) : 0;
     if (rx.shareDamageFrac && share <= 0) return false;
     if (Math.random() >= (rx.chance ?? 1)) return false;
 
     announce(battle, reactor, rx, key);
     if (rx.allyCast) castOn(battle, reactor, rx.allyCast, victim);
+    if (rx.counterWith) castOn(battle, reactor, rx.counterWith, attacker);
+    if (rx.saveFromDown) {
+        victim.hp = 1;
+        victim.status = victim.status.filter(s => s !== 'unconscious');
+        battle.logMsg(`${reactor.name} holds ${victim.name}'s soul in place!`);
+        battle._spawnFloat(victim, 'Saved!', '#bbffcc');
+    }
     if (share > 0) {
         reactor.hp -= share;
         victim.hp = Math.min(victim.maxHp, victim.hp + share);
@@ -180,4 +201,66 @@ function tryAllyReaction(battle, reactor, key, victim, result) {
         battle._spawnFloat(victim, `+${share}`, '#8f8');
     }
     return true;
+}
+
+// Reactions to a unit dropping to 0 HP (TacticalBattle._onDown). The fallen unit's own
+// 'onDown' reactions (Lingering Spite bursts at adjacent enemies, Phylactery revives it),
+// then, if it was a copy (an inert summon), its summoner's 'decoyDown' reactions against
+// whoever broke it (Shattered Image).
+export function tryDownReactions(battle, unit, source) {
+    if (isUnconscious(unit) && !isDead(unit)) {
+        for (const key of passivesOf(unit, 'reaction')) {
+            const rx = ABILITIES[key];
+            if (rx?.trigger !== 'onDown') continue;
+            if (rx.oncePerBattle && unit._reactionsUsed?.[key]) continue;
+            if (Math.random() >= (rx.chance ?? 1)) continue;
+            announce(battle, unit, rx, key);
+            if (rx.downBurst) {
+                for (const foe of battle.livingUnits.filter(u => u.team !== unit.team && isConscious(u) && dist(u, unit) === 1)) {
+                    const res = resolveAbility(unit, foe, rx.downBurst, battle.map);
+                    battle._applyResult(unit, foe, rx.downBurst, res, { isReaction: true });
+                }
+            }
+            if (rx.reviveFrac) {
+                unit.hp = Math.max(1, Math.round(unit.maxHp * rx.reviveFrac));
+                unit.status = unit.status.filter(s => s !== 'unconscious');
+                battle.logMsg(`${unit.name} rises again!`);
+                battle._spawnFloat(unit, `+${unit.hp}`, '#8f8');
+                battle._emit?.('revive', { source: unit, target: unit, amount: unit.hp, ability: key });
+            }
+            break;
+        }
+    }
+    if (!JOB_STATS[unit.job]?.inert || unit.summonerId == null || !source || !isConscious(source)) return;
+    const summoner = battle.livingUnits.find(u => u.id === unit.summonerId);
+    if (!summoner || !isConscious(summoner)) return;
+    for (const key of passivesOf(summoner, 'reaction')) {
+        const rx = ABILITIES[key];
+        if (rx?.trigger !== 'decoyDown' || Math.random() >= (rx.chance ?? 1)) continue;
+        announce(battle, summoner, rx, key);
+        if (rx.attackerStatus && inflictStatus(source, rx.attackerStatus.status, rx.attackerStatus.duration, summoner)) {
+            battle.logMsg(`${source.name} is afflicted with ${rx.attackerStatus.status}!`);
+        }
+        break;
+    }
+}
+
+// 'enemyCharge' reactions (Read the Battle): when `charger` starts channeling a spell, opponents
+// within the reaction's chargeRange may disrupt it, so it needs delayCharge more to go off.
+export function tryChargeReactions(battle, charger) {
+    if (!charger._charging) return;
+    for (const reactor of battle.livingUnits) {
+        if (reactor.team === charger.team || !isConscious(reactor)) continue;
+        if (['sleep', 'stun', 'charm'].some(s => reactor.status.includes(s))) continue;
+        for (const key of passivesOf(reactor, 'reaction')) {
+            const rx = ABILITIES[key];
+            if (rx?.trigger !== 'enemyCharge' || dist(reactor, charger) > (rx.chargeRange ?? 4)) continue;
+            if (Math.random() >= (rx.chance ?? 1)) continue;
+            announce(battle, reactor, rx, key);
+            // The charge has only just begun, so lengthen it rather than set its progress back.
+            charger._charging.needed += rx.delayCharge ?? 30;
+            battle._spawnFloat(charger, 'Disrupted!', '#cc88cc');
+            return;
+        }
+    }
 }

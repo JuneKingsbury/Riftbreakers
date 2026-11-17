@@ -32,6 +32,8 @@ export class BattleScene {
         this._presetMapDef      = opts.mapDef            || null;
         this._customPlayerSpawns = opts.customPlayerSpawns || null;
         this._manualControl      = opts.manualControl === true;
+        // Camera from the deploy screen (BattleView3D.getCameraState), kept instead of reframing.
+        this._cameraState        = opts.camera ?? null;
         this._paused             = false;
         this._speed              = 1;
         this._battle     = null;
@@ -85,6 +87,7 @@ export class BattleScene {
         try {
             this._renderer = new BattleView3D(containerEl, skinManager);
             this._renderer.setTimeScale(this._speed);
+            if (this._cameraState) this._renderer.setCameraState(this._cameraState);
             if (alert) this._renderer.fxAlert(this._encounter?.kind === 'boss' ? 0.2 : 0.12);
         } catch (err) {
             this._stopped = true;
@@ -105,7 +108,8 @@ export class BattleScene {
         // Input listeners. Touch screens also get one-finger pan and pinch zoom.
         this._detachTouch = attachTouchGestures(this._renderer.canvas, this._renderer);
         this._updateInsets();
-        this._renderer.fitToMap?.();
+        // Frame the whole map, unless the camera came over from the deploy screen.
+        if (!this._cameraState) this._renderer.fitToMap?.();
         this._renderer.canvas.addEventListener('mousedown',    this._onMouseDown   = (e) => this._handleMouseDown(e));
         this._renderer.canvas.addEventListener('mousemove',    this._onMouseMove   = (e) => this._handleMouseMove(e));
         this._renderer.canvas.addEventListener('mouseup',      this._onMouseUp     = (e) => this._handleMouseUp(e));

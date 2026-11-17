@@ -1,6 +1,7 @@
 import { hasLineOfSight, MAX_CLIMB, settleZ, unitCell, stepNeighbors, columnCells, cellsNear, posKey, parseKey } from './battle-map.js';
 import { faceToward, isUnconscious, isDead } from './units.js';
-import { ABILITIES } from './data-registry.js';
+import { ABILITIES, JOB_STATS } from './data-registry.js';
+import { moveEntity } from '../systems/movement-lerp.js';
 
 // Re-export so callers that import ABILITIES from this module keep working.
 export { ABILITIES };
@@ -33,8 +34,8 @@ function activeSupports(unit) {
     return passivesOf(unit, 'support').filter(k => !(ABILITIES[k].passiveMpCost > 0 && unit.mp <= 0));
 }
 
-const MULT_FIELDS = ['xpMult', 'chargeMult', 'highGroundMult', 'aoeDmgMult', 'healMult'];
-const ADD_FIELDS = ['evaBonus', 'statusDurationBonus', 'turnRegenHp', 'passiveMpCost', 'matToPhysical', 'summonBoost'];
+const MULT_FIELDS = ['xpMult', 'chargeMult', 'highGroundMult', 'aoeDmgMult', 'healMult', 'drainMult'];
+const ADD_FIELDS = ['evaBonus', 'statusDurationBonus', 'turnRegenHp', 'passiveMpCost', 'matToPhysical', 'summonBoost', 'mpOnFall'];
 const MAP_FIELDS = ['dmgDealt', 'dmgTaken', 'lowHpDmgDealt'];
 
 // Several supports combined into one profile: multipliers multiply, bonuses add,
@@ -54,6 +55,9 @@ function mergeSupports(abs) {
         if (ab.ignoreEvasion) out.ignoreEvasion = true;
         if (ab.surviveLethal) out.surviveLethal = true;
         if (ab.attackProc && !out.attackProc) out.attackProc = ab.attackProc;
+        if (ab.precise) out.precise = true;
+        if (ab.partyStartCt != null) out.partyStartCt = Math.max(out.partyStartCt ?? 0, ab.partyStartCt);
+        if (ab.turnAlliesBuff) out.turnAlliesBuff = [...(out.turnAlliesBuff || []), ...ab.turnAlliesBuff];
     }
     return out;
 }
@@ -72,8 +76,43 @@ export function passiveActive(unit, key) {
     return activeSupports(unit).some(k => k.split('@')[0] === key.split('@')[0]);
 }
 
-export const NEGATIVE_STATUSES = ['poison', 'slow', 'silence', 'sleep', 'stun', 'berserk', 'charm', 'frog', 'enfeebled', 'doom'];
-export const POSITIVE_STATUSES = ['haste', 'protect', 'shell', 'regen', 'reflect', 'reraise', 'slipped'];
+// taunted: must attack the unit that taunted it (unit._tauntedBy). hidden: enemies can't pick
+// the unit as a target until it acts.
+export const NEGATIVE_STATUSES = ['poison', 'slow', 'silence', 'sleep', 'stun', 'berserk', 'charm', 'frog', 'enfeebled', 'doom', 'taunted'];
+export const POSITIVE_STATUSES = ['haste', 'protect', 'shell', 'regen', 'reflect', 'reraise', 'slipped', 'hidden'];
+
+// Highest a speed gauge can be pushed by an order (Rally and the like).
+const CT_GAIN_CAP = 150;
+
+/**
+ * Whether an ability resolving for `source` reaches `unit` (inside its area). 'ally' and
+ * 'enemy' abilities only touch that side; 'all' touches both (an Alchemist's splash), unless
+ * the source has a precise support (Steady Hands): then helpful splashes skip enemies and
+ * harmful ones skip allies. Shared by the battle and the AI's estimates.
+ */
+export function abilityAffects(source, ab, unit) {
+    const same = unit.team === source.team;
+    if (ab.targetType === 'ally') return same;
+    if (ab.targetType === 'enemy') return !same;
+    if (ab.targetType === 'all' && supportOf(source)?.precise) return isHelpful(ab) ? same : !same;
+    return true;
+}
+
+/** True for abilities that help whoever they reach: heals, cures, boons, a faster gauge. */
+export function isHelpful(ab) {
+    if (ab.isHeal || ab.isCure) return true;
+    if (ab.basePower > 0) return false;
+    if (ab.applyStatus) return POSITIVE_STATUSES.includes(ab.applyStatus);
+    if (ab.ctGain != null) return ab.ctGain > 0;
+    return !!ab.buffs?.every(b => b.value > 0);
+}
+
+// Trades two units' places (Reposition), sliding both.
+function swapPlaces(a, b) {
+    const pa = { x: a.x, y: a.y, z: a.z }, pb = { x: b.x, y: b.y, z: b.z };
+    moveEntity(a, pb.x, pb.y, 220, pb.z);
+    moveEntity(b, pa.x, pa.y, 220, pa.z);
+}
 
 // Inflict a timed status, honouring the target's immunities and the source's
 // duration bonus, and apply its stat side effects. If already present, the
@@ -86,6 +125,7 @@ export function inflictStatus(target, status, duration, source = null) {
     if (!fresh && dur <= (target.statusTimers[status] ?? 0)) return false;
     if (fresh) target.status.push(status);
     target.statusTimers[status] = dur;
+    if (status === 'taunted' && source) target._tauntedBy = source.id;
     if (fresh && status === 'enfeebled') {
         target.buffs = target.buffs || [];
         target.buffs.push({ key: 'enfeebled', stat: 'atk', value: -5, duration: dur });
@@ -139,10 +179,17 @@ export function directionEvasionMod(attacker, target) {
 
 // Movement works on cells (battle-map.js): keys are "x,y,z" and steps carry z, so a unit
 // under a bridge and one on top of it are in different places.
+// Cells a unit may walk through but not stop on: its own side's copies (Mirror Image). A copy
+// stands still forever, and must not wall its allies into a corridor.
+function passableCells(unit, allUnits) {
+    return new Set(allUnits.filter(u => u !== unit && !isDead(u) && u.team === unit.team && JOB_STATS[u.job]?.inert).map(posKey));
+}
+
 export function computeMoveRange(unit, map, allUnits) {
     settleZ(map, [unit, ...allUnits]);
     // Block cells occupied by living units (including unconscious ones, who still occupy space).
     const blocked = new Set(allUnits.filter(u => u !== unit && !isDead(u)).map(posKey));
+    const through = passableCells(unit, allUnits);
     const prof = moveProfile(unit);
     const reachable = new Set();
     const start = unitCell(map, unit);
@@ -159,7 +206,7 @@ export function computeMoveRange(unit, map, allUnits) {
 
         for (const n of stepNeighbors(map, cell, prof.climb)) {
             const key = posKey(n);
-            if (!prof.passThroughUnits && blocked.has(key)) continue;
+            if (!prof.passThroughUnits && blocked.has(key) && !through.has(key)) continue;
             const remaining = budget - (prof.ignoreTerrainCost ? 1 : n.moveCost);
             if (remaining < 0) continue;
             if ((visited.get(key) ?? -1) >= remaining) continue;
@@ -177,6 +224,7 @@ export function computeMoveRange(unit, map, allUnits) {
 export function computeMovePath(unit, map, allUnits, destX, destY, destZ = null) {
     settleZ(map, [unit, ...allUnits]);
     const blocked = new Set(allUnits.filter(u => u !== unit && !isDead(u)).map(posKey));
+    const through = passableCells(unit, allUnits);
     const prof    = moveProfile(unit);
     const start   = unitCell(map, unit);
     if (!start) return null;
@@ -194,7 +242,7 @@ export function computeMovePath(unit, map, allUnits, destX, destY, destZ = null)
         const here = posKey(cell);
         for (const n of stepNeighbors(map, cell, prof.climb)) {
             const key = posKey(n);
-            if (blocked.has(key) && (isDest(n) || !prof.passThroughUnits)) continue;
+            if (blocked.has(key) && (isDest(n) || (!prof.passThroughUnits && !through.has(key)))) continue;
             const remaining = budget - (prof.ignoreTerrainCost ? 1 : n.moveCost);
             if (remaining < 0) continue;
             if ((visited.get(key) ?? -1) >= remaining) continue;
@@ -279,6 +327,19 @@ export function resolveAbility(source, target, ability, map) {
     const srcSup = supportOf(source);
     const tgtSup = supportOf(target);
 
+    // Orders (Rally, Delay, Reposition, Stimulant): move speed gauges or swap places, plus any
+    // status or buffs they carry. They always land.
+    if (!ab.basePower && !ab.isHeal && !ab.isCure && (ab.ctGain != null || ab.swapPlaces)) {
+        if (ab.ctGain) target.ct = Math.max(0, Math.min(CT_GAIN_CAP, (target.ct ?? 0) + ab.ctGain));
+        if (ab.swapPlaces && target !== source) swapPlaces(source, target);
+        let statusApplied = null;
+        if (ab.applyStatus && inflictStatus(target, ab.applyStatus, ab.statusDuration ?? 2, source)) statusApplied = ab.applyStatus;
+        if (ab.buffs) applyBuffs(target, ab, ability);
+        faceToward(source, target.x, target.y);
+        const ctText = ab.ctGain ? `${ab.ctGain > 0 ? '+' : ''}${ab.ctGain} CT` : null;
+        return { damage: 0, healing: 0, statusApplied, floatingText: ab.floatText ?? ctText, swapped: !!ab.swapPlaces };
+    }
+
     // Buff-only abilities (Focus, Earth Skin): apply the stat changes and stop.
     if (ab.buffs && !ab.basePower && !ab.isHeal && !ab.applyStatus) {
         applyBuffs(target, ab, ability);
@@ -311,8 +372,10 @@ export function resolveAbility(source, target, ability, map) {
             target.status = target.status.filter(s => s !== 'unconscious');
             revived = true;
         }
+        // Elixir: the same dose cures afflictions.
+        const cured = ab.alsoCure ? cleanseStatuses(target).length > 0 : false;
         faceToward(source, target.x, target.y);
-        return { damage: 0, healing, statusApplied: null, revived };
+        return { damage: 0, healing, statusApplied: null, revived, floatingText: cured ? 'Cured!' : null };
     }
 
     if (ab.isDispel) {
@@ -335,7 +398,8 @@ export function resolveAbility(source, target, ability, map) {
         let effectiveEva = ((getEffectiveStat(target, 'eva') || 0) / 100) * evaMod;
         const defBonus = target.status.includes('defend') ? 0.2 : 0;
         effectiveEva += tgtSup?.evaBonus ?? 0;
-        const finalEva = srcSup?.ignoreEvasion ? 0 : Math.min(0.9, effectiveEva + defBonus);
+        // Orders (noEvade) and true strikes (ignoreEvasion) can't be dodged.
+        const finalEva = (srcSup?.ignoreEvasion || ab.ignoreEvasion || ab.noEvade) ? 0 : Math.min(0.9, effectiveEva + defBonus);
         if (Math.random() < finalEva) {
             faceToward(source, target.x, target.y);
             return { damage: 0, healing: 0, statusApplied: null, missed: true };
@@ -343,7 +407,7 @@ export function resolveAbility(source, target, ability, map) {
     }
 
     // reflect: magic spells bounce back to the caster
-    if (ab.type === 'magic' && target.status.includes('reflect') && target.team !== source.team) {
+    if (ab.type === 'magic' && !ab.ignoreReflect && target.status.includes('reflect') && target.team !== source.team) {
         faceToward(source, target.x, target.y);
         return resolveAbility(target, source, ability, map);
     }
@@ -358,7 +422,8 @@ export function resolveAbility(source, target, ability, map) {
         // protect status: -25% physical damage
         if (target.status.includes('protect')) raw *= 0.75;
     } else {
-        const mdf = getEffectiveStat(target, 'mdf') * (1 - (srcSup?.mdfPierce ?? 0));
+        const pierce = Math.min(1, (srcSup?.mdfPierce ?? 0) + (ab.mdfPierce ?? 0));
+        const mdf = getEffectiveStat(target, 'mdf') * (1 - pierce);
         raw = Math.max(1, getEffectiveStat(source, 'mat') * 2 - mdf * defMult) * ab.basePower * highGroundBonus;
         // shell status: -25% magic damage
         if (target.status.includes('shell')) raw *= 0.75;
@@ -367,6 +432,8 @@ export function resolveAbility(source, target, ability, map) {
     if (source.hp < source.maxHp * 0.5) raw *= srcSup?.lowHpDmgDealt?.[kind] ?? 1;
     if (ab.aoe > 0 || ab.aoePattern) raw *= srcSup?.aoeDmgMult ?? 1;
     raw *= tgtSup?.dmgTaken?.[kind] ?? 1;
+    // Nightmare, Catalyst: extra damage against a target with the named status.
+    for (const [status, mult] of Object.entries(ab.bonusVsStatus ?? {})) if (target.status.includes(status)) raw *= mult;
     raw *= source._momentumMult ?? 1;
     const variance = 0.9 + Math.random() * 0.2;
     const damage = Math.round(raw * variance);
@@ -420,9 +487,12 @@ export function resolveAbility(source, target, ability, map) {
 
     let drained = 0;
     if (ab.drainFrac && damage > 0 && source.hp > 0) {
-        drained = Math.min(source.maxHp - source.hp, Math.round(damage * ab.drainFrac));
+        drained = Math.min(source.maxHp - source.hp, Math.round(damage * ab.drainFrac * (srcSup?.drainMult ?? 1)));
         source.hp += drained;
     }
+
+    // Exploit Opening: the attacker is back in action sooner.
+    if (ab.selfCtGain) source.ct = Math.max(0, Math.min(CT_GAIN_CAP, (source.ct ?? 0) + ab.selfCtGain));
 
     faceToward(source, target.x, target.y);
     return { damage, healing: 0, statusApplied, killedInstantly, drained };

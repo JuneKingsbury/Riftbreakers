@@ -20,6 +20,10 @@ export const STARTING_GEAR = {
     spellblade:  { armorKey: 'leather_vest',   helmetKey: 'leather_cap', weaponKey: 'iron_sword',  toolKey: null },
     stoneshaper: { armorKey: 'leather_jacket', helmetKey: 'leather_cap', weaponKey: 'wooden_club', toolKey: 'stone_axe' },
     seer:        { armorKey: 'cotton_shirt',   helmetKey: 'wool_cap',    weaponKey: 'wooden_wand', toolKey: 'lantern' },
+    illusionist: { armorKey: 'cotton_tunic',   helmetKey: 'cotton_cap',  weaponKey: 'wooden_wand', toolKey: null },
+    gravecaller: { armorKey: 'wool_tunic',     helmetKey: 'wool_cap',    weaponKey: 'wooden_wand', toolKey: 'lantern' },
+    alchemist:   { armorKey: 'leather_jacket', helmetKey: 'leather_cap', weaponKey: 'wooden_wand', toolKey: null },
+    warlord:     { armorKey: 'leather_vest',   helmetKey: 'leather_cap', weaponKey: 'iron_sword',  toolKey: 'iron_shield' },
 };
 
 // The root of a job's skill tree: every member joins knowing it.

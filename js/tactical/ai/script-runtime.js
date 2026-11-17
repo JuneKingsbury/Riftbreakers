@@ -11,7 +11,7 @@ import { columnCells, settleZ, posKey, parseKey } from '../battle-map.js';
 import { ABILITIES } from '../data-registry.js';
 import { isConscious, isDead, faceToward } from '../units.js';
 import { estimateAbilityEffect } from './estimate.js';
-import { NEGATIVE_STATUSES } from '../abilities.js';
+import { NEGATIVE_STATUSES, isHelpful } from '../abilities.js';
 import * as Q from './queries.js';
 import { evalCond, describeCond, ACTION_KINDS, MOVE_MODES } from './blocks.js';
 import { RANGED_ROLES } from './default-scripts.js';
@@ -23,6 +23,10 @@ const DEFAULT_TARGET = { side: 'enemy', pick: 'nearest' };
 
 // Charged spells land later on whoever is on the tile, so rate them lower.
 const CHARGE_PENALTY = 0.6;
+// Enemies a harmful splash must catch before it's worth also catching one healthy ally.
+const SPLASH_CROWD = 3;
+// Only rally an ally whose speed gauge is below this.
+const RALLY_BELOW_CT = 70;
 const KILL_BONUS = 1000;
 
 function passesFilter(f, cand, ctx) {
@@ -63,12 +67,23 @@ export function resolveTarget(sel, ctx) {
     if (s.side === 'self') {
         cands = [ctx.self];
     } else if (s.side === 'ally') {
-        cands = Q.alliesOf(ctx.self, ctx.units);
+        // Copies (Mirror Image) are illusions: never worth a heal, a buff or a rescue.
+        cands = Q.alliesOf(ctx.self, ctx.units).filter(u => !JOB_DATA[u.job]?.inert);
         // Unconscious allies are only candidates when the selector asks for them (revive).
         const wantsDown = filters.some(f => f.kind === 'status' && f.status === 'unconscious' && f.has !== false);
         if (!wantsDown) cands = cands.filter(isConscious);
     } else {
-        cands = Q.enemiesOf(ctx.self, ctx.units);
+        // Knocked-out enemies are only candidates when the selector asks for them (corpse rites).
+        const wantsDown = filters.some(f => f.kind === 'status' && f.status === 'unconscious' && f.has !== false);
+        cands = wantsDown
+            ? ctx.units.filter(u => u.team !== ctx.self.team && Q.hasStatus(u, 'unconscious'))
+            : Q.enemiesOf(ctx.self, ctx.units);
+        // Hidden enemies (Vanish) can't be picked; a taunted unit must go after its taunter.
+        cands = cands.filter(c => !Q.hasStatus(c, 'hidden'));
+        if (!wantsDown && Q.hasStatus(ctx.self, 'taunted')) {
+            const taunter = cands.find(c => c.id === ctx.self._tauntedBy);
+            if (taunter) cands = [taunter];
+        }
     }
     for (const f of filters) cands = cands.filter(c => passesFilter(f, c, ctx));
     if (cands.length === 0) return null;
@@ -155,7 +170,8 @@ function bestTile(keys, target, mode, ctx) {
 }
 
 const CATEGORY_FILTERS = {
-    best_damage: ab => ab.targetType === 'enemy' && !ab.isHeal && !ab.isCure,
+    // A harmful splash ('all') counts as damage; usefulOn keeps it off allies.
+    best_damage: ab => (ab.targetType === 'enemy' || (ab.targetType === 'all' && !isHelpful(ab))) && !ab.isHeal && !ab.isCure && !!ab.basePower,
     best_heal:   ab => !!ab.isHeal,
     best_cure:   ab => !!ab.isCure,
     best_status: ab => ab.targetType === 'enemy' && !!ab.applyStatus,
@@ -173,6 +189,18 @@ function isAllyBuff(ab) {
 // Whether using the ability on this target could accomplish anything, so a
 // script never wastes a turn healing a full-HP ally or curing a clean one.
 function usefulOn(ab, key, target, ctx) {
+    // Copies (inert summons): only make more once the ones out there are gone.
+    if (ab.isSummon && JOB_DATA[ab.summonJob]?.inert) {
+        const mine = ctx.units.filter(u => u.summonerId === ctx.self.id && isConscious(u)).length;
+        return mine < (ab.summonCount ?? 1);
+    }
+    if (ab.targetType === 'all') return splashWorthIt(ab, key, target, ctx);
+    if (ab.targetType === 'corpse') return corpseWorthIt(ab, key, target, ctx);
+    // Orders: rally an ally (not oneself), delay an enemy whose gauge is worth setting back,
+    // swap with someone else.
+    if (ab.swapPlaces) return target !== ctx.self && isConscious(target);
+    // A rally is wasted on an ally whose gauge is nearly full already.
+    if (ab.ctGain != null && !ab.basePower) return ab.ctGain > 0 ? target !== ctx.self && (target.ct ?? 0) < RALLY_BELOW_CT : (target.ct ?? 0) > 15;
     if (ab.isHeal) return target.hp < target.maxHp || Q.hasStatus(target, 'unconscious');
     if (ab.isCure) return target.status.some(s => NEGATIVE_STATUSES.includes(s));
     if (ab.targetType === 'ally' && ab.applyStatus) return !Q.hasStatus(target, ab.applyStatus);
@@ -185,8 +213,44 @@ function usefulOn(ab, key, target, ctx) {
     return true;
 }
 
+// Whether a splash that reaches both sides (an Alchemist's flask) does more good than harm
+// where it would land. Helpful ones need more allies who'd benefit than enemies. Harmful ones
+// need an enemy to hit and no ally in the way, or a big payoff: at least SPLASH_CROWD enemies
+// for one healthy ally (above half HP) caught in it.
+function splashWorthIt(ab, key, center, ctx) {
+    const reached = Q.unitsAffected(ctx.self, key, center, ctx.units, ctx.map);
+    const mine = reached.filter(u => u.team === ctx.self.team), theirs = reached.filter(u => u.team !== ctx.self.team);
+    if (!isHelpful(ab)) {
+        const hurtable = theirs.filter(u => isConscious(u));
+        if (hurtable.length === 0) return false;
+        if (mine.length === 0) return true;
+        return hurtable.length >= SPLASH_CROWD && mine.length === 1 && mine[0] !== ctx.self && Q.hpPct(mine[0]) > 50;
+    }
+    const gains = (u) => {
+        if (ab.isHeal) return u.hp < u.maxHp || Q.hasStatus(u, 'unconscious');
+        if (ab.isCure) return u.status.some(s => NEGATIVE_STATUSES.includes(s));
+        if (!isConscious(u)) return false;
+        if (ab.applyStatus) return !Q.hasStatus(u, ab.applyStatus);
+        return true;
+    };
+    const good = mine.filter(gains).length, bad = theirs.filter(gains).length;
+    return good > 0 && good > bad;
+}
+
+// Whether a corpse rite has a body to use at `target`, and something to do with it.
+function corpseWorthIt(ab, key, target, ctx) {
+    if (target.team === ctx.self.team || !Q.hasStatus(target, 'unconscious')) return false;
+    const near = (u) => Q.distance(u, target) <= Math.max(1, ab.aoe ?? 0) && isConscious(u);
+    if (ab.corpseEffect === 'burst') return ctx.units.some(u => u.team !== ctx.self.team && u !== target && near(u));
+    if (ab.corpseEffect === 'ward') return ctx.units.some(u => u.team === ctx.self.team && near(u));
+    return true;
+}
+
 function sideAllows(ab, side) {
     if (ab.isSummon) return true;
+    // A splash can be aimed at anyone; corpse rites aim at fallen enemies.
+    if (ab.targetType === 'all') return true;
+    if (ab.targetType === 'corpse') return side === 'enemy';
     // A heal or other ally-targeted ability may be aimed at oneself.
     return ab.targetType === side || (side === 'self' && ab.targetType === 'ally');
 }

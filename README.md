@@ -28,6 +28,19 @@ path through battles, elites, events, shops, rest sites, treasure and recruits, 
   how they look: a realm's `look` swaps map materials for ones with the same rules (moss for grass,
   bookshelves for walls) and sets the battle and act map backgrounds.
 
+- **Classes:** ten starting roles (`data/jobs.js`), each promoting into one of two Tier 2 jobs.
+  Warden, Evoker and Runebow are open from the start; the rest are bought with renown.
+  The six schools of magic (Evocation, Enchantment, Abjuration, Conjuration, Transmutation,
+  Divination) are joined by:
+  - **Illusionist** (Illusion): copies that enemies would rather strike (they stand still,
+    shatter when broken, and allies walk through them), Blur and Vanish.
+  - **Gravecaller** (Necromancy): drains, and rites on knocked-out enemies (raise them as
+    skeletons, burst them among their friends).
+  - **Alchemist** (no school, no MP): flasks that splash both sides, so where everyone stands
+    matters. The Field Surgeon's Steady Hands keeps them to one side.
+  - **Warlord** (no school): orders that move speed gauges (Rally, Delay), Taunt, and swapping
+    places with an ally.
+  Recruits met on the road can be any role, unlocked or not.
 - **Party:** start with three Tier 1 roles and recruit up to six. Battles are automatic, so the
   party fully heals after every win; damage from events lasts until then. Losing a battle ends the run.
 - **Growth:** wins give XP; every level gives a skill point. Each role has a small skill tree

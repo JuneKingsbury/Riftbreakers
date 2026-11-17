@@ -1,5 +1,5 @@
 import { createUnitFromCharData, faceToward } from './units.js';
-import { inflictStatus } from './abilities.js';
+import { inflictStatus, supportOf } from './abilities.js';
 import { getScriptFor } from './ai/script-store.js';
 import { CHARACTER_DATA } from './data/characters.js';
 import { equipmentStatBonuses } from './data/equipment.js';
@@ -74,6 +74,9 @@ export function buildUnits(setup, playerSpawns, enemySpawns) {
     });
     const players = units.filter(u => u.team === 'player');
     const enemies = units.filter(u => u.team === 'enemy');
+    // Field Command / Initiative: the best head start any member gives goes to the whole party.
+    const headStart = Math.max(0, ...players.map(u => supportOf(u)?.partyStartCt ?? 0));
+    if (headStart) for (const u of players) u.ct += headStart;
     const centre = (arr) => arr.length
         ? { x: arr.reduce((s, u) => s + u.x, 0) / arr.length, y: arr.reduce((s, u) => s + u.y, 0) / arr.length }
         : null;

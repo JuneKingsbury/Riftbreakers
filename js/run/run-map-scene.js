@@ -186,8 +186,8 @@ export class RunMapScene {
     _startBattle() {
         const run = this.run;
         const encounter = run.pending.encounter;
-        const deploy = new DeployScene(encounter, run, this._skin, this._sm, (mapDef, spawns) => {
-            this._sm.replace(new BattleScene(encounter, run, () => this._afterChange(), { mapDef, customPlayerSpawns: spawns }));
+        const deploy = new DeployScene(encounter, run, this._skin, this._sm, (mapDef, spawns, camera) => {
+            this._sm.replace(new BattleScene(encounter, run, () => this._afterChange(), { mapDef, customPlayerSpawns: spawns, camera }));
         });
         this._sm.push(deploy);
     }

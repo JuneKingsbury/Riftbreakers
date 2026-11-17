@@ -50,6 +50,7 @@ export function sideForAbility(choice) {
     if (CATEGORY_SIDES[choice]) return CATEGORY_SIDES[choice];
     const ab = ABILITIES[choice];
     if (!ab || ab.isSummon) return null;
+    if (ab.targetType === 'corpse') return 'enemy';   // a fallen enemy's body
     return ['enemy', 'ally', 'self'].includes(ab.targetType) ? ab.targetType : null;
 }
 
