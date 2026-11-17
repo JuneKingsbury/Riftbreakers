@@ -66,6 +66,18 @@ The camera starts in free mode, framing the whole map. V (or the ⤢ button) swi
 which follows the acting unit.
 Game rules never depend on the view: per-unit animation state lives in `js/tactical/view-state.js`.
 
+Battle effects follow Rifthold's combat views. The battle reports what happens through
+`TacticalBattle.onEvent`, and the view answers with:
+- **Unit motion:** lunges, recoil from hits with a white flash, dodge hops, falling over when
+  knocked out (and getting back up when revived), and a victory bounce.
+- **Particles:** square-pixel sparks, debris and motes in each element's colors.
+- **Effect sprites:** the skin's effect images, animated in code.
+- **Projectiles** that point along their flight and leave trails, plus camera shake.
+
+Hits land when the arrow, spell or swing arrives. The mechanics are in
+`js/tactical/battle-fx.js` and the per-ability choices in `js/tactical/fx-presets.js`. Camera
+shake is off for players whose system asks for reduced motion.
+
 `tests/harness/view3d.html` and `tests/harness/scenes.html` are manual pages for looking at the view
 (serve the repo root, then open `/tests/harness/view3d.html?map=0` or `?map=<map id>`). Add
 `&realm=<realm id>` to see a map in a realm's look with that realm's boss fight.

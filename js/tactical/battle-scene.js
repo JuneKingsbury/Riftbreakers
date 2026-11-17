@@ -59,13 +59,24 @@ export class BattleScene {
 
         this._battle = new TacticalBattle(map, units);
         this._applySpeed();
+        // What happens in the fight drives sounds and effects. Hits from an ability that is
+        // still in flight (an arrow, a spell, a swing mid-lunge) wait until it lands.
+        this._impactDelayMs = 0;
         this._battle.onEvent = (type, data) => {
-            const sfx = battleEventSound(type, data);
-            if (sfx) Sound.playSfx(sfx);
+            const play = () => {
+                if (this._stopped) return;
+                const sfx = battleEventSound(type, data);
+                if (sfx) Sound.playSfx(sfx);
+                this._renderer?.fxEvent(type, data);
+            };
+            if (this._chargeEvents) this._chargeEvents.push(play);
+            else if (this._impactDelayMs > 0) setTimeout(play, this._impactDelayMs);
+            else play();
         };
         this._downIds = downChanges(units).down;
         Sound.playMusic(battleMusic(this._encounter, this._run));
-        if (battleOpensWithAlert(this._encounter)) Sound.playSfx('battle_alert');
+        const alert = battleOpensWithAlert(this._encounter);
+        if (alert) Sound.playSfx('battle_alert');
 
         containerEl.innerHTML = '';
         containerEl.style.position = 'relative';
@@ -73,6 +84,8 @@ export class BattleScene {
 
         try {
             this._renderer = new BattleView3D(containerEl, skinManager);
+            this._renderer.setTimeScale(this._speed);
+            if (alert) this._renderer.fxAlert(this._encounter?.kind === 'boss' ? 0.2 : 0.12);
         } catch (err) {
             this._stopped = true;
             showViewError(containerEl, err, () => this._sm.pop());
@@ -121,7 +134,9 @@ export class BattleScene {
             this._lastTrackAt = 0;
             this._realtime = new RealtimeBattle(this._battle, {
                 onAbility: (u, x, y, key) => this._playAbilityAnimation(u, x, y, key),
-                onCharge: (fired) => { for (const fc of fired) this._playAbilityAnimation(fc.unit, fc.targetX, fc.targetY, fc.ability); },
+                beforeCharges: () => { this._chargeEvents = []; },
+                onCharge: (fired) => this._playCharges(fired),
+                afterCharges: () => { if (this._chargeEvents) this._playCharges([]); },
                 onTurn: (u) => this._followActor(u),
             });
         }
@@ -172,6 +187,7 @@ export class BattleScene {
         if (this._battle.state === STATES.BATTLE_OVER && !this._settled) {
             this._settled = true;
             this._won = this._battle.winner === 'player';
+            this._renderer?.fxCheer(this._battle.winner, this._battle.units);
             if (this._won) Sound.playSfx('loot');
             else Sound.stopMusic(1500);
             this._pendingRewards = this._run
@@ -219,6 +235,7 @@ export class BattleScene {
     // Playback speed also shortens walking, so units do not crawl while everything else races.
     _applySpeed() {
         if (this._battle) this._battle.moveMsPerStep = BASE_MS_PER_STEP / this._speed;
+        this._renderer?.setTimeScale(this._speed);
     }
 
     _resetTurn() {
@@ -230,8 +247,29 @@ export class BattleScene {
     // A unit that has just gone down, from any cause (a hit, poison, doom), sounds once.
     _soundDowns() {
         const { down, fresh } = downChanges(this._battle.units, this._downIds);
-        for (const u of fresh) Sound.playSfx(downSound(u));
+        for (const u of fresh) { Sound.playSfx(downSound(u)); this._renderer?.fxDown(u); }
         this._downIds = down;
+    }
+
+    // Charged spells resolve before they are animated, so their events were buffered: play the
+    // animations, then release the events when the spells land. Returns the longest animation.
+    _playCharges(fired) {
+        const events = this._chargeEvents ?? [];
+        this._chargeEvents = null;
+        let longest = 0, landsAfter = 0;
+        for (const fc of fired) {
+            longest = Math.max(longest, this._playAbilityAnimation(fc.unit, fc.targetX, fc.targetY, fc.ability));
+            landsAfter = Math.max(landsAfter, this._impactDelayMs);
+        }
+        for (const play of events) landsAfter > 0 ? setTimeout(play, landsAfter) : play();
+        return longest;
+    }
+
+    // The ability resolves right after its animation starts (executor.finishIntent), and its
+    // events fire as it does: hold their effects for `ms`, then go back to playing at once.
+    _holdImpacts(ms) {
+        this._impactDelayMs = ms;
+        queueMicrotask(() => { this._impactDelayMs = 0; });
     }
 
     _playAbilityAnimation(source, targetX, targetY, abilityKey, targetZ = null) {
@@ -248,13 +286,18 @@ export class BattleScene {
         const speed      = this._speed;
         const baseAnimMs = animType === 'slash' ? 280 : 350;
         viewState(source).anim = { type: animType, dx: rawDx / len, dy: rawDy / len, startMs: performance.now(), durationMs: baseAnimMs / speed };
-        if (animType === 'shot' || animType === 'cast') {
+        this._renderer?.fxAbility(source, { x: targetX, y: targetY, z: targetZ }, abilityKey);
+        const onSelf = targetX === source.x && targetY === source.y;
+        if ((animType === 'shot' || animType === 'cast') && !onSelf) {
             const color      = ab.projectileColor || '#ffffff';
             const projDelay  = animType === 'shot' ? 180 : 200;
             const projFlight = 420;
-            setTimeout(() => { if (this._stopped) return; this._renderer.spawnProjectile(source, { x: targetX, y: targetY, z: targetZ }, color, projFlight / speed); }, projDelay / speed);
+            setTimeout(() => { if (this._stopped) return; this._renderer.spawnProjectile(source, { x: targetX, y: targetY, z: targetZ }, color, projFlight / speed, abilityKey); }, projDelay / speed);
+            this._holdImpacts((projDelay + projFlight) / speed);
             return projDelay + projFlight;
         }
+        // A swing connects partway through the lunge (Rifthold: at t = 0.45).
+        if (animType === 'slash') this._holdImpacts((baseAnimMs * 0.45) / speed);
         return baseAnimMs;
     }
 
@@ -262,14 +305,12 @@ export class BattleScene {
         if (this._stopped || this._battle.state === STATES.BATTLE_OVER) return;
         this._resetTurn();
 
+        this._chargeEvents = [];
         const firedCharges = this._battle.checkAndFireCharges();
         // Register any summons created by charged abilities.
         for (const id of this._battle._pendingSummons) this._autoUnits.add(id);
         this._battle._pendingSummons = [];
-        let chargeMs = 0;
-        for (const fc of firedCharges) {
-            chargeMs = Math.max(chargeMs, this._playAbilityAnimation(fc.unit, fc.targetX, fc.targetY, fc.ability));
-        }
+        const chargeMs = this._playCharges(firedCharges);
 
         const MOVE_POLL_MS = 40;
         const waitForMovement = (then) => {

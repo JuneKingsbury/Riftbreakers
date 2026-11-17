@@ -8,6 +8,11 @@ import { getEntityRenderPos, isEntityMoving } from '../systems/movement-lerp.js'
 import { isAlive, isUnconscious, facingForStep } from './units.js';
 import { viewState } from './view-state.js';
 import { UnitSprites } from './unit-sprites.js';
+import { BattleFx } from './battle-fx.js';
+import {
+    abilityColors, projectileSprite, impactSprite, meleeSprite, isHeavyHit, hitShake, statusSprite,
+    HEAL_COLORS, BUFF_COLORS, DEATH_COLORS, POISON_COLORS, PHYSICAL_SPARKS,
+} from './fx-presets.js';
 
 /**
  * Real-3D battle view: terrain is built from the map's blocks (see terrain-mesh.js),
@@ -33,6 +38,15 @@ const PAN_SPEED = 6;             // tiles per second at tileSize 48
 const CAMERA_DISTANCE = 60;
 const ROTATE_EASE_MS = 70;
 const FACING_TWEEN_MS = 180;
+// Unit motion for reactions, after Rifthold's expedition view (durations at 1x speed).
+const RECOIL_MS = 260;     // knocked back from a hit, squashed and tilted
+const DODGE_MS = 240;      // a quick hop when an attack misses
+const FLASH_MS = 200;      // white silhouette on a hit
+const TOPPLE_MS = 450;     // falling over when knocked out
+const RISE_MS = 300;       // getting back up when revived
+const VANISH_MS = 500;     // a dead unit sinks away after falling
+const SPAWN_MS = 400;      // a summon scales in
+const LYING_ANGLE = 1.35;  // radians: lying on the ground
 const NAME_MIN_TILE_SIZE = 34;   // below this zoom, only the acting unit shows a name
 
 const FACING_DIR = { north: [0, -1], south: [0, 1], east: [1, 0], west: [-1, 0] };
@@ -179,6 +193,13 @@ export class BattleView3D {
         this._projectiles = [];
 
         this._glowTexture = makeGlowTexture();
+        this._timeScale = 1;
+        this._silhouettes = new WeakMap();   // sprite image -> white silhouette canvas
+        this.fx = new BattleFx(this.scene, (category, key) => {
+            const sm = this.skinManager;
+            const image = sm && sm.isActive ? sm.getSprite(category, key) : null;
+            return image ? this._textureFor(image) : null;
+        });
         this._shadowGeo = new THREE.CircleGeometry(0.34, 20);
         this._shadowMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.35, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
         this._arrowGeo = new THREE.BufferGeometry();
@@ -344,17 +365,150 @@ export class BattleView3D {
      * Fires a glowing projectile between two positions ({x, y, z}). A missing z means the
      * standing cell of that column nearest the other end's level.
      */
-    spawnProjectile(from, to, color, durationMs) {
+    spawnProjectile(from, to, color, durationMs, abilityKey = null) {
         const map = this._map;
         const sz = from.z ?? (map ? standZ(map, from.x, from.y, to.z ?? null) : 0);
         const tz = to.z ?? (map ? standZ(map, to.x, to.y, sz) : 0);
         const ends = { sx: from.x, sy: from.y, sz, tx: to.x, ty: to.y, tz };
+        // A glow, plus the skin's projectile art pointing along the flight when it has one.
+        const art = projectileSprite(abilityKey);
+        const artTex = art ? this.fx.effectTexture('effects', art) : null;
         const mat = new THREE.SpriteMaterial({ map: this._glowTexture, color: new THREE.Color(color), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
         const sprite = new THREE.Sprite(mat);
-        sprite.scale.set(0.5, 0.5, 1);
+        const glowSize = artTex && art === 'projectile_arrow' ? 0.22 : 0.5;
+        sprite.scale.set(glowSize, glowSize, 1);
         sprite.renderOrder = 20;
         this.scene.add(sprite);
-        this._projectiles.push({ ...ends, sprite, startMs: performance.now(), durationMs: durationMs || 500 });
+        let head = null;
+        if (artTex) {
+            head = new THREE.Sprite(new THREE.SpriteMaterial({ map: artTex, transparent: true, depthTest: false, depthWrite: false }));
+            head.scale.set(0.55, 0.55, 1);
+            head.renderOrder = 21;
+            this.scene.add(head);
+        }
+        // Thrown stones arc higher and tumble; arrows and spells fly flatter.
+        const thrown = !art && ABILITIES[abilityKey]?.animType === 'shot';
+        this._projectiles.push({
+            ...ends, sprite, head, glowSize, colors: abilityColors(abilityKey), thrown,
+            arc: thrown ? 0.45 : 0.15, startMs: performance.now(), durationMs: durationMs || 500,
+        });
+    }
+
+    /** Effects play at the battle's playback speed (1, 2, 4...). */
+    setTimeScale(scale) {
+        this._timeScale = Math.max(0.1, scale || 1);
+    }
+
+    // Chest height of a unit, where hits and spells land.
+    _fxPoint(unit, lift = 0.45) {
+        const pose = this._map ? this._unitPose(unit, this._map, performance.now()) : { x: unit.x, y: 0, z: unit.y };
+        return { x: pose.x, y: pose.y + lift, z: pose.z };
+    }
+
+    // Ground direction from a to b ({x, y} grid), normalized, as world {x, z}.
+    _dirBetween(a, b) {
+        const dx = (b?.x ?? 0) - (a?.x ?? 0), dz = (b?.y ?? 0) - (a?.y ?? 0);
+        const len = Math.hypot(dx, dz) || 1;
+        return { x: dx / len, z: dz / len };
+    }
+
+    // Screen angle of a ground direction, for art that points right.
+    _screenAngle(from, dir) {
+        const a = new THREE.Vector3(from.x, from.y, from.z).project(this.camera);
+        const b = new THREE.Vector3(from.x + dir.x, from.y, from.z + dir.z).project(this.camera);
+        return Math.atan2((b.y - a.y) * this._height, (b.x - a.x) * this._width);
+    }
+
+    /**
+     * An ability starts: a melee swoosh in front of the attacker, or a cast sparkle with motes
+     * rising in the spell's colors. (Projectiles are spawned separately, see spawnProjectile.)
+     */
+    fxAbility(source, target, abilityKey) {
+        const ab = ABILITIES[abilityKey];
+        if (!ab || !source) return;
+        const at = this._fxPoint(source);
+        const ms = (n) => n / this._timeScale;
+        if ((ab.animType || 'slash') === 'slash') {
+            const dir = this._dirBetween(source, target);
+            const start = { x: at.x + dir.x * 0.3, y: at.y, z: at.z + dir.z * 0.3 };
+            // Rifthold: starts 0.3 tile out and slides 0.5 more, fading over the last 40%.
+            this.fx.sprite(meleeSprite(abilityKey), start, { ms: ms(170), size: 0.65, slide: { x: dir.x * 0.5, y: 0, z: dir.z * 0.5 },
+                rotation: this._screenAngle(start, dir), fadeFrom: 0.6 });
+        } else if (ab.animType === 'cast') {
+            const colors = abilityColors(abilityKey);
+            this.fx.sprite('spell_cast', { ...at, y: at.y + 0.55 }, { ms: ms(380), size: 0.35, grow: 0.25, rise: 0.15, additive: true, popIn: ms(80) });
+            this.fx.burst({ ...at, y: at.y - 0.3 }, { layer: 'mote', count: 8, colors, speed: [0.15, 0.4], up: [0.6, 1.1],
+                gravity: 0.4, life: [0.4, 0.7], radius: 0.25, wobble: 0.03 });
+        }
+    }
+
+    /** Effects for a battle event (TacticalBattle.onEvent): hits, misses, heals, buffs, statuses. */
+    fxEvent(type, data = {}) {
+        const { source, target, ability } = data;
+        const ms = (n) => n / this._timeScale;
+        const now = performance.now();
+        if (type === 'summon' && data.unit) {
+            const vs = viewState(data.unit);
+            vs.spawnAt = now;
+            const at = this._fxPoint(data.unit, 0.2);
+            this.fx.sprite('summon_arrive', at, { ms: ms(600), size: 0.4, grow: 0.9, additive: true });
+            this.fx.burst(at, { layer: 'mote', count: 12, colors: abilityColors(ability), speed: [0.4, 0.9], up: [0.3, 0.9], gravity: 0.6, life: [0.4, 0.8] });
+            return;
+        }
+        if (!target) return;
+        const vs = viewState(target);
+        const at = this._fxPoint(target);
+        if (type === 'hit') {
+            const dir = this._dirBetween(source, target);
+            const heavy = isHeavyHit(data.damage, target);
+            vs.react = { type: 'recoil', dx: dir.x, dz: dir.z, side: dir.x >= 0 ? -1 : 1, startMs: now, durationMs: ms(RECOIL_MS) };
+            vs.flash = { startMs: now, durationMs: ms(FLASH_MS) };
+            const magic = ABILITIES[ability]?.type === 'magic';
+            // Rifthold's melee spray: a fan away from the attacker that falls to the ground.
+            this.fx.burst(at, { layer: magic ? 'spark' : 'debris', count: heavy ? 12 : 7, colors: magic ? abilityColors(ability) : PHYSICAL_SPARKS,
+                dir: magic ? null : dir, spread: 0.45 * Math.PI, speed: [0.6, 1.5], up: [0.1, 0.6], gravity: magic ? 0.2 : 2.4,
+                life: [0.3, 0.55], floor: at.y - 0.45 });
+            this.fx.sprite(impactSprite(ability), at, { ms: ms(heavy ? 260 : 200), size: heavy ? 0.6 : 0.45, grow: 0.25, additive: magic, popIn: ms(40) });
+            this.fx.shake(hitShake(data.damage, target));
+        } else if (type === 'miss') {
+            const dir = this._dirBetween(source, target);
+            // Sidestep, perpendicular to the attack.
+            vs.react = { type: 'dodge', dx: -dir.z, dz: dir.x, startMs: now, durationMs: ms(DODGE_MS) };
+            this.fx.sprite('shield_block', at, { ms: ms(260), size: 0.4, grow: 0.15, popIn: ms(40) });
+        } else if (type === 'heal' || type === 'revive') {
+            this.fx.sprite('spell_heal', at, { ms: ms(600), size: 0.4, rise: 0.4, popIn: ms(80) });
+            this.fx.burst({ ...at, y: at.y - 0.35 }, { layer: 'mote', count: type === 'revive' ? 16 : 9, colors: HEAL_COLORS,
+                speed: [0.05, 0.25], up: [0.5, 0.9], gravity: -0.2, life: [0.6, 0.9], radius: 0.3, wobble: 0.04 });
+        } else if (type === 'buff') {
+            this.fx.sprite('spell_buff', at, { ms: ms(600), size: 0.4, rise: 0.45, popIn: ms(80) });
+            this.fx.burst({ ...at, y: at.y - 0.35 }, { layer: 'mote', count: 8, colors: BUFF_COLORS, speed: [0.05, 0.2],
+                up: [0.5, 0.9], gravity: -0.2, life: [0.5, 0.8], radius: 0.3 });
+        } else if (type === 'status') {
+            const art = statusSprite(data.status);
+            if (art) this.fx.sprite(art, { ...at, y: at.y + 0.25 }, { ms: ms(650), size: 0.42, grow: 0.12, rise: 0.15, popIn: ms(90) });
+        }
+    }
+
+    /** A unit has just gone down: a puff, a rising skull if it died, and a jolt for the party. */
+    fxDown(unit) {
+        const ms = (n) => n / this._timeScale;
+        const at = this._fxPoint(unit, 0.3);
+        this.fx.burst(at, { layer: 'debris', count: 14, colors: DEATH_COLORS, speed: [0.3, 0.9], up: [0.2, 0.8],
+            gravity: 1.6, life: [0.45, 0.8], radius: 0.15, floor: at.y - 0.3 });
+        // Rifthold's death marker: floats up and grows from half size, fading in its second half.
+        if (unit.status.includes('dead')) this.fx.sprite('death', { ...at, y: at.y + 0.3 }, { ms: ms(1100), size: 0.3, grow: 0.3, rise: 0.5, fadeFrom: 0.5 });
+        this.fx.shake(unit.team === 'player' ? 0.1 : 0.05);
+    }
+
+    /** The battle is won or lost: the winners bounce for joy. */
+    fxCheer(team, units) {
+        const now = performance.now();
+        for (const u of units) if (u.team === team) viewState(u).cheerAt = now + (u.id % 5) * 90;
+    }
+
+    /** A boss or elite steps up: a big jolt. */
+    fxAlert(amount = 0.18) {
+        this.fx.shake(amount);
     }
 
     // ---- Frame ---------------------------------------------------------------
@@ -380,6 +534,7 @@ export class BattleView3D {
         this._updateHighlights(battle);
         this._updateUnits(units, activeUnit, map, dt, now);
         this._updateProjectiles(map, now);
+        this.fx.update(dt * this._timeScale, this._pixelsPerUnit());
         this._updateFloats(units, map, dt);
 
         this.renderer.render(this.scene, this.camera);
@@ -406,6 +561,7 @@ export class BattleView3D {
         this._shadowMat.dispose();
         this._arrowGeo.dispose();
         this._glowTexture.dispose();
+        this.fx.dispose();
         this.renderer.dispose();
         // Each scene makes its own context and browsers cap how many may be live.
         this.renderer.forceContextLoss();
@@ -496,7 +652,16 @@ export class BattleView3D {
             this._target.y + Math.sin(PITCH) * CAMERA_DISTANCE,
             this._target.z + Math.cos(az) * Math.cos(PITCH) * CAMERA_DISTANCE
         );
-        cam.lookAt(this._target);
+        // Shake moves eye and target together, so the view jolts sideways without tilting.
+        const shake = this.fx.shakeOffset();
+        const look = this._target.clone();
+        if (shake.x || shake.y) {
+            const { right } = this._groundBasis();
+            const offset = right.multiplyScalar(shake.x).add(new THREE.Vector3(0, shake.y, 0));
+            cam.position.add(offset);
+            look.add(offset);
+        }
+        cam.lookAt(look);
         cam.updateMatrixWorld();
         this._applyFrustum();
     }
@@ -723,6 +888,10 @@ export class BattleView3D {
         const outline = makeSprite({ transparent: true, depthWrite: false, alphaTest: 0.01 });
         outline.renderOrder = 4;
         outline.visible = false;
+        // White silhouette laid over the sprite for an instant when the unit is hit.
+        const flash = makeSprite({ transparent: true, depthWrite: false, alphaTest: 0.01, opacity: 0 });
+        flash.renderOrder = 11;
+        flash.visible = false;
 
         const shadow = new THREE.Mesh(this._shadowGeo, this._shadowMat);
         shadow.rotation.x = -Math.PI / 2;
@@ -743,7 +912,7 @@ export class BattleView3D {
         this.overlay.appendChild(tag);
 
         return {
-            sprite, ghost, outline, shadow, arrow, tag,
+            sprite, ghost, outline, flash, shadow, arrow, tag,
             els: {
                 cname: tag.querySelector('.tac3d-cname'),
                 charge: tag.querySelector('.tac3d-charge'),
@@ -761,7 +930,7 @@ export class BattleView3D {
     }
 
     _disposeUnitView(uv) {
-        for (const s of [uv.sprite, uv.ghost, uv.outline]) { this.scene.remove(s); s.material.dispose(); }
+        for (const s of [uv.sprite, uv.ghost, uv.outline, uv.flash]) { this.scene.remove(s); s.material.dispose(); }
         this.scene.remove(uv.shadow);
         this.scene.remove(uv.arrow);
         uv.arrow.material.dispose();
@@ -864,14 +1033,20 @@ export class BattleView3D {
             const uv = this._unitViews.get(unit);
             if (!uv) continue;
             const alive = isAlive(unit);
-            uv.sprite.visible = uv.ghost.visible = alive;
+            const vs = viewState(unit);
+            // A unit that dies stays on screen long enough to fall over, then sinks away.
+            if (alive) vs.deadAt = null;
+            else if (vs.deadAt == null) vs.deadAt = now;
+            const vanish = alive ? 0
+                : Math.min(1, Math.max(0, (now - vs.deadAt - TOPPLE_MS / this._timeScale) / (VANISH_MS / this._timeScale)));
+            const shown = alive || vanish < 1;
+            uv.sprite.visible = uv.ghost.visible = shown;
             uv.shadow.visible = uv.arrow.visible = alive;
             uv.tag.style.display = alive ? '' : 'none';
-            if (!alive) { uv.outline.visible = false; continue; }
+            if (!shown) { uv.outline.visible = false; uv.flash.visible = false; continue; }
 
-            const ko = isUnconscious(unit);
+            const ko = isUnconscious(unit) || !alive;
             const pose = this._unitPose(unit, map, now);
-            const vs = viewState(unit);
 
             // Textures. Composite canvases can be swapped by the skin manager, so compare each frame.
             let image = this.unitSprites.get(unit, false, null);
@@ -883,8 +1058,10 @@ export class BattleView3D {
             for (const m of [uv.sprite.material, uv.ghost.material]) {
                 if (m.map !== uv.texture) { m.map = uv.texture; m.needsUpdate = true; }
             }
-            uv.sprite.material.color.setHex(ko ? 0x777777 : 0xffffff);
-            uv.ghost.material.color.setHex(ko ? 0x777777 : 0xffffff);
+            // Grey when down; a cold blue cast while slowed.
+            const tint = ko ? 0x777777 : unit.status.includes('slow') ? 0xc4d8ff : 0xffffff;
+            uv.sprite.material.color.setHex(tint);
+            uv.ghost.material.color.setHex(tint);
 
             // Idle sway and breathing, walk sway, and attack animation, mirroring the old 2D motion.
             const seed = (unit.id * 1619) || 0;
@@ -897,8 +1074,11 @@ export class BattleView3D {
             } else {
                 sway = Math.sin((now / 2600) * Math.PI * 2 + phaseSeed) * 0.02;
             }
-            const breathe = (0.5 - 0.5 * Math.cos((now / 3200) * Math.PI * 2 + phaseSeed)) * 0.03;
-            let offX = 0, offY = 0, offZ = 0, extraRot = 0, extraScale = 1;
+            // Breathing: deeper when badly hurt (Rifthold: ×2.2 below 30% HP), slow and deep asleep.
+            const asleep = unit.status.includes('sleep');
+            const breathDepth = (unit.hp / unit.maxHp < 0.3 ? 2.2 : 1) * (asleep ? 2 : 1);
+            const breathe = (0.5 - 0.5 * Math.cos((now / (asleep ? 6400 : 3200)) * Math.PI * 2 + phaseSeed)) * 0.03 * breathDepth;
+            let offX = 0, offY = 0, offZ = 0, extraRot = 0, extraScale = 1, squash = 1;
             const a = vs.anim;
             if (a) {
                 const t = Math.min(1, (now - a.startMs) / a.durationMs);
@@ -916,8 +1096,22 @@ export class BattleView3D {
                     }
                 }
             }
+            offY += this._reactionMotion(vs, now, (dx, dz, rot, sq) => { offX += dx; offZ += dz; extraRot += rot; squash *= sq; });
+            // Status body language: a dazed wobble while stunned.
+            if (unit.status.includes('stun')) extraRot += Math.sin(now / 90) * 0.06;
+            this._statusParticles(unit, vs, pose, now);
+            // Falling over when knocked out, and getting back up when revived.
+            const lie = this._lying(vs, ko, dt);
+            extraRot += LYING_ANGLE * lie * ((unit.id & 1) ? 1 : -1);
+            if (vs.spawnAt != null) {
+                const t = (now - vs.spawnAt) / (SPAWN_MS / this._timeScale);
+                if (t >= 1) vs.spawnAt = null;
+                else extraScale *= Math.max(0.05, t * (2 - t));
+            }
+            if (vs.cheerAt != null && !ko) offY += Math.abs(Math.sin(((now - vs.cheerAt) / 600) * Math.PI)) * 0.16;
+            if (vanish > 0) extraScale *= 1 - vanish;
 
-            const sh = SPRITE_HEIGHT * extraScale * (1 + breathe);
+            const sh = SPRITE_HEIGHT * extraScale * (1 + breathe) * squash;
             const sw = SPRITE_HEIGHT * uv.aspect * extraScale;
             // Sprite art leaves empty rows under the feet. Slide the quad down on screen by that
             // gap so the feet meet the ground (and the shadow) instead of floating above them.
@@ -931,6 +1125,7 @@ export class BattleView3D {
                 s.material.rotation = sway + extraRot;
             }
             uv.ghost.material.opacity = ko ? 0.25 : 0.4;
+            this._updateFlash(uv, vs, image, px, py, pz, sw, sh, sway + extraRot, camDir, now);
 
             // Selection glow for the acting unit, drawn as a larger outline just behind the sprite.
             const isActive = unit === activeUnit;
@@ -975,7 +1170,86 @@ export class BattleView3D {
             uv.arrow.position.set(pose.x + Math.cos(angle) * 0.42, pose.y + 0.04, pose.z - Math.sin(angle) * 0.42);
             uv.arrow.material.opacity = ko ? 0.4 : 0.95;
 
-            this._updateTag(uv, unit, ko, projected.set(px, py + sh / Math.cos(PITCH) + 0.05, pz), isActive);
+            // A unit lying down has its head near the ground, so its tag comes down too.
+            const tagHeight = sh / Math.cos(PITCH) * (1 - 0.6 * lie) + 0.05;
+            this._updateTag(uv, unit, ko, projected.set(px, py + tagHeight, pz), isActive);
+        }
+    }
+
+    // Recoil and dodge (vs.react, set by the effect hooks). Calls apply(dx, dz, rotation, squash)
+    // and returns the lift. Each follows sin(πt), so it starts and ends at rest (Rifthold).
+    _reactionMotion(vs, now, apply) {
+        const r = vs.react;
+        if (!r) return 0;
+        const t = (now - r.startMs) / r.durationMs;
+        if (t >= 1) { vs.react = null; return 0; }
+        const arc = Math.sin(t * Math.PI);
+        if (r.type === 'recoil') {
+            apply(r.dx * 0.14 * arc, r.dz * 0.14 * arc, 0.1 * r.side * arc, 1 - 0.12 * arc);
+            return 0;
+        }
+        apply(r.dx * 0.1 * arc, r.dz * 0.1 * arc, 0, 1);   // dodge: a hop to the side
+        return 0.2 * arc;
+    }
+
+    // Eases vs.lie toward 1 while down and back to 0 when up; returns it eased out (0..1).
+    _lying(vs, down, dt) {
+        const target = down ? 1 : 0;
+        if (vs.lie == null) vs.lie = target;   // a unit that starts down is already lying
+        const ms = target > vs.lie ? TOPPLE_MS : RISE_MS;
+        const step = (dt * this._timeScale) / ms;
+        vs.lie = target > vs.lie ? Math.min(1, vs.lie + step) : Math.max(0, vs.lie - step);
+        return vs.lie * (2 - vs.lie);
+    }
+
+    // The white hit flash: the sprite's silhouette laid over it, fading out (Rifthold's
+    // Shards view: alpha 0.7·(1 - t)).
+    _updateFlash(uv, vs, image, px, py, pz, sw, sh, rotation, camDir, now) {
+        const f = vs.flash;
+        const t = f ? (now - f.startMs) / f.durationMs : 1;
+        if (t >= 1) { vs.flash = null; uv.flash.visible = false; return; }
+        const silhouette = this._silhouette(image);
+        if (!silhouette) { uv.flash.visible = false; return; }
+        const tex = this._textureFor(silhouette);
+        if (uv.flash.material.map !== tex) { uv.flash.material.map = tex; uv.flash.material.needsUpdate = true; }
+        uv.flash.visible = true;
+        uv.flash.material.opacity = 0.75 * (1 - t);
+        uv.flash.material.rotation = rotation;
+        uv.flash.position.set(px, py, pz).addScaledVector(camDir, -0.01);
+        uv.flash.scale.set(sw, sh, 1);
+    }
+
+    _silhouette(image) {
+        if (!image) return null;
+        let c = this._silhouettes.get(image);
+        if (c !== undefined) return c;
+        try {
+            const w = image.naturalWidth || image.width, h = image.naturalHeight || image.height;
+            c = document.createElement('canvas');
+            c.width = w; c.height = h;
+            const g = c.getContext('2d');
+            g.drawImage(image, 0, 0);
+            g.globalCompositeOperation = 'source-in';
+            g.fillStyle = '#ffffff';
+            g.fillRect(0, 0, w, h);
+        } catch { c = null; }
+        this._silhouettes.set(image, c);
+        return c;
+    }
+
+    // Lingering statuses give off a few particles: poison bubbles, and sparks around haste.
+    _statusParticles(unit, vs, pose, now) {
+        if (unit.status.includes('dead') || unit.status.includes('unconscious')) return;
+        const at = { x: pose.x, y: pose.y + 0.5, z: pose.z };
+        if (unit.status.includes('poison') && now >= (vs.nextBubble ?? 0)) {
+            vs.nextBubble = now + 420 / this._timeScale;
+            this.fx.burst(at, { layer: 'mote', count: 1, colors: POISON_COLORS, speed: [0, 0.1], up: [0.25, 0.45],
+                gravity: -0.1, life: [0.7, 1], radius: 0.18, wobble: 0.04, alpha: 0.8 });
+        }
+        if (unit.status.includes('haste') && now >= (vs.nextSpark ?? 0)) {
+            vs.nextSpark = now + 300 / this._timeScale;
+            this.fx.burst({ ...at, y: pose.y + 0.15 }, { layer: 'spark', count: 2, colors: BUFF_COLORS, speed: [0.1, 0.3],
+                up: [0.1, 0.3], life: [0.3, 0.45], radius: 0.2 });
         }
     }
 
@@ -1023,18 +1297,29 @@ export class BattleView3D {
         for (let i = this._projectiles.length - 1; i >= 0; i--) {
             const p = this._projectiles[i];
             const t = (now - p.startMs) / p.durationMs;
+            const at = (u) => {
+                const y0 = blockTopY(p.sz), y1 = blockTopY(p.tz);
+                return new THREE.Vector3(p.sx + (p.tx - p.sx) * u, y0 + (y1 - y0) * u + 0.55 + Math.sin(u * Math.PI) * p.arc, p.sy + (p.ty - p.sy) * u);
+            };
             if (t >= 1) {
-                this.scene.remove(p.sprite);
-                p.sprite.material.dispose();
+                // A puff where it lands, so even a miss is seen to arrive.
+                this.fx.burst(at(1), { layer: 'spark', count: 5, colors: p.colors, speed: [0.4, 0.9], up: [0, 0.4], life: [0.2, 0.35] });
+                for (const s of [p.sprite, p.head].filter(Boolean)) { this.scene.remove(s); s.material.dispose(); }
                 this._projectiles.splice(i, 1);
                 continue;
             }
-            const x = p.sx + (p.tx - p.sx) * t;
-            const z = p.sy + (p.ty - p.sy) * t;
-            const y0 = blockTopY(p.sz), y1 = blockTopY(p.tz);
-            const y = y0 + (y1 - y0) * t + 0.55 + Math.sin(t * Math.PI) * 0.15;
-            p.sprite.position.set(x, y, z);
+            const pos = at(t);
+            p.sprite.position.copy(pos);
             p.sprite.material.opacity = t < 0.1 ? t * 10 : t > 0.85 ? (1 - t) / 0.15 : 1;
+            if (p.head) {
+                // Point the art (drawn facing right) along the on-screen direction of travel.
+                const a = pos.clone().project(this.camera), b = at(Math.min(1, t + 0.02)).project(this.camera);
+                p.head.position.copy(pos);
+                p.head.material.rotation = Math.atan2((b.y - a.y) * this._height, (b.x - a.x) * this._width);
+            }
+            // A short trail of fading motes behind it.
+            this.fx.burst(pos, { layer: p.thrown ? 'debris' : 'mote', count: 1, colors: p.colors, speed: [0, 0.05], up: [0, 0],
+                life: [0.15, 0.25], radius: 0.03, alpha: p.thrown ? 0.6 : 0.7 });
         }
     }
 
@@ -1053,14 +1338,21 @@ export class BattleView3D {
                     f.el.className = 'tac3d-float';
                     f.el.textContent = f.text;
                     f.el.style.color = f.color;
+                    // A hit for a quarter of the unit's HP or more gets a bigger number.
+                    const dmg = /^-(\d+)$/.exec(f.text);
+                    if (dmg && isHeavyHit(Number(dmg[1]), unit)) f.el.style.fontSize = '21px';
+                    // Drift a little to one side, so numbers landing together don't stack.
+                    f.drift = (Math.random() - 0.5) * 22;
                     this.overlay.appendChild(f.el);
                 }
                 const progress = f.age / f.maxAge;
                 v.set(unit.x, top, unit.y).project(this.camera);
-                const sx = (v.x * 0.5 + 0.5) * this._width;
+                const sx = (v.x * 0.5 + 0.5) * this._width + (f.drift ?? 0) * progress;
                 const sy = (-v.y * 0.5 + 0.5) * this._height - progress * 38;
-                f.el.style.opacity = String(1 - progress);
-                f.el.style.transform = `translate(${Math.round(sx)}px, ${Math.round(sy)}px) translate(-50%, -100%)`;
+                // Pop in at 1.5x and settle, then fade over the second half.
+                const pop = progress < 0.12 ? 1.5 - (progress / 0.12) * 0.5 : 1;
+                f.el.style.opacity = String(progress < 0.5 ? 1 : 1 - (progress - 0.5) * 2);
+                f.el.style.transform = `translate(${Math.round(sx)}px, ${Math.round(sy)}px) translate(-50%, -100%) scale(${pop.toFixed(2)})`;
             }
         }
     }

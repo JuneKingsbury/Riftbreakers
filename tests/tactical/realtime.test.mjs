@@ -142,3 +142,17 @@ test('a real-time battle plays to a winner', () => {
     assert.ok(battle.winner === 'player' || battle.winner === 'enemy');
     assert.ok(rt.turnsTaken > 4);
 });
+
+test('the charge check is bracketed by hooks on every step, fired or not', () => {
+    const calls = [];
+    const map = field();
+    const a = createUnit('A', 'novice', 'player', 0, 0);
+    const b = createUnit('B', 'goblin', 'enemy', 5, 0);
+    const rt = new RealtimeBattle(new TacticalBattle(map, [a, b]), {
+        beforeCharges: () => calls.push('before'), afterCharges: () => calls.push('after'),
+        onCharge: () => calls.push('charge'),
+    });
+    rt.update(50);
+    rt.update(50);
+    assert.deepEqual(calls.filter(c => c !== 'charge').slice(0, 4), ['before', 'after', 'before', 'after']);
+});

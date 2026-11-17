@@ -113,9 +113,9 @@ export class TacticalBattle {
     }
 
     // Log and float one resolved hit, then give the target a chance to react.
-    // Event types: hit { source, target, damage }, miss { source, target },
-    // heal { source, target, amount }, revive { target }, buff { source, target, ability },
-    // status { source, target, status }, summon { source, unit }.
+    // Event types, each with the ability key that caused it: hit { source, target, damage },
+    // miss { source, target }, heal and revive { source, target, amount },
+    // buff { source, target }, status { source, target, status }; and summon { source, unit }.
     _emit(type, data) {
         if (!this.onEvent) return;
         try { this.onEvent(type, data); } catch { /* a listener must not break the fight */ }
@@ -127,20 +127,20 @@ export class TacticalBattle {
             return;
         }
         if (result.missed) {
-            this._emit('miss', { source, target });
+            this._emit('miss', { source, target, ability: abKey });
             this.logMsg(`${source.name} missed ${target.name}!`);
             this._spawnFloat(target, 'Miss!', '#aaa');
             return;
         }
         if (result.damage > 0) {
-            this._emit('hit', { source, target, damage: result.damage });
+            this._emit('hit', { source, target, damage: result.damage, ability: abKey });
             const highGround = (source.z ?? 0) > (target.z ?? 0);
             const suffix = highGround ? ' (high gnd!)' : '';
             this.logMsg(`${source.name} hits ${target.name} for ${result.damage} dmg${suffix}.`);
             this._spawnFloat(target, `-${result.damage}`, '#f88');
         }
         if (result.healing > 0) {
-            this._emit(result.revived ? 'revive' : 'heal', { source, target, amount: result.healing });
+            this._emit(result.revived ? 'revive' : 'heal', { source, target, amount: result.healing, ability: abKey });
             this.logMsg(`${source.name} heals ${target.name} for ${result.healing} HP.`);
             this._spawnFloat(target, `+${result.healing}`, '#8f8');
         }
@@ -165,7 +165,7 @@ export class TacticalBattle {
             this._spawnFloat(target, 'Reraise!', '#ffeeaa');
         }
         if (result.statusApplied) {
-            this._emit('status', { source, target, status: result.statusApplied });
+            this._emit('status', { source, target, status: result.statusApplied, ability: abKey });
             this.logMsg(`${target.name} is afflicted with ${result.statusApplied}!`);
         }
         if (result.killedInstantly) {

@@ -37,7 +37,9 @@ function speedMult(unit) {
 
 export class RealtimeBattle {
     // hooks.onAbility(unit, x, y, key) plays an ability animation and returns its length (ms at 1x).
-    // hooks.onCharge(fired) is told about charged abilities that went off (see checkAndFireCharges).
+    // hooks.onCharge(fired) is told about charged abilities that went off (see checkAndFireCharges),
+    // just after they resolve. hooks.beforeCharges() and hooks.afterCharges() bracket that check
+    // on every step, whether or not anything fired.
     // hooks.onTurn(unit) is told whenever a unit starts a turn.
     constructor(battle, hooks = {}) {
         this.battle = battle;
@@ -70,8 +72,10 @@ export class RealtimeBattle {
             if (u._charging) u._charging.ct += gain;
         }
 
+        this.hooks.beforeCharges?.();
         const fired = battle.checkAndFireCharges();
         if (fired.length) this.hooks.onCharge?.(fired);
+        this.hooks.afterCharges?.();
         if (this.over) return;
 
         // Actions whose walk has finished.
