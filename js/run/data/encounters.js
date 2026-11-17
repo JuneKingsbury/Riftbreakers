@@ -1331,10 +1331,12 @@ export const ENCOUNTERS = {
 
 export const ACT_COUNT = 3;
 
+// Enemy stats added per act. The curve climbs evenly: Act 2 sits about halfway between Act 1
+// and Act 3 (a steeper Act 2 used to end most runs there; see the balance study notes).
 export const ACT_STAT_MODS = {
     1: { maxHp: -4, atk: -1 },
-    2: { maxHp: 26, atk: 6, def: 3, mat: 6, mdf: 3 },
-    3: { maxHp: 32, atk: 7, def: 4, mat: 7, mdf: 4, spd: 1 },
+    2: { maxHp: 17, atk: 4, def: 2, mat: 4, mdf: 2 },
+    3: { maxHp: 36, atk: 8, def: 4, mat: 8, mdf: 4, spd: 1 },
 };
 
 export const ELITE_STAT_MODS = { maxHp: 8, atk: 1, mat: 1 };

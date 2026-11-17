@@ -64,6 +64,7 @@
 //   lowHpDmgDealt          { physical?, magic? }  Multiplier while below 50% HP
 //   evaBonus      number   Added evasion vs physical attacks
 //   ignoreEvasion bool     Physical attacks ignore target evasion
+//   evasionPierce number   Physical attacks are dodged this much less often (0.75: a quarter as often)
 //   highGroundMult number  Replaces the 1.25 high-ground damage bonus; also negates it against you
 //   matToPhysical number   Fraction of MAT added to ATK for physical damage
 //   mdfPierce     number   Fraction of target MDF ignored by your magic
@@ -1489,8 +1490,8 @@ export const ABILITY_DATA = {
         extends: 'mana_surge',
         name: 'Concentrate',
         passiveMpCost: 0, dmgDealt: null,
-        ignoreEvasion: true,
-        desc: 'Breathe, aim, release. Your physical attacks ignore the target\'s evasion.',
+        evasionPierce: 0.75,
+        desc: 'Breathe, aim, release. Your physical attacks are much harder to dodge: targets dodge them only a quarter as often.',
     },
     earthen_footing: {
         extends: 'mana_surge',

@@ -31,7 +31,7 @@ test('harder tiers and smaller parties pay more renown, and the bonuses add up',
     assert.equal(renownMultiplier(2, 3), 1.5);
     assert.equal(renownMultiplier(0, 1), 1.5);
     assert.equal(renownMultiplier(0, 2), 1.25);
-    assert.equal(renownMultiplier(4, 1), 2.5);
+    assert.equal(renownMultiplier(4, 1), 3, 'Tier IV (+150%) and a lone hero (+50%)');
 
     const profile = newProfile();
     const r = run({ tier: 2 }, 5, ['evoker']);

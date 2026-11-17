@@ -53,6 +53,7 @@ function mergeSupports(abs) {
         if (ab.mdfPierce != null) out.mdfPierce = Math.max(out.mdfPierce ?? 0, ab.mdfPierce);
         if (ab.statusImmune) out.statusImmune = [...new Set([...(out.statusImmune || []), ...ab.statusImmune])];
         if (ab.ignoreEvasion) out.ignoreEvasion = true;
+        if (ab.evasionPierce != null) out.evasionPierce = Math.max(out.evasionPierce ?? 0, ab.evasionPierce);
         if (ab.surviveLethal) out.surviveLethal = true;
         if (ab.attackProc && !out.attackProc) out.attackProc = ab.attackProc;
         if (ab.precise) out.precise = true;
@@ -184,7 +185,9 @@ export function dodgeChance(source, target, ab) {
     const eva = ((getEffectiveStat(target, 'eva') || 0) / 100) * directionEvasionMod(source, target)
         + (supportOf(target)?.evaBonus ?? 0)
         + (target.status.includes('defend') ? 0.2 : 0);
-    return Math.max(0, Math.min(MAX_DODGE, eva));
+    // Concentrate and the like: much harder to dodge, but never certain to land.
+    const pierce = Math.min(1, supportOf(source)?.evasionPierce ?? 0);
+    return Math.max(0, Math.min(MAX_DODGE, eva) * (1 - pierce));
 }
 
 /** The chance a damaging skill from `source` lands as a critical hit. */

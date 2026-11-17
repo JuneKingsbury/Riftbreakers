@@ -86,13 +86,15 @@ test('Iron Will blocks stun; Wyrd Drain lengthens inflicted statuses', () => {
     assert.equal(foe.statusTimers.slow, 3);
 });
 
-test('Concentrate ignores evasion', () => {
+test('Concentrate makes a likely dodge a likely hit', () => {
     const archer = unit('A', 'runebow', 'player', 1, 1);
     const dodgy = () => unit('E', 'goblin', 'enemy', 2, 1, { eva: 100 });
-    // A side attack halves the target's 100 evasion to 50%, so a 0.1 roll is a dodge.
-    assert.ok(withRandom(0.1, () => resolveAbility(archer, dodgy(), 'attack', map)).missed);
+    // A side attack halves the target's 100 evasion to 50%, so a 0.2 roll is a dodge...
+    assert.ok(withRandom(0.2, () => resolveAbility(archer, dodgy(), 'attack', map)).missed);
+    // ...but Concentrate cuts that to 12.5%, so the same roll hits, and a very low one still misses.
     archer.support = 'concentrate';
-    assert.ok(!withRandom(0.1, () => resolveAbility(archer, dodgy(), 'attack', map)).missed);
+    assert.ok(!withRandom(0.2, () => resolveAbility(archer, dodgy(), 'attack', map)).missed);
+    assert.ok(withRandom(0.05, () => resolveAbility(archer, dodgy(), 'attack', map)).missed);
 });
 
 test('Spell Pierce, Arcane Weapon and Bloodlust raise damage', () => {

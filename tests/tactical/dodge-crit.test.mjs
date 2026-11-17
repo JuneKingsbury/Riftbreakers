@@ -68,3 +68,15 @@ test('a critical hit deals 1.5x damage and says so', () => {
     assert.ok(!normal.crit && crit.crit);
     assert.ok(Math.abs(crit.damage - normal.damage * CRIT_MULT) <= 1, `${crit.damage} vs ${normal.damage}`);
 });
+
+test('Concentrate makes attacks much harder to dodge, but never certain to land', () => {
+    const archer = mk('A', 'runebow', 'player', 1, 2, { support: 'concentrate' });
+    archer.learned = ['concentrate'];
+    const plain = mk('P', 'runebow', 'player', 1, 2);
+    const foe = mk('B', 'illusionist', 'enemy', 2, 2, { eva: 40, facing: 'west' });
+    const base = dodgeChance(plain, foe, ABILITIES.attack);
+    const focused = dodgeChance(archer, foe, ABILITIES.attack);
+    assert.equal(base, 0.4);
+    assert.ok(focused > 0, 'still dodgeable');
+    assert.ok(Math.abs(focused - base * 0.25) < 1e-9, `a quarter as often: ${focused}`);
+});

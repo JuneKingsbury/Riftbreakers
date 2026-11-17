@@ -56,6 +56,7 @@ const ITEM_RARITY = {
 
 // ---- Rift Tiers (profile RIFT_TIERS) ----
 export const RIFT_TAX = 0.25;   // Tier II: shop prices
+export const SLIM_GOLD = 0.7;   // Tier III: battle gold
 const TIER1_TOUGH = { maxHp: 10, atk: 2, mat: 2 };                  // Tier I: elites and bosses
 const TIER4_STORM = { maxHp: 8, atk: 1, def: 1, mat: 1, mdf: 1 };   // Tier IV: every enemy
 
@@ -450,7 +451,7 @@ export class RunState {
             xpGained[m.name] = amt;
             levelUps[m.name] = this._grantXp(m, amt);
         }
-        const gold = Math.round(base.gold * relicMult(this.relics, 'goldMult'));
+        const gold = Math.round(base.gold * relicMult(this.relics, 'goldMult') * ((this.options.tier ?? 0) >= 3 ? SLIM_GOLD : 1));
         this.gold += gold;
         this.stats.battles += 1;
         if (enc.kind === 'elite') this.stats.elites += 1;

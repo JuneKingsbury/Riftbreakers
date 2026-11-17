@@ -58,7 +58,7 @@ export const JOB_DATA = {
     // ============================================================
 
     evoker: {
-        maxHp: 36, maxMp: 52,
+        maxHp: 38, maxMp: 52,
         spd: 7, atk: 6, def: 3, mat: 15, mdf: 7,
         move: 3, eva: 11,
         skillsetName: 'Evocation',
@@ -81,8 +81,8 @@ export const JOB_DATA = {
     },
 
     spellblade: {
-        maxHp: 46, maxMp: 22,
-        spd: 9, atk: 12, def: 6, mat: 6, mdf: 7,
+        maxHp: 46, maxMp: 30,
+        spd: 9, atk: 12, def: 6, mat: 9, mdf: 7,
         move: 3, eva: 15,
         skillsetName: 'Runeblade',
         tier: 1,
@@ -129,8 +129,8 @@ export const JOB_DATA = {
 
     runebow: {
         maxHp: 40, maxMp: 42,
-        spd: 9, atk: 8, def: 4, mat: 11, mdf: 7,
-        move: 4, eva: 15,
+        spd: 8, atk: 7, def: 4, mat: 10, mdf: 7,
+        move: 4, eva: 13,
         skillsetName: 'Runecraft',
         tier: 1,
         promotions: ['riftcaller', 'beastcaller'],
@@ -151,7 +151,7 @@ export const JOB_DATA = {
     },
 
     stoneshaper: {
-        maxHp: 50, maxMp: 30,
+        maxHp: 47, maxMp: 30,
         spd: 8, atk: 11, def: 7, mat: 9, mdf: 7,
         move: 4, eva: 14,
         skillsetName: 'Transmutation',
@@ -174,8 +174,8 @@ export const JOB_DATA = {
     },
 
     seer: {
-        maxHp: 40, maxMp: 48,
-        spd: 7, atk: 6, def: 5, mat: 10, mdf: 11,
+        maxHp: 44, maxMp: 48,
+        spd: 8, atk: 6, def: 6, mat: 11, mdf: 11,
         move: 3, eva: 16,
         skillsetName: 'Divination',
         tier: 1,
@@ -200,8 +200,8 @@ export const JOB_DATA = {
     // ---- Tier 1: added classes (unlocked with renown, see run/profile.js) ----
 
     illusionist: {
-        maxHp: 34, maxMp: 48,
-        spd: 9, atk: 5, def: 3, mat: 13, mdf: 10,
+        maxHp: 40, maxMp: 48,
+        spd: 9, atk: 5, def: 4, mat: 14, mdf: 10,
         move: 4, eva: 18,
         skillsetName: 'Illusion',
         tier: 1,
