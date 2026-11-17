@@ -4,11 +4,12 @@
 //
 // Hovering a bag item (or a first tap on touch screens) previews it: the doll wears it and
 // the stats show what would change. Clicking it (or a second tap) equips it, and whatever was
-// in that slot goes back to the bag. Clicking a slot filters the bag to that slot.
+// in that slot goes back to the bag. Clicking a worn item takes it off (back into the bag) and
+// shows the bag for that slot. Clicking an empty slot just shows the bag for that slot.
 import { Sound } from '../audio/sound.js';
 import { EQUIPMENT, EQUIP_FIELDS } from '../tactical/data/equipment.js';
 import { STATS, equipDelta, previewUnit } from './member-stats.js';
-import { BTN, esc, jobLabel, titleCase, itemTitle, itemSummary, itemIconHtml, portraitHtml, drawSprites, drawPortrait, FONT } from './ui-kit.js';
+import { BTN, esc, jobLabel, titleCase, abilityName, itemTitle, itemSummary, itemIconHtml, portraitHtml, drawSprites, drawPortrait, FONT } from './ui-kit.js';
 
 const SLOT_LABEL = { weaponKey: 'Weapon', armorKey: 'Armor', helmetKey: 'Helmet', toolKey: 'Tool' };
 const fieldOf = (key) => `${EQUIPMENT[key]?.slot}Key`;
@@ -96,6 +97,7 @@ export class GearScreen {
         this._body = body;
         this._drawDoll(m, m.appearance);
         this._wire(body, m);
+        this._idle(m);
     }
 
     _slotHtml(m, field) {
@@ -126,7 +128,7 @@ export class GearScreen {
         for (const [s, label] of STATS) {
             html += `<div><span style="color:#778;">${label}</span> <span style="color:#ddd;">${unit[s]}</span><span data-gear-delta="${s}"></span></div>`;
         }
-        html += `</div><div data-gear-hint style="color:#667;font-size:10px;margin-top:6px;min-height:14px;">Hover an item to compare.</div></div>`;
+        html += `</div><div data-gear-hint style="color:#667;font-size:10px;margin-top:6px;min-height:14px;">Hover gear to compare.</div></div>`;
         return html;
     }
 
@@ -143,10 +145,6 @@ export class GearScreen {
         let html = `<div style="color:#fc8;font-size:10px;text-transform:uppercase;margin-bottom:5px;">Bag</div>
             <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px;">${chip(null, 'All', total)}${EQUIP_FIELDS.map(f => chip(f, SLOT_LABEL[f], count(f))).join('')}</div>`;
 
-        const worn = this._filter ? m.appearance?.[this._filter] : null;
-        if (worn) {
-            html += `<button data-gear-unequip="${this._filter}" style="${BTN}color:#f99;border-color:#744;">Take off ${esc(EQUIPMENT[worn].name)}</button>`;
-        }
 
         const shown = bag.filter(k => !this._filter || fieldOf(k) === this._filter);
         // Usable gear first, best improvement first, then everything this character can't use.
@@ -200,9 +198,42 @@ export class GearScreen {
             const cur = field ? m.appearance?.[field] : null;
             hint.innerHTML = key
                 ? `${esc(EQUIPMENT[key].name)}${cur ? ` replaces ${esc(EQUIPMENT[cur].name)}` : ` goes in the empty ${SLOT_LABEL[field].toLowerCase()} slot`}. ${this._armed === key ? 'Tap again to equip.' : 'Click to equip.'}`
-                : 'Hover an item to compare.';
+                : 'Hover gear to compare.';
         }
         this._drawDoll(m, key ? { ...m.appearance, [field]: key } : m.appearance);
+    }
+
+    // Shows (field) or clears (null) what the item worn in a slot gives: the same comparison
+    // as for bag items, against wearing nothing there.
+    _slotInfo(m, field) {
+        const body = this._body;
+        const key = field ? m.appearance?.[field] : null;
+        if (!body) return;
+        if (!key) { this._preview(m, null); return; }
+        const { delta } = equipDelta(this.run, m, field, null);
+        const gives = {};
+        for (const [s] of STATS) gives[s] = -delta[s];
+        for (const [s] of STATS) {
+            const v = gives[s];
+            body.querySelector(`[data-gear-delta="${s}"]`).innerHTML = v
+                ? ` <span style="color:${v > 0 ? UP : DOWN};">(${v > 0 ? '+' : '−'}${Math.abs(v)})</span>` : '';
+        }
+        body.querySelectorAll('[data-gear-slot]').forEach(b => { b.style.outline = b.dataset.gearSlot === field ? '1px solid #fc8' : ''; });
+        const hint = body.querySelector('[data-gear-hint]');
+        if (hint) {
+            const item = EQUIPMENT[key];
+            const skills = [...(item.grants || []), ...(item.grantsPassive || [])].map(abilityName);
+            const also = skills.length ? ` and ${esc(skills.join(', '))}` : '';
+            const next = 'Click to take it off and see what could replace it.';
+            hint.innerHTML = `${esc(item.name)} gives ${deltaText(gives)}${also}. ${next}`;
+        }
+        this._drawDoll(m, m.appearance);
+    }
+
+    // With nothing hovered: the selected slot's breakdown, if a slot is selected.
+    _idle(m) {
+        if (this._filter && m.appearance?.[this._filter]) this._slotInfo(m, this._filter);
+        else this._preview(m, null);
     }
 
     _equip(m, field, key) {
@@ -218,15 +249,32 @@ export class GearScreen {
         on('[data-gear-member]', el => { this._name = el.dataset.gearMember; this._armed = null; this._render(); });
         on('[data-gear-step]', el => this._step(Number(el.dataset.gearStep)));
         on('[data-gear-filter]', el => { this._filter = el.dataset.gearFilter || null; this._render(); });
-        on('[data-gear-slot]', el => { this._filter = this._filter === el.dataset.gearSlot ? null : el.dataset.gearSlot; this._render(); });
-        on('[data-gear-unequip]', el => this._equip(m, el.dataset.gearUnequip, null));
+        on('[data-gear-slot]', el => {
+            const field = el.dataset.gearSlot;
+            this._filter = field;
+            if (m.appearance?.[field]) this._equip(m, field, null);   // re-renders
+            else this._render();
+        });
+        // A click anywhere that isn't a control (empty space, the doll, the stats) drops the
+        // selected slot and any tapped-but-not-equipped item, so the highlight and numbers clear.
+        body.addEventListener('click', (e) => {
+            if (e.target.closest('button, select, input, a')) return;
+            if (!this._filter && !this._armed) return;
+            this._filter = null;
+            this._armed = null;
+            this._render();
+        });
+        body.querySelectorAll('[data-gear-slot]').forEach(el => {
+            el.addEventListener('pointerenter', (e) => { if (e.pointerType !== 'touch') this._slotInfo(m, el.dataset.gearSlot); });
+            el.addEventListener('pointerleave', (e) => { if (e.pointerType !== 'touch') this._idle(m); });
+        });
 
         let pointer = 'mouse';
         body.querySelectorAll('[data-gear-item]:not([disabled])').forEach(el => {
             const key = el.dataset.gearItem;
             el.addEventListener('pointerdown', (e) => { pointer = e.pointerType; });
             el.addEventListener('pointerenter', (e) => { if (e.pointerType !== 'touch') this._preview(m, key); });
-            el.addEventListener('pointerleave', (e) => { if (e.pointerType !== 'touch' && !this._armed) this._preview(m, null); });
+            el.addEventListener('pointerleave', (e) => { if (e.pointerType !== 'touch' && !this._armed) this._idle(m); });
             el.addEventListener('click', () => {
                 // Touch screens can't hover: the first tap previews, the second equips.
                 if (pointer === 'touch' && this._armed !== key) {
