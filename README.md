@@ -93,6 +93,10 @@ Battle effects follow Rifthold's combat views. The battle reports what happens t
 - **Effect sprites:** the skin's effect images, animated in code.
 - **Projectiles** that point along their flight and leave trails, plus camera shake.
 
+Area abilities play out on every tile they cover, rippling out from the center: a glow on each
+tile plus a style per element (fx-presets `areaStyle`: dust, flames, frost, sparks, light, spores,
+splashes). Earth spells make the tiles themselves heave (`TerrainShaker` in `terrain-mesh.js`),
+with units and grass riding them.
 Hits land when the arrow, spell or swing arrives. The mechanics are in
 `js/tactical/battle-fx.js` and the per-ability choices in `js/tactical/fx-presets.js`. Camera
 shake is off for players whose system asks for reduced motion.

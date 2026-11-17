@@ -50,7 +50,8 @@ once, so busy fights stay clear.
 | `spell_shield` | `sfx/spells/spell_shield.ogg` | Protect, Shell, Reflect |
 | `spell_affliction` | `sfx/ui/mental_break.ogg` | Stun, sleep, charm, berserk, frog or doom lands |
 | `summon` | `sfx/spells/summon_arrival.ogg` | A summoned creature appears |
-| `terraform` | `sfx/spells/spell_terraform.ogg` | A terrain spell (Stone Wall, Root Field) |
+| `terraform` | `sfx/spells/spell_terraform.ogg` | A terrain spell (Stone Wall, Root Field), and the ground heaving under an earth spell (Tremor, Landslide) |
+| `thunder` | `sfx/environment/thunder_crack.ogg` | A thunder spell crackling across its area |
 | `battle_alert` | `sfx/ui/wave_alert.ogg` | An elite or boss fight begins |
 | `level_up` | `sfx/spells/magic_levelup.ogg` | Someone leveled up (reward screen) |
 | `skill_learned` | `sfx/spells/magic_levelup.ogg` | A skill is learned or upgraded |

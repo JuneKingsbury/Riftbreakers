@@ -93,3 +93,39 @@ const STATUS_SPRITES = {
 export function statusSprite(status) {
     return STATUS_SPRITES[status] ?? null;
 }
+
+// ---- Area effects ----------------------------------------------------------------------
+// How an ability that covers an area plays out on each tile it hits (battle-view3d.fxArea):
+//   kind     particle style per tile (see AREA_KINDS in battle-view3d.js)
+//   colors   particle colors          flash  color of the brief glow on every tile hit
+//   quake    how hard the ground shakes, in world units (0: it doesn't)
+// Tiles further from the center play a little later, so the effect ripples outward.
+
+const AREA_BY_ELEMENT = {
+    earth:    'quake',
+    fire:     'flames',
+    ice:      'frost',
+    thunder:  'storm',
+    holy:     'light',
+    nature:   'spores',
+    alchemy:  'splash',
+    command:  'rally',
+    void:     'arcane', shadow: 'arcane', spirit: 'arcane', arcane: 'arcane', illusion: 'arcane', necrotic: 'arcane',
+};
+
+/** The area style for an ability (any ability with an area; see AREA_BY_ELEMENT). */
+export function areaStyle(abilityKey) {
+    const ab = ABILITIES[abilityKey] ?? {};
+    let kind = AREA_BY_ELEMENT[ab.element];
+    if (ab.terrainEffect) kind = 'quake';                    // the ground itself is reshaped
+    if (!kind) kind = ab.isHeal || ab.isCure || ab.targetType === 'ally' ? 'blessing' : 'impact';
+    const colors = kind === 'quake' ? PALETTES.earth
+        : kind === 'blessing' ? (ab.isHeal ? HEAL_COLORS : BUFF_COLORS)
+        : kind === 'impact' ? PHYSICAL_SPARKS
+        : kind === 'rally' ? BUFF_COLORS
+        : abilityColors(abilityKey);
+    // Big earth spells shake hardest; thunder and volleys rattle the ground a little.
+    const radius = ab.aoe ?? 1;
+    const quake = kind === 'quake' ? 0.06 + 0.035 * radius : kind === 'storm' ? 0.025 : (kind === 'impact' && ab.animType === 'shot') ? 0.02 : 0;
+    return { kind, colors, flash: kind === 'splash' ? colors[0] : (colors[1] ?? colors[0]), quake };
+}

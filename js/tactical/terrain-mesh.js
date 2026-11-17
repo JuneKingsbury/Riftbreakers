@@ -174,7 +174,7 @@ export function buildTerrainMesh(map, skinManager, textureFor, { cutAbove = Infi
                     if (def.fx) {
                         let entry = fxTiles.get(def.fx.tex);
                         if (!entry) { entry = { kind: def.fx.kind, tint: def.fx.tint ?? null, tiles: [] }; fxTiles.set(def.fx.tex, entry); }
-                        entry.tiles.push({ x, z: y, top, index: id, topColor });
+                        entry.tiles.push({ x, z: y, top, index: id, topColor, key: `${x},${y},${z}` });
                     }
                 }
 
@@ -300,20 +300,111 @@ const _pos = new THREE.Vector3();
 const _scl = new THREE.Vector3(1, 1, 1);
 const _up = new THREE.Vector3(0, 1, 0);
 
-/** Animates grass sway and water shimmer. fx is the value from buildTerrainMesh. */
-export function updateTerrainFx(fx, now) {
+/**
+ * Animates grass sway and water shimmer. fx is the value from buildTerrainMesh. lift, when
+ * given, returns how far a tile ("x,y,z") is raised right now (TerrainShaker), so the tufts
+ * ride a quaking tile.
+ */
+export function updateTerrainFx(fx, now, lift = null) {
     if (!fx) return;
     const t = (now / GRASS_SWAY_PERIOD_MS) * Math.PI * 2;
     for (const tuft of fx.tufts) {
         tuft.tiles.forEach((tile, i) => {
             const sway = Math.sin(t + ((tile.index % 1000) / 1000) * 6.28) * GRASS_SWAY_AMPLITUDE;
             _q.setFromAxisAngle(_up, sway);
-            tuft.mesh.setMatrixAt(i, _m.compose(_pos.set(tile.x, tile.top + TERRAIN_FX_LIFT, tile.z), _q, _scl));
+            const up = lift ? lift(tile.key) : 0;
+            tuft.mesh.setMatrixAt(i, _m.compose(_pos.set(tile.x, tile.top + TERRAIN_FX_LIFT + up, tile.z), _q, _scl));
         });
         tuft.mesh.instanceMatrix.needsUpdate = true;
     }
     for (const w of fx.water) {
         const a = WATER_ALPHA_BASE + WATER_ALPHA_VARIATION * Math.cos((now / WATER_PERIOD_MS) * Math.PI * 2 + w.phase);
         w.mesh.material.opacity = Math.max(0, Math.min(1, a));
+    }
+}
+
+/**
+ * Shakes individual tiles of a built terrain (buildTerrainMesh): the ground quaking under an
+ * earth spell. For every standing cell it knows the vertices of that block's top face and the
+ * top edge of its side faces, so a tile can rise and sink as a whole while its sides stretch
+ * to follow. Quakes are a decaying wobble, each cell starting after its own delay so a quake
+ * can ripple outward from its center.
+ *
+ * Times are performance.now()-style milliseconds; pass durations already scaled for the
+ * battle's playback speed.
+ *
+ * @par Thread Safety:
+ *      Not thread-safe. Main thread only.
+ */
+export class TerrainShaker {
+    /**
+     * @param {{pickMeshes: THREE.Mesh[]}} terrain  From buildTerrainMesh.
+     * @param {object} map  The map the terrain was built from.
+     */
+    constructor(terrain, map) {
+        this.cells = new Map();     // "x,y,z" -> [{ attr, index, baseY }]
+        this.active = new Map();    // "x,y,z" -> { start, ms, amp }
+        this.touched = new Set();   // attributes moved this frame or the last
+        for (const mesh of terrain.pickMeshes) {
+            const owners = mesh.userData.owners;
+            const attr = mesh.geometry.attributes.position;
+            if (!owners || !attr) continue;
+            owners.forEach((owner, q) => {
+                const { x, y, z, face } = decodeOwner(map, owner);
+                if (face === FACE.BOTTOM) return;
+                const key = `${x},${y},${z}`;
+                let list = this.cells.get(key);
+                if (!list) { list = []; this.cells.set(key, list); }
+                const ys = [0, 1, 2, 3].map(v => attr.getY(q * 4 + v));
+                const topY = Math.max(...ys);
+                for (let v = 0; v < 4; v++) {
+                    // Top faces move whole; side faces only along their top edge.
+                    if (face === FACE.TOP || ys[v] >= topY - 1e-6) list.push({ attr, index: q * 4 + v, baseY: ys[v] });
+                }
+            });
+        }
+    }
+
+    /**
+     * Starts a quake. cells: [{ key: "x,y,z", delay: ms }]. amp: peak lift in world units.
+     * ms: how long each cell shakes. A cell already shaking takes the stronger quake.
+     */
+    quake(cells, { amp = 0.1, ms = 600, now = performance.now() } = {}) {
+        for (const { key, delay = 0 } of cells) {
+            if (!this.cells.has(key)) continue;
+            const prev = this.active.get(key);
+            if (prev && prev.amp >= amp && now < prev.start + prev.ms) continue;
+            this.active.set(key, { start: now + delay, ms, amp });
+        }
+    }
+
+    /** How far the cell is lifted right now (0 when still). */
+    offsetAt(key, now = performance.now()) {
+        const q = this.active.get(key);
+        if (!q) return 0;
+        const t = (now - q.start) / q.ms;
+        if (t <= 0 || t >= 1) return 0;
+        // Three quick jolts that die away: rises first, so the ground visibly heaves.
+        return q.amp * Math.sin(t * Math.PI * 6) * (1 - t);
+    }
+
+    /** Moves the shaking tiles' vertices for this frame; settles finished ones back exactly. */
+    update(now = performance.now()) {
+        const moved = new Set();
+        for (const [key, q] of this.active) {
+            const done = now >= q.start + q.ms;
+            const off = done ? 0 : this.offsetAt(key, now);
+            for (const v of this.cells.get(key)) {
+                v.attr.setY(v.index, v.baseY + off);
+                moved.add(v.attr);
+            }
+            if (done) this.active.delete(key);
+        }
+        for (const attr of moved) attr.needsUpdate = true;
+        return moved.size > 0;
+    }
+
+    get busy() {
+        return this.active.size > 0;
     }
 }

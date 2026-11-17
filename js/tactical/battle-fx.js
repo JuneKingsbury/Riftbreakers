@@ -22,10 +22,13 @@ const LAYERS = {
     spark:  { size: 0.075, blending: THREE.AdditiveBlending },
     mote:   { size: 0.11,  blending: THREE.AdditiveBlending },
     debris: { size: 0.09,  blending: THREE.NormalBlending },
+    // Big soft puffs for area effects: dust plumes, smoke, spore clouds, flame bursts.
+    cloud:  { size: 0.24,  blending: THREE.NormalBlending, soft: true },
+    glow:   { size: 0.2,   blending: THREE.AdditiveBlending, soft: true },
 };
 
 class ParticleLayer {
-    constructor(scene, { size, blending }) {
+    constructor(scene, { size, blending, soft = false }) {
         this.sizeFactor = size;
         this.items = [];
         this.positions = new Float32Array(MAX_PARTICLES * 3);
@@ -37,7 +40,7 @@ class ParticleLayer {
         this.geometry.setDrawRange(0, 0);
         this.material = new THREE.PointsMaterial({
             size: 4, sizeAttenuation: false, vertexColors: true, transparent: true,
-            depthWrite: false, blending,
+            depthWrite: false, blending, ...(soft ? { map: softDot() } : {}),
         });
         this.points = new THREE.Points(this.geometry, this.material);
         this.points.frustumCulled = false;
@@ -81,6 +84,23 @@ class ParticleLayer {
     }
 }
 
+// A round dot with soft edges, for the big particle layers (square pixels look blocky that large).
+let _softDot = null;
+function softDot() {
+    if (_softDot || typeof document === 'undefined') return _softDot;
+    const c = document.createElement('canvas');
+    c.width = c.height = 32;
+    const g = c.getContext('2d');
+    const grad = g.createRadialGradient(16, 16, 0, 16, 16, 16);
+    grad.addColorStop(0, 'rgba(255,255,255,1)');
+    grad.addColorStop(0.5, 'rgba(255,255,255,0.7)');
+    grad.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = grad;
+    g.fillRect(0, 0, 32, 32);
+    _softDot = new THREE.CanvasTexture(c);
+    return _softDot;
+}
+
 const rand = (a, b) => a + Math.random() * (b - a);
 const pick = (list) => list[Math.floor(Math.random() * list.length)];
 
@@ -95,7 +115,11 @@ export class BattleFx {
         this.effectTexture = effectTexture;
         this.layers = Object.fromEntries(Object.entries(LAYERS).map(([k, opts]) => [k, new ParticleLayer(scene, opts)]));
         this.sprites = [];
+        this.flashes = [];           // glows laid flat on tiles (tileFlash)
+        this.pending = [];           // { at, fn }: effects waiting for their moment (later)
+        this.clock = 0;              // battle time, ms
         this.shakeAmount = 0;        // tiles; decays
+        this.flashGeometry = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
         this.reducedMotion = !!globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
     }
 
@@ -177,6 +201,31 @@ export class BattleFx {
         fx.s.material.opacity = fx.opacity * (t < fx.fadeFrom ? 1 : 1 - (t - fx.fadeFrom) / (1 - fx.fadeFrom));
     }
 
+    // ---- Timing and tile glows ------------------------------------------------------------
+
+    /** Runs fn after `delayMs` of battle time (so it keeps pace with the playback speed). */
+    later(delayMs, fn) {
+        if (delayMs <= 0) { fn(); return; }
+        this.pending.push({ at: this.clock + delayMs, fn });
+    }
+
+    /**
+     * A glow laid flat on a tile's top surface (`at` is the center of that surface): marks a
+     * tile an area ability hit. It swells in quickly and fades out.
+     */
+    tileFlash(at, color, { ms = 450, size = 0.96, opacity = 0.55 } = {}) {
+        const mat = new THREE.MeshBasicMaterial({
+            color, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending,
+            polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
+        });
+        const mesh = new THREE.Mesh(this.flashGeometry, mat);
+        mesh.position.set(at.x, at.y + 0.015, at.z);
+        mesh.scale.set(size, 1, size);
+        mesh.renderOrder = 5;
+        this.scene.add(mesh);
+        this.flashes.push({ mesh, age: 0, ms, opacity });
+    }
+
     // ---- Shake -------------------------------------------------------------------------
 
     /** Adds camera shake, in tiles (a hit ~0.05, a knockout ~0.1, a boss ~0.2). */
@@ -199,6 +248,19 @@ export class BattleFx {
         // only a long stall is capped here; a tighter cap would slow effects at high speed.
         dtMs = Math.min(MAX_STEP_MS, dtMs);
         const dt = dtMs / 1000;
+        this.clock += dtMs;
+        if (this.pending.length) {
+            const due = this.pending.filter(p => p.at <= this.clock);
+            this.pending = this.pending.filter(p => p.at > this.clock);
+            for (const p of due) p.fn();
+        }
+        for (let i = this.flashes.length - 1; i >= 0; i--) {
+            const f = this.flashes[i];
+            f.age += dtMs;
+            const t = f.age / f.ms;
+            if (t >= 1) { this.scene.remove(f.mesh); f.mesh.material.dispose(); this.flashes.splice(i, 1); continue; }
+            f.mesh.material.opacity = f.opacity * (t < 0.15 ? t / 0.15 : 1 - (t - 0.15) / 0.85);
+        }
         for (const layer of Object.values(this.layers)) layer.update(dt, pixelsPerTile);
         for (let i = this.sprites.length - 1; i >= 0; i--) {
             const fx = this.sprites[i];
@@ -211,12 +273,17 @@ export class BattleFx {
     }
 
     get busy() {
-        return this.sprites.length > 0 || Object.values(this.layers).some(l => l.items.length > 0);
+        return this.sprites.length > 0 || this.flashes.length > 0 || this.pending.length > 0
+            || Object.values(this.layers).some(l => l.items.length > 0);
     }
 
     dispose() {
         for (const layer of Object.values(this.layers)) layer.dispose(this.scene);
         for (const fx of this.sprites) { this.scene.remove(fx.s); fx.s.material.dispose(); }
+        for (const f of this.flashes) { this.scene.remove(f.mesh); f.mesh.material.dispose(); }
         this.sprites = [];
+        this.flashes = [];
+        this.pending = [];
+        this.flashGeometry.dispose();
     }
 }

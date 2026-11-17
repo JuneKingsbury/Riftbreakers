@@ -28,6 +28,7 @@ export const SOUND_MANIFEST = {
         spell_revive:   { file: 'audio/sfx/spells/magic_levelup.ogg', gain: 0.9, pitch: 100 },
         summon:         { file: 'audio/sfx/spells/summon_arrival.ogg', gain: 0.8 },
         terraform:      { file: 'audio/sfx/spells/spell_terraform.ogg', gain: 0.7 },
+        thunder:        { file: 'audio/sfx/environment/thunder_crack.ogg', gain: 0.6 },
 
         // Run
         level_up:       { file: 'audio/sfx/spells/magic_levelup.ogg', pitch: 100 },

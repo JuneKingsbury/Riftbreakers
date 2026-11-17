@@ -324,3 +324,32 @@ test('off-hand items are tools, and a save with one equipped as a weapon puts it
     assert.equal(lm.appearance.weaponKey, null);
     assert.equal(loaded.inventory.parrying_dagger, before + 1, 'returned to the bag, not lost');
 });
+
+test('a run can start with one, two or three roles; asking for none gives the default three', async () => {
+    const { MIN_START_PARTY, START_PARTY } = await import('../../js/run/run-state.js');
+    assert.equal(MIN_START_PARTY, 1);
+    for (const jobs of [['warden'], ['evoker', 'runebow'], ['warden', 'evoker', 'runebow']]) {
+        const run = RunState.create({ jobs, seed: 2 });
+        assert.deepEqual(run.party.map(m => m.job), jobs);
+        assert.equal(run.status, 'active');
+        assert.ok(run.reachable().length > 0, 'the act map is open');
+    }
+    assert.equal(RunState.create({ jobs: [], seed: 2 }).party.length, START_PARTY);
+    assert.equal(RunState.create({ jobs: ['warden', 'evoker', 'runebow', 'seer'], seed: 2 }).party.length, START_PARTY, 'never more than three');
+});
+
+test('a lone hero\'s first battle is a real fight that plays to the end', async () => {
+    const { loadMapData } = await import('../../js/tactical/battle-map.js');
+    const { MAP_DATA } = await import('../../js/tactical/data/maps/index.js');
+    const { TacticalBattle } = await import('../../js/tactical/battle.js');
+    const { buildUnits } = await import('../../js/tactical/build-units.js');
+    const { runRealtimeBattle } = await import('../../js/tactical/realtime.js');
+    const run = RunState.create({ jobs: ['spellblade'], seed: 4 });
+    enter(run, 'combat');
+    const enc = run.pending.encounter;
+    assert.ok(enc.roster.length >= 2, 'not a walkover');
+    const map = loadMapData(MAP_DATA[0]);
+    const battle = new TacticalBattle(map, buildUnits({ party: run.party, encounter: enc }, map.playerSpawns, map.enemySpawns));
+    assert.equal(battle.units.filter(u => u.team === 'player').length, 1);
+    assert.ok(runRealtimeBattle(battle, {}).over);
+});

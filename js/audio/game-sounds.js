@@ -9,6 +9,7 @@
 //   a won run          credits
 import { ABILITIES } from '../tactical/data-registry.js';
 import { POSITIVE_STATUSES } from '../tactical/abilities.js';
+import { areaStyle } from '../tactical/fx-presets.js';
 
 const realmTrack = (id) => (id ? `expedition_${id}` : null);
 
@@ -57,6 +58,13 @@ export function battleEventSound(type, data = {}) {
         case 'revive': return 'spell_revive';
         case 'buff':   return 'spell_buff';
         case 'summon': return 'summon';
+        // Earth spells rumble as the ground heaves (terrain spells already did, as they were
+        // cast); thunder cracks across the area.
+        case 'area': {
+            const kind = areaStyle(data.ability).kind;
+            if (kind === 'quake' && !ABILITIES[data.ability]?.terrainEffect) return 'terraform';
+            return kind === 'storm' ? 'thunder' : null;
+        }
         case 'status':
             if (WARDS.has(data.status)) return 'spell_shield';
             if (POSITIVE_STATUSES.includes(data.status)) return 'spell_buff';

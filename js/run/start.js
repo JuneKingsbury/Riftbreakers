@@ -2,7 +2,7 @@
 // continue the saved run, or spend renown on unlocks.
 import { SceneManager } from '../tactical/scene-manager.js';
 import { RunMapScene } from './run-map-scene.js';
-import { RunState, START_PARTY } from './run-state.js';
+import { RunState, START_PARTY, MIN_START_PARTY } from './run-state.js';
 import { loadProfile, saveProfile, runOptions, UNLOCKS, canBuyUnlock, buyUnlock, hasUnlock } from './profile.js';
 import { jobsOfTier } from '../tactical/data-registry.js';
 import { JOB_DATA } from '../tactical/data/jobs.js';
@@ -46,7 +46,7 @@ export function newRun(containerEl, skinManager, { onStart, onExit, onCancel }) 
 
     const render = () => {
         let html = `<div style="color:#ffcc44;font-weight:bold;font-size:16px;margin-bottom:4px;">New Run</div>
-            <div style="color:#999;font-size:11px;margin-bottom:10px;">Choose ${START_PARTY} starting roles. You will meet recruits on the road and can grow to six.</div>`;
+            <div style="color:#999;font-size:11px;margin-bottom:10px;">Choose up to ${START_PARTY} starting roles. You will meet recruits on the road and can grow to six.</div>`;
         if (hasSavedRun()) html += `<div style="color:#f99;font-size:11px;margin-bottom:8px;">Starting a new run abandons the saved one.</div>`;
         for (const job of jobsOfTier(1)) {
             const unlocked = options.jobs.includes(job);
@@ -59,9 +59,12 @@ export function newRun(containerEl, skinManager, { onStart, onExit, onCancel }) 
                 <div style="color:#778;font-size:10px;margin-top:2px;line-height:1.4;">${esc(kit)}</div>
             </button>`;
         }
-        const ready = picked.length === START_PARTY;
+        const ready = picked.length >= MIN_START_PARTY;
+        if (ready && picked.length < START_PARTY) {
+            html += `<div style="color:#fc8;font-size:11px;margin-top:6px;">Challenge run: starting with ${picked.length === 1 ? 'a lone hero' : `${picked.length} members`} makes the road a lot harder.</div>`;
+        }
         html += `<div style="height:6px;"></div>
-            <button data-begin ${ready ? '' : 'disabled'} style="${BTN}${ready ? BTN_GOOD : BTN_DISABLED}text-align:center;font-weight:bold;">Begin (${picked.length}/${START_PARTY})</button>`;
+            <button data-begin ${ready ? '' : 'disabled'} style="${BTN}${ready ? BTN_GOOD : BTN_DISABLED}text-align:center;font-weight:bold;">${ready ? `Begin with ${picked.length} (${picked.length}/${START_PARTY})` : `Choose a role to begin (0/${START_PARTY})`}</button>`;
         const body = modal.show(html, { width: 480, onClose: () => { modal.destroy(); onCancel?.(); }, view: 'new-run' });
         body.querySelectorAll('[data-job]').forEach(b => b.addEventListener('click', () => {
             const job = b.dataset.job;
@@ -71,7 +74,7 @@ export function newRun(containerEl, skinManager, { onStart, onExit, onCancel }) 
             render();
         }));
         body.querySelector('[data-begin]')?.addEventListener('click', () => {
-            if (picked.length !== START_PARTY) return;
+            if (picked.length < MIN_START_PARTY || picked.length > START_PARTY) return;
             const run = RunState.create({ jobs: [...picked], options });
             run.save();
             modal.destroy();

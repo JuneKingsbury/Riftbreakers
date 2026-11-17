@@ -1,7 +1,7 @@
 import * as THREE from '../../lib/three/three.module.js';
 import { getCell, topCell, standZ } from './battle-map.js';
 import { terrainTopY, blockTopY, SLAB_BOTTOM } from './tile-render.js';
-import { QuadBatch, buildTerrainMesh, updateTerrainFx, terrainSignature, decodeOwner, cellForBlock } from './terrain-mesh.js';
+import { QuadBatch, buildTerrainMesh, updateTerrainFx, terrainSignature, decodeOwner, cellForBlock, TerrainShaker } from './terrain-mesh.js';
 import { STATES } from './battle.js';
 import { ABILITIES } from './abilities.js';
 import { getEntityRenderPos, isEntityMoving } from '../systems/movement-lerp.js';
@@ -10,7 +10,7 @@ import { viewState } from './view-state.js';
 import { UnitSprites } from './unit-sprites.js';
 import { BattleFx } from './battle-fx.js';
 import {
-    abilityColors, projectileSprite, impactSprite, meleeSprite, isHeavyHit, hitShake, statusSprite,
+    abilityColors, projectileSprite, impactSprite, meleeSprite, isHeavyHit, hitShake, statusSprite, areaStyle,
     HEAL_COLORS, BUFF_COLORS, DEATH_COLORS, POISON_COLORS, PHYSICAL_SPARKS,
 } from './fx-presets.js';
 
@@ -47,6 +47,66 @@ const RISE_MS = 300;       // getting back up when revived
 const VANISH_MS = 500;     // a dead unit sinks away after falling
 const SPAWN_MS = 400;      // a summon scales in
 const LYING_ANGLE = 1.35;  // radians: lying on the ground
+
+// What plays on each tile an area ability hits (see fxArea and fx-presets.areaStyle).
+// at: the center of the tile's top surface. ms(n) scales a duration for the playback speed.
+const AREA_KINDS = {
+    // Earth: dust thrown up and chunks of ground that fall back.
+    quake: (fx, at, colors) => {
+        fx.burst(at, { layer: 'debris', count: 9, colors, speed: [0.2, 0.8], up: [1.4, 2.6], gravity: 5, life: [0.6, 0.9], radius: 0.4, floor: at.y });
+        fx.burst({ ...at, y: at.y + 0.1 }, { layer: 'cloud', count: 5, colors: ['#e0cfae', '#bfa883', '#9a8466'], speed: [0.1, 0.35], up: [0.2, 0.5], gravity: -0.05, drag: 0.97, life: [0.8, 1.3], radius: 0.4, alpha: 0.75 });
+    },
+    // Fire: a lick of flame and embers rising.
+    flames: (fx, at, colors, ms) => {
+        fx.sprite('fire', { ...at, y: at.y + 0.3 }, { ms: ms(560), size: 0.65, grow: 0.2, rise: 0.3, additive: true, popIn: ms(60) });
+        fx.burst({ ...at, y: at.y + 0.15 }, { layer: 'glow', count: 4, colors, speed: [0.05, 0.2], up: [0.6, 1.1], gravity: -0.1, life: [0.4, 0.7], radius: 0.3, alpha: 0.7 });
+        fx.burst({ ...at, y: at.y + 0.1 }, { layer: 'spark', count: 8, colors, speed: [0.05, 0.3], up: [0.8, 1.6], gravity: -0.2, life: [0.4, 0.8], radius: 0.35, wobble: 0.05 });
+        fx.burst({ ...at, y: at.y + 0.5 }, { layer: 'cloud', count: 2, colors: ['#5a504a', '#3a3430'], speed: [0.05, 0.15], up: [0.4, 0.7], drag: 0.97, life: [0.8, 1.1], radius: 0.25, alpha: 0.35 });
+    },
+    // Ice: a frost crystal, and flakes drifting down.
+    frost: (fx, at, colors, ms) => {
+        fx.sprite('freezing', { ...at, y: at.y + 0.3 }, { ms: ms(600), size: 0.4, grow: 0.1, popIn: ms(80) });
+        fx.burst({ ...at, y: at.y + 0.9 }, { layer: 'mote', count: 6, colors, speed: [0.05, 0.2], up: [-0.4, -0.2], life: [0.6, 0.9], radius: 0.4, wobble: 0.05 });
+    },
+    // Thunder: a bright crack and sparks skittering off the ground.
+    storm: (fx, at, colors) => {
+        fx.burst({ ...at, y: at.y + 0.1 }, { layer: 'glow', count: 2, colors: ['#ffffff', colors[1]], speed: [0, 0.05], up: [0, 0.1], life: [0.12, 0.22], radius: 0.05, alpha: 0.9 });
+        fx.burst({ ...at, y: at.y + 0.05 }, { layer: 'spark', count: 10, colors, speed: [1, 2.2], up: [0.2, 0.9], gravity: 2, life: [0.15, 0.35], radius: 0.1 });
+        fx.burst({ ...at, y: at.y + 0.6 }, { layer: 'spark', count: 4, colors: ['#ffffff'], speed: [0, 0.1], up: [-2.5, -1.5], life: [0.12, 0.2], radius: 0.05 });
+    },
+    // Holy: a column of light motes rising.
+    light: (fx, at, colors) => {
+        fx.burst(at, { layer: 'mote', count: 9, colors, speed: [0, 0.08], up: [1, 1.8], gravity: -0.3, life: [0.5, 0.9], radius: 0.3 });
+        fx.burst({ ...at, y: at.y + 0.2 }, { layer: 'glow', count: 3, colors, speed: [0, 0.05], up: [0.8, 1.4], life: [0.5, 0.8], radius: 0.1, alpha: 0.6 });
+    },
+    // Void, shadow, spirit, arcane: motes swirling up and away.
+    arcane: (fx, at, colors) => {
+        fx.burst({ ...at, y: at.y + 0.2 }, { layer: 'glow', count: 2, colors, speed: [0.05, 0.2], up: [0.3, 0.6], life: [0.5, 0.8], radius: 0.2, alpha: 0.6 });
+        fx.burst({ ...at, y: at.y + 0.15 }, { layer: 'mote', count: 9, colors, speed: [0.3, 0.7], up: [0.4, 0.9], gravity: 0.2, life: [0.5, 0.8], radius: 0.25, wobble: 0.06 });
+    },
+    // Nature: a slow cloud of spores that hangs over the tile.
+    spores: (fx, at, colors) => {
+        fx.burst({ ...at, y: at.y + 0.2 }, { layer: 'mote', count: 8, colors, speed: [0.05, 0.25], up: [0.1, 0.35], gravity: -0.02, life: [0.9, 1.4], radius: 0.4, wobble: 0.08, alpha: 0.7 });
+        fx.burst({ ...at, y: at.y + 0.25 }, { layer: 'cloud', count: 3, colors, speed: [0.05, 0.2], up: [0.05, 0.2], drag: 0.97, life: [1, 1.5], radius: 0.35, alpha: 0.4 });
+    },
+    // Alchemy: droplets splashing up and falling back.
+    splash: (fx, at, colors) => {
+        fx.burst({ ...at, y: at.y + 0.05 }, { layer: 'spark', count: 10, colors, speed: [0.5, 1.2], up: [0.8, 1.5], gravity: 4, life: [0.35, 0.6], radius: 0.2, floor: at.y });
+    },
+    // Volleys and wide swings: impacts throwing up dust.
+    impact: (fx, at, colors) => {
+        fx.burst({ ...at, y: at.y + 0.05 }, { layer: 'debris', count: 6, colors: ['#c8b8a0', '#8a7a66'], speed: [0.3, 0.8], up: [0.6, 1.2], gravity: 4, life: [0.3, 0.5], radius: 0.3, floor: at.y });
+        fx.burst({ ...at, y: at.y + 0.1 }, { layer: 'spark', count: 4, colors, speed: [0.6, 1.2], up: [0.2, 0.6], life: [0.15, 0.3], radius: 0.2 });
+    },
+    // Heals and boons on the group: gentle motes rising.
+    blessing: (fx, at, colors) => {
+        fx.burst(at, { layer: 'mote', count: 6, colors, speed: [0, 0.1], up: [0.6, 1.1], gravity: -0.2, life: [0.6, 0.9], radius: 0.35, wobble: 0.04 });
+    },
+    // Orders: a brief golden ring of sparks.
+    rally: (fx, at, colors) => {
+        fx.burst({ ...at, y: at.y + 0.1 }, { layer: 'spark', count: 6, colors, speed: [0.5, 0.8], up: [0.1, 0.3], life: [0.25, 0.4], radius: 0.05 });
+    },
+};
 const NAME_MIN_TILE_SIZE = 34;   // below this zoom, only the acting unit shows a name
 
 const FACING_DIR = { north: [0, -1], south: [0, 1], east: [1, 0], west: [-1, 0] };
@@ -498,6 +558,7 @@ export class BattleView3D {
         const { source, target, ability } = data;
         const ms = (n) => n / this._timeScale;
         const now = performance.now();
+        if (type === 'area') { this.fxArea(data); return; }
         if (type === 'summon' && data.unit) {
             const vs = viewState(data.unit);
             vs.spawnAt = now;
@@ -537,6 +598,35 @@ export class BattleView3D {
         } else if (type === 'status') {
             const art = statusSprite(data.status);
             if (art) this.fx.sprite(art, { ...at, y: at.y + 0.25 }, { ms: ms(650), size: 0.42, grow: 0.12, rise: 0.15, popIn: ms(90) });
+        }
+    }
+
+    /**
+     * An area ability lands (TacticalBattle 'area' event): every tile it covers glows briefly
+     * and plays the ability's style (fx-presets.areaStyle), rippling out from the center. Earth
+     * spells also make the tiles themselves heave (TerrainShaker), and the camera with them.
+     */
+    fxArea({ ability, cells, center } = {}) {
+        if (!this._map || !cells?.length) return;
+        const style = areaStyle(ability);
+        const ms = (n) => n / this._timeScale;
+        const ring = (x, y) => Math.abs(x - center.x) + Math.abs(y - center.y);
+        const parsed = cells.map(k => { const [x, y, z] = k.split(',').map(Number); return { key: k, x, y, z }; });
+        const radius = Math.max(1, ...parsed.map(c => ring(c.x, c.y)));
+        const RIPPLE_MS = 70;   // per tile of distance from the center
+        for (const c of parsed) {
+            const top = terrainTopY(getCell(this._map, c.x, c.y, c.z) ?? { z: c.z });
+            const at = { x: c.x, y: top, z: c.y };
+            const delay = ms(ring(c.x, c.y) * RIPPLE_MS);
+            this.fx.later(delay, () => {
+                this.fx.tileFlash(at, style.flash, { ms: ms(480) });
+                AREA_KINDS[style.kind]?.(this.fx, at, style.colors, ms);
+            });
+        }
+        if (style.quake > 0 && this._shaker) {
+            this._shaker.quake(parsed.map(c => ({ key: c.key, delay: ms(ring(c.x, c.y) * RIPPLE_MS) })),
+                { amp: style.quake, ms: ms(620) });
+            this.fx.shake(Math.min(0.18, style.quake * (0.6 + 0.25 * radius)));
         }
     }
 
@@ -581,7 +671,8 @@ export class BattleView3D {
         this._syncUnits(units);
 
         this._updateCamera(battle, dt, now);
-        updateTerrainFx(this._terrain?.fx, now);
+        this._shaker?.update(now);
+        updateTerrainFx(this._terrain?.fx, now, this._shaker?.busy ? (key) => this._shaker.offsetAt(key, now) : null);
         this._updateHighlights(battle);
         this._updateUnits(units, activeUnit, map, dt, now);
         this._updateProjectiles(map, now);
@@ -804,6 +895,10 @@ export class BattleView3D {
         this.renderer.setClearColor(new THREE.Color(map.look?.sky ?? DEFAULT_SKY), 1);
         this._terrain = buildTerrainMesh(map, this.skinManager, image => this._textureFor(image));
         this._terrain.map = map;
+        // Tiles still quaking keep shaking across a rebuild (Stone Wall reshapes the ground mid-quake).
+        const quaking = this._shaker?.active;
+        this._shaker = new TerrainShaker(this._terrain, map);
+        if (quaking) for (const [k, q] of quaking) if (this._shaker.cells.has(k)) this._shaker.active.set(k, q);
         this._terrainSig = sig;
         this.scene.add(this._terrain.group);
     }
@@ -1079,6 +1174,8 @@ export class BattleView3D {
             y = srcY + diff * eased;
             hop = Math.sin(hopT * Math.PI) * amp;
         }
+        // Standing on a quaking tile: ride it.
+        if (this._shaker?.busy) y += this._shaker.offsetAt(`${unit.x},${unit.y},${unit.z}`, now);
         return { x, y, z, hop };
     }
 

@@ -120,7 +120,8 @@ export class TacticalBattle {
     // Log and float one resolved hit, then give the target a chance to react.
     // Event types, each with the ability key that caused it: hit { source, target, damage },
     // miss { source, target }, heal and revive { source, target, amount },
-    // buff { source, target }, status { source, target, status }; and summon { source, unit }.
+    // buff { source, target }, status { source, target, status }; summon { source, unit };
+    // and area { source, cells: ["x,y,z"], center } when an area ability resolves.
     _emit(type, data) {
         if (!this.onEvent) return;
         try { this.onEvent(type, data); } catch { /* a listener must not break the fight */ }
@@ -550,6 +551,7 @@ export class TacticalBattle {
 
         const affectedTiles = this._affectedCells(ab, tx, ty, tz, this.abilityRotation);
         const targets = this._targetsIn(source, ab, affectedTiles);
+        this._emitArea(source, this.selectedAbility, affectedTiles, { x: tx, y: ty, z: tz });
 
         if (targets.length === 0 && !ab.isHeal && !ab.isCure && ab.targetType !== 'tile') {
             this.logMsg(`${source.name} used ${ab.name} but hit nothing!`);
@@ -604,6 +606,7 @@ export class TacticalBattle {
                 }
                 const affectedTiles = this._affectedCells(ab, targetX, targetY, targetZ, rotation);
                 const targets = this._targetsIn(unit, ab, affectedTiles);
+                this._emitArea(unit, ability, affectedTiles, { x: targetX, y: targetY, z: targetZ });
 
                 for (const target of targets) {
                     const result = resolveAbility(unit, target, ability, this.map);
@@ -654,6 +657,7 @@ export class TacticalBattle {
         }
         const affectedTiles = ab.aoe > 0 ? computeAoeArea(this.map, { x: tx, y: ty, z: tz }, ab.aoe) : new Set([cellKey(tx, ty, tz)]);
         const targets = this._targetsIn(unit, ab, affectedTiles);
+        this._emitArea(unit, abilityKey, affectedTiles, { x: tx, y: ty, z: tz });
 
         for (const target of targets) {
             const result = resolveAbility(unit, target, abilityKey, this.map);
@@ -777,6 +781,14 @@ export class TacticalBattle {
         return out.sort((a, b) => a.d - b.d);
     }
 
+    // Tells the presentation which cells an area ability covered, so it can play out on each
+    // ("x,y,z" keys, and the center it was aimed at). Single-target abilities send nothing.
+    _emitArea(source, key, cells, center) {
+        const ab = ABILITIES[key];
+        if (!ab || !(ab.aoe > 0 || ab.aoePattern) || !cells?.size) return;
+        this._emit('area', { source, ability: key, cells: [...cells], center: { x: center.x, y: center.y, z: center.z ?? 0 } });
+    }
+
     // ---- Targets ---------------------------------------------------------------------
 
     // The units an ability touches inside its affected cells (see abilityAffects).
@@ -824,6 +836,7 @@ export class TacticalBattle {
         const body = bodies[0];
         this._consumeBody(body);
         const around = computeAoeArea(this.map, body, Math.max(1, ab.aoe));
+        this._emitArea(source, key, around, body);
         if (ab.corpseEffect === 'burst') {
             this.logMsg(`${body.name}'s body bursts!`);
             for (const target of this.livingUnits.filter(u => u.team !== source.team && isConscious(u) && around.has(posKey(u)))) {

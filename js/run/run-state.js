@@ -37,7 +37,9 @@ export const MAX_PARTY = 6;
 export const TRAIN_SP = 1;
 // Extra skill points the starting party begins with, so each member opens with a choice.
 export const START_BONUS_SP = 1;
+// A run starts with 1 to START_PARTY members of the player's choosing (fewer is a challenge run).
 export const START_PARTY = 3;
+export const MIN_START_PARTY = 1;
 
 const BATTLE_TYPES = { combat: 'normal', elite: 'elite', boss: 'boss' };
 
@@ -49,7 +51,7 @@ const ITEM_RARITY = {
 };
 
 export class RunState {
-    // opts.jobs     The starting roles (START_PARTY of them)
+    // opts.jobs     The starting roles: MIN_START_PARTY to START_PARTY of them (none: BASE_JOBS)
     // opts.options  runOptions(profile); defaults to a fresh profile
     // opts.seed     Rng seed (random by default)
     static create({ jobs, options = runOptions(null), seed = randomSeed() } = {}) {
@@ -69,7 +71,8 @@ export class RunState {
         run.seenEncounters = [];
         run.seenEvents = [];
         run.party = [];
-        for (const job of (jobs || BASE_JOBS).slice(0, START_PARTY)) {
+        const roles = jobs?.length ? jobs : BASE_JOBS;
+        for (const job of roles.slice(0, START_PARTY)) {
             const m = createMember(run.rng, job, run.party.map(x => x.name), { level: options.startLevel });
             m.sp += START_BONUS_SP;
             run.party.push(m);
