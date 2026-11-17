@@ -2,7 +2,7 @@
 // stack, toasts, labels and sprite drawing.
 import { ABILITIES } from '../tactical/data-registry.js';
 import { JOB_DATA } from '../tactical/data/jobs.js';
-import { EQUIPMENT, EQUIP_STAT_KEYS, itemRarity } from '../tactical/data/equipment.js';
+import { EQUIPMENT, EQUIP_STAT_KEYS, itemRarity, itemName } from '../tactical/data/equipment.js';
 
 export const FONT = `'Courier New',monospace`;
 
@@ -50,7 +50,7 @@ export function abilityName(key) {
 }
 
 export function itemLabel(key) {
-    return titleCase(key);
+    return itemName(key);
 }
 
 // "ATK +8, DEF -1" for an item's stat bonuses.

@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 
 import { gridMap } from '../map-fixtures.mjs';
 import { JOB_DATA } from '../../js/tactical/data/jobs.js';
-import { EQUIPMENT } from '../../js/tactical/data/equipment.js';
+import { EQUIPMENT, itemName } from '../../js/tactical/data/equipment.js';
 import { ABILITIES } from '../../js/tactical/data-registry.js';
 import { createUnit } from '../../js/tactical/units.js';
 import { resolveAbility, inflictStatus } from '../../js/tactical/abilities.js';
@@ -53,6 +53,13 @@ test('each starting role promotes into two Tier 2 jobs, and every Tier 2 job is 
         }
     }
     for (const job of playerJobs.filter(j => JOB_DATA[j].tier === 2)) assert.ok(reached.has(job), job);
+});
+
+test('every item has a display name', () => {
+    for (const [key, item] of Object.entries(EQUIPMENT)) assert.ok(item.name?.trim(), key);
+    assert.equal(itemName('scholars_spectacles'), "Scholar's Spectacles");
+    assert.equal(itemName('chaos_wrought_plate'), 'Chaos-Wrought Plate');
+    assert.equal(itemName('staff_of_regrowth'), 'Staff of Regrowth');
 });
 
 test('equipment only grants abilities that exist, in the right kind of slot', () => {

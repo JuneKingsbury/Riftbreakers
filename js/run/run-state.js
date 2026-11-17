@@ -26,7 +26,7 @@ import { RELICS, relicStatMods, relicMult, relicsWith } from './data/relics.js';
 import { eventsForAct, EVENTS } from './data/events.js';
 import { createMember, recruitCandidates } from './data/recruits.js';
 import { runOptions, BASE_JOBS } from './profile.js';
-import { EQUIPMENT, EQUIP_FIELDS, equipmentStatBonuses, itemPrice, itemRarity } from '../tactical/data/equipment.js';
+import { EQUIPMENT, EQUIP_FIELDS, equipmentStatBonuses, itemPrice, itemRarity, itemName } from '../tactical/data/equipment.js';
 import { JOB_STATS, ABILITIES, allowedEquipTypes, jobsOfTier } from '../tactical/data-registry.js';
 import { sanitizeLoadout, learnAbility, upgradeAbility, canPromote, promote, promotionOptions, addXp, levelStatMods } from '../tactical/loadout.js';
 
@@ -572,9 +572,4 @@ export class RunState {
         }
         return out;
     }
-}
-
-// Display name for an item key, e.g. 'iron_sword' → 'Iron Sword'.
-export function itemName(key) {
-    return key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
