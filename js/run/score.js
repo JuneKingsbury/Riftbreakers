@@ -28,7 +28,7 @@ export function partySizeMultiplier(startPartySize = 3) {
 // The score multiplier for a run at each Rift Tier (index = tier). Matches 1 + the tier's
 // renown bonus in RIFT_TIERS (profile.js). Kept here so the leaderboard rules can import
 // nothing: MAX_POINTS_PER_BATTLE there must allow the last entry.
-export const RIFT_TIER_SCORE = [1, 1.25, 1.5, 1.75, 2.5];
+export const RIFT_TIER_SCORE = [1, 1.25, 1.5, 1.75, 2, 2.5];
 
 /** The score multiplier for a run at Rift Tier `tier` (0 = no tier). */
 export function riftTierMultiplier(tier = 0) {
@@ -68,7 +68,7 @@ export function battleScore({ kind, survivors, partySize, rounds, startPartySize
 export const SCORE_TIP = 'Score\nEach battle won adds points: more for elites and bosses, '
     + 'scaled by how many of your party are still standing (summons don\'t count) and by how few turns it took. '
     + 'Runs started with 2 heroes score ×1.5, and with 1 hero ×2. '
-    + 'Rift Tiers score more: ×1.25 at Tier I, ×1.5 at II, ×1.75 at III and ×2.5 at IV. '
+    + 'Rift Tiers score more: ×1.25 at Tier I, ×1.5 at II, ×1.75 at III, ×2 at IV and ×2.5 at V. '
     + 'Your best wins are ranked by score.';
 
 /** One line explaining a battle's points, e.g. '3/3 standing · 5 turns (×1.2 speed)'. */

@@ -31,7 +31,8 @@ test('harder tiers and smaller parties pay more renown, and the bonuses add up',
     assert.equal(renownMultiplier(2, 3), 1.5);
     assert.equal(renownMultiplier(0, 1), 1.5);
     assert.equal(renownMultiplier(0, 2), 1.25);
-    assert.equal(renownMultiplier(4, 1), 3, 'Tier IV (+150%) and a lone hero (+50%)');
+    assert.equal(renownMultiplier(4, 1), 2.5, 'Tier IV (+100%) and a lone hero (+50%)');
+    assert.equal(renownMultiplier(5, 1), 3, 'Tier V (+150%) and a lone hero (+50%)');
 
     const profile = newProfile();
     const r = run({ tier: 2 }, 5, ['evoker']);
@@ -50,7 +51,7 @@ test('a win opens the next Rift Tier, up to the last', () => {
     assert.equal(profile.stats.riftTier, MAX_RIFT_TIER);
     const lost = run({ tier: 4 }); lost.status = 'lost'; recordRun(profile, lost);
     assert.equal(profile.stats.riftTier, MAX_RIFT_TIER);
-    assert.equal(RIFT_TIERS.length, 5);
+    assert.equal(RIFT_TIERS.length, 6);
 });
 
 test('Tier I toughens elites and bosses, Tier IV every enemy', () => {
@@ -86,6 +87,20 @@ test('Tier IV bosses bring one more ally', () => {
     };
     assert.ok(boss(4) >= boss(0));
     assert.ok(boss(4) > boss(0) || realmEncounters(run().realmId, 'boss').every(e => e.def.roster.length <= boss(0)), 'unless the roster has no one else');
+});
+
+test('Tier V toughens every enemy beyond Tier IV, and elites bring one more ally', () => {
+    for (const kind of ['normal', 'elite', 'boss']) {
+        const iv = riftTierMods(4, kind), v = riftTierMods(5, kind);
+        assert.ok(v.maxHp > iv.maxHp && v.atk > iv.atk && v.mat > iv.mat, kind);
+    }
+    const elite = (tier) => {
+        const r = run({ tier });
+        enter(r, 'elite');
+        return r.pending.encounter.roster.length;
+    };
+    assert.ok(elite(5) >= elite(4));
+    assert.ok(elite(5) > elite(4) || realmEncounters(run().realmId, 'elite').every(e => e.def.roster.length <= elite(4)), 'unless the roster has no one else');
 });
 
 // ---- Collection rewards ----

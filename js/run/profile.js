@@ -242,7 +242,8 @@ export const RIFT_TIERS = [
     { name: 'Tier I: Hardened', desc: 'Elites and bosses are tougher: +10 HP, +2 ATK and +2 MAT each.', renown: 0.25 },
     { name: 'Tier II: Rift Tax', desc: 'Shop prices are 25% higher.', renown: 0.5 },
     { name: 'Tier III: Slim Pickings', desc: 'Battles pay 30% less gold, and their rewards offer one fewer item to choose from.', renown: 0.75 },
-    { name: 'Tier IV: Gathering Storm', desc: 'Every enemy gains +8 HP and +1 to ATK, DEF, MAT and MDF, and bosses bring one more ally.', renown: 1.5 },
+    { name: 'Tier IV: Gathering Storm', desc: 'Every enemy gains +8 HP and +1 to ATK, DEF, MAT and MDF, and bosses bring one more ally.', renown: 1 },
+    { name: 'Tier V: Riftstorm', desc: 'Every enemy gains another +8 HP and +1 to ATK and MAT, and elites bring one more ally.', renown: 1.5 },
 ];
 export const MAX_RIFT_TIER = RIFT_TIERS.length - 1;
 

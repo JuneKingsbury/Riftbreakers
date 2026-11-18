@@ -8,7 +8,7 @@
 export const NAME_MAX = 20;
 export const MAX_PARTY_SIZE = 6;
 // The most a single battle can score: a boss (500) at ×2 speed with a solo start (×2) at
-// Rift Tier IV (×2.5, RIFT_TIER_SCORE in score.js).
+// Rift Tier V (×2.5, RIFT_TIER_SCORE in score.js).
 export const MAX_POINTS_PER_BATTLE = 5000;
 
 const ID_RE = /^[a-z0-9-]{1,40}$/i;

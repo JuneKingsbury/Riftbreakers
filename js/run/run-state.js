@@ -62,6 +62,7 @@ export const RIFT_TAX = 0.25;   // Tier II: shop prices
 export const SLIM_GOLD = 0.7;   // Tier III: battle gold
 const TIER1_TOUGH = { maxHp: 10, atk: 2, mat: 2 };                  // Tier I: elites and bosses
 const TIER4_STORM = { maxHp: 8, atk: 1, def: 1, mat: 1, mdf: 1 };   // Tier IV: every enemy
+const TIER5_RIFTSTORM = { maxHp: 8, atk: 1, mat: 1 };               // Tier V: every enemy, on top of IV
 
 function addStatMods(...mods) {
     const out = {};
@@ -74,6 +75,7 @@ export function riftTierMods(tier, kind) {
     const mods = addStatMods(
         tier >= 1 && (kind === 'elite' || kind === 'boss') ? TIER1_TOUGH : null,
         tier >= 4 ? TIER4_STORM : null,
+        tier >= 5 ? TIER5_RIFTSTORM : null,
     );
     return Object.keys(mods).length ? mods : null;
 }
@@ -435,8 +437,10 @@ export class RunState {
         // Bosses: the fight chosen when the act began (the others count as already seen).
         let seen = this.seenEncounters;
         if (kind === 'boss' && this.actBoss) seen = [...seen, ...realmEncounters(this.realmId, 'boss').map(e => e.def.id).filter(id => id !== this.actBoss)];
-        // Rift Tier IV: bosses bring one more ally (as if the party were one larger).
-        const size = this.party.length + (kind === 'boss' && tier >= 4 ? 1 : 0);
+        // Rift Tier IV: bosses bring one more ally, and Tier V: elites do too (as if the party
+        // were one larger).
+        const extraAlly = (kind === 'boss' && tier >= 4) || (kind === 'elite' && tier >= 5);
+        const size = this.party.length + (extraAlly ? 1 : 0);
         const enc = rollEncounter(this.rng, this.realmId, this.act, kind, size, seen, easy);
         this.seenEncounters.push(enc.id);
         const mods = riftTierMods(tier, enc.kind);
