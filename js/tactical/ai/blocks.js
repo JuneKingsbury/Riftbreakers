@@ -6,6 +6,7 @@
 // Label templates use {param} placeholders, which the editor renders as inputs.
 import { unitCell, MATERIALS } from '../battle-map.js';
 import { ABILITIES } from '../data-registry.js';
+import { STATUSES } from '../../content/vocab.js';
 import * as Q from './queries.js';
 import { isConscious } from '../units.js';
 
@@ -25,10 +26,11 @@ export function compare(op, a, b) {
 // Materials a unit can stand on (the 'I am standing on' condition).
 export const TILE_TYPES = Object.keys(MATERIALS).filter(t => MATERIALS[t].standable);
 
-// Statuses a script may reference: the ones the engine uses plus any an ability can inflict.
+// Statuses a script may reference: the ones the engine uses plus any an ability can inflict,
+// in the order content/vocab.js lists them (harmful, then helpful).
 export const STATUS_OPTIONS = [...new Set([
     'stun', 'slow', 'defend', 'charging', 'unconscious',
-    ...Object.values(ABILITIES).map(a => a.applyStatus).filter(Boolean),
+    ...Object.keys(STATUSES).filter(s => Object.values(ABILITIES).some(a => a.applyStatus === s)),
 ])];
 
 // Pseudo-abilities that choose the best usable ability of a kind at run time.

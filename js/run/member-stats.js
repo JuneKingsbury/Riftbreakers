@@ -3,9 +3,10 @@
 import { createUnitFromCharData } from '../tactical/units.js';
 import { equipmentStatBonuses } from '../tactical/data/equipment.js';
 import { relicStatMods } from './data/relics.js';
+import { STATS as STAT_INFO } from '../content/vocab.js';
 
 // The stats the menus list, in order, with their labels.
-export const STATS = [['maxHp', 'HP'], ['maxMp', 'MP'], ['atk', 'ATK'], ['def', 'DEF'], ['mat', 'MAT'], ['mdf', 'MDF'], ['spd', 'SPD'], ['move', 'Move'], ['eva', 'EVA'], ['crit', 'CRIT']];
+export const STATS = Object.entries(STAT_INFO).map(([key, s]) => [key, s.short]);
 
 function addMods(...mods) {
     const out = {};

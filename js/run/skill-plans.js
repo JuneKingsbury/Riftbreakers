@@ -20,7 +20,7 @@
 //
 // Older saves kept a separate plan per promoted class; sanitizePlans folds those into their
 // starting class's plan (see mergeLegacy).
-import { JOB_DATA } from '../tactical/data/jobs.js';
+import { JOB_DATA } from '../content/jobs.js';
 import { MAX_RANK, isUpgradeable, ABILITIES } from '../tactical/data-registry.js';
 import { isLearned, skillRank, canLearn, canUpgrade, learnAbility, upgradeAbility, canPromote, promotionOptions } from '../tactical/loadout.js';
 import { defaultStorage } from './profile.js';

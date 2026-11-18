@@ -6,8 +6,7 @@ import { readFileSync } from 'node:fs';
 
 import { CHAINS, REALMS, ACT_REALMS, actOf, realmSources, rollRealms, pickRealmMap, realmLook } from '../../js/run/data/realms.js';
 import { ENCOUNTERS, ACT_COUNT, WRITTEN_FOR, rollEncounter, realmEncounters, retuneEncounter, rosterPower } from '../../js/run/data/encounters.js';
-import { EVENTS, eventsFor } from '../../js/run/data/events.js';
-import { REALM_EVENTS } from '../../js/run/data/realm-events.js';
+import { EVENTS, REALM_EVENTS, eventsFor } from '../../js/run/data/events.js';
 import { RunState } from '../../js/run/run-state.js';
 import { Rng } from '../../js/run/rng.js';
 import { MATERIALS, loadMapData } from '../../js/tactical/battle-map.js';
@@ -236,7 +235,7 @@ test('a weighted look mixes its materials per block, the same way every time', (
     assert.equal(lookType(null, 'grass', 0, 0, 0), 'grass');
 });
 
-test('each unlisted realm is folded into the one listed realm of its chain', () => {
+test('each act realm fields its own fights and those of the realms it draws on; every other realm is drawn by one act realm', () => {
     assert.deepEqual(realmSources('crystal_caves'), ['crystal_caves', 'crystal_mines', 'crystal_depths']);
     assert.deepEqual(realmSources('palace_fortress'), ['palace_fortress', 'kingdom_outskirts', 'crusader_barracks']);
     assert.deepEqual(realmSources('wild_frontiers'), ['wild_frontiers']);
@@ -246,6 +245,22 @@ test('each unlisted realm is folded into the one listed realm of its chain', () 
     for (const ids of Object.values(ACT_REALMS)) for (const id of ids) for (const src of realmSources(id)) (owners[src] ??= []).push(id);
     assert.deepEqual(Object.keys(owners).sort(), Object.keys(REALMS).sort());
     for (const [src, by] of Object.entries(owners)) assert.equal(by.length, 1, `${src} is folded into ${by}`);
+});
+
+test('a realm draws on whatever its draws list names, not on its chain', () => {
+    // GIVEN: Crystal Caves drawing a realm from another chain instead of its own
+    const before = REALMS.crystal_caves.draws;
+    REALMS.crystal_caves.draws = ['fungal_hollows'];
+    try {
+        // WHEN: the act realm's fights are gathered
+        const zones = new Set(realmEncounters('crystal_caves', 'normal').map(e => e.zone));
+
+        // THEN: they come from it and the drawn realm only
+        assert.deepEqual(realmSources('crystal_caves'), ['crystal_caves', 'fungal_hollows']);
+        assert.deepEqual([...zones].sort(), ['crystal_caves', 'fungal_hollows']);
+    } finally {
+        REALMS.crystal_caves.draws = before;
+    }
 });
 
 test('a folded-in fight keeps its roster but is refitted to the act it is fought in', () => {

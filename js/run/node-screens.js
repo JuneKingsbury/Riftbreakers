@@ -6,7 +6,7 @@ import { REALMS } from './data/realms.js';
 import { Sound } from '../audio/sound.js';
 import { SCORE_TIP, scoreLine } from './score.js';
 import { canSpendPoints } from '../tactical/loadout.js';
-import { JOB_DATA } from '../tactical/data/jobs.js';
+import { JOB_DATA } from '../content/jobs.js';
 import { MAX_PARTY } from './run-state.js';
 import { EQUIPMENT, EQUIP_FIELDS, EQUIP_STAT_KEYS, canEnchant, enchantedKey, enchantLevel, MAX_ENCHANT } from '../tactical/data/equipment.js';
 import {

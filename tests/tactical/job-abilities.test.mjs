@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { gridMap } from '../map-fixtures.mjs';
-import { JOB_DATA } from '../../js/tactical/data/jobs.js';
+import { JOB_DATA } from '../../js/content/jobs.js';
 import { EQUIPMENT, itemName } from '../../js/tactical/data/equipment.js';
 import { ABILITIES } from '../../js/tactical/data-registry.js';
 import { createUnit } from '../../js/tactical/units.js';
@@ -166,7 +166,7 @@ test('Spirit Pact strengthens summons', () => {
     const binder = unit('S', 'spiritbinder', 'player', 1, 1, { support: 'spirit_pact' });
     const battle = new TacticalBattle(map, [binder]);
     const wisp = battle._resolveSummon(binder, ABILITIES.call_wisp, 2, 1);
-    const plain = createUnit('W', 'spectral_wisp', 'player', 0, 0);
+    const plain = createUnit('W', 'summoned_wisp', 'player', 0, 0);
     assert.ok(wisp.maxHp > plain.maxHp && wisp.mat > plain.mat);
 });
 

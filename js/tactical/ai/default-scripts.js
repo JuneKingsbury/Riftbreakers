@@ -6,7 +6,7 @@
 // Enemies do not use these: they keep the scoring AI in enemy-ai.js.
 import { ABILITIES, baseKey } from '../data-registry.js';
 import { POSITIVE_STATUSES, isHelpful } from '../abilities.js';
-import { JOB_DATA } from '../data/jobs.js';
+import { JOB_DATA } from '../../content/jobs.js';
 
 const always = () => ({ test: 'always', params: {} });
 const test = (name, params = {}) => ({ test: name, params });
@@ -51,14 +51,13 @@ const HEALER = () => ({
     rules: [revive('r1'), heal('r2', 60), attack('r3', 'Attack the nearest enemy', 'nearest')],
 });
 
-const BY_JOB = {
-    novice: MELEE, spellblade: MELEE, battlemage: MELEE, earthshaker: MELEE, stoneshaper: MELEE,
-    paladin: MELEE_HEALER, bastion: MELEE,
-    beastcaller: MELEE_SUMMONER,
-    evoker: RANGED(3), runebow: RANGED(4), riftcaller: RANGED(4), skyhunter: RANGED(4), fatebinder: RANGED(3), seer: RANGED(3),
-    spiritbinder: RANGED_SUMMONER, worldsinger: RANGED_SUMMONER,
-    warden: HEALER, sanctifier: HEALER, lifeseer: HEALER,
+// Each class's starter script, from its ai.script (js/content/classes/).
+const SCRIPTS = {
+    melee: MELEE, melee_healer: MELEE_HEALER, melee_summoner: MELEE_SUMMONER,
+    ranged: (job) => RANGED(JOB_DATA[job].ai.scriptRange ?? 3), ranged_summoner: RANGED_SUMMONER, healer: HEALER,
 };
+const BY_JOB = Object.fromEntries(Object.entries(JOB_DATA).filter(([, j]) => j.ai?.script)
+    .map(([key, j]) => [key, j.ai.script === 'ranged' ? SCRIPTS.ranged(key) : SCRIPTS[j.ai.script]]));
 
 export function defaultScriptFor(job) {
     return (BY_JOB[job] ?? GENERIC)();
@@ -68,14 +67,13 @@ export function defaultScriptFor(job) {
 
 // Jobs that fight from range and should keep out of harm's way (see positionStyle in
 // script-runtime.js). Healers aren't listed: holding them back lost fights.
-export const RANGED_ROLES = new Set(['evoker', 'runebow', 'riftcaller', 'skyhunter', 'fatebinder', 'seer', 'spiritbinder', 'worldsinger',
-    'illusionist', 'dreamweaver', 'mirage_oracle', 'gravecaller', 'lich', 'alchemist', 'plaguewright']);
+// (Each class's ai hints in js/content/classes/; see SCHEMAS.job.ai in content/vocab.js.)
+const jobsWhere = (test) => Object.keys(JOB_DATA).filter(j => JOB_DATA[j].ai && test(JOB_DATA[j].ai));
+export const RANGED_ROLES = new Set(jobsWhere(ai => ai.ranged));
 
-const RANGED_KEEP = { evoker: 3, runebow: 4, riftcaller: 4, skyhunter: 4, fatebinder: 3, seer: 3, spiritbinder: 3, worldsinger: 3, sanctifier: 3, lifeseer: 3, warden: 3,
-    illusionist: 3, dreamweaver: 3, mirage_oracle: 3, gravecaller: 3, lich: 3, gravewarden: 3, alchemist: 3, plaguewright: 3, field_surgeon: 3 };
-const MELEE_JOBS = new Set(['novice', 'spellblade', 'battlemage', 'earthshaker', 'stoneshaper', 'paladin', 'beastcaller',
-    'warlord', 'marshal', 'tactician', 'bastion']);
-const HEALER_JOBS = new Set(['warden', 'sanctifier', 'lifeseer', 'paladin', 'field_surgeon']);
+const RANGED_KEEP = Object.fromEntries(jobsWhere(ai => ai.keep != null).map(j => [j, JOB_DATA[j].ai.keep]));
+const MELEE_JOBS = new Set(jobsWhere(ai => ai.melee));
+const HEALER_JOBS = new Set(jobsWhere(ai => ai.healer));
 
 const statusFilter = (status) => [{ kind: 'status', status, has: false }];
 

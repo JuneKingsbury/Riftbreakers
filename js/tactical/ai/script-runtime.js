@@ -15,7 +15,7 @@ import { NEGATIVE_STATUSES, isHelpful } from '../abilities.js';
 import * as Q from './queries.js';
 import { evalCond, describeCond, ACTION_KINDS, MOVE_MODES } from './blocks.js';
 import { RANGED_ROLES } from './default-scripts.js';
-import { JOB_DATA } from '../data/jobs.js';
+import { JOB_DATA } from '../../content/jobs.js';
 
 export const MAX_RULES = 16;
 // With the Tactician's Codex unlock a script holds more rules; this is the most any script can.

@@ -7,7 +7,7 @@ import { createUnit } from '../../js/tactical/units.js';
 import { standZ } from '../../js/tactical/battle-map.js';
 import { TacticalBattle } from '../../js/tactical/battle.js';
 import { getEffectiveStat } from '../../js/tactical/abilities.js';
-import { JOB_DATA } from '../../js/tactical/data/jobs.js';
+import { JOB_DATA } from '../../js/content/jobs.js';
 import { EQUIPMENT } from '../../js/tactical/data/equipment.js';
 import { allowedEquipTypes } from '../../js/tactical/data-registry.js';
 import { runScript } from '../../js/tactical/ai/script-runtime.js';

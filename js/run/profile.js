@@ -4,7 +4,7 @@
 // Settings can export it, with the run in progress, to a file or code (save-transfer.js).
 
 import { EQUIPMENT, EQUIP_FIELDS, baseItemKey, enchantLevel } from '../tactical/data/equipment.js';
-import { JOB_DATA } from '../tactical/data/jobs.js';
+import { JOB_DATA } from '../content/jobs.js';
 import { REALMS } from './data/realms.js';
 import { BACKDROPS } from './data/backdrops.js';
 import { notifySaved } from './save-events.js';
@@ -18,7 +18,14 @@ export const BEST_RUNS = 10;
 // Every boss fight in the game (each realm fields two), for the bestiary.
 export const BOSS_IDS = [...new Set(Object.values(REALMS).flatMap(r => r.bosses || []))];
 
-export const BASE_JOBS = ['warden', 'evoker', 'runebow'];
+// Starting classes come from each class's `unlock` (js/content/classes/): 'base' classes are
+// open from the start, in `order` (a run with no picks starts with them); 'renown' classes are
+// bought in Unlocks, listed in `order`.
+const classesUnlockedBy = (type) => Object.keys(JOB_DATA).filter(j => JOB_DATA[j].unlock?.type === type)
+    .sort((a, b) => JOB_DATA[a].unlock.order - JOB_DATA[b].unlock.order);
+const className = (job) => job.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+
+export const BASE_JOBS = classesUnlockedBy('base');
 
 // Starting classes all cost the same, and each one bought makes the next dearer: the price
 // is CLASS_COSTS[classes already owned]. Any order works; the last class is a long-term goal.
@@ -28,13 +35,8 @@ export const CLASS_COSTS = [40, 65, 95, 130, 170, 215, 265];
 // they change a run, and don't depend on what else is owned.
 // requires: another unlock that must be bought first.
 export const UNLOCKS = {
-    job_spellblade:  { name: 'Spellblade', job: 'spellblade', desc: 'Unlocks the Spellblade as a starting class.' },
-    job_stoneshaper: { name: 'Stoneshaper', job: 'stoneshaper', desc: 'Unlocks the Stoneshaper as a starting class.' },
-    job_seer:        { name: 'Seer', job: 'seer', desc: 'Unlocks the Seer as a starting class.' },
-    job_warlord:     { name: 'Warlord', job: 'warlord', desc: 'Unlocks the Warlord as a starting class.' },
-    job_alchemist:   { name: 'Alchemist', job: 'alchemist', desc: 'Unlocks the Alchemist as a starting class.' },
-    job_illusionist: { name: 'Illusionist', job: 'illusionist', desc: 'Unlocks the Illusionist as a starting class.' },
-    job_gravecaller: { name: 'Gravecaller', job: 'gravecaller', desc: 'Unlocks the Gravecaller as a starting class.' },
+    ...Object.fromEntries(classesUnlockedBy('renown').map(job => [`job_${job}`,
+        { name: className(job), job, desc: `Unlocks the ${className(job)} as a starting class.` }])),
     purse_1:         { name: 'Coin Purse', cost: 40, desc: 'Start each run with 50 more gold.' },
     purse_2:         { name: 'Heavy Purse', cost: 100, requires: 'purse_1', desc: 'Start each run with another 50 gold.' },
     veterans:        { name: 'Veterans', cost: 120, desc: 'Your starting party begins at level 2, with one more skill point to spend.' },

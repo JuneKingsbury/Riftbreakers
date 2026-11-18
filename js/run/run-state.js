@@ -24,7 +24,7 @@ import { generateActMap, reachableIds } from './map-gen.js';
 import { rollEncounter, realmEncounters, battleRewards, ACT_COUNT, EASY_FIGHTS } from './data/encounters.js';
 import { RELICS, relicStatMods, relicMult, relicsWith } from './data/relics.js';
 import { eventsFor, EVENTS } from './data/events.js';
-import { rollRealms, REALMS } from './data/realms.js';
+import { rollRealms, REALMS, appearsIn } from './data/realms.js';
 import { createMember, recruitCandidates } from './data/recruits.js';
 import { autoAllocate, plannedPromotion } from './skill-plans.js';
 import { battleScore } from './score.js';
@@ -122,7 +122,8 @@ export class RunState {
         if (options.travelersPack) {
             const pack = new Rng((seed ^ 0x51ED7A11) >>> 0);
             for (const slot of ['boots', 'trinket']) {
-                const keys = Object.keys(EQUIPMENT).filter(k => EQUIPMENT[k].slot === slot && itemRarity(k) === 'common' && !EQUIPMENT[k].featOnly);
+                const keys = Object.keys(EQUIPMENT).filter(k => EQUIPMENT[k].slot === slot && itemRarity(k) === 'common' && !EQUIPMENT[k].featOnly
+                    && appearsIn(EQUIPMENT[k], run.act, run.realmId));
                 if (keys.length) run.addItem(pack.pick(keys));
             }
         }
@@ -415,7 +416,7 @@ export class RunState {
         for (let i = 0; i < count * 6 && out.length < count; i++) {
             const rarity = this.rng.weighted(weights);
             const keys = Object.keys(EQUIPMENT).filter(k => itemRarity(k) === rarity && !out.includes(k)
-                && (!EQUIPMENT[k].featOnly || this.options.featItems?.includes(k)));
+                && (!EQUIPMENT[k].featOnly || this.options.featItems?.includes(k)) && appearsIn(EQUIPMENT[k], this.act, this.realmId));
             const usable = keys.filter(k => this.usableByParty(k));
             const pool = usable.length ? usable : keys;
             if (pool.length) out.push(this.rng.pick(pool));
@@ -434,7 +435,8 @@ export class RunState {
     _rollRelics(rarities, count) {
         // Empty Purse runs never find gold or shop relics: they would do nothing.
         const useless = (r) => this.noGold && (r.goldMult || r.shopDiscount);
-        const pool = Object.keys(RELICS).filter(k => rarities.includes(RELICS[k].rarity) && !this.relics.includes(k) && !useless(RELICS[k]));
+        const pool = Object.keys(RELICS).filter(k => rarities.includes(RELICS[k].rarity) && !this.relics.includes(k) && !useless(RELICS[k])
+            && appearsIn(RELICS[k], this.act, this.realmId));
         return this.rng.sample(pool, count);
     }
 

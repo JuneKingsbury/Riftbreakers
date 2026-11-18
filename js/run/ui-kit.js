@@ -1,7 +1,7 @@
 // Shared DOM helpers for the run screens: button styles, a modal with a back
 // stack, toasts, labels and sprite drawing.
 import { ABILITIES } from '../tactical/data-registry.js';
-import { JOB_DATA } from '../tactical/data/jobs.js';
+import { JOB_DATA } from '../content/jobs.js';
 import { EQUIPMENT, EQUIP_STAT_KEYS, itemRarity, itemName } from '../tactical/data/equipment.js';
 import { Sound } from '../audio/sound.js';
 import { placeTipAt } from '../ui/tip-place.js';

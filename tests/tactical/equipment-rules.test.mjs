@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { allowedEquipTypes, jobsOfTier, ABILITIES } from '../../js/tactical/data-registry.js';
-import { JOB_DATA } from '../../js/tactical/data/jobs.js';
+import { JOB_DATA } from '../../js/content/jobs.js';
 import { STARTING_GEAR } from '../../js/run/data/recruits.js';
 import { EQUIPMENT } from '../../js/tactical/data/equipment.js';
 

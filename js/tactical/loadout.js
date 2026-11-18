@@ -13,7 +13,7 @@
 //   appearance  Equipped items (armorKey, ...) also grant abilities, see data/equipment.js:
 //               actions join the skill list, passives are active on top of the chosen slots
 import { ABILITIES, MAX_RANK, rankedKey, isUpgradeable } from './data-registry.js';
-import { JOB_DATA } from './data/jobs.js';
+import { JOB_DATA } from '../content/jobs.js';
 import { equipmentGrants } from './data/equipment.js';
 
 export const LOADOUT_SLOTS = ['reaction', 'support', 'movement'];

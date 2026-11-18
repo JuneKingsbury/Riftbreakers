@@ -1,10 +1,11 @@
 // Party menu: each member's level, HP, stats, skills to learn and upgrade with skill points, passive slots,
 // equipment and promotion. Works on a RunState and saves it after every change.
 import { previewUnit, STATS } from './member-stats.js';
+import { EQUIP_SLOTS } from '../content/vocab.js';
 import { GearScreen } from './gear-screen.js';
 import { Sound } from '../audio/sound.js';
 import { ABILITIES } from '../tactical/data-registry.js';
-import { JOB_DATA } from '../tactical/data/jobs.js';
+import { JOB_DATA } from '../content/jobs.js';
 import { EQUIPMENT, EQUIP_FIELDS, equipmentGrants } from '../tactical/data/equipment.js';
 import {
     LOADOUT_SLOTS, abilitySlot, isLearned, learnBlocker, memberJobs, equippable, skillRank, canUpgrade,
@@ -22,7 +23,7 @@ import { renderSkillPlanEditor } from '../ui/skill-plan-panel.js';
 
 const NUMERAL = ['', 'I', 'II', 'III'];
 
-const SLOT_LABEL = { armorKey: 'Armor', helmetKey: 'Helmet', weaponKey: 'Weapon', toolKey: 'Tool', bootsKey: 'Boots', trinketKey: 'Trinket' };
+const SLOT_LABEL = Object.fromEntries(Object.values(EQUIP_SLOTS).map(s => [s.field, s.label]));
 // Kept for anything importing it from here.
 export { previewUnit };
 

@@ -4,6 +4,7 @@
 // runs, won or lost, by score. All come from the profile (items, bossKills, challenges,
 // bestRuns), so they last between runs and travel with save exports.
 import { EQUIPMENT, EQUIP_FIELDS } from '../tactical/data/equipment.js';
+import { RARITIES } from '../content/vocab.js';
 import { REALMS, ACT_REALMS } from './data/realms.js';
 import { ENCOUNTERS } from './data/encounters.js';
 import { loadProfile, BEST_RUNS, BOSS_IDS, COLLECTION_REWARDS, RIFT_TIERS, CHALLENGES } from './profile.js';
@@ -15,7 +16,7 @@ import {
 } from './ui-kit.js';
 
 const SLOTS = [['weapon', 'Weapons'], ['armor', 'Armor'], ['helmet', 'Helmets'], ['tool', 'Tools'], ['boots', 'Boots'], ['trinket', 'Trinkets']];
-const RARITY_ORDER = { common: 0, uncommon: 1, rare: 2 };
+const RARITY_ORDER = Object.fromEntries(RARITIES.map((r, i) => [r, i]));
 const TAB = `padding:5px 12px;font-family:${FONT};font-size:12px;border-radius:4px 4px 0 0;cursor:pointer;width:auto;`;
 
 /** Every item in the game, grouped by slot and sorted by rarity then name. */

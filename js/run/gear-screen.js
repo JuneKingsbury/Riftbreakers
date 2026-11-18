@@ -9,9 +9,10 @@
 import { Sound } from '../audio/sound.js';
 import { EQUIPMENT, EQUIP_FIELDS } from '../tactical/data/equipment.js';
 import { STATS, equipDelta, previewUnit } from './member-stats.js';
+import { EQUIP_SLOTS } from '../content/vocab.js';
 import { BTN, esc, jobLabel, titleCase, abilityName, itemTitle, itemSummary, itemIconHtml, portraitHtml, drawSprites, drawPortrait, FONT } from './ui-kit.js';
 
-const SLOT_LABEL = { weaponKey: 'Weapon', armorKey: 'Armor', helmetKey: 'Helmet', toolKey: 'Tool', bootsKey: 'Boots', trinketKey: 'Trinket' };
+const SLOT_LABEL = Object.fromEntries(Object.values(EQUIP_SLOTS).map(s => [s.field, s.label]));
 const fieldOf = (key) => `${EQUIPMENT[key]?.slot}Key`;
 const CHIP = `padding:3px 8px;font-family:${FONT};font-size:11px;border-radius:3px;cursor:pointer;width:auto;`;
 const UP = '#7e7', DOWN = '#f77';

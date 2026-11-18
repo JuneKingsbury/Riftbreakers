@@ -11,9 +11,8 @@ import {
 } from '../../js/run/profile.js';
 import { EQUIPMENT, itemPrice } from '../../js/tactical/data/equipment.js';
 import { RELICS } from '../../js/run/data/relics.js';
-import { SCOUTING } from '../../js/run/data/scouting.js';
 import { BACKDROPS } from '../../js/run/data/backdrops.js';
-import { realmEncounters } from '../../js/run/data/encounters.js';
+import { realmEncounters, SCOUTING } from '../../js/run/data/encounters.js';
 
 const JOBS = ['warden', 'evoker', 'runebow'];
 const run = (opts = {}, seed = 5, jobs = JOBS) => RunState.create({ jobs, seed, options: { ...runOptions(null), ...opts } });

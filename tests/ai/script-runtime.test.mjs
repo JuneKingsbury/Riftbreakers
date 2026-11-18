@@ -6,7 +6,7 @@ import { createUnit } from '../../js/tactical/units.js';
 import { getCell, standZ } from '../../js/tactical/battle-map.js';
 import { gridMap } from '../map-fixtures.mjs';
 import { ABILITIES, JOB_STATS } from '../../js/tactical/data-registry.js';
-import { JOB_DATA } from '../../js/tactical/data/jobs.js';
+import { JOB_DATA } from '../../js/content/jobs.js';
 import { scaledLoadout } from '../../js/tactical/loadout.js';
 import { resolveAbility } from '../../js/tactical/abilities.js';
 import { estimateAbilityEffect } from '../../js/tactical/ai/estimate.js';

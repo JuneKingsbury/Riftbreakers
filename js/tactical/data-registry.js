@@ -2,33 +2,36 @@
 // that the rest of the engine consumes.
 //
 // Both ABILITY_DATA and JOB_DATA entries may include an `extends` key pointing
-// to another entry in the same table. Inheritance is single-parent and shallow:
-// the child's explicit fields take priority; the parent fills in everything else.
-// Chains are resolved recursively up to 10 levels deep.
+// to another entry in the same table (or, for abilities, to one of ABILITY_TEMPLATES).
+// Inheritance is single-parent and shallow: the child's explicit fields take priority;
+// the parent fills in everything else. Chains are resolved recursively up to 10 levels deep.
+// The content itself lives in js/content/ (see its README).
 
-import { ABILITY_DATA } from './data/abilities.js';
-import { JOB_DATA }     from './data/jobs.js';
+import { ABILITY_DATA, ABILITY_TEMPLATES } from '../content/abilities.js';
+import { JOB_DATA }     from '../content/jobs.js';
+import { STATS, STATUSES } from '../content/vocab.js';
 
-function resolveEntry(key, table, depth = 0) {
+function resolveEntry(key, table, templates, depth = 0) {
     if (depth > 10) throw new Error(`data-registry: inheritance chain too deep at "${key}"`);
-    const entry = table[key];
+    const entry = Object.hasOwn(table, key) ? table[key] : templates[key];
     if (!entry) throw new Error(`data-registry: unknown key "${key}"`);
     if (!entry.extends) return { ...entry };
-    const parent = resolveEntry(entry.extends, table, depth + 1);
+    const parent = resolveEntry(entry.extends, table, templates, depth + 1);
     const { extends: _, ...rest } = entry;
     // Arrays (like `abilities`) from the child fully replace the parent's array.
     return { ...parent, ...rest };
 }
 
-function buildTable(rawData) {
+// Only the table's own keys are output: templates are building blocks, not entries.
+function buildTable(rawData, templates = {}) {
     const result = {};
     for (const key of Object.keys(rawData)) {
-        result[key] = resolveEntry(key, rawData);
+        result[key] = resolveEntry(key, rawData, templates);
     }
     return result;
 }
 
-export const ABILITIES = buildTable(ABILITY_DATA);
+export const ABILITIES = buildTable(ABILITY_DATA, ABILITY_TEMPLATES);
 
 // Every unit's critical hit chance, in percent, before gear (see critChance in abilities.js).
 export const BASE_CRIT = 5;
@@ -100,9 +103,8 @@ for (const [key, ab] of Object.entries({ ...ABILITIES })) {
     for (let r = 2; r <= MAX_RANK; r++) ABILITIES[rankedKey(key, r)] = rankedEntry(ab, r);
 }
 
-const STAT_LABEL = { atk: 'ATK', def: 'DEF', mat: 'MAT', mdf: 'MDF', spd: 'SPD', move: 'Move', eva: 'EVA', maxHp: 'max HP', maxMp: 'max MP' };
-const STATUS_WORD = { taunted: 'Taunt', enfeebled: 'Enfeeble' };
-const titleWord = (k) => STATUS_WORD[k] ?? String(k).replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+const statLabel = (k) => STATS[k]?.long ?? k;
+const titleWord = (k) => STATUSES[k]?.name ?? String(k).replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 const signed = (v) => (v > 0 ? `+${v}` : `${v}`.replace('-', '−'));
 
 /**
@@ -127,7 +129,7 @@ export function rankChanges(key, rank) {
     }
     (a.buffs || []).forEach((buff, i) => {
         const next = b.buffs?.[i];
-        if (next && next.value !== buff.value) out.push(`${STAT_LABEL[buff.stat] ?? buff.stat} ${signed(buff.value)} → ${signed(next.value)}`);
+        if (next && next.value !== buff.value) out.push(`${statLabel(buff.stat)} ${signed(buff.value)} → ${signed(next.value)}`);
     });
     return out;
 }

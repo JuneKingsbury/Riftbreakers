@@ -7,23 +7,10 @@ import {
     loadProfile, saveProfile, runOptions, UNLOCKS, canBuyUnlock, buyUnlock, hasUnlock, unlockCost, RIFT_TIERS, renownMultiplier, SMALL_PARTY_RENOWN, CHALLENGES,
 } from './profile.js';
 import { jobsOfTier } from '../tactical/data-registry.js';
-import { JOB_DATA } from '../tactical/data/jobs.js';
+import { JOB_DATA } from '../content/jobs.js';
 import { Modal, BTN, BTN_DISABLED, BTN_GOOD, BTN_GOLD, esc, jobLabel, abilityName } from './ui-kit.js';
 import { riftTransition } from '../ui/rift-transition.js';
 
-// One-line role summaries for the starting picks.
-const ROLE = {
-    warden: 'Healer and protector',
-    evoker: 'Ranged magic damage',
-    runebow: 'Long-range archer',
-    spellblade: 'Melee debuffer',
-    stoneshaper: 'Durable melee bruiser',
-    seer: 'Control and support',
-    illusionist: 'Evasive trickster',
-    gravecaller: 'Life-draining necromancer',
-    alchemist: 'Splash healing and damage',
-    warlord: 'Commander and taunter',
-};
 
 export function hasSavedRun() {
     return !!RunState.load();
@@ -73,7 +60,7 @@ export function newRun(containerEl, skinManager, { onStart, onExit, onCancel, ch
             const lock = Object.keys(UNLOCKS).find(k => UNLOCKS[k].job === job);
             html += `<button data-job="${job}" ${unlocked ? '' : 'disabled'} style="${BTN}${unlocked ? '' : BTN_DISABLED}${on ? 'border:2px solid #7bf;background:#0a1830;' : ''}">
                 <div style="display:flex;justify-content:space-between;"><span style="font-weight:bold;color:${on ? '#9cf' : '#ddd'};">${on ? '✓ ' : ''}${jobLabel(job)}</span>
-                <span style="color:#888;font-size:10px;">${unlocked ? esc(ROLE[job]) : `🔒 ${lock ? unlockCost(profile, lock) : '?'} renown`}</span></div>
+                <span style="color:#888;font-size:10px;">${unlocked ? esc(JOB_DATA[job].role) : `🔒 ${lock ? unlockCost(profile, lock) : '?'} renown`}</span></div>
                 <div style="color:#778;font-size:10px;margin-top:2px;line-height:1.4;">${esc(kit)}</div>
             </button>`;
         }

@@ -6,6 +6,15 @@ A tactics roguelike in the world of Rifthold.
 No build step. Serve the repo root (`npm run serve`, or any static server) and open `index.html`.
 Run the headless logic tests with `npm test` (Node 22+).
 
+## Adding content
+
+All game content is data in `js/content/`: one file per class (with its abilities) and per realm
+(with its fights, bosses and events), plus files for enemies, items, relics and general events.
+[`js/content/README.md`](js/content/README.md) explains how to add each kind.
+[`js/content/vocab.js`](js/content/vocab.js) lists every stat, status effect, element, equipment type
+and field content may use, and [`js/content/CONTENT.md`](js/content/CONTENT.md) has them as tables
+(regenerate with `npm run content-docs`). `npm test` checks all content against `vocab.js`.
+
 ## Runs
 
 A run is four acts (`js/run/`). Each act is a generated map of 15 floors (`map-gen.js`): pick a
@@ -13,25 +22,24 @@ path through battles, elites, events, shops, rest sites, treasure and recruits, 
 Acts 1 to 3 each have one recruit floor. Act 4 has none, since the party should be full by then.
 Runs saved before Act 4 existed keep their three acts (`RunState.actCount`).
 
-- **Realms:** each act is set in a realm from Rifthold (`data/realms.js`), picked at random from that
-  act's list (`ACT_REALMS`), never two from the same chain. Act 1: The Wild Frontiers, Verdant Depths
+- **Realms:** each act is set in a realm from Rifthold (`js/content/realms/`), picked at random from that
+  act's list (`ACT_REALMS` in `content/realms/index.js`), never two from the same chain. Act 1: The Wild Frontiers, Verdant Depths
   or Crystal Caves. Act 2: Arcane Library or Sunken Abyss. Act 3: Palace Fortress or Void Sanctum.
-  Act 4: Shifting Labyrinth. A realm that moved to a later act (`WRITTEN_FOR` in
-  `data/encounters.js`) fights its own battles at that act's levels. The other realms of each chain are folded into the listed one
-  (`realmSources`): Crystal Caves also fields Crystal Mines and Crystal Depths fights and events.
+  Act 4: Shifting Labyrinth. A realm that moved to a later act (its `writtenFor`) fights its own battles at that act's levels. Each listed realm names the other realms it also draws on
+  (`draws` in its file): Crystal Caves also fields Crystal Mines and Crystal Depths fights and events.
   Folded-in fights keep their rosters and their own look and maps, but are retuned for the act
-  (`retuneEncounter` in `data/encounters.js`): levels move to the act's, and stats scale so the
+  (`retuneEncounter` in `run/data/encounters.js`): levels move to the act's, and stats scale so the
   roster's power matches the home realm's own fights, with small per-realm corrections
-  (`RETUNE_BIAS`) measured in simulated battles. Putting a realm back in a list stops folding it.
+  (each realm's `retuneBias`) measured in simulated battles. A realm listed for an act can't also be drawn by another.
   An act ends at the heart of its realm: each listed realm names its two bosses (`bosses`), so a
   boss from a realm's outer reaches isn't fielded as its finale.
   The realm decides the act's
-  enemies (`data/encounters.js`, keyed by realm; a roster entry's `sprite` dresses a job as a realm
-  creature), about half of its events (`data/realm-events.js`), which battle maps its fights use, and
+  enemies (its file's `encounters`; a roster entry's `sprite` dresses a job as a realm
+  creature), about half of its events (its file's `events`), which battle maps its fights use, and
   how they look: a realm's `look` swaps map materials for ones with the same rules (moss for grass,
   bookshelves for walls) and sets the battle and act map backgrounds.
 
-- **Classes:** ten starting roles (`data/jobs.js`), each promoting into one of two Tier 2 jobs.
+- **Classes:** ten starting roles (`js/content/classes/`, one file per class with its abilities), each promoting into one of two Tier 2 jobs.
   Warden, Evoker and Runebow are open from the start; the rest are bought with renown.
   The six schools of magic (Evocation, Enchantment, Abjuration, Conjuration, Transmutation,
   Divination) are joined by:
@@ -47,17 +55,17 @@ Runs saved before Act 4 existed keep their three acts (`RunState.actCount`).
 - **Party:** start with one to three Tier 1 roles (fewer is a challenge run) and recruit up to six. Battles are automatic, so the
   party fully heals after every win; damage from events lasts until then. Losing a battle ends the run.
 - **Growth:** wins give XP; every level gives a skill point. Each role has a small skill tree
-  (`data/jobs.js`: cost and prerequisite per skill), and learned skills can be upgraded to rank II
+  (each class's `learnable`: cost and prerequisite per skill), and learned skills can be upgraded to rank II
   and III (`data-registry.js` generates the ranked versions). At level 5 a member can promote once
   into one of two Tier 2 jobs, at any time from the Party menu (it costs nothing). Equipment adds stats and can grant
-  abilities (`data/equipment.js`): actions join the skill list, and passives (e.g. Ghost Step) are
-  always on, on top of the reaction/support/movement the character chose, and relics are party-wide modifiers (`js/run/data/relics.js`).
+  abilities (`js/content/items/`): actions join the skill list, and passives (e.g. Ghost Step) are
+  always on, on top of the reaction/support/movement the character chose, and relics are party-wide modifiers (`js/content/relics.js`).
 - **Equipment screen:** Equipment (G on the map, the Change buttons in the Party menu, or the
   button on node screens) shows one character on a paper doll beside the party's shared bag
   (`js/run/gear-screen.js`). Tabs or ← → switch characters. Hovering an item (a first tap on
   touch screens) previews it on the doll with every stat change; clicking it equips it. The
   numbers come from `member-stats.js`, the same calculation battles use.
-- **Equipment rules:** each class's `allowedEquipment` (`data/jobs.js`) fits its role, and a
+- **Equipment rules:** each class's `allowedEquipment` (`js/content/classes/`) fits its role, and a
   promoted class adds to its starting class's list with `equipmentExpansions` (e.g. Battlemage
   gains blades, Marshal heavy armor). `tests/tactical/equipment-rules.test.mjs` checks that
   starting gear is wearable and that magic-heavy classes can always hold a magic weapon.
@@ -71,7 +79,7 @@ Runs saved before Act 4 existed keep their three acts (`RunState.actCount`).
   travel with save exports.
 - **Rest sites and enchanting:** a rest site offers Train (XP for everyone) or Enchant: one owned
   item, equipped or in the bag, gains a level, up to +2 (about +20% of its main stats per level).
-  An enchanted item is its own key (`iron_sword+1`, registered in `data/equipment.js` and hidden
+  An enchanted item is its own key (`iron_sword+1`, registered in `tactical/data/equipment.js` and hidden
   from loops over `EQUIPMENT`), so it equips, sells and saves like any item. Found items are
   rarely already enchanted: 3% +1 and 0.5% +2, doubled from elites and bosses (`run-state.js`).
 - **Real time:** battles run in real time (`js/tactical/realtime.js`). Everyone acts at the
@@ -89,7 +97,7 @@ Runs saved before Act 4 existed keep their three acts (`RunState.actCount`).
   fights), for +25% to +100% renown. Winning at a tier opens the next. Starting with one or two
   members adds +50% or +25%. The enemy and shop effects live in `run-state.js` (`riftTierMods`).
 - **More unlocks:** Traveler's Pack, Masterwork, Haggler, Relic Codex (after Heirloom), Scout's
-  Report (`data/scouting.js`: a line on each act's boss, chosen when the act begins), Tactician's
+  Report (each boss fight's `scouting`: a line on each act's boss, chosen when the act begins), Tactician's
   Codex (24 rules and a shared template, `script-store.js`) and title backdrops
   (`data/backdrops.js`, picked in Settings > Graphics). The tile skin is fixed to the game's own.
 - **Collection rewards:** in Feats, finding 33% of all items pays 50 renown once, and 66% earns
@@ -280,7 +288,7 @@ the ones listed in that folder's `manifest.json`.
   lists it.
 - **Enemies** has one sprite per enemy name (`entities/enemy_<name>.png`). **Items** and
   **Equipment Worn** have one per item. All three tabs are built from the game's data
-  (`run/data/encounters.js`, `tactical/data/equipment.js`), so new enemies and items appear on their
+  (the encounters and items in `js/content/`), so new enemies and items appear on their
   own. A `×N` badge marks an enemy whose art is still identical to N-1 others. An enemy with no
   sprite of its own yet is drawn with its shared, tinted sprite, and opens on that art in the editor.
 - **Legacy** lists the colony builder's old items, which the tactical game doesn't use.

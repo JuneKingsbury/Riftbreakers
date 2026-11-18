@@ -14,7 +14,7 @@ import { PartyMenu } from './party-menu.js';
 import { RunState, MAX_PARTY } from './run-state.js';
 import { RELICS } from './data/relics.js';
 import { CHAINS } from './data/realms.js';
-import { SCOUTING } from './data/scouting.js';
+import { SCOUTING } from './data/encounters.js';
 import { loadProfile, saveProfile, recordRun, noteItems, noteBosses, claimCollectionRewards, CHALLENGES } from './profile.js';
 import { loadPlans, describePurchases } from './skill-plans.js';
 import { Modal, Toast, BTN, BTN_GOOD, BTN_DANGER, GLOW, RARITY_COLOR, NODE_INFO, FONT, esc, jobLabel, hpBar, portraitHtml, drawSprites } from './ui-kit.js';

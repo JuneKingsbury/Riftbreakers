@@ -2,6 +2,7 @@ import { hasLineOfSight, MAX_CLIMB, settleZ, unitCell, stepNeighbors, columnCell
 import { faceToward, isUnconscious, isDead } from './units.js';
 import { ABILITIES, JOB_STATS, BASE_CRIT } from './data-registry.js';
 import { moveEntity } from '../systems/movement-lerp.js';
+import { NEGATIVE_STATUSES, POSITIVE_STATUSES } from '../content/vocab.js';
 
 // Re-export so callers that import ABILITIES from this module keep working.
 export { ABILITIES };
@@ -79,8 +80,8 @@ export function passiveActive(unit, key) {
 
 // taunted: must attack the unit that taunted it (unit._tauntedBy). hidden: enemies can't pick
 // the unit as a target until it acts.
-export const NEGATIVE_STATUSES = ['poison', 'slow', 'silence', 'sleep', 'stun', 'berserk', 'charm', 'frog', 'enfeebled', 'doom', 'taunted'];
-export const POSITIVE_STATUSES = ['haste', 'protect', 'shell', 'regen', 'reflect', 'reraise', 'slipped', 'hidden'];
+// Harmful and helpful statuses are listed, with what each does, in content/vocab.js.
+export { NEGATIVE_STATUSES, POSITIVE_STATUSES };
 
 // Highest a speed gauge can be pushed by an order (Rally and the like).
 const CT_GAIN_CAP = 150;

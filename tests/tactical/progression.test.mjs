@@ -12,7 +12,7 @@ import {
     addXp, XP_PER_LEVEL, PROMOTION_LEVEL,
 } from '../../js/tactical/loadout.js';
 import { buildUnits } from '../../js/tactical/build-units.js';
-import { JOB_DATA } from '../../js/tactical/data/jobs.js';
+import { JOB_DATA } from '../../js/content/jobs.js';
 import { TacticalBattle } from '../../js/tactical/battle.js';
 
 function field(rowChar = () => '.') {

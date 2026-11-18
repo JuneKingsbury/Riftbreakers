@@ -1,5 +1,5 @@
 // Generated party members: the starting party and recruits met during a run.
-import { JOB_DATA } from '../../tactical/data/jobs.js';
+import { JOB_DATA } from '../../content/jobs.js';
 import { jobsOfTier } from '../../tactical/data-registry.js';
 
 export const NAMES = [
@@ -12,19 +12,12 @@ export const NAMES = [
 const RACES = ['human', 'human', 'nymph', 'ferin', 'kobalos', 'bufos'];
 const COLORS = ['#4488ff', '#cc44ff', '#44cc66', '#ffcc44', '#44ccdd', '#cc8844', '#ff6688', '#88dd44', '#dd6633', '#66aaff', '#bb88ff', '#ffaa33'];
 
-// What each starting role carries when it joins: { armorKey, helmetKey, weaponKey, toolKey }.
-export const STARTING_GEAR = {
-    warden:      { armorKey: 'iron_brigandine', helmetKey: 'iron_helmet', weaponKey: 'wooden_wand', toolKey: 'iron_shield' },
-    evoker:      { armorKey: 'wool_tunic',     helmetKey: 'wool_cap',    weaponKey: 'wooden_wand', toolKey: null },
-    runebow:     { armorKey: 'leather_jacket', helmetKey: 'leather_cap', weaponKey: 'short_bow',   toolKey: 'hunters_quiver' },
-    spellblade:  { armorKey: 'leather_vest',   helmetKey: 'leather_cap', weaponKey: 'iron_sword',  toolKey: null },
-    stoneshaper: { armorKey: 'leather_jacket', helmetKey: 'leather_cap', weaponKey: 'wooden_club', toolKey: 'stone_axe' },
-    seer:        { armorKey: 'cotton_shirt',   helmetKey: 'wool_cap',    weaponKey: 'wooden_wand', toolKey: 'lantern' },
-    illusionist: { armorKey: 'cotton_tunic',   helmetKey: 'cotton_cap',  weaponKey: 'wooden_wand', toolKey: null },
-    gravecaller: { armorKey: 'wool_tunic',     helmetKey: 'wool_cap',    weaponKey: 'wooden_wand', toolKey: 'lantern' },
-    alchemist:   { armorKey: 'leather_jacket', helmetKey: 'leather_cap', weaponKey: 'wooden_wand', toolKey: null },
-    warlord:     { armorKey: 'leather_vest',   helmetKey: 'leather_cap', weaponKey: 'iron_sword',  toolKey: 'iron_shield' },
-};
+// What each starting role carries when it joins: { armorKey, helmetKey, weaponKey, toolKey },
+// from each class's startingGear (js/content/classes/).
+export const STARTING_GEAR = Object.fromEntries(Object.entries(JOB_DATA).filter(([, j]) => j.startingGear).map(([key, j]) => [key, {
+    armorKey: j.startingGear.armor ?? null, helmetKey: j.startingGear.helmet ?? null,
+    weaponKey: j.startingGear.weapon ?? null, toolKey: j.startingGear.tool ?? null,
+}]));
 
 // The root of a job's skill tree: every member joins knowing it.
 export function starterAbility(job) {
