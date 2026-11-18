@@ -15,14 +15,14 @@ import { RunState, MAX_PARTY } from './run-state.js';
 import { RELICS } from './data/relics.js';
 import { CHAINS } from './data/realms.js';
 import { SCOUTING } from './data/scouting.js';
-import { loadProfile, saveProfile, recordRun, noteItems, noteBosses, claimCollectionRewards } from './profile.js';
+import { loadProfile, saveProfile, recordRun, noteItems, noteBosses, claimCollectionRewards, CHALLENGES } from './profile.js';
 import { loadPlans, describePurchases } from './skill-plans.js';
 import { Modal, Toast, BTN, BTN_GOOD, BTN_DANGER, GLOW, RARITY_COLOR, NODE_INFO, FONT, esc, jobLabel, hpBar, portraitHtml, drawSprites } from './ui-kit.js';
 import { DeployScene } from '../tactical/deploy-scene.js';
 import { BattleScene } from '../tactical/battle-scene.js';
 import { openScriptEditor } from '../tactical/ai/script-editor.js';
 import { setScriptBacking } from '../tactical/ai/script-store.js';
-import { canPromote, canSpendPoints } from '../tactical/loadout.js';
+import { canSpendPoints } from '../tactical/loadout.js';
 import { isPortrait } from '../ui/layout.js';
 import { riftTransition } from '../ui/rift-transition.js';
 
@@ -285,7 +285,7 @@ export class RunMapScene {
         const run = this.run;
         const back = run.pending ? () => this._screens.show() : null;
         const body = this._modal.show(`<div style="color:#ffcc44;font-weight:bold;font-size:15px;margin-bottom:8px;">Menu</div>
-            ${this._realmLoreHtml()}${this._relicsHtml()}${this._legendHtml()}
+            ${this._challengeHtml()}${this._realmLoreHtml()}${this._relicsHtml()}${this._legendHtml()}
             <div style="margin-top:14px;border-top:1px solid #223;padding-top:8px;">
                 <button data-action="quit" style="${BTN}color:#888;">Save &amp; quit to title</button>
                 <button data-action="abandon" style="${BTN}${BTN_DANGER}">Abandon run</button>
@@ -311,6 +311,12 @@ export class RunMapScene {
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px;font-size:10px;">
             ${Object.values(NODE_INFO).map(i => `<span><span style="color:${i.color};">${i.icon}</span> ${i.label}</span>`).join('')}</div>
             <div style="color:#666;font-size:10px;margin-top:6px;">${isPortrait() ? 'Tap' : 'Click'} a glowing node to travel. ${isPortrait() ? 'Drag' : 'Scroll'} to look ahead.</div>`;
+    }
+
+    // The run's challenge, if it took one (Feats > Challenges), so its rule stays in view.
+    _challengeHtml() {
+        const c = CHALLENGES[this.run.challenge];
+        return c ? `<div style="color:#c9a;font-size:10px;line-height:1.4;margin-top:4px;">⚑ Challenge: ${esc(c.name)}. ${esc(c.desc)}</div>` : '';
     }
 
     // The current realm's lore. Landscape shows it at the top of the sidebar; the portrait top
@@ -356,7 +362,7 @@ export class RunMapScene {
                 ${portraitHtml(m, 24)}
                 <div style="flex:1;min-width:0;font-size:10px;">
                     <div style="color:${m.appearance?.nameColor || '#ccc'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(m.name)}</div>
-                    <div style="color:#888;white-space:nowrap;">Lv${m.level}${canPromote(m) ? ' <span style="color:#fc6;">★</span>' : ''}${can ? ` <span style="color:#afa;font-weight:bold;">●${m.sp}</span>` : ''}</div>
+                    <div style="color:#888;white-space:nowrap;">Lv${m.level}${run.canPromote(m) ? ' <span style="color:#fc6;">★</span>' : ''}${can ? ` <span style="color:#afa;font-weight:bold;">●${m.sp}</span>` : ''}</div>
                     ${hpBar(hp, max, 56)}
                 </div>
             </div>`;
@@ -380,6 +386,7 @@ export class RunMapScene {
         const floor = run.currentNode?.floor ?? 0;
         let html = `<div style="color:#ffcc44;font-weight:bold;font-size:13px;">Act ${run.act}: ${esc(run.realm.name)}</div>
             <div style="color:#888;font-size:10px;">${esc(CHAINS[run.realm.chain].name)} · Floor ${floor} of 15</div>
+            ${this._challengeHtml()}
             <div style="color:#99a;font-size:10px;line-height:1.4;margin:5px 0 8px;">${esc(run.realm.blurb)}</div>
             <div style="display:flex;justify-content:space-between;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid #335;">
                 <span style="color:#fc8;">★ ${run.gold} gold</span><span style="color:#9cf;" data-tip="${esc(SCORE_TIP)}">✦ ${run.score || 0} score</span><span style="color:#888;">${Object.values(run.inventory).reduce((s, n) => s + n, 0)} in bag</span>
@@ -392,7 +399,7 @@ export class RunMapScene {
             html += `<div data-action="member" data-member="${esc(m.name)}" title="Open ${esc(m.name)}" style="display:flex;gap:7px;align-items:center;margin-bottom:5px;padding:3px;border:1px solid ${spend ? '#6f6' : 'transparent'};border-radius:4px;cursor:pointer;${spend ? GLOW : ''}">
                 ${portraitHtml(m, 26)}
                 <div style="flex:1;min-width:0;">
-                    <div style="color:${m.appearance?.nameColor || '#ccc'};font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(m.name)}${canPromote(m) ? ' <span style="color:#fc6;">★</span>' : ''}</div>
+                    <div style="color:${m.appearance?.nameColor || '#ccc'};font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(m.name)}${run.canPromote(m) ? ' <span style="color:#fc6;">★</span>' : ''}</div>
                     <div style="font-size:9px;color:#777;text-transform:uppercase;">Lv ${m.level} ${jobLabel(m.job)} ${spend ? `<span style="color:#afa;font-weight:bold;">● ${m.sp} SP</span>` : ''}</div>
                     <div style="font-size:9px;color:#999;">${hpBar(hp, max, 70)} ${hp}/${max}</div>
                 </div>

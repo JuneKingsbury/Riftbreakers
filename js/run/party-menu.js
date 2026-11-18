@@ -8,7 +8,7 @@ import { JOB_DATA } from '../tactical/data/jobs.js';
 import { EQUIPMENT, EQUIP_FIELDS, equipmentGrants } from '../tactical/data/equipment.js';
 import {
     LOADOUT_SLOTS, abilitySlot, isLearned, learnBlocker, memberJobs, equippable, skillRank, canUpgrade,
-    upgradeCost, canSpendPoints, canPromote, promotionOptions, buildLoadout, PROMOTION_LEVEL, XP_PER_LEVEL,
+    upgradeCost, canSpendPoints, promotionOptions, buildLoadout, PROMOTION_LEVEL, XP_PER_LEVEL,
 } from '../tactical/loadout.js';
 import { MAX_RANK, isUpgradeable, rankedKey, rankChanges } from '../tactical/data-registry.js';
 import { MAX_PARTY } from './run-state.js';
@@ -46,7 +46,7 @@ export class PartyMenu {
         let html = `<div style="color:#ffcc44;font-weight:bold;font-size:15px;margin-bottom:10px;">Party <span style="color:#888;font-size:11px;">(${run.party.length}/${MAX_PARTY})</span></div>`;
         for (const m of run.party) {
             const hp = run.hp(m), max = run.maxHp(m);
-            const promo = canPromote(m) ? `<span style="color:#fc6;font-size:10px;"> ★ can promote</span>` : '';
+            const promo = run.canPromote(m) ? `<span style="color:#fc6;font-size:10px;"> ★ can promote</span>` : '';
             const spend = canSpendPoints(m);
             html += `<div class="rk-member" data-member="${esc(m.name)}" style="display:flex;gap:10px;align-items:center;margin-bottom:6px;padding:7px 8px;cursor:pointer;background:#0d0d20;border:1px solid #335;border-radius:5px;${spend ? GLOW : ''}">
                 ${portraitHtml(m, 32)}
@@ -145,7 +145,12 @@ export class PartyMenu {
 
     _promotionHtml(m) {
         if (m.origin || JOB_DATA[m.job]?.tier !== 1) return '';
-        const ready = canPromote(m) && this.run.status === 'active';
+        if (this.run.challenge === 'no_promotions') {
+            return `<div style="margin-bottom:10px;padding:8px;border:1px solid #223;border-radius:4px;background:#0c0c18;">
+                <div style="color:#fc8;font-size:10px;text-transform:uppercase;margin-bottom:4px;">Promotion</div>
+                <div style="color:#888;font-size:11px;">Humble Origins: no one promotes on this challenge run.</div></div>`;
+        }
+        const ready = this.run.canPromote(m) && this.run.status === 'active';
         let html = `<div style="margin-bottom:10px;padding:8px;border:1px solid ${ready ? '#664' : '#223'};border-radius:4px;background:#0c0c18;">
             <div style="color:#fc8;font-size:10px;text-transform:uppercase;margin-bottom:4px;">Promotion</div>`;
         if (!ready) {

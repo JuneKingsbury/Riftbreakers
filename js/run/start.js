@@ -4,7 +4,7 @@ import { SceneManager } from '../tactical/scene-manager.js';
 import { RunMapScene } from './run-map-scene.js';
 import { RunState, START_PARTY, MIN_START_PARTY } from './run-state.js';
 import {
-    loadProfile, saveProfile, runOptions, UNLOCKS, canBuyUnlock, buyUnlock, hasUnlock, RIFT_TIERS, renownMultiplier, SMALL_PARTY_RENOWN,
+    loadProfile, saveProfile, runOptions, UNLOCKS, canBuyUnlock, buyUnlock, hasUnlock, RIFT_TIERS, renownMultiplier, SMALL_PARTY_RENOWN, CHALLENGES,
 } from './profile.js';
 import { jobsOfTier } from '../tactical/data-registry.js';
 import { JOB_DATA } from '../tactical/data/jobs.js';
@@ -45,7 +45,8 @@ export function continueRun(containerEl, skinManager, onExit) {
 
 // Shows the starting-party picker; on confirm, starts the run in containerEl.
 // onCancel: the player backed out. onStart: the game container is about to be used.
-export function newRun(containerEl, skinManager, { onStart, onExit, onCancel }) {
+// challenge: a CHALLENGES id when started from Feats > Challenges (locked in for the run).
+export function newRun(containerEl, skinManager, { onStart, onExit, onCancel, challenge = null }) {
     const profile = loadProfile();
     const options = runOptions(profile);
     const modal = new Modal(1200);
@@ -54,8 +55,16 @@ export function newRun(containerEl, skinManager, { onStart, onExit, onCancel }) 
     let tier = 0;
 
     const render = () => {
-        let html = `<div style="color:#ffcc44;font-weight:bold;font-size:16px;margin-bottom:4px;">New Run</div>
+        const c = CHALLENGES[challenge];
+        let html = `<div style="color:#ffcc44;font-weight:bold;font-size:16px;margin-bottom:4px;">${c ? 'New Challenge Run' : 'New Run'}</div>
             <div style="color:#999;font-size:11px;margin-bottom:10px;">Choose up to ${START_PARTY} starting classes. You'll meet recruits on the road, and the party can grow to six.</div>`;
+        if (c) {
+            html += `<div style="margin-bottom:10px;padding:8px;border:1px solid #a7c;border-radius:4px;background:#1a1028;">
+                <div style="color:#daf;font-weight:bold;font-size:12px;">⚑ Challenge: ${esc(c.name)}</div>
+                <div style="color:#bab;font-size:11px;line-height:1.4;margin-top:2px;">${esc(c.desc)}</div>
+                <div style="color:#887;font-size:10px;margin-top:4px;">Pick any Rift Tier and party size. Challenge runs earn renown as usual but can't go on the online leaderboard.</div>
+            </div>`;
+        }
         if (hasSavedRun()) html += `<div style="color:#f99;font-size:11px;margin-bottom:8px;">Starting a new run abandons the saved one.</div>`;
         for (const job of jobsOfTier(1)) {
             const unlocked = options.jobs.includes(job);
@@ -105,7 +114,7 @@ export function newRun(containerEl, skinManager, { onStart, onExit, onCancel }) 
         }));
         body.querySelector('[data-begin]')?.addEventListener('click', () => {
             if (picked.length < MIN_START_PARTY || picked.length > START_PARTY) return;
-            const run = RunState.create({ jobs: [...picked], options: { ...options, tier } });
+            const run = RunState.create({ jobs: [...picked], options: { ...options, tier, challenge: CHALLENGES[challenge] ? challenge : null } });
             run.save();
             // Step through the rift into the first act.
             riftTransition({ skinManager, onMidpoint: () => {

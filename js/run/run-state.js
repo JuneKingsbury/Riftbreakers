@@ -92,7 +92,7 @@ export class RunState {
         run.options = options;
         run.act = 1;
         run.realms = RunState.realmsForSeed(seed);
-        run.gold = options.startGold;
+        run.gold = options.challenge === 'no_gold' ? 0 : options.startGold;
         run.inventory = {};
         run.relics = [];
         run.scripts = {};
@@ -184,7 +184,7 @@ export class RunState {
         const bosses = realmEncounters(this.realmId, 'boss').map(e => e.def.id);
         this.actBoss = bosses.length ? new Rng((this.seed ^ (0xB055 * this.act)) >>> 0).pick(bosses) : null;
         // The last act has no recruit floor: the party should be at full size by then.
-        this.map = generateActMap(this.rng, this.act, { recruit: this.act < ACT_COUNT });
+        this.map = generateActMap(this.rng, this.act, { recruit: this.act < ACT_COUNT, shops: !this.noGold });
         this.currentNodeId = null;
         this.visited = [];
         this.pending = null;
@@ -194,6 +194,29 @@ export class RunState {
     // three acts, so they end where they always would have.
     get actCount() {
         return this.realms.length;
+    }
+
+    // ---- Challenge runs (profile CHALLENGES) ----
+
+    get challenge() {
+        return this.options?.challenge ?? null;
+    }
+
+    // Empty Purse: the run never gains gold and has no shops.
+    get noGold() {
+        return this.challenge === 'no_gold';
+    }
+
+    // Gold the run gains: all of it, or none on an Empty Purse run. Returns what was added.
+    _earnGold(amount) {
+        const gained = this.noGold ? 0 : Math.max(0, amount);
+        this.gold += gained;
+        return gained;
+    }
+
+    /** Whether `member` may promote now: ready (see loadout.canPromote) and not a Humble Origins run. */
+    canPromote(member) {
+        return this.challenge !== 'no_promotions' && canPromote(member);
     }
 
     // The realm the current act is set in (data/realms.js).
@@ -227,7 +250,7 @@ export class RunState {
             case 'shop':     this.pending = this._rollShop(); break;
             case 'event':    this.pending = { kind: 'event', eventId: this._rollEvent(), resolved: false, result: null }; break;
             case 'rest':     this.pending = { kind: 'rest', used: false }; break;
-            case 'treasure': this.pending = { kind: 'treasure', gold: this.rng.range(40, 70), relic: this._rollRelics(['common', 'uncommon'], 1)[0] ?? null, claimed: false }; break;
+            case 'treasure': this.pending = { kind: 'treasure', gold: this.noGold ? 0 : this.rng.range(40, 70), relic: this._rollRelics(['common', 'uncommon'], 1)[0] ?? null, claimed: false }; break;
             case 'recruit':  this.pending = this._recruitPending(); break;
         }
         return node;
@@ -329,7 +352,7 @@ export class RunState {
     // Party menu. It is free: it doesn't use up a rest or any other node.
     promote(memberName, job) {
         const m = this.member(memberName);
-        if (!m || this.status !== 'active' || !canPromote(m) || !promotionOptions(m).includes(job)) return false;
+        if (!m || this.status !== 'active' || !this.canPromote(m) || !promotionOptions(m).includes(job)) return false;
         const before = this.maxHp(m);
         promote(m, job);
         // Keep the same wounds when the new job's base HP differs.
@@ -409,7 +432,9 @@ export class RunState {
     }
 
     _rollRelics(rarities, count) {
-        const pool = Object.keys(RELICS).filter(k => rarities.includes(RELICS[k].rarity) && !this.relics.includes(k));
+        // Empty Purse runs never find gold or shop relics: they would do nothing.
+        const useless = (r) => this.noGold && (r.goldMult || r.shopDiscount);
+        const pool = Object.keys(RELICS).filter(k => rarities.includes(RELICS[k].rarity) && !this.relics.includes(k) && !useless(RELICS[k]));
         return this.rng.sample(pool, count);
     }
 
@@ -477,8 +502,7 @@ export class RunState {
             xpGained[m.name] = amt;
             levelUps[m.name] = this._grantXp(m, amt);
         }
-        const gold = Math.round(base.gold * relicMult(this.relics, 'goldMult') * ((this.options.tier ?? 0) >= 3 ? SLIM_GOLD : 1));
-        this.gold += gold;
+        const gold = this._earnGold(Math.round(base.gold * relicMult(this.relics, 'goldMult') * ((this.options.tier ?? 0) >= 3 ? SLIM_GOLD : 1)));
         this.stats.battles += 1;
         if (enc.kind === 'elite') this.stats.elites += 1;
         if (enc.kind === 'boss') {
@@ -503,12 +527,15 @@ export class RunState {
             return { kind: 'reward', encounter: enc, boss: true, final: true, gold, score, xp: xpGained, levelUps, items: [], relics: [] };
         }
 
-        const choices = Math.max(1, base.itemChoices + (relicsWith(this.relics, 'extraItemChoice').length ? 1 : 0)
+        // Take It or Leave It: one item and one boss relic, whatever else would add choices.
+        const oneChoice = this.challenge === 'one_choice';
+        const choices = oneChoice ? 1 : Math.max(1, base.itemChoices + (relicsWith(this.relics, 'extraItemChoice').length ? 1 : 0)
             - ((this.options.tier ?? 0) >= 3 ? 1 : 0));   // Rift Tier III
+        const bossRelics = oneChoice ? 1 : 3;
         let relics = [];
-        if (enc.kind === 'boss') relics = this._rollRelics(['rare'], 3);
+        if (enc.kind === 'boss') relics = this._rollRelics(['rare'], bossRelics);
         else if (enc.kind === 'elite') relics = this._rollRelics(this.options.relicLore ? ['common', 'uncommon', 'rare'] : ['common', 'uncommon'], 1);
-        if (enc.kind === 'boss' && relics.length === 0) relics = this._rollRelics(['uncommon'], 3);
+        if (enc.kind === 'boss' && relics.length === 0) relics = this._rollRelics(['uncommon'], bossRelics);
         this.pending = {
             kind: 'reward',
             encounter: enc,
@@ -604,7 +631,7 @@ export class RunState {
 
     sell(key) {
         if (this.pending?.kind !== 'shop' || !this.removeItem(key)) return false;
-        this.gold += this.sellPrice(key);
+        this._earnGold(this.sellPrice(key));
         return true;
     }
 
@@ -655,7 +682,7 @@ export class RunState {
     claimTreasure() {
         const p = this.pending;
         if (p?.kind !== 'treasure' || p.claimed) return false;
-        this.gold += p.gold;
+        this._earnGold(p.gold);
         if (p.relic) this.addRelic(p.relic);
         p.claimed = true;
         return true;
@@ -687,7 +714,7 @@ export class RunState {
         const p = this.pending;
         if (p?.kind !== 'recruit' || p.done) return false;
         if (p.full) for (const m of this.party) this._grantXp(m, 40);
-        else this.gold += 40;
+        else this._earnGold(40);
         p.done = true;
         return true;
     }
@@ -733,6 +760,7 @@ export class RunState {
         let text = resultText || '';
         text = text.replace('{name}', fx.member ?? '').replace('{item}', fx.item ? itemName(fx.item) : 'nothing')
             .replace('{relic}', fx.relic ? RELICS[fx.relic].name : 'nothing');
+        if (fx.goldLost) text += ' (Empty Purse: the gold slips away.)';
         this.pending.resolved = true;
         this.pending.result = text;
         let next = null;
@@ -743,7 +771,9 @@ export class RunState {
     // Applies an event effect (see data/events.js). Returns what was gained: { item, relic, member }.
     applyEffect(effect) {
         const out = {};
-        if (effect.gold) this.gold = Math.max(0, this.gold + effect.gold);
+        if (effect.gold > 0) {
+            if (!this._earnGold(effect.gold)) out.goldLost = true;
+        } else if (effect.gold) this.gold = Math.max(0, this.gold + effect.gold);
         if (effect.healPct) this.healAll(effect.healPct);
         if (effect.xp) for (const m of this.party) this._grantXp(m, effect.xp);
         if (effect.item) {

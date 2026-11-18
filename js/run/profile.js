@@ -61,6 +61,7 @@ export function newProfile() {
         bestRuns: [],     // summaries of the best finished runs, won or lost, highest score first (see runSummary)
         bossKills: {},    // boss fight id → times defeated, across all runs
         rewards: [],      // collection rewards earned (COLLECTION_REWARDS ids)
+        challenges: {},   // challenge id → { wins, first: the first winning run (see runSummary) }
     };
 }
 
@@ -94,6 +95,13 @@ export function sanitizeProfile(data) {
         : Array.isArray(data.bestWins) ? asWins(data.bestWins)
             : Array.isArray(data.recentWins) ? asWins(data.recentWins) : [];
     p.bestRuns = rankRuns(runs.map(sanitizeRun).filter(Boolean));
+    if (data.challenges && typeof data.challenges === 'object') {
+        for (const id of Object.keys(CHALLENGES)) {
+            const c = data.challenges[id];
+            const first = c && typeof c === 'object' ? sanitizeRun(c.first) : null;
+            if (first) p.challenges[id] = { wins: Math.max(1, count(c.wins)), first: { ...first, won: true, challenge: id } };
+        }
+    }
     if (data.bossKills && typeof data.bossKills === 'object') {
         for (const id of BOSS_IDS) if (Object.hasOwn(data.bossKills, id) && count(data.bossKills[id]) > 0) p.bossKills[id] = count(data.bossKills[id]);
     }
@@ -148,6 +156,7 @@ function sanitizeRun(w) {
         score: count(w.score),
         startPartySize: Math.min(3, count(w.startPartySize, 3)) || 3,
         tier: Math.min(MAX_RIFT_TIER, count(w.tier)),
+        challenge: isChallenge(w.challenge) ? w.challenge : null,
         // A per-run id, so the leaderboard takes each run once (see leaderboard.js).
         id: typeof w.id === 'string' && /^[a-z0-9-]{1,40}$/i.test(w.id) ? w.id : '',
         submitted: w.submitted === true,
@@ -174,6 +183,7 @@ export function runSummary(run, renown, now = new Date()) {
         score: run.score || 0,
         startPartySize: run.startPartySize ?? 3,
         tier: run.options?.tier ?? 0,
+        challenge: run.options?.challenge ?? null,
         id: `${(run.seed >>> 0).toString(36)}-${now.getTime().toString(36)}`,
     });
 }
@@ -255,6 +265,18 @@ export function renownMultiplier(tier = 0, startPartySize = 3) {
     return 1 + (RIFT_TIERS[tier]?.renown ?? 0) + (SMALL_PARTY_RENOWN[startPartySize] ?? 0);
 }
 
+// ---- Challenge runs (Feats > Challenges) ----
+// A run may take one challenge, at any Rift Tier and party size. Renown and score work as
+// usual, but challenge runs can't go on the online leaderboard (its entries don't say which
+// challenge a run took). Winning one checks it off in Feats with the winning team.
+export const CHALLENGES = {
+    no_gold:       { name: 'Empty Purse', desc: 'No gold all run: you start with none, nothing pays any, and there are no shops.' },
+    no_promotions: { name: 'Humble Origins', desc: 'No class promotions: everyone stays in their Tier 1 class.' },
+    one_choice:    { name: 'Take It or Leave It', desc: 'Every battle reward offers one item, and bosses offer one relic, instead of a choice.' },
+};
+
+const isChallenge = (c) => typeof c === 'string' && Object.hasOwn(CHALLENGES, c);
+
 // ---- Collection rewards (Feats) ----
 // Finding a share of every item earns a reward, once: renown at 33%, and at 66% the Collector's
 // Loupe, a trinket that can only be found once it is earned.
@@ -308,6 +330,7 @@ export function runOptions(profile) {
         // Items that can only be found once a collection reward has been earned.
         featItems:     Object.entries(COLLECTION_REWARDS).filter(([id, r]) => r.item && profile?.rewards?.includes(id)).map(([, r]) => r.item),
         tier:          0,   // set on the New Run screen (RIFT_TIERS)
+        challenge:     null,   // set when started from Feats > Challenges (CHALLENGES)
     };
 }
 
@@ -332,8 +355,16 @@ export function recordRun(profile, run, now = new Date()) {
     noteBosses(profile, run);
     // Every run that won a battle is a candidate high score, whether it was won, lost or abandoned.
     // (Abandoning can't raise a score: points only come from winning battles.)
-    if ((run.stats.battles || 0) > 0) {
-        profile.bestRuns = rankRuns([runSummary(run, earned, now), ...(profile.bestRuns || [])].filter(Boolean));
+    const summary = runSummary(run, earned, now);
+    if ((run.stats.battles || 0) > 0 && summary) {
+        profile.bestRuns = rankRuns([summary, ...(profile.bestRuns || [])]);
+    }
+    // A won challenge is checked off, remembering the first team to win it.
+    const challenge = run.options?.challenge;
+    if (won && isChallenge(challenge) && summary) {
+        profile.challenges ??= {};
+        const c = profile.challenges[challenge];
+        profile.challenges[challenge] = c ? { ...c, wins: c.wins + 1 } : { wins: 1, first: summary };
     }
     return earned;
 }

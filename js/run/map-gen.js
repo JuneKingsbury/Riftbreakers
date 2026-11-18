@@ -13,7 +13,8 @@
 //   last floor before the boss is all rest; no elite or rest before floor 5; a shop, elite or
 //   rest never follows another of the same type; siblings avoid sharing those types. Every
 //   route crosses each floor once, so it meets exactly one recruit per act that has them
-//   (three per run: the last act has none).
+//   (three per run: the last act has none). An act generated with shops: false has none
+//   (the No Gold challenge).
 //
 // Output: { act, floors: [[node]], nodes: { id: node }, bossId }
 //   node: { id, floor, lane, type, next: [ids] }
@@ -35,7 +36,7 @@ const nodeId = (floor, lane) => `${floor}-${lane}`;
  * @param {number} [act=1]
  * @param {{ recruit?: boolean }} [opts]  recruit: false leaves out the recruit floor.
  */
-export function generateActMap(rng, act = 1, { recruit = true } = {}) {
+export function generateActMap(rng, act = 1, { recruit = true, shops = true } = {}) {
     // ---- Paths ----
     const edges = new Map();   // nodeId → Set of next lanes
     const used = new Set();
@@ -83,18 +84,19 @@ export function generateActMap(rng, act = 1, { recruit = true } = {}) {
 
     // ---- Types ----
     for (const row of floors.slice(0, TOP_FLOOR)) {
-        for (const n of row) n.type = rollType(rng, n, parents[n.id] || [], nodes, recruit);
+        for (const n of row) n.type = rollType(rng, n, parents[n.id] || [], nodes, recruit, shops);
     }
 
     return { act, floors, nodes, bossId };
 }
 
-function rollType(rng, n, nodeParents, nodes, recruit) {
+function rollType(rng, n, nodeParents, nodes, recruit, shops) {
     if (n.floor === 1) return 'combat';
     if (n.floor === RECRUIT_FLOOR && recruit) return 'recruit';
     if (n.floor === TREASURE_FLOOR) return 'treasure';
     if (n.floor === TOP_FLOOR) return 'rest';
     const weights = { ...BASE_WEIGHTS };
+    if (!shops) delete weights.shop;
     if (n.floor < 5) { delete weights.elite; delete weights.rest; }
     if (n.floor === TOP_FLOOR - 1) delete weights.rest;
     for (const p of nodeParents) {

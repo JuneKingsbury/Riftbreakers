@@ -214,7 +214,12 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
     document.getElementById('start-feats')?.addEventListener('click', () => {
-        import('../run/feats.js').then(({ showFeats }) => showFeats(skinManager));
+        import('../run/feats.js').then(({ showFeats }) => showFeats(skinManager, undefined, {
+            // Feats > Challenges: Start opens the New Run picker with that challenge locked in.
+            onStartChallenge: (challenge) => import('../run/start.js').then(({ newRun }) => {
+                newRun(gameEl, skinManager, { onStart: showGame, onExit: backToTitle, challenge });
+            }),
+        }));
     });
     document.getElementById('start-unlocks')?.addEventListener('click', () => {
         import('../run/start.js').then(({ showUnlocks }) => showUnlocks());

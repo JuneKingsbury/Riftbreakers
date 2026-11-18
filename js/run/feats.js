@@ -1,11 +1,12 @@
 // Feats, from the title screen: a collection log of every item in the game (found or not yet
-// found, across all runs), a bestiary of every boss and how often it has been beaten, and the
-// best runs, won or lost, by score. All come from the profile (items, bossKills, bestRuns), so they
-// last between runs and travel with save exports.
+// found, across all runs), a bestiary of every boss and how often it has been beaten, the
+// challenge runs (started from here, checked off with the first winning team), and the best
+// runs, won or lost, by score. All come from the profile (items, bossKills, challenges,
+// bestRuns), so they last between runs and travel with save exports.
 import { EQUIPMENT, EQUIP_FIELDS } from '../tactical/data/equipment.js';
 import { REALMS, ACT_REALMS } from './data/realms.js';
 import { ENCOUNTERS } from './data/encounters.js';
-import { loadProfile, BEST_RUNS, BOSS_IDS, COLLECTION_REWARDS, RIFT_TIERS } from './profile.js';
+import { loadProfile, BEST_RUNS, BOSS_IDS, COLLECTION_REWARDS, RIFT_TIERS, CHALLENGES } from './profile.js';
 import { SCORE_TIP } from './score.js';
 import { canSubmit, submitRun, fetchLeaderboard, savedName, runResult } from './leaderboard.js';
 import { NAME_MAX, nameProblem } from './leaderboard-rules.js';
@@ -44,9 +45,10 @@ export function percent(have, total) {
     return total ? Math.floor((have / total) * 100) : 0;
 }
 
-// 'Solo start · Tier II: Rift Tax', or '' for a standard run.
+// 'Challenge: Empty Purse · Solo start · Tier II: Rift Tax', or '' for a standard run.
 function modeText(w) {
     const parts = [];
+    if (CHALLENGES[w.challenge]) parts.push(`Challenge: ${CHALLENGES[w.challenge].name}`);
     if (w.startPartySize === 1) parts.push('Solo start (score ×2)');
     else if (w.startPartySize === 2) parts.push('Duo start (score ×1.5)');
     if (w.tier > 0) parts.push(RIFT_TIERS[w.tier]?.name ?? `Tier ${w.tier}`);
@@ -58,12 +60,26 @@ function when(iso) {
     return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
+// A remembered run's party: portrait, name, level and class for each member.
+function partyHtml(w) {
+    let html = `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;">`;
+    for (const m of w.party) {
+        html += `<div style="display:flex;gap:5px;align-items:center;">${portraitHtml(m, 24)}
+            <div style="font-size:10px;line-height:1.25;"><div style="color:${esc(m.appearance?.nameColor || '#ccc')};">${esc(m.name)}</div>
+            <div style="color:#778;">Lv ${m.level} ${esc(m.origin ? `${jobLabel(m.origin)} → ${jobLabel(m.job)}` : jobLabel(m.job))}</div></div></div>`;
+    }
+    return html + `</div>`;
+}
+
 /**
  * Opens the Feats panel.
  * @param {object} [skinManager]  For item icons and portraits (none: text only).
  * @param {() => void} [onClose]
+ * @param {object} [opts]
+ * @param {(challenge: string) => void} [opts.onStartChallenge]  Starts a challenge run (Feats
+ *     closes first). Without it, the Challenges tab has no Start buttons.
  */
-export function showFeats(skinManager = globalThis._sharedSkinManager, onClose) {
+export function showFeats(skinManager = globalThis._sharedSkinManager, onClose, { onStartChallenge } = {}) {
     const profile = loadProfile();
     const found = new Set(profile.items);
     const catalog = itemCatalog();
@@ -163,16 +179,45 @@ export function showFeats(skinManager = globalThis._sharedSkinManager, onClose) 
                 <div style="font-size:11px;">${outcomeHtml(w)}</div>
                 ${modeText(w) ? `<div style="color:#c9a;font-size:10px;">${esc(modeText(w))}</div>` : ''}
                 ${realms ? `<div style="color:#99a;font-size:10px;margin:2px 0 6px;">${esc(realms)}</div>` : ''}
-                <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;">`;
-            for (const m of w.party) {
-                html += `<div style="display:flex;gap:5px;align-items:center;">${portraitHtml(m, 24)}
-                    <div style="font-size:10px;line-height:1.25;"><div style="color:${esc(m.appearance?.nameColor || '#ccc')};">${esc(m.name)}</div>
-                    <div style="color:#778;">Lv ${m.level} ${esc(m.origin ? `${jobLabel(m.origin)} → ${jobLabel(m.job)}` : jobLabel(m.job))}</div></div></div>`;
-            }
-            html += `</div><div style="color:#889;font-size:10px;">${w.floors} floors · ${w.battles} battles · ${w.elites} elites · ${w.bosses} bosses · ${w.relics} relics · +${w.renown} renown</div>`;
+                ${partyHtml(w)}`;
+            html += `<div style="color:#889;font-size:10px;">${w.floors} floors · ${w.battles} battles · ${w.elites} elites · ${w.bosses} bosses · ${w.relics} relics · +${w.renown} renown</div>`;
             html += submitHtml(w);
             html += `</div>`;
         });
+        return html;
+    };
+
+    // Each challenge: checked off with its first winning team once won, and a button to start one.
+    const challengesHtml = () => {
+        const ids = Object.keys(CHALLENGES);
+        const won = ids.filter(id => profile.challenges[id]).length;
+        let html = `<div style="margin-top:10px;font-size:11px;color:#ccd;">Challenges won: <b style="color:#c9f;">${won} of ${ids.length}</b></div>
+            ${bar(won, ids.length, '#a6d')}
+            <div style="color:#778;font-size:10px;margin:4px 0 8px;line-height:1.5;">A challenge run has one extra rule, at any Rift Tier and party size. It earns renown as usual but can't go on the online leaderboard.</div>`;
+        for (const id of ids) {
+            const c = CHALLENGES[id], rec = profile.challenges[id];
+            const w = rec?.first;
+            html += `<div style="padding:8px;margin-bottom:6px;border-radius:5px;background:${w ? '#141026' : '#0b0b16'};border:1px solid ${w ? '#6a4a8a' : '#2a2a44'};">
+                <div style="display:flex;gap:8px;align-items:flex-start;">
+                    <span style="font-size:16px;line-height:1.2;color:${w ? '#8d8' : '#445'};">${w ? '✓' : '○'}</span>
+                    <div style="flex:1;min-width:0;">
+                        <div style="color:${w ? '#eed' : '#bbc'};font-weight:bold;">${esc(c.name)}</div>
+                        <div style="color:#99a;font-size:10px;line-height:1.4;">${esc(c.desc)}</div>
+                    </div>
+                    ${onStartChallenge ? `<button data-start-challenge="${id}" style="${BTN_SM}background:#1a1028;border:1px solid #a7c;color:#daf;white-space:nowrap;">${w ? 'Play again' : 'Start'}</button>` : ''}
+                </div>`;
+            if (w) {
+                const realms = w.realms.map(r => REALMS[r]?.name).filter(Boolean).join(' → ');
+                const mode = modeText({ ...w, challenge: null });
+                html += `<div style="margin:6px 0 0 24px;">
+                    <div style="font-size:10px;color:#c9a;">First won ${esc(when(w.date))}${rec.wins > 1 ? ` · won ${rec.wins} times` : ''}${mode ? ` · ${esc(mode)}` : ''}</div>
+                    ${realms ? `<div style="color:#99a;font-size:10px;margin:2px 0 4px;">${esc(realms)}</div>` : ''}
+                    ${partyHtml(w)}
+                    <div style="color:#889;font-size:10px;">${w.score} score · ${w.battles} battles · ${w.elites} elites · ${w.bosses} bosses · ${w.relics} relics</div>
+                </div>`;
+            }
+            html += `</div>`;
+        }
         return html;
     };
 
@@ -180,6 +225,7 @@ export function showFeats(skinManager = globalThis._sharedSkinManager, onClose) 
     // Under each run: its leaderboard status, or the name form while submitting it.
     const submitHtml = (w) => {
         if (w.submitted) return `<div style="color:#8c8;font-size:10px;margin-top:5px;">✓ On the online leaderboard</div>`;
+        if (w.challenge) return `<div style="color:#667;font-size:10px;margin-top:5px;">Challenge runs can't go on the leaderboard.</div>`;
         if (!canSubmit(w)) return w.score ? '' : `<div style="color:#667;font-size:10px;margin-top:5px;">No score (played before scoring), so it can't go on the leaderboard.</div>`;
         if (submitting !== w.id) {
             return `<button data-submit-win="${esc(w.id)}" style="${BTN_SM}margin-top:6px;background:#16223a;border:1px solid #57a;color:#bdf;">Submit to leaderboard</button>`;
@@ -275,11 +321,12 @@ export function showFeats(skinManager = globalThis._sharedSkinManager, onClose) 
             border:1px solid ${tab === id ? '#99f' : '#335'};border-bottom:none;color:${tab === id ? '#fff' : '#aab'};">${label}</button>`;
         let html = `<div style="color:#ffcc44;font-weight:bold;font-size:16px;margin-bottom:4px;">Feats</div>
             <div style="color:#889;font-size:11px;margin-bottom:10px;">Runs ${s.runs} · Wins ${s.wins} · Best: act ${s.bestAct || '-'}, ${s.bestFloor} floors · Items ${percent(found.size, total)}% · Bosses ${bossesBeaten} / ${bossTotal}</div>
-            <div style="display:flex;gap:4px;flex-wrap:wrap;border-bottom:1px solid #335;">${tabBtn('items', `Items ${percent(found.size, total)}%`)}${tabBtn('bestiary', `Bestiary ${bossesBeaten}/${bossTotal}`)}${tabBtn('wins', 'High Scores')}${tabBtn('leaderboard', 'Leaderboard')}</div>`;
-        html += tab === 'items' ? itemsHtml() : tab === 'bestiary' ? bestiaryHtml() : tab === 'wins' ? scoresHtml() : boardHtml();
+            <div style="display:flex;gap:4px;flex-wrap:wrap;border-bottom:1px solid #335;">${tabBtn('items', `Items ${percent(found.size, total)}%`)}${tabBtn('bestiary', `Bestiary ${bossesBeaten}/${bossTotal}`)}${tabBtn('challenges', `Challenges ${Object.keys(CHALLENGES).filter(id => profile.challenges[id]).length}/${Object.keys(CHALLENGES).length}`)}${tabBtn('wins', 'High Scores')}${tabBtn('leaderboard', 'Leaderboard')}</div>`;
+        html += tab === 'items' ? itemsHtml() : tab === 'bestiary' ? bestiaryHtml() : tab === 'challenges' ? challengesHtml()
+            : tab === 'wins' ? scoresHtml() : boardHtml();
         const body = modal.show(html, { width: 640, view: 'feats', onClose: () => { modal.destroy(); toastEl?.destroy(); onClose?.(); } });
         // Portraits are looked up by name among the drawn members, so pass the remembered ones.
-        drawSprites(body, profile.bestRuns.flatMap(w => w.party), skinManager);
+        drawSprites(body, [...profile.bestRuns, ...Object.values(profile.challenges).map(c => c.first)].flatMap(w => w.party), skinManager);
         wireTips(body);
         body.querySelectorAll('[data-feats-tab]').forEach(b => b.addEventListener('click', () => {
             tab = b.dataset.featsTab;
@@ -287,6 +334,11 @@ export function showFeats(skinManager = globalThis._sharedSkinManager, onClose) 
             if (tab === 'leaderboard' && !board) loadBoard();
         }));
         body.querySelector('[data-lb-refresh]')?.addEventListener('click', loadBoard);
+        body.querySelectorAll('[data-start-challenge]').forEach(b => b.addEventListener('click', () => {
+            modal.destroy();
+            toastEl?.destroy();
+            onStartChallenge(b.dataset.startChallenge);
+        }));
         body.querySelectorAll('[data-submit-win]').forEach(b => b.addEventListener('click', () => {
             submitting = b.dataset.submitWin;
             submitMsg = null;

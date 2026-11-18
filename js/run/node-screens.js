@@ -5,7 +5,7 @@ import { RELICS } from './data/relics.js';
 import { REALMS } from './data/realms.js';
 import { Sound } from '../audio/sound.js';
 import { SCORE_TIP, scoreLine } from './score.js';
-import { canPromote, canSpendPoints } from '../tactical/loadout.js';
+import { canSpendPoints } from '../tactical/loadout.js';
 import { JOB_DATA } from '../tactical/data/jobs.js';
 import { MAX_PARTY } from './run-state.js';
 import { EQUIPMENT, EQUIP_FIELDS, EQUIP_STAT_KEYS, canEnchant, enchantedKey, enchantLevel, MAX_ENCHANT } from '../tactical/data/equipment.js';
@@ -125,7 +125,7 @@ export class NodeScreens {
         this._chimed.add(p);
         const run = this.run;
         let html = H1(p.boss ? '♛ Boss Defeated!' : '✦ Victory!');
-        html += `<div style="color:#fd8;margin-bottom:4px;">+${p.gold} gold</div>`;
+        if (!run.noGold) html += `<div style="color:#fd8;margin-bottom:4px;">+${p.gold} gold</div>`;
         if (p.score) {
             html += `<div data-tip="${esc(SCORE_TIP)}" style="color:#9cf;margin-bottom:4px;">+${p.score.points} score
                 <span style="color:#778;font-size:10px;">${esc(scoreLine(p.score))}</span></div>`;
@@ -154,7 +154,7 @@ export class NodeScreens {
                 html += `<div style="padding:6px 8px;border:1px solid #335;border-radius:4px;">${relicHtml(p.relics[0])}</div>`;
             }
         }
-        const ready = run.party.filter(m => canPromote(m));
+        const ready = run.party.filter(m => run.canPromote(m));
         if (ready.length) {
             html += SECTION('Promotion');
             html += `<div style="color:#fc6;font-size:11px;margin-bottom:6px;">${esc(ready.map(m => m.name).join(', '))} can promote now from the Party menu.</div>`;
@@ -292,7 +292,7 @@ export class NodeScreens {
         }
         for (const key of Object.keys(run.inventory)) if (EQUIPMENT[key]) rows += itemRow(key, { item: key }, 'in the bag');
         html += rows || `<div style="color:#777;font-size:11px;margin-bottom:6px;">Nothing to enchant yet.</div>`;
-        const ready = run.party.filter(m => canPromote(m));
+        const ready = run.party.filter(m => run.canPromote(m));
         if (ready.length) {
             html += `<div style="color:#fc6;font-size:11px;margin:6px 0;">★ ${esc(ready.map(m => m.name).join(', '))} can promote from the Party menu at any time. It won't use up your rest.</div>`;
         }
@@ -310,7 +310,8 @@ export class NodeScreens {
         const run = this.run;
         let html = H1('✦ Treasure', '#ec4');
         html += SUB('An old strongbox, half-buried by the road.');
-        html += `<div style="color:#fd8;margin-bottom:6px;">${p.gold} gold</div>`;
+        html += run.noGold ? `<div style="color:#889;margin-bottom:6px;">Empty, of gold at least.</div>`
+            : `<div style="color:#fd8;margin-bottom:6px;">${p.gold} gold</div>`;
         if (p.relic) html += `<div style="padding:6px 8px;border:1px solid #335;border-radius:4px;margin-bottom:8px;">${relicHtml(p.relic)}</div>`;
         html += p.claimed
             ? `<button data-continue style="${BTN}${BTN_GOOD}text-align:center;">Continue ›</button>`
@@ -349,7 +350,7 @@ export class NodeScreens {
                     <div style="color:#99a;font-size:10px;margin-top:3px;">Skills: ${esc(kit.map(abilityName).join(', '))}</div>
                 </div>`;
             });
-            html += `<button data-decline style="${BTN}">Turn them away (+40 gold)</button>`;
+            html += `<button data-decline style="${BTN}">Turn them away${run.noGold ? '' : ' (+40 gold)'}</button>`;
         }
         // Candidates aren't party members yet, so draw their portraits from the pending list.
         const body = this._show(html, (on) => {

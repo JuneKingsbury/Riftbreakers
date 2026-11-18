@@ -35,9 +35,12 @@ export function runResult(entry) {
     return { won: entry.bosses >= acts, act: Math.min(acts, entry.bosses + 1) };
 }
 
-/** Whether a remembered run can go on the leaderboard (scored, with an id, not yet sent). */
+/**
+ * Whether a remembered run can go on the leaderboard (scored, with an id, not yet sent). Challenge
+ * runs can't: leaderboard entries don't record a challenge.
+ */
 export function canSubmit(run) {
-    return !!run?.id && run.score > 0 && !run.submitted;
+    return !!run?.id && run.score > 0 && !run.submitted && !run.challenge;
 }
 
 async function api(path, opts = {}, fetchImpl = globalThis.fetch) {
