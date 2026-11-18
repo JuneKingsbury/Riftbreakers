@@ -10,10 +10,18 @@ import { jobsOfTier } from '../tactical/data-registry.js';
 import { JOB_DATA } from '../content/jobs.js';
 import { Modal, BTN, BTN_DISABLED, BTN_GOOD, BTN_GOLD, esc, jobLabel, abilityName } from './ui-kit.js';
 import { riftTransition } from '../ui/rift-transition.js';
+import { dailyDate, dailyJobs, dailyLabel, dailyPlayed, createDailyRun, markDailyStarted } from './daily.js';
 
 
 export function hasSavedRun() {
     return !!RunState.load();
+}
+
+// The warning shown before replacing the saved run. A saved daily run can't be started again.
+function savedRunWarning() {
+    return RunState.load()?.options?.daily
+        ? 'Starting a new run abandons your daily run in progress, and today\'s daily can\'t be played again.'
+        : 'Starting a new run abandons the saved one.';
 }
 
 function launch(containerEl, skinManager, run, onExit) {
@@ -52,7 +60,7 @@ export function newRun(containerEl, skinManager, { onStart, onExit, onCancel, ch
                 <div style="color:#887;font-size:10px;margin-top:4px;">Pick any Rift Tier and party size. Challenge runs earn renown as usual but can't go on the online leaderboard.</div>
             </div>`;
         }
-        if (hasSavedRun()) html += `<div style="color:#f99;font-size:11px;margin-bottom:8px;">Starting a new run abandons the saved one.</div>`;
+        if (hasSavedRun()) html += `<div style="color:#f99;font-size:11px;margin-bottom:8px;">${savedRunWarning()}</div>`;
         for (const job of jobsOfTier(1)) {
             const unlocked = options.jobs.includes(job);
             const on = picked.includes(job);
@@ -112,6 +120,42 @@ export function newRun(containerEl, skinManager, { onStart, onExit, onCancel, ch
         });
     };
     render();
+}
+
+// Shows today's daily run (its date, classes and rules); on confirm, starts it in containerEl.
+// The day's one attempt is used as soon as the run starts. Callbacks as for newRun.
+export function dailyRun(containerEl, skinManager, { onStart, onExit, onCancel }) {
+    const date = dailyDate();
+    if (dailyPlayed(date)) { onCancel?.(); return; }
+    const modal = new Modal(1200);
+    const jobs = dailyJobs(date);
+    let html = `<div style="color:#ffcc44;font-weight:bold;font-size:16px;margin-bottom:4px;">Daily Run · ${esc(dailyLabel(date))}</div>
+        <div style="color:#aab;font-size:11px;line-height:1.5;margin-bottom:10px;">Every player gets the same run today: the same map, fights and rewards, with the same starting party.
+        Unlocks and Rift Tiers don't apply. You get <b style="color:#fc8;">one attempt</b>, and it counts as soon as you set out.</div>
+        <div style="color:#fc8;font-size:10px;text-transform:uppercase;margin:6px 0 4px;">Today's party</div>`;
+    for (const job of jobs) {
+        const kit = Object.keys(JOB_DATA[job].learnable).map(abilityName).join(', ');
+        html += `<div style="${BTN}cursor:default;">
+            <div style="display:flex;justify-content:space-between;"><span style="font-weight:bold;color:#ddd;">${jobLabel(job)}</span>
+            <span style="color:#888;font-size:10px;">${esc(JOB_DATA[job].role)}</span></div>
+            <div style="color:#778;font-size:10px;margin-top:2px;line-height:1.4;">${esc(kit)}</div></div>`;
+    }
+    if (hasSavedRun()) html += `<div style="color:#f99;font-size:11px;margin:8px 0;">${savedRunWarning()}</div>`;
+    html += `<div style="color:#778;font-size:10px;margin:6px 0;">Finish (win or lose) to post your score on today's daily leaderboard. A new daily starts at midnight UTC.</div>
+        <button data-begin style="${BTN}${BTN_GOOD}text-align:center;font-weight:bold;">Set out</button>`;
+    const body = modal.show(html, { width: 480, onClose: () => { modal.destroy(); onCancel?.(); }, view: 'daily-run' });
+    body.querySelector('[data-begin]').addEventListener('click', () => {
+        // The day may have turned over while this was open: that day's run is a different one.
+        if (dailyDate() !== date || dailyPlayed(date)) { modal.destroy(); onCancel?.(); return; }
+        const run = createDailyRun(date);
+        markDailyStarted(date);
+        run.save();
+        riftTransition({ skinManager, onMidpoint: () => {
+            modal.destroy();
+            onStart?.();
+            launch(containerEl, skinManager, run, onExit);
+        } });
+    });
 }
 
 export function showUnlocks(onClose) {

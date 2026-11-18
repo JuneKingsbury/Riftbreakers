@@ -227,6 +227,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     const continueBtn = document.getElementById('continue-run');
+    let refreshDaily = () => {};   // set once the daily panel loads
     const showGame = () => {
         startScreen.style.display = 'none';
         gameEl.style.display = 'block';
@@ -237,6 +238,7 @@ document.addEventListener('DOMContentLoaded', () => {
         startScreen.style.display = '';
         redrawBackdrop();   // a resize while hidden drew at zero size
         refreshContinue();
+        refreshDaily();
         Sound.playMusic(TITLE_MUSIC);
     };
     const refreshContinue = () => {
@@ -244,15 +246,28 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     refreshContinue();
     // Importing a save can add or remove a run in progress, so Continue follows it.
-    wireSavePanel(refreshContinue);
+    wireSavePanel(() => { refreshContinue(); refreshDaily(); });
     // Cloud saves: a download from Google Drive replaces progress the same way an import does.
-    wireCloudPanel(() => { refreshContinue(); fillBackdropSelect(); redrawBackdrop(); });
+    wireCloudPanel(() => { refreshContinue(); refreshDaily(); fillBackdropSelect(); redrawBackdrop(); });
 
     document.getElementById('new-run')?.addEventListener('click', () => {
         import('../run/start.js').then(({ newRun }) => {
             newRun(gameEl, skinManager, { onStart: showGame, onExit: backToTitle });
         });
     });
+    // Daily run: its button and the daily leaderboard beside the menu (ui/daily-panel.js).
+    const dailyBtn = document.getElementById('daily-run');
+    const dailyBoard = document.getElementById('daily-board');
+    if (dailyBtn && dailyBoard) {
+        import('../ui/daily-panel.js').then(({ mountDailyPanel }) => {
+            refreshDaily = mountDailyPanel({
+                button: dailyBtn, panel: dailyBoard,
+                onPlay: () => import('../run/start.js').then(({ dailyRun }) => {
+                    dailyRun(gameEl, skinManager, { onStart: showGame, onExit: backToTitle, onCancel: refreshDaily });
+                }),
+            });
+        });
+    }
     continueBtn?.addEventListener('click', () => {
         import('../run/start.js').then(({ continueRun }) => {
             showGame();

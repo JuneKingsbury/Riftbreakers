@@ -15,6 +15,7 @@ import { RunState, MAX_PARTY } from './run-state.js';
 import { RELICS } from './data/relics.js';
 import { CHAINS } from './data/realms.js';
 import { SCOUTING } from './data/encounters.js';
+import { recordDailyResult } from './daily.js';
 import { loadProfile, saveProfile, recordRun, noteItems, noteBosses, claimCollectionRewards, CHALLENGES } from './profile.js';
 import { loadPlans, describePurchases } from './skill-plans.js';
 import { Modal, Toast, BTN, BTN_GOOD, BTN_DANGER, GLOW, RARITY_COLOR, NODE_INFO, FONT, esc, jobLabel, hpBar, portraitHtml, drawSprites } from './ui-kit.js';
@@ -210,8 +211,10 @@ export class RunMapScene {
     _endRun() {
         if (this.run.renownEarned == null) {
             const profile = loadProfile();
-            this.run.renownEarned = recordRun(profile, this.run);
+            const now = new Date();   // shared, so the daily result has the same id as the high score
+            this.run.renownEarned = recordRun(profile, this.run, now);
             saveProfile(profile);
+            if (this.run.options?.daily) recordDailyResult(this.run, this.run.renownEarned, now);
             RunState.clearSave();
         }
         if (this.run.status === 'won') Sound.playMusic(VICTORY_MUSIC);

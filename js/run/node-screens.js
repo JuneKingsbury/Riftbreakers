@@ -399,7 +399,10 @@ export class NodeScreens {
             html += `<div style="margin-top:12px;color:#fc6;font-size:13px;">+${run.renownEarned} renown</div>
                 <div style="color:#888;font-size:10px;">Spend renown on unlocks from the title screen.</div>`;
         }
-        if (won) {
+        if (run.options?.daily) {
+            html += `<div style="margin-top:8px;color:#9cf;font-size:11px;">Daily run score: <b>${run.score || 0}</b></div>
+                <div style="color:#888;font-size:10px;">Submit it from the daily leaderboard on the title screen.</div>`;
+        } else if (won) {
             html += `<div style="margin-top:8px;color:#9cf;font-size:11px;">Final score: <b>${run.score || 0}</b></div>
                 <div style="color:#888;font-size:10px;">Your best wins are kept in Feats &gt; Victories, where you can submit them to the online leaderboard.</div>`;
         }

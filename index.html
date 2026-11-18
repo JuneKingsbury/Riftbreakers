@@ -37,6 +37,9 @@
         <p>A tactics roguelike set in the world of Rifthold.</p>
         <div class="start-btn-grid">
             <div class="start-btn-row">
+                <button id="daily-run">Daily Run</button>
+            </div>
+            <div class="start-btn-row">
                 <button id="new-run" style="background:#1a2a1a;border-color:#4a8;color:#afa;">New Run</button>
                 <button id="continue-run" disabled>Continue</button>
             </div>
@@ -45,11 +48,13 @@
                 <button id="start-feats">Feats</button>
             </div>
             <div class="start-btn-row">
-                <button id="start-settings" data-modal-open>Settings</button>
                 <button id="start-credits" data-modal-open>Credits</button>
+                <button id="start-settings" data-modal-open>Settings</button>
             </div>
         </div>
         <div id="version-label" style="color:#999;"></div>
+        <!-- Today's daily run leaderboard (js/ui/daily-panel.js). -->
+        <div id="daily-board"></div>
 
         <div id="start-settings-panel" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); padding:20px; border:1px solid #555; border-radius:8px; background:#1e1e32; text-align:left; width:min(520px, 92vw); max-width:92vw; max-height:80vh; overflow-y:auto; z-index:1000; box-shadow:0 8px 32px rgba(0,0,0,0.7);">
             <button data-modal-close onclick="document.getElementById('start-settings-panel').style.display='none';document.getElementById('modal-backdrop').style.display='none'" style="position:absolute; top:8px; right:12px; background:none; border:none; color:#aaa; font-size:18px; cursor:pointer; z-index:1;">&times;</button>

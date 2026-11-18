@@ -1,9 +1,11 @@
 // The online leaderboard: high-scoring runs, won or lost, submitted with a name, highest score
 // first, stored by the Worker (cloudflare-worker/riftbreak-api.js). A run is submitted at most
 // once (by its id). Entries don't say whether the run was won: runResult works it out.
+// Daily runs (daily.js) go on their day's own leaderboard (the Worker's /daily) instead.
 import { API_BASE } from '../core/cloud-config.js';
-import { validateEntry, cleanName } from './leaderboard-rules.js';
+import { validateEntry, cleanName, dailyOpen } from './leaderboard-rules.js';
 import { loadProfile, saveProfile, defaultStorage } from './profile.js';
+import { markDailySubmitted } from './daily.js';
 
 export const NAME_KEY = 'riftbreak.leaderboard.name';
 export const LEADERBOARD_SIZE = 100;
@@ -21,6 +23,7 @@ export function entryFromRun(run, name) {
         battles: run.battles, floors: run.floors, elites: run.elites, bosses: run.bosses,
         realms: run.realms ?? [],
         party: run.party.map(m => ({ job: m.job, origin: m.origin ?? null, level: m.level })),
+        ...(run.daily ? { daily: run.daily } : {}),
     };
 }
 
@@ -37,10 +40,11 @@ export function runResult(entry) {
 
 /**
  * Whether a remembered run can go on the leaderboard (scored, with an id, not yet sent). Challenge
- * runs can't: leaderboard entries don't record a challenge.
+ * runs can't: leaderboard entries don't record a challenge. A daily run can until its day's
+ * leaderboard closes (dailyOpen).
  */
-export function canSubmit(run) {
-    return !!run?.id && run.score > 0 && !run.submitted && !run.challenge;
+export function canSubmit(run, nowMs = Date.now()) {
+    return !!run?.id && run.score > 0 && !run.submitted && !run.challenge && (!run.daily || dailyOpen(run.daily, nowMs));
 }
 
 async function api(path, opts = {}, fetchImpl = globalThis.fetch) {
@@ -62,7 +66,7 @@ async function api(path, opts = {}, fetchImpl = globalThis.fetch) {
 export async function submitRun(run, name, { fetchImpl, storage = defaultStorage() } = {}) {
     const { entry, error } = validateEntry(entryFromRun(run, name));
     if (error) throw new Error(error);
-    const result = await api('/leaderboard', {
+    const result = await api(entry.daily ? '/daily' : '/leaderboard', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(entry),
     }, fetchImpl);
     try { storage?.setItem(NAME_KEY, entry.name); } catch { /* not remembered */ }
@@ -72,6 +76,7 @@ export async function submitRun(run, name, { fetchImpl, storage = defaultStorage
         mine.submitted = true;
         saveProfile(profile, storage);
     }
+    if (entry.daily) markDailySubmitted(run.id, storage);
     return { rank: result.rank ?? null, total: result.total ?? null };
 }
 
@@ -80,4 +85,11 @@ export async function fetchLeaderboard({ limit = LEADERBOARD_SIZE, fetchImpl } =
     const data = await api(`/leaderboard?limit=${limit}`, {}, fetchImpl);
     return (Array.isArray(data.entries) ? data.entries : [])
         .map(e => validateEntry(e).entry).filter(Boolean);
+}
+
+/** The top entries of the daily run on `date` ('YYYY-MM-DD'), highest score first. Throws with a message for the player. */
+export async function fetchDailyLeaderboard(date, { limit = LEADERBOARD_SIZE, fetchImpl } = {}) {
+    const data = await api(`/daily?date=${encodeURIComponent(date)}&limit=${limit}`, {}, fetchImpl);
+    return (Array.isArray(data.entries) ? data.entries : [])
+        .map(e => validateEntry(e).entry).filter(e => e && e.daily === date);
 }

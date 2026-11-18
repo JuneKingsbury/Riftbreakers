@@ -8,6 +8,7 @@ import { JOB_DATA } from '../content/jobs.js';
 import { REALMS } from './data/realms.js';
 import { BACKDROPS } from './data/backdrops.js';
 import { notifySaved } from './save-events.js';
+import { isDailyDate } from './leaderboard-rules.js';
 
 export const PROFILE_KEY = 'riftbreak.profile.v1';
 
@@ -165,6 +166,8 @@ function sanitizeRun(w) {
         startPartySize: Math.min(3, count(w.startPartySize, 3)) || 3,
         tier: Math.min(MAX_RIFT_TIER, count(w.tier)),
         challenge: isChallenge(w.challenge) ? w.challenge : null,
+        // The UTC date of a daily run (daily.js), or null.
+        daily: isDailyDate(w.daily) ? w.daily : null,
         // A per-run id, so the leaderboard takes each run once (see leaderboard.js).
         id: typeof w.id === 'string' && /^[a-z0-9-]{1,40}$/i.test(w.id) ? w.id : '',
         submitted: w.submitted === true,
@@ -192,6 +195,7 @@ export function runSummary(run, renown, now = new Date()) {
         startPartySize: run.startPartySize ?? 3,
         tier: run.options?.tier ?? 0,
         challenge: run.options?.challenge ?? null,
+        daily: run.options?.daily ?? null,
         id: `${(run.seed >>> 0).toString(36)}-${now.getTime().toString(36)}`,
     });
 }

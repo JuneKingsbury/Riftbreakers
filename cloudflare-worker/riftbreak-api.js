@@ -5,9 +5,11 @@
 //                      never appears in the page. Same as Rifthold's rifthold-oauth.js.
 //   GET  /leaderboard  ?limit=N (1-100): { entries: [...] }, highest score first
 //   POST /leaderboard  An entry (js/run/leaderboard-rules.js) → { rank, total }
+//   GET  /daily        ?date=YYYY-MM-DD&limit=N: that day's daily-run entries, highest first
+//   POST /daily        A daily-run entry (its `daily` date still open, dailyOpen) → { rank, total } that day
 //
 // Setup: see README.md in this folder (D1 database, CLIENT_SECRET, deploy).
-import { validateEntry } from '../js/run/leaderboard-rules.js';
+import { validateEntry, isDailyDate, dailyOpen } from '../js/run/leaderboard-rules.js';
 
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
 
@@ -56,37 +58,56 @@ async function handleToken(request, env, origin) {
     return new Response(await resp.text(), { status: resp.status, headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) } });
 }
 
+const listLimit = (url) => Math.max(1, Math.min(100, parseInt(url.searchParams.get('limit'), 10) || 50));
+const parseRows = (results) => results.map(r => { try { return JSON.parse(r.data); } catch { return null; } }).filter(Boolean);
+
 async function listEntries(env, url, origin) {
-    const limit = Math.max(1, Math.min(100, parseInt(url.searchParams.get('limit'), 10) || 50));
-    const { results } = await env.DB.prepare('SELECT data FROM entries ORDER BY score DESC, date ASC LIMIT ?').bind(limit).all();
-    const entries = results.map(r => { try { return JSON.parse(r.data); } catch { return null; } }).filter(Boolean);
-    return json({ entries }, 200, origin);
+    const { results } = await env.DB.prepare('SELECT data FROM entries ORDER BY score DESC, date ASC LIMIT ?').bind(listLimit(url)).all();
+    return json({ entries: parseRows(results) }, 200, origin);
 }
 
-async function submitEntry(request, env, origin) {
+async function listDaily(env, url, origin) {
+    const date = url.searchParams.get('date');
+    if (!isDailyDate(date)) return json({ error: 'Bad date.' }, 400, origin);
+    const { results } = await env.DB.prepare('SELECT data FROM daily_entries WHERE daily = ? ORDER BY score DESC, date ASC LIMIT ?')
+        .bind(date, listLimit(url)).all();
+    return json({ entries: parseRows(results) }, 200, origin);
+}
+
+// POST /leaderboard (daily = false) or POST /daily (daily = true).
+async function submitEntry(request, env, origin, daily) {
     const text = await request.text();
     if (text.length > MAX_BODY_BYTES) return json({ error: 'That entry is too big.' }, 413, origin);
     let body;
     try { body = JSON.parse(text); } catch { return json({ error: 'Not JSON.' }, 400, origin); }
     const { entry, error } = validateEntry(body);
     if (error) return json({ error }, 400, origin);
-
-    // Rate limit by address (stored only as a salted hash).
     const now = Date.now();
+    if (daily && !entry.daily) return json({ error: 'Only daily runs go on the daily leaderboard.' }, 400, origin);
+    if (!daily && entry.daily) return json({ error: 'Daily runs go on the daily leaderboard.' }, 400, origin);
+    if (daily && !dailyOpen(entry.daily, now)) return json({ error: 'That day\'s daily leaderboard has closed.' }, 400, origin);
+
+    // Rate limit by address (stored only as a salted hash). Both leaderboards share the limit.
     const ipHash = await sha256(`${env.IP_SALT || 'riftbreak'}:${request.headers.get('CF-Connecting-IP') || 'unknown'}`);
     const recent = await env.DB.prepare('SELECT COUNT(*) AS n FROM submissions WHERE ip_hash = ? AND created_at > ?')
         .bind(ipHash, now - 3600_000).first();
     if ((recent?.n ?? 0) >= SUBMISSIONS_PER_HOUR) return json({ error: 'Too many submissions. Try again in a while.' }, 429, origin);
 
-    const inserted = await env.DB.prepare('INSERT OR IGNORE INTO entries (id, name, score, date, data, created_at) VALUES (?, ?, ?, ?, ?, ?)')
-        .bind(entry.id, entry.name, entry.score, entry.date, JSON.stringify(entry), now).run();
+    const inserted = daily
+        ? await env.DB.prepare('INSERT OR IGNORE INTO daily_entries (id, daily, name, score, date, data, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+            .bind(entry.id, entry.daily, entry.name, entry.score, entry.date, JSON.stringify(entry), now).run()
+        : await env.DB.prepare('INSERT OR IGNORE INTO entries (id, name, score, date, data, created_at) VALUES (?, ?, ?, ?, ?, ?)')
+            .bind(entry.id, entry.name, entry.score, entry.date, JSON.stringify(entry), now).run();
     if (!inserted.meta?.changes) return json({ error: 'This run is already on the leaderboard.' }, 409, origin);
     await env.DB.batch([
         env.DB.prepare('INSERT INTO submissions (ip_hash, created_at) VALUES (?, ?)').bind(ipHash, now),
         env.DB.prepare('DELETE FROM submissions WHERE created_at < ?').bind(now - 86_400_000),
     ]);
-    const higher = await env.DB.prepare('SELECT COUNT(*) AS n FROM entries WHERE score > ?').bind(entry.score).first();
-    const total = await env.DB.prepare('SELECT COUNT(*) AS n FROM entries').first();
+    const [higher, total] = daily
+        ? [await env.DB.prepare('SELECT COUNT(*) AS n FROM daily_entries WHERE daily = ? AND score > ?').bind(entry.daily, entry.score).first(),
+            await env.DB.prepare('SELECT COUNT(*) AS n FROM daily_entries WHERE daily = ?').bind(entry.daily).first()]
+        : [await env.DB.prepare('SELECT COUNT(*) AS n FROM entries WHERE score > ?').bind(entry.score).first(),
+            await env.DB.prepare('SELECT COUNT(*) AS n FROM entries').first()];
     return json({ rank: (higher?.n ?? 0) + 1, total: total?.n ?? 1 }, 201, origin);
 }
 
@@ -103,7 +124,9 @@ export default {
         try {
             if (request.method === 'POST' && url.pathname === '/token') return await handleToken(request, env, origin);
             if (request.method === 'GET' && url.pathname === '/leaderboard') return await listEntries(env, url, origin);
-            if (request.method === 'POST' && url.pathname === '/leaderboard') return await submitEntry(request, env, origin);
+            if (request.method === 'POST' && url.pathname === '/leaderboard') return await submitEntry(request, env, origin, false);
+            if (request.method === 'GET' && url.pathname === '/daily') return await listDaily(env, url, origin);
+            if (request.method === 'POST' && url.pathname === '/daily') return await submitEntry(request, env, origin, true);
         } catch {
             return json({ error: 'The server had a problem. Try again later.' }, 500, origin);
         }

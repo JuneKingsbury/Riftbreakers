@@ -4,6 +4,7 @@ One Cloudflare Worker serves both online features:
 
 - **`POST /token`**: Google OAuth token exchanges for Drive cloud saves (`js/core/gdrive.js`). It adds the client secret server-side, the same way Rifthold's `rifthold-oauth.js` does.
 - **`GET` / `POST /leaderboard`**: the high-score leaderboard (`js/run/leaderboard.js`), stored in Cloudflare D1.
+- **`GET` / `POST /daily`**: one leaderboard per daily run (`js/run/daily.js`), in its own D1 table (`daily_entries`). `GET /daily?date=YYYY-MM-DD` lists a day. Daily runs can only go here, and other runs can't.
 
 The game expects the Worker at `API_BASE` in `js/core/cloud-config.js`, which defaults to `https://riftbreak-api.jurbanics.workers.dev`.
 
@@ -39,11 +40,16 @@ Run these from the repo root, since the Worker imports `../js/run/leaderboard-ru
 7. In the same Cloud project, enable the **Google Drive API** (APIs & Services > Library > Google Drive API > Enable).
    Without it, sign-in succeeds but every Drive call returns 403 `accessNotConfigured`.
 
+## Adding the daily leaderboard to an existing setup
+
+The schema only adds tables (`CREATE TABLE IF NOT EXISTS`), so run step 2 again and redeploy (step 4). Until then, the title screen's daily panel says the leaderboard can't be reached, and daily runs still play.
+
 ## Notes
 
 - **Separate from Rifthold.** Riftbreak has its own OAuth client, so its own consent screen and its own hidden Drive app folder. The page origin is shared with Rifthold, though, so the game's localStorage keys and auth channel are all prefixed `riftbreak`.
 - **Allowed origins.** `ALLOWED_ORIGINS` in `riftbreak-api.js` allows `https://junekingsbury.github.io`, plus `localhost`/`127.0.0.1` on any port.
 - **Leaderboard checks.** Entries are checked by `validateEntry` (shared with the game). Each run id is accepted once, and each address can submit 10 entries an hour. Scores are computed by the game, so a determined player could fake one. The plausibility cap (`MAX_POINTS_PER_BATTLE`, 5000 points per battle) only stops obvious nonsense.
+- **Daily checks.** A daily entry must name a real day that is still open (that day up to two days later, UTC), with three starting members and no Rift Tier. The one-attempt-a-day rule is kept by the game on each device, so the server doesn't enforce it.
 - **Removing an entry:**
   ```
   npx wrangler d1 execute riftbreak --remote --command "DELETE FROM entries WHERE id = '...'"

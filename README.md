@@ -111,6 +111,14 @@ Runs saved before Act 4 existed keep their three acts (`RunState.actCount`).
   `recordRun`; older `bestWins` load as wins), all cleaned on load and included in save exports.
   Leaderboard entries don't store the result: `runResult` reads it from bosses beaten versus
   realms reached.
+- **Daily run:** the title screen's Daily Run button (`js/run/daily.js`) starts the day's shared
+  run. The day is the UTC date, so it changes at midnight UTC for everyone, and the seed and the
+  three starting classes (any Tier 1 classes, locked or not) come from it. Daily runs use a fresh
+  profile's rules (no unlocks, no Rift Tier), so every player gets the same run. Each device gets
+  one attempt a day, used as soon as the run starts, and the button stays greyed out until the next
+  day. The panel beside the menu (`js/ui/daily-panel.js`) shows today's daily leaderboard, with
+  your finished run on top and a button to submit it. A daily run can be submitted until two days
+  after its own (`dailyOpen` in `leaderboard-rules.js`), so a run finished after midnight still counts.
 - **Splash:** the studio splash from Rifthold plays on load (`js/ui/splash.js`, with
   `icons/splash.gif`, `icons/splashBackgroundTile.png` and Pixelify Sans in `fonts/`). Any key
   or tap skips it.

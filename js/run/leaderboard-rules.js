@@ -3,7 +3,9 @@
 // the Worker bundles this file on its own.
 //
 // An entry: { id, name, score, date, startPartySize, tier, battles, floors, elites, bosses,
-//             realms: [string], party: [{ job, origin, level }] }
+//             realms: [string], party: [{ job, origin, level }], daily? }
+// `daily` (a UTC date, 'YYYY-MM-DD') marks a daily run (daily.js), which goes on that day's own
+// leaderboard instead of the all-time one.
 
 export const NAME_MAX = 20;
 export const MAX_PARTY_SIZE = 6;
@@ -11,7 +13,29 @@ export const MAX_PARTY_SIZE = 6;
 // Rift Tier V (×2.5, RIFT_TIER_SCORE in score.js).
 export const MAX_POINTS_PER_BATTLE = 5000;
 
+// How many days after its own a daily run can still be submitted, so a run finished just
+// after the UTC midnight reset still counts for the day it was started.
+export const DAILY_GRACE_DAYS = 2;
+
 const ID_RE = /^[a-z0-9-]{1,40}$/i;
+const DAILY_RE = /^\d{4}-\d{2}-\d{2}$/;
+const DAY_MS = 86_400_000;
+
+/** The UTC date of `ms` as 'YYYY-MM-DD': the daily run every player shares on that day. */
+export function utcDate(ms = Date.now()) {
+    return new Date(ms).toISOString().slice(0, 10);
+}
+
+/** Whether `daily` is a real 'YYYY-MM-DD' date. */
+export function isDailyDate(daily) {
+    return typeof daily === 'string' && DAILY_RE.test(daily) && utcDate(Date.parse(`${daily}T00:00:00Z`) || 0) === daily;
+}
+
+/** Whether the daily leaderboard for `daily` still takes runs at `nowMs`: from that day until DAILY_GRACE_DAYS after. */
+export function dailyOpen(daily, nowMs = Date.now()) {
+    if (!isDailyDate(daily)) return false;
+    return daily <= utcDate(nowMs) && daily >= utcDate(nowMs - DAILY_GRACE_DAYS * DAY_MS);
+}
 const KEY_RE = /^[a-z0-9_]{1,32}$/;
 // Letters and digits in any script, spaces, and a little punctuation.
 const NAME_RE = /^[\p{L}\p{N}][\p{L}\p{N} _.'-]*$/u;
@@ -44,6 +68,8 @@ export function validateEntry(e) {
         if (!int(e[k], lo, hi)) return { error: `Bad ${k}.` };
     }
     if (e.score > e.battles * MAX_POINTS_PER_BATTLE) return { error: 'That score is higher than the battles allow.' };
+    // Daily runs all start the same way: three members, no Rift Tier.
+    if (e.daily != null && (!isDailyDate(e.daily) || e.tier !== 0 || e.startPartySize !== 3)) return { error: 'Bad daily run.' };
     const date = new Date(e.date);
     if (typeof e.date !== 'string' || Number.isNaN(date.getTime())) return { error: 'Bad date.' };
     if (!Array.isArray(e.realms) || e.realms.length > 5 || !e.realms.every(r => typeof r === 'string' && KEY_RE.test(r))) return { error: 'Bad realms.' };
@@ -60,6 +86,7 @@ export function validateEntry(e) {
             id: e.id, name: cleanName(e.name), score: e.score, date: date.toISOString(),
             startPartySize: e.startPartySize, tier: e.tier, battles: e.battles, floors: e.floors,
             elites: e.elites, bosses: e.bosses, realms: [...e.realms], party,
+            ...(e.daily != null ? { daily: e.daily } : {}),
         },
     };
 }

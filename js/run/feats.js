@@ -11,6 +11,7 @@ import { loadProfile, BEST_RUNS, BOSS_IDS, COLLECTION_REWARDS, RIFT_TIERS, CHALL
 import { SCORE_TIP } from './score.js';
 import { canSubmit, submitRun, fetchLeaderboard, savedName, runResult } from './leaderboard.js';
 import { NAME_MAX, nameProblem } from './leaderboard-rules.js';
+import { dailyLabel } from './daily.js';
 import {
     Modal, Toast, FONT, RARITY_COLOR, esc, jobLabel, itemLabel, itemSummary, itemIconHtml, portraitHtml, drawSprites, wireTips,
 } from './ui-kit.js';
@@ -49,6 +50,7 @@ export function percent(have, total) {
 // 'Challenge: Empty Purse · Solo start · Tier II: Rift Tax', or '' for a standard run.
 function modeText(w) {
     const parts = [];
+    if (w.daily) parts.push(`Daily run · ${dailyLabel(w.daily)}`);
     if (CHALLENGES[w.challenge]) parts.push(`Challenge: ${CHALLENGES[w.challenge].name}`);
     if (w.startPartySize === 1) parts.push('Solo start (score ×2)');
     else if (w.startPartySize === 2) parts.push('Duo start (score ×1.5)');
@@ -227,6 +229,7 @@ export function showFeats(skinManager = globalThis._sharedSkinManager, onClose, 
     const submitHtml = (w) => {
         if (w.submitted) return `<div style="color:#8c8;font-size:10px;margin-top:5px;">✓ On the online leaderboard</div>`;
         if (w.challenge) return `<div style="color:#667;font-size:10px;margin-top:5px;">Challenge runs can't go on the leaderboard.</div>`;
+        if (w.daily && w.score > 0 && !canSubmit(w)) return `<div style="color:#667;font-size:10px;margin-top:5px;">That day's daily leaderboard has closed.</div>`;
         if (!canSubmit(w)) return w.score ? '' : `<div style="color:#667;font-size:10px;margin-top:5px;">No score (played before scoring), so it can't go on the leaderboard.</div>`;
         if (submitting !== w.id) {
             return `<button data-submit-win="${esc(w.id)}" style="${BTN_SM}margin-top:6px;background:#16223a;border:1px solid #57a;color:#bdf;">Submit to leaderboard</button>`;
