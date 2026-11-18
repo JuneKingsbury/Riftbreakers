@@ -4,7 +4,7 @@ import { SceneManager } from '../tactical/scene-manager.js';
 import { RunMapScene } from './run-map-scene.js';
 import { RunState, START_PARTY, MIN_START_PARTY } from './run-state.js';
 import {
-    loadProfile, saveProfile, runOptions, UNLOCKS, canBuyUnlock, buyUnlock, hasUnlock, RIFT_TIERS, renownMultiplier, SMALL_PARTY_RENOWN, CHALLENGES,
+    loadProfile, saveProfile, runOptions, UNLOCKS, canBuyUnlock, buyUnlock, hasUnlock, unlockCost, RIFT_TIERS, renownMultiplier, SMALL_PARTY_RENOWN, CHALLENGES,
 } from './profile.js';
 import { jobsOfTier } from '../tactical/data-registry.js';
 import { JOB_DATA } from '../tactical/data/jobs.js';
@@ -70,10 +70,10 @@ export function newRun(containerEl, skinManager, { onStart, onExit, onCancel, ch
             const unlocked = options.jobs.includes(job);
             const on = picked.includes(job);
             const kit = Object.keys(JOB_DATA[job].learnable).map(abilityName).join(', ');
-            const lock = Object.values(UNLOCKS).find(u => u.job === job);
+            const lock = Object.keys(UNLOCKS).find(k => UNLOCKS[k].job === job);
             html += `<button data-job="${job}" ${unlocked ? '' : 'disabled'} style="${BTN}${unlocked ? '' : BTN_DISABLED}${on ? 'border:2px solid #7bf;background:#0a1830;' : ''}">
                 <div style="display:flex;justify-content:space-between;"><span style="font-weight:bold;color:${on ? '#9cf' : '#ddd'};">${on ? '✓ ' : ''}${jobLabel(job)}</span>
-                <span style="color:#888;font-size:10px;">${unlocked ? esc(ROLE[job]) : `🔒 ${lock?.cost ?? '?'} renown`}</span></div>
+                <span style="color:#888;font-size:10px;">${unlocked ? esc(ROLE[job]) : `🔒 ${lock ? unlockCost(profile, lock) : '?'} renown`}</span></div>
                 <div style="color:#778;font-size:10px;margin-top:2px;line-height:1.4;">${esc(kit)}</div>
             </button>`;
         }
@@ -146,13 +146,14 @@ export function showUnlocks(onClose) {
         ];
         for (const [title, test] of groups) {
         html += `<div style="color:#fc8;font-size:10px;text-transform:uppercase;margin:10px 0 4px;">${title}</div>`;
+        if (title === 'Classes') html += `<div style="color:#889;font-size:10px;margin:-2px 0 4px;">All classes cost the same. Each one you unlock raises the price of the rest.</div>`;
         for (const [key, u] of Object.entries(UNLOCKS).filter(test)) {
             const owned = hasUnlock(profile, key);
             const can = canBuyUnlock(profile, key);
             const needs = u.requires && !hasUnlock(profile, u.requires) ? ` · needs ${UNLOCKS[u.requires].name}` : '';
             html += `<button data-buy="${key}" ${can ? '' : 'disabled'} style="${BTN}${owned ? BTN_GOOD : can ? BTN_GOLD : BTN_DISABLED}">
                 <div style="display:flex;justify-content:space-between;"><span style="font-weight:bold;">${owned ? '✓ ' : ''}${esc(u.name)}</span>
-                <span style="font-size:10px;">${owned ? 'owned' : `${u.cost} renown${needs}`}</span></div>
+                <span style="font-size:10px;">${owned ? 'owned' : `${unlockCost(profile, key)} renown${needs}`}</span></div>
                 <div style="color:#889;font-size:10px;margin-top:2px;">${esc(u.desc)}</div>
             </button>`;
         }

@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { RunState, RIFT_TAX, riftTierMods } from '../../js/run/run-state.js';
 import {
     newProfile, runOptions, recordRun, renownFor, renownMultiplier, RIFT_TIERS, MAX_RIFT_TIER, UNLOCKS,
-    COLLECTION_REWARDS, claimCollectionRewards, collectionPercent, buyUnlock,
+    COLLECTION_REWARDS, claimCollectionRewards, collectionPercent, buyUnlock, unlockCost, canBuyUnlock,
 } from '../../js/run/profile.js';
 import { EQUIPMENT, itemPrice } from '../../js/tactical/data/equipment.js';
 import { RELICS } from '../../js/run/data/relics.js';
@@ -214,6 +214,54 @@ test('the Codex allows longer scripts, and a template saves and loads', async ()
     } finally {
         if (prev) Object.defineProperty(globalThis, 'localStorage', prev); else delete globalThis.localStorage;
     }
+});
+
+// ---- Unlock prices ----
+
+const CLASS_KEYS = Object.keys(UNLOCKS).filter(k => UNLOCKS[k].job);
+
+test('every class costs the same, and each one bought raises the price of the rest', () => {
+    const p = newProfile();
+    p.renown = 10_000;
+    const paid = [];
+    for (const key of CLASS_KEYS) {
+        const prices = CLASS_KEYS.filter(k => !p.unlocked.includes(k)).map(k => unlockCost(p, k));
+        assert.equal(new Set(prices).size, 1, 'one price for every class still locked');
+        const before = p.renown;
+        assert.ok(buyUnlock(p, key));
+        paid.push(before - p.renown);
+    }
+    assert.deepEqual(paid, [40, 65, 95, 130, 170, 215, 265]);
+});
+
+test('the order classes are bought in does not change their total price', () => {
+    const totalFor = (order) => {
+        const p = newProfile();
+        p.renown = 10_000;
+        for (const k of order) assert.ok(buyUnlock(p, k));
+        return 10_000 - p.renown;
+    };
+    assert.equal(totalFor(CLASS_KEYS), totalFor([...CLASS_KEYS].reverse()));
+    assert.equal(totalFor(CLASS_KEYS), 980);
+});
+
+test('a class needs the full current price, not the first one', () => {
+    const p = newProfile();
+    p.renown = 40;
+    assert.ok(buyUnlock(p, 'job_seer'));
+    p.renown = 64;
+    assert.ok(!canBuyUnlock(p, 'job_warlord'), 'the second class costs 65');
+    p.renown = 65;
+    assert.ok(buyUnlock(p, 'job_warlord'));
+    assert.equal(p.renown, 0);
+});
+
+test('a run perk costs the same whatever else is owned', () => {
+    const fresh = newProfile();
+    const loaded = { ...newProfile(), unlocked: Object.keys(UNLOCKS).filter(k => k !== 'relic_lore') };
+    assert.equal(unlockCost(fresh, 'relic_lore'), 140);
+    assert.equal(unlockCost(loaded, 'relic_lore'), 140);
+    assert.equal(unlockCost(fresh, 'not_an_unlock'), null);
 });
 
 // ---- Backdrops ----

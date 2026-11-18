@@ -20,30 +20,36 @@ export const BOSS_IDS = [...new Set(Object.values(REALMS).flatMap(r => r.bosses 
 
 export const BASE_JOBS = ['warden', 'evoker', 'runebow'];
 
+// Starting classes all cost the same, and each one bought makes the next dearer: the price
+// is CLASS_COSTS[classes already owned]. Any order works; the last class is a long-term goal.
+export const CLASS_COSTS = [40, 65, 95, 130, 170, 215, 265];
+
+// cost: renown, for everything but the classes (CLASS_COSTS). Perks are priced by how much
+// they change a run, and don't depend on what else is owned.
 // requires: another unlock that must be bought first.
 export const UNLOCKS = {
-    job_spellblade:  { name: 'Spellblade', cost: 30, job: 'spellblade', desc: 'Unlocks the Spellblade as a starting class.' },
-    job_stoneshaper: { name: 'Stoneshaper', cost: 40, job: 'stoneshaper', desc: 'Unlocks the Stoneshaper as a starting class.' },
-    job_seer:        { name: 'Seer', cost: 50, job: 'seer', desc: 'Unlocks the Seer as a starting class.' },
-    job_warlord:     { name: 'Warlord', cost: 35, job: 'warlord', desc: 'Unlocks the Warlord as a starting class.' },
-    job_alchemist:   { name: 'Alchemist', cost: 40, job: 'alchemist', desc: 'Unlocks the Alchemist as a starting class.' },
-    job_illusionist: { name: 'Illusionist', cost: 45, job: 'illusionist', desc: 'Unlocks the Illusionist as a starting class.' },
-    job_gravecaller: { name: 'Gravecaller', cost: 50, job: 'gravecaller', desc: 'Unlocks the Gravecaller as a starting class.' },
-    purse_1:         { name: 'Coin Purse', cost: 25, desc: 'Start each run with 50 more gold.' },
-    purse_2:         { name: 'Heavy Purse', cost: 50, requires: 'purse_1', desc: 'Start each run with another 50 gold.' },
-    veterans:        { name: 'Veterans', cost: 45, desc: 'Your starting party begins at level 2, with one more skill point to spend.' },
-    heirloom:        { name: 'Heirloom', cost: 60, desc: 'Start each run by choosing one of three common relics.' },
-    drillmaster:     { name: 'Master Trainer', cost: 40, desc: 'Training gives 50% more XP, and enchanting also gives everyone 25 XP.' },
-    recruiter:       { name: 'Recruiter', cost: 35, desc: 'Recruit nodes offer four candidates instead of three.' },
-    fine_wares:      { name: 'Fine Wares', cost: 40, desc: 'Shops stock one more item and carry uncommon gear more often.' },
-    relic_lore:      { name: 'Relic Lore', cost: 60, desc: 'Elites can drop rare relics.' },
-    second_wind:     { name: 'Second Wind', cost: 55, desc: 'Everyone in the party gains 50 XP when a new act begins.' },
-    travelers_pack:  { name: "Traveler's Pack", cost: 35, desc: 'Start each run with a common pair of boots and a common trinket in the bag.' },
-    masterwork:      { name: 'Masterwork', cost: 45, desc: 'Items you find come already enchanted twice as often.' },
-    haggler:         { name: 'Haggler', cost: 40, desc: 'Each shop restocks its wares once for free.' },
-    relic_codex:     { name: 'Relic Codex', cost: 70, requires: 'heirloom', desc: 'Your starting relic choice also offers an uncommon relic.' },
-    scouts_report:   { name: "Scout's Report", cost: 30, desc: 'Each act opens with word of the boss waiting at its end.' },
-    tacticians_codex: { name: "Tactician's Codex", cost: 35, desc: 'Tactics hold 8 more rules, and you can save a template to load onto any character.' },
+    job_spellblade:  { name: 'Spellblade', job: 'spellblade', desc: 'Unlocks the Spellblade as a starting class.' },
+    job_stoneshaper: { name: 'Stoneshaper', job: 'stoneshaper', desc: 'Unlocks the Stoneshaper as a starting class.' },
+    job_seer:        { name: 'Seer', job: 'seer', desc: 'Unlocks the Seer as a starting class.' },
+    job_warlord:     { name: 'Warlord', job: 'warlord', desc: 'Unlocks the Warlord as a starting class.' },
+    job_alchemist:   { name: 'Alchemist', job: 'alchemist', desc: 'Unlocks the Alchemist as a starting class.' },
+    job_illusionist: { name: 'Illusionist', job: 'illusionist', desc: 'Unlocks the Illusionist as a starting class.' },
+    job_gravecaller: { name: 'Gravecaller', job: 'gravecaller', desc: 'Unlocks the Gravecaller as a starting class.' },
+    purse_1:         { name: 'Coin Purse', cost: 40, desc: 'Start each run with 50 more gold.' },
+    purse_2:         { name: 'Heavy Purse', cost: 100, requires: 'purse_1', desc: 'Start each run with another 50 gold.' },
+    veterans:        { name: 'Veterans', cost: 120, desc: 'Your starting party begins at level 2, with one more skill point to spend.' },
+    heirloom:        { name: 'Heirloom', cost: 130, desc: 'Start each run by choosing one of three common relics.' },
+    drillmaster:     { name: 'Master Trainer', cost: 80, desc: 'Training gives 50% more XP, and enchanting also gives everyone 25 XP.' },
+    recruiter:       { name: 'Recruiter', cost: 70, desc: 'Recruit nodes offer four candidates instead of three.' },
+    fine_wares:      { name: 'Fine Wares', cost: 90, desc: 'Shops stock one more item and carry uncommon gear more often.' },
+    relic_lore:      { name: 'Relic Lore', cost: 140, desc: 'Elites can drop rare relics.' },
+    second_wind:     { name: 'Second Wind', cost: 120, desc: 'Everyone in the party gains 50 XP when a new act begins.' },
+    travelers_pack:  { name: "Traveler's Pack", cost: 60, desc: 'Start each run with a common pair of boots and a common trinket in the bag.' },
+    masterwork:      { name: 'Masterwork', cost: 100, desc: 'Items you find come already enchanted twice as often.' },
+    haggler:         { name: 'Haggler', cost: 80, desc: 'Each shop restocks its wares once for free.' },
+    relic_codex:     { name: 'Relic Codex', cost: 160, requires: 'heirloom', desc: 'Your starting relic choice also offers an uncommon relic.' },
+    scouts_report:   { name: "Scout's Report", cost: 35, desc: 'Each act opens with word of the boss waiting at its end.' },
+    tacticians_codex: { name: "Tactician's Codex", cost: 50, desc: 'Tactics hold 8 more rules, and you can save a template to load onto any character.' },
     // Title screen backdrops (data/backdrops.js). The free ones need no unlock.
     ...Object.fromEntries(Object.entries(BACKDROPS).filter(([, b]) => b.cost > 0)
         .map(([id, b]) => [`backdrop_${id}`, { name: `Backdrop: ${b.name}`, cost: b.cost, backdrop: id, desc: 'A new tile for the title screen. Pick it in Settings > Graphics.' }])),
@@ -222,16 +228,29 @@ export function hasUnlock(profile, key) {
     return !!profile?.unlocked?.includes(key);
 }
 
+/**
+ * What an unlock costs this profile now, in renown: a class by how many classes it already
+ * owns (CLASS_COSTS, the last price holding if more classes are ever added), anything else
+ * its own cost. Null for an unknown key.
+ */
+export function unlockCost(profile, key) {
+    const u = UNLOCKS[key];
+    if (!u) return null;
+    if (!u.job) return u.cost;
+    const owned = (profile?.unlocked || []).filter(k => UNLOCKS[k]?.job).length;
+    return CLASS_COSTS[Math.min(owned, CLASS_COSTS.length - 1)];
+}
+
 export function canBuyUnlock(profile, key) {
     const u = UNLOCKS[key];
     if (!u || hasUnlock(profile, key)) return false;
     if (u.requires && !hasUnlock(profile, u.requires)) return false;
-    return profile.renown >= u.cost;
+    return profile.renown >= unlockCost(profile, key);
 }
 
 export function buyUnlock(profile, key) {
     if (!canBuyUnlock(profile, key)) return false;
-    profile.renown -= UNLOCKS[key].cost;
+    profile.renown -= unlockCost(profile, key);
     profile.unlocked.push(key);
     return true;
 }
