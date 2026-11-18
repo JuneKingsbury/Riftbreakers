@@ -1,2 +1,8 @@
 node_modules/
 .DS_Store
+
+# Google OAuth client secret (it lives only in the Worker: wrangler secret put CLIENT_SECRET)
+client_secret_*.json
+# Wrangler local state and local secrets
+.wrangler/
+.dev.vars

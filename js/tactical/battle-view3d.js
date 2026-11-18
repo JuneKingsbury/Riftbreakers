@@ -1527,7 +1527,7 @@ export class BattleView3D {
         const mk = (label, title, fn) => {
             const b = document.createElement('button');
             b.textContent = label;
-            b.title = title;
+            b.dataset.tip = title;   // a styled tip that also shows on touch (run/ui-kit.js)
             b.addEventListener('click', (e) => { e.stopPropagation(); fn(); });
             b.addEventListener('mousedown', (e) => e.stopPropagation());
             b.addEventListener('pointerdown', (e) => e.stopPropagation());
@@ -1535,9 +1535,9 @@ export class BattleView3D {
             return b;
         };
         mk('↺', 'Rotate left (Q)',  () => this.rotateView(-1));
-        mk('◎', 'Center on the unit, or show the whole map (F)', () => { if (this._tracking) this.onCenterRequest?.(); else this.fitToMap(); });
+        mk('◎', 'Center (F)\nCenter on the unit, or show the whole map.', () => { if (this._tracking) this.onCenterRequest?.(); else this.fitToMap(); });
         mk('↻', 'Rotate right (E)', () => this.rotateView(1));
-        this._freeButton = mk('⤢', 'Free camera (V). Shows the whole map and stops following units.', () => this.setFreeCamera(this._tracking));
+        this._freeButton = mk('⤢', 'Free camera (V)\nShows the whole map and stops following units.', () => this.setFreeCamera(this._tracking));
         this._freeButton.classList.toggle('active', !this._tracking);
         this.overlay.appendChild(bar);
         this._compass = bar;

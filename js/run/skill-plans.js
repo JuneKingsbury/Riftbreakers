@@ -16,6 +16,7 @@ import { JOB_DATA } from '../tactical/data/jobs.js';
 import { MAX_RANK, isUpgradeable, ABILITIES } from '../tactical/data-registry.js';
 import { isLearned, skillRank, canLearn, canUpgrade, learnAbility, upgradeAbility } from '../tactical/loadout.js';
 import { defaultStorage } from './profile.js';
+import { notifySaved } from './save-events.js';
 
 export const PLANS_KEY = 'riftbreak.skillplans.v1';
 
@@ -86,6 +87,7 @@ export function savePlans(plans, storage = defaultStorage()) {
     if (!storage) return false;
     try {
         storage.setItem(PLANS_KEY, JSON.stringify(sanitizePlans(plans)));
+        notifySaved();
         return true;
     } catch { return false; }
 }

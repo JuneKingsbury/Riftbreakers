@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Riftbreakers: Privacy Policy</title>
+    <link rel="icon" type="image/x-icon" href="icons/favicon.ico">
+    <style>
+        /* Self-contained styles only. The game's css/style.css is intentionally
+           NOT loaded here: it globally disables scrolling (overflow:hidden,
+           position:fixed) and text selection (user-select:none), which would
+           break these document pages. */
+        html, body {
+            overflow: auto;
+        }
+        body {
+            background: #1a1a2e;
+            color: #cccccc;
+            margin: 0;
+            padding: 0;
+            line-height: 1.65;
+            font-size: 16px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            -webkit-user-select: text;
+            user-select: text;
+        }
+        .doc {
+            max-width: 760px;
+            margin: 0 auto;
+            padding: 48px 24px 80px;
+        }
+        .doc a { color: #66ff99; }
+        .doc h1 { color: #ffcc00; font-size: 28px; margin-bottom: 4px; }
+        .doc h2 { color: #66ff99; font-size: 20px; margin-top: 36px; }
+        .doc h3 { color: #ffcc88; font-size: 17px; margin-top: 22px; margin-bottom: 6px; }
+        .doc .effective { color: #888888; font-size: 14px; margin-top: 0; }
+        .doc ul { padding-left: 22px; }
+        .doc li { margin-bottom: 8px; }
+        .doc code { background: #0e0e22; padding: 2px 6px; border-radius: 3px; color: #eeeeee; font-size: 14px; }
+        .doc .note { color: #888888; font-size: 14px; margin-top: 48px; border-top: 1px solid #333355; padding-top: 16px; }
+    </style>
+</head>
+<body>
+<main class="doc">
+    <h1>Privacy Policy</h1>
+    <p class="effective">Riftbreakers, operated by June Kingsbury (berry branch games). Effective November 18, 2026.</p>
+
+    <p>
+        Riftbreakers is a single-player tactics game. It keeps your progress on your own device. Two features
+        are optional and send data off your device: <strong>Google Drive cloud save</strong> and the
+        <strong>online leaderboard</strong>. This policy explains what each one does with your data. If you
+        use neither, nothing described below applies to you.
+    </p>
+
+    <h2>Google Drive cloud save</h2>
+    <h3>What Google data we access</h3>
+    <p>
+        When you connect Google Drive, Riftbreakers requests a single, highly restricted permission scope:
+        <code>drive.appdata</code>. It grants access only to a hidden, application-specific folder inside
+        your own Google Drive. Riftbreakers cannot see, read or modify any of your other Drive files, folders,
+        documents or photos. We do not request your email address, contacts, profile details or any other
+        Google data.
+    </p>
+    <h3>What is stored, and where</h3>
+    <ul>
+        <li><strong>Save data only.</strong> The hidden folder holds a single file,
+            <code>riftbreak-save.json</code>: your renown, unlocks, statistics, skill plans and any run in
+            progress. It contains no personal information.</li>
+        <li><strong>Sign-in tokens stay on your device.</strong> The tokens that keep you signed in are
+            stored in your browser's local storage on the device you play on.</li>
+        <li><strong>A small token relay.</strong> When you sign in, and when a sign-in is renewed, the
+            request passes through a relay we run on Cloudflare Workers. The relay adds the game's OAuth client
+            secret, so that secret never has to be published in the game, and forwards the request to Google.
+            It does not store or log your authorization codes or tokens. Your save data never passes
+            through it: saves travel directly between your device and your Google Drive.</li>
+    </ul>
+    <h3>How we use it</h3>
+    <p>
+        Your save data is used for one purpose only: to store your progress in your Google Drive and load it
+        back onto your devices. We do not sell it, share it with third parties, or use it for advertising or
+        analytics.
+    </p>
+    <h3>Google API Services User Data Policy</h3>
+    <p>
+        Riftbreakers' use and transfer of information received from Google APIs adheres to the
+        <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener">Google
+        API Services User Data Policy</a>, including the Limited Use requirements.
+    </p>
+
+    <h2>Online leaderboard</h2>
+    <p>The leaderboard is public. Nothing is sent to it unless you choose to submit a winning run.</p>
+    <h3>What a submission contains</h3>
+    <ul>
+        <li>The <strong>name you type</strong> (up to 20 characters). It is shown publicly, so please don't
+            use your real name or anything that identifies you.</li>
+        <li>The run's score, the date it was won, its starting party size and Rift Tier, its battle, floor,
+            elite and boss counts, the realms it passed through, and each party member's class and level.</li>
+        <li>A random run id, so the same run can't be submitted twice.</li>
+    </ul>
+    <p>
+        Submissions are not linked to your Google account. Submitting doesn't require signing in.
+    </p>
+    <h3>Abuse protection</h3>
+    <p>
+        To limit spam, the server keeps a one-way (salted SHA-256) hash of the IP address each submission came
+        from, for 24 hours, and then deletes it. The address itself is not stored. Our host, Cloudflare,
+        processes requests as described in
+        <a href="https://www.cloudflare.com/privacypolicy/" target="_blank" rel="noopener">Cloudflare's privacy policy</a>.
+    </p>
+    <h3>Keeping and removing entries</h3>
+    <p>
+        Leaderboard entries are kept until the leaderboard is reset or the entry is removed. To have an entry
+        removed, email us with its name, score and date, and we will delete it. We may also remove entries with
+        offensive names or impossible scores.
+    </p>
+
+    <h2>On your device</h2>
+    <p>
+        Riftbreakers stores your progress, settings, the name you last submitted to the leaderboard, and
+        cloud-sync bookkeeping in your browser's local storage. You can clear it at any time through your
+        browser's site settings. Export your save from Settings first if you want to keep it.
+    </p>
+
+    <h2>Revoking access and deleting your data</h2>
+    <ul>
+        <li>Choose <strong>Disconnect</strong> under Settings &gt; Save Data &gt; Cloud Save. This signs you out
+            and removes the stored tokens from your device.</li>
+        <li>Revoke the game's access entirely from your Google Account at
+            <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener">myaccount.google.com/permissions</a>.</li>
+        <li>Delete the game's hidden app data from Google Drive (Drive settings &gt; Manage apps) to remove the
+            cloud save permanently.</li>
+        <li>Email us to remove a leaderboard entry.</li>
+    </ul>
+
+    <h2>Children's privacy</h2>
+    <p>
+        Riftbreakers is not directed at children under 13, and we do not knowingly collect personal
+        information from children.
+    </p>
+
+    <h2>Changes to this policy</h2>
+    <p>We may update this policy from time to time. Changes will be posted on this page with a new effective date.</p>
+
+    <h2>Contact</h2>
+    <p>Questions about this policy? Email <a href="mailto:jurbanics@gmail.com">jurbanics@gmail.com</a>.</p>
+
+    <p class="note">See also our <a href="terms.html">Terms of Service</a>. <a href="./">Back to the game</a>.</p>
+</main>
+</body>
+</html>

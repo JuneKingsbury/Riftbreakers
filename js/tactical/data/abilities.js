@@ -2254,4 +2254,75 @@ export const ABILITY_DATA = {
         extends: 'mana_surge', name: 'Initiative', passiveMpCost: 0, dmgDealt: null, partyStartCt: 30,
         desc: 'Every battle is planned in advance. The whole party opens with a big head start on its speed gauges.',
     },
+
+    // ============================================================
+    // ---- Skyhunter (Runebow promotion: Conjuration + Divination) ----
+    // ============================================================
+    hunters_mark: {
+        name: "Hunter's Mark", type: 'physical', range: 5, aoe: 0, mpCost: 8, actionCost: 40,
+        targetType: 'enemy', basePower: 0.8, animType: 'shot',
+        projectileColor: '#ffdd77', chargeTime: 0, noEvade: true,
+        buffs: [{ stat: 'def', value: -4, duration: 3 }, { stat: 'mdf', value: -4, duration: 3 }],
+        desc: 'A glowing rune-arrow pins your quarry in plain sight. It can\'t be dodged, deals damage, and the target\'s DEF and MDF fall by {buff:def} for 3 turns.',
+    },
+    piercing_shot: {
+        extends: 'long_shot', name: 'Piercing Shot', range: 6, basePower: 1.1, mpCost: 6, actionCost: 42,
+        ignoreEvasion: true, projectileColor: '#ffeeaa',
+        desc: 'You loose the arrow where the target is about to be. Long range, solid damage, and it can\'t be dodged.',
+    },
+    starfall: {
+        name: 'Starfall', type: 'magic', range: 6, aoe: 1, requiresLos: false, mpCost: 20, actionCost: 55,
+        targetType: 'enemy', basePower: 0.9, element: 'holy', animType: 'shot',
+        projectileColor: '#ffffcc', chargeTime: 40,
+        desc: 'A volley of conjured arrows arcs into the sky and falls like stars. Hits the target and every enemy next to them, over any cover.',
+    },
+    // Overwatch's shot: not learned on its own.
+    overwatch_shot: {
+        extends: 'long_shot', name: 'Overwatch', mpCost: 0,
+        desc: 'A covering shot at an enemy who just struck an ally.',
+    },
+    overwatch: {
+        extends: 'brace', name: 'Overwatch', trigger: 'allyHit', chance: 0.4, selfStatus: null,
+        counterWith: 'overwatch_shot', counterReach: 5,
+        desc: 'When an adjacent ally is hit, you may shoot back at the attacker, if they are within 5 tiles.',
+    },
+    eagle_eye: {
+        extends: 'mana_surge', name: 'Eagle Eye', passiveMpCost: 0, dmgDealt: { physical: 1.2 },
+        desc: 'Nothing escapes your sight, so every arrow finds a weak spot. Physical damage +20%.',
+    },
+
+    // ============================================================
+    // ---- Bastion (Warden promotion: Abjuration + Transmutation) ----
+    // ============================================================
+    bulwark: {
+        name: 'Bulwark', type: 'magic', range: 3, aoe: 0, mpCost: 12, actionCost: 42,
+        targetType: 'ally', basePower: 0, element: 'earth', animType: 'cast',
+        projectileColor: '#bbaa88', chargeTime: 0,
+        applyStatus: 'protect', statusDuration: 3,
+        buffs: [{ stat: 'mdf', value: 3, duration: 3 }],
+        desc: 'Turns an ally\'s skin to living stone. They gain Protect for {turns} and MDF +{buff:mdf} for 3 turns.',
+    },
+    ward_circle: {
+        name: 'Ward Circle', type: 'magic', range: 0, aoe: 1, mpCost: 16, actionCost: 45,
+        targetType: 'ally', basePower: 0, element: 'arcane', animType: 'cast',
+        projectileColor: '#aaccdd', chargeTime: 0,
+        applyStatus: 'shell', statusDuration: 3,
+        desc: 'Draws a ring of runes around your feet. You and every adjacent ally gain Shell for {turns}.',
+    },
+    grasping_stone: {
+        name: 'Grasping Stone', type: 'magic', range: 3, aoe: 1, requiresLos: false, mpCost: 18, actionCost: 50,
+        targetType: 'enemy', basePower: 0.6, element: 'earth', animType: 'cast',
+        projectileColor: '#998866', chargeTime: 35,
+        applyStatus: 'slow', statusDuration: 2,
+        desc: 'Stone hands rise from the ground and seize everyone in the area. Damages each enemy and slows them for {turns}.',
+    },
+    mana_shell: {
+        extends: 'brace', name: 'Mana Shell', trigger: 'magicHit', chance: 0.5, selfStatus: 'shell',
+        desc: 'When a spell hits you, you may harden your wards against the next. You gain Shell.',
+    },
+    unbreakable: {
+        extends: 'mana_surge', name: 'Unbreakable', passiveMpCost: 0, dmgDealt: null,
+        dmgTaken: { physical: 0.85, magic: 0.85 },
+        desc: 'Stone in body and will. All damage you take is 15% lower.',
+    },
 };

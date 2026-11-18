@@ -4,6 +4,7 @@ import { ABILITIES } from '../tactical/data-registry.js';
 import { JOB_DATA } from '../tactical/data/jobs.js';
 import { EQUIPMENT, EQUIP_STAT_KEYS, itemRarity, itemName } from '../tactical/data/equipment.js';
 import { Sound } from '../audio/sound.js';
+import { placeTipAt } from '../ui/tip-place.js';
 
 export const FONT = `'Courier New',monospace`;
 
@@ -247,11 +248,14 @@ export class Modal {
 }
 
 // ---- Hover tips ----
-// Any element inside `root` with a data-tip attribute shows a styled tip: on hover with a
-// mouse, or on tap with touch (where hovering doesn't exist). The text may have line breaks;
-// the first line is shown as a heading. Disabled buttons get no pointer events, so put the
-// data-tip on a wrapper around them (with pointer-events:none on the button).
-let tipEl = null, tipTimer = 0;
+// Any element with a data-tip attribute, anywhere in the page, shows a styled tip: on hover with
+// a mouse, or while a finger holds it with touch (where hovering doesn't exist). A touch tip sits
+// clear of the finger (ui/tip-place.js) and stays a moment after lifting it; a tap still presses
+// the button. The text may have line breaks; the first line is shown as a heading. Disabled
+// buttons get no pointer events, so put the data-tip on a wrapper around them (with
+// pointer-events:none on the button).
+let tipEl = null, tipTimer = 0, touchTip = null, tipsWired = false;
+const TOUCH_TIP_LINGER_MS = 2500;
 function tipBox() {
     if (tipEl?.isConnected) return tipEl;
     tipEl = document.createElement('div');
@@ -262,49 +266,69 @@ function tipBox() {
     document.body.appendChild(tipEl);
     return tipEl;
 }
-function placeTip(x, y) {
-    const el = tipBox(), pad = 12;
-    const w = el.offsetWidth, h = el.offsetHeight;
-    el.style.left = `${Math.max(4, Math.min(window.innerWidth - w - 4, x + pad))}px`;
-    el.style.top = `${y + pad + h > window.innerHeight ? Math.max(4, y - h - pad) : y + pad}px`;
+function placeTip(x, y, touch = false) {
+    placeTipAt(tipBox(), x, y, touch);
 }
-function showTip(text, x, y) {
+function showTip(text, x, y, touch = false) {
     const el = tipBox();
     const [head, ...rest] = String(text).split('\n');
     el.innerHTML = `<div style="color:#fc8;font-weight:bold;">${esc(head)}</div>${rest.map(l => `<div>${esc(l)}</div>`).join('')}`;
     el.style.display = 'block';
-    placeTip(x, y);
+    placeTip(x, y, touch);
 }
 export function hideTip() {
     clearTimeout(tipTimer);
+    touchTip = null;
     if (tipEl) tipEl.style.display = 'none';
 }
-export function wireTips(root) {
-    if (!root || root._tipsWired) return;
-    root._tipsWired = true;
-    const target = (e) => e.target.closest?.('[data-tip]');
-    root.addEventListener('pointerover', (e) => {
+// Listens on the whole document (capture phase, so buttons that stop their events still get
+// tips), once.
+function wireDocumentTips() {
+    if (tipsWired || typeof document === 'undefined') return;
+    tipsWired = true;
+    const target = (el) => el?.closest?.('[data-tip]');
+    const opts = { capture: true, passive: true };
+    document.addEventListener('pointerover', (e) => {
         if (e.pointerType === 'touch') return;
-        const t = target(e);
+        const t = target(e.target);
         if (t) showTip(t.dataset.tip, e.clientX, e.clientY);
-    });
-    root.addEventListener('pointermove', (e) => {
+    }, opts);
+    document.addEventListener('pointermove', (e) => {
+        if (e.pointerType === 'touch') {
+            if (touchTip?.id === e.pointerId) placeTip(e.clientX, e.clientY, true);
+            return;
+        }
+        if (target(e.target)) placeTip(e.clientX, e.clientY);
+        else if (!touchTip && tipEl?.style.display === 'block') hideTip();
+    }, opts);
+    document.addEventListener('pointerout', (e) => {
         if (e.pointerType === 'touch') return;
-        if (target(e)) placeTip(e.clientX, e.clientY); else hideTip();
-    });
-    root.addEventListener('pointerout', (e) => {
-        if (!e.relatedTarget || !target({ target: e.relatedTarget })) hideTip();
-    });
-    // Touch: a tap shows the tip for a few seconds (and still presses the button).
-    root.addEventListener('pointerdown', (e) => {
-        const t = target(e);
+        if (!e.relatedTarget || !target(e.relatedTarget)) hideTip();
+    }, opts);
+    document.addEventListener('pointerdown', (e) => {
         if (e.pointerType !== 'touch') { hideTip(); return; }
-        if (!t) return;
-        showTip(t.dataset.tip, e.clientX, e.clientY - 40);
+        const t = target(e.target);
+        if (!t) { if (touchTip) hideTip(); return; }
         clearTimeout(tipTimer);
-        tipTimer = setTimeout(hideTip, 3000);
-    });
+        showTip(t.dataset.tip, e.clientX, e.clientY, true);
+        touchTip = { id: e.pointerId };
+    }, opts);
+    const lift = (e) => {
+        if (e.pointerType !== 'touch' || touchTip?.id !== e.pointerId) return;
+        touchTip = null;
+        clearTimeout(tipTimer);
+        tipTimer = setTimeout(hideTip, TOUCH_TIP_LINGER_MS);
+    };
+    document.addEventListener('pointerup', lift, opts);
+    document.addEventListener('pointercancel', lift, opts);
 }
+/** Makes data-tip tips work (they work page-wide; `root` is kept for older callers). */
+export function wireTips(root) {
+    void root;
+    wireDocumentTips();
+}
+// Every screen that draws with this kit gets tips, including ones that never call wireTips.
+wireDocumentTips();
 
 export class Toast {
     constructor() {

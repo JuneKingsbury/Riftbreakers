@@ -194,7 +194,7 @@ export class ScriptEditor {
             const leaf = negated ? c.args[0] : c;
             const base = `rules.${i}.when.args.${j}${negated ? '.args.0' : ''}`;
             return `<div style="margin:2px 0;">${j > 0 ? `<span style="color:#88a;">${w.op === 'or' ? 'or' : 'and'}</span> ` : ''}
-                <label title="Negate"><input type="checkbox" data-act="toggle-not" data-rule="${i}" data-cond="${j}"${negated ? ' checked' : ''}> not</label>
+                <label data-tip="Negate\nThe rule fires when this is NOT true."><input type="checkbox" data-act="toggle-not" data-rule="${i}" data-cond="${j}"${negated ? ' checked' : ''}> not</label>
                 ${this._condLeaf(leaf, base, ctx)}
                 <button data-act="del-cond" data-rule="${i}" data-cond="${j}" style="${BTN}">&times;</button></div>`;
         }).join('');
@@ -222,7 +222,7 @@ export class ScriptEditor {
         let html = this._select(Object.keys(ACTION_KINDS), a.do, `${base}.do`, k => ACTION_KINDS[k]).replace('data-bind', 'data-kind="do" data-bind');
         if (a.do === 'ability') {
             html += ' ' + this._abilityPicker(a.ability, `${base}.ability`, ctx);
-            html += ` <label title="Walk into range first if needed"><input type="checkbox" data-bind="${base}.approach" data-kind="check"${a.approach !== false ? ' checked' : ''}> approach</label>`;
+            html += ` <label data-tip="Approach\nWalk into range first if needed."><input type="checkbox" data-bind="${base}.approach" data-kind="check"${a.approach !== false ? ' checked' : ''}> approach</label>`;
             html += this._positioning(a, base);
         } else if (a.do === 'move') {
             html += ' ' + this._select(Object.keys(MOVE_MODES), a.mode, `${base}.mode`, k => MOVE_MODES[k]);
@@ -243,7 +243,7 @@ export class ScriptEditor {
 
     // How the unit moves around enemies and allies when carrying out this rule.
     _positioning(a, base) {
-        return ` <span title="Careful: stay out of enemy reach and near allies. Stay with group: don't charge in far ahead. Bold: go straight for it. Auto: careful for ranged attackers, bold otherwise.">positioning ${this._select(Object.keys(POSITIONING), a.position ?? 'auto', `${base}.position`, k => POSITIONING[k])}</span>`;
+        return ` <span data-tip="Positioning\nCareful: stay out of enemy reach and near allies.\nStay with group: don't charge in far ahead.\nBold: go straight for it.\nAuto: careful for ranged attackers, bold otherwise.">positioning ${this._select(Object.keys(POSITIONING), a.position ?? 'auto', `${base}.position`, k => POSITIONING[k])}</span>`;
     }
 
     // Ability dropdown: "best of a kind" choices that adapt to the character, then each
@@ -329,8 +329,8 @@ export class ScriptEditor {
                     <button data-act="save" style="${BTN}color:#8f8;border-color:#464;"${blocked || !dirty ? ' disabled' : ''}>Save ${esc(cd.name)}</button>
                     <button data-act="revert" style="${BTN}"${dirty ? '' : ' disabled'}>Revert changes</button>
                     <button data-act="reset" style="${BTN}"${hasCustomScript(cd.name) || dirty ? '' : ' disabled'}>Use default behavior</button>
-                    ${this._codex ? `<button data-act="save-template" style="${BTN}color:#fc8;border-color:#664;"${blocked ? ' disabled' : ''} title="Keep these rules as a template for any character">Save as template</button>
-                    <button data-act="load-template" style="${BTN}color:#fc8;border-color:#664;"${loadTemplate() ? '' : ' disabled'} title="Replace these rules with your template">Load template</button>` : ''}
+                    ${this._codex ? `<button data-act="save-template" style="${BTN}color:#fc8;border-color:#664;"${blocked ? ' disabled' : ''} data-tip="Save as template\nKeep these rules as a template for any character.">Save as template</button>
+                    <button data-act="load-template" style="${BTN}color:#fc8;border-color:#664;"${loadTemplate() ? '' : ' disabled'} data-tip="Load template\nReplace these rules with your template.">Load template</button>` : ''}
                     <span style="color:#8c8;">${esc(this._message)}</span>
                     <span style="margin-left:auto;color:#778;font-size:11px;">${blocked ? 'Fix the problems above to save.' : ''}</span>
                 </div>

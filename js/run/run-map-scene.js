@@ -7,6 +7,7 @@
 // relics, the legend and quitting moved into a Menu.
 import { RunMapRenderer } from './run-map-renderer.js';
 import { Sound } from '../audio/sound.js';
+import { SCORE_TIP } from './score.js';
 import { mapMusic, VICTORY_MUSIC } from '../audio/game-sounds.js';
 import { NodeScreens } from './node-screens.js';
 import { PartyMenu } from './party-menu.js';
@@ -358,7 +359,7 @@ export class RunMapScene {
             <div style="color:#888;font-size:10px;">${esc(CHAINS[run.realm.chain].name)} · Floor ${floor} of 15</div>
             <div style="color:#99a;font-size:10px;line-height:1.4;margin:5px 0 8px;">${esc(run.realm.blurb)}</div>
             <div style="display:flex;justify-content:space-between;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid #335;">
-                <span style="color:#fc8;">★ ${run.gold} gold</span><span style="color:#888;">${Object.values(run.inventory).reduce((s, n) => s + n, 0)} in bag</span>
+                <span style="color:#fc8;">★ ${run.gold} gold</span><span style="color:#9cf;" data-tip="${esc(SCORE_TIP)}">✦ ${run.score || 0} score</span><span style="color:#888;">${Object.values(run.inventory).reduce((s, n) => s + n, 0)} in bag</span>
             </div>`;
 
         html += `<div style="color:#fc8;font-size:10px;text-transform:uppercase;margin-bottom:5px;">Party (${run.party.length}/${MAX_PARTY})</div>`;

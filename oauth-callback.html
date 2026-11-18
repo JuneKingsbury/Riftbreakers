@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; base-uri 'none'">
+    <title>Riftbreak: Google Sign-In</title>
+    <style>
+        body { font-family: sans-serif; background: #1a1a2e; color: #ccc; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; text-align: center; }
+        h2 { color: #66ff99; }
+        p { color: #888; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <div>
+        <h2>Riftbreak: Google Drive Connected!</h2>
+        <p>You can close this tab and return to the game.</p>
+    </div>
+    <script>
+        // Hand the query string (code + state) back to the game (js/core/gdrive.js), then close.
+        // The channel name is Riftbreak's own: Rifthold shares this origin.
+        try {
+            const ch = new BroadcastChannel('riftbreak_gdrive_auth');
+            ch.postMessage(window.location.search);
+            ch.close();
+        } catch (e) {
+            if (window.opener) window.opener.postMessage({ riftbreakGdriveAuth: window.location.search }, window.location.origin);
+        }
+        setTimeout(() => window.close(), 1000);
+    </script>
+</body>
+</html>

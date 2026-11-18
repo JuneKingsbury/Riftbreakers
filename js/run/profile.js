@@ -7,11 +7,12 @@ import { EQUIPMENT, EQUIP_FIELDS, baseItemKey, enchantLevel } from '../tactical/
 import { JOB_DATA } from '../tactical/data/jobs.js';
 import { REALMS } from './data/realms.js';
 import { BACKDROPS } from './data/backdrops.js';
+import { notifySaved } from './save-events.js';
 
 export const PROFILE_KEY = 'riftbreak.profile.v1';
 
-// Feats: how many winning runs the profile remembers (the most recent first).
-export const RECENT_WINS = 5;
+// Feats: how many winning runs the profile remembers: the best by score (score.js), highest first.
+export const BEST_WINS = 10;
 
 // Every boss fight in the game (each realm fields two), for the bestiary.
 export const BOSS_IDS = [...new Set(Object.values(REALMS).flatMap(r => r.bosses || []))];
@@ -56,7 +57,7 @@ export function newProfile() {
     return {
         renown: 0, unlocked: [], stats: { runs: 0, wins: 0, bestAct: 0, bestFloor: 0, riftTier: 0 },
         items: [],        // every item ever obtained, by base key (an enchanted find counts as its item)
-        recentWins: [],   // summaries of the latest winning runs, newest first (see winSummary)
+        bestWins: [],     // summaries of the best winning runs, highest score first (see winSummary)
         bossKills: {},    // boss fight id → times defeated, across all runs
         rewards: [],      // collection rewards earned (COLLECTION_REWARDS ids)
     };
@@ -85,7 +86,9 @@ export function sanitizeProfile(data) {
     if (p.stats.wins > 0 && p.stats.riftTier === 0) p.stats.riftTier = 1;
     if (Array.isArray(data.rewards)) p.rewards = [...new Set(data.rewards.filter(r => Object.hasOwn(COLLECTION_REWARDS, r)))];
     if (Array.isArray(data.items)) p.items = [...new Set(data.items.filter(isBaseItem))];
-    if (Array.isArray(data.recentWins)) p.recentWins = data.recentWins.map(sanitizeWin).filter(Boolean).slice(0, RECENT_WINS);
+    // Profiles from before scoring kept their latest wins (recentWins): those count with score 0.
+    const wins = Array.isArray(data.bestWins) ? data.bestWins : Array.isArray(data.recentWins) ? data.recentWins : [];
+    p.bestWins = rankWins(wins.map(sanitizeWin).filter(Boolean));
     if (data.bossKills && typeof data.bossKills === 'object') {
         for (const id of BOSS_IDS) if (Object.hasOwn(data.bossKills, id) && count(data.bossKills[id]) > 0) p.bossKills[id] = count(data.bossKills[id]);
     }
@@ -129,7 +132,18 @@ function sanitizeWin(w) {
         realms: (Array.isArray(w.realms) ? w.realms : []).filter(r => typeof r === 'string' && Object.hasOwn(REALMS, r)).slice(0, 3),
         floors: count(w.floors), battles: count(w.battles), elites: count(w.elites), bosses: count(w.bosses),
         relics: count(w.relics), renown: count(w.renown),
+        score: count(w.score),
+        startPartySize: Math.min(3, count(w.startPartySize, 3)) || 3,
+        tier: Math.min(MAX_RIFT_TIER, count(w.tier)),
+        // A per-win id, so the leaderboard takes each run once (see leaderboard.js).
+        id: typeof w.id === 'string' && /^[a-z0-9-]{1,40}$/i.test(w.id) ? w.id : '',
+        submitted: w.submitted === true,
     };
+}
+
+/** Wins ordered best first: highest score, then newest. At most BEST_WINS. */
+export function rankWins(wins) {
+    return [...wins].sort((a, b) => (b.score - a.score) || String(b.date).localeCompare(String(a.date))).slice(0, BEST_WINS);
 }
 
 /** What a won run is remembered by in Feats. */
@@ -141,6 +155,10 @@ export function winSummary(run, renown, now = new Date()) {
         ...run.stats,
         relics: run.relics.length,
         renown,
+        score: run.score || 0,
+        startPartySize: run.startPartySize ?? 3,
+        tier: run.options?.tier ?? 0,
+        id: `${(run.seed >>> 0).toString(36)}-${now.getTime().toString(36)}`,
     });
 }
 
@@ -167,7 +185,11 @@ export function loadProfile(storage = defaultStorage()) {
 }
 
 export function saveProfile(profile, storage = defaultStorage()) {
-    try { storage?.setItem(PROFILE_KEY, JSON.stringify(sanitizeProfile(profile))); return !!storage; } catch { return false; }
+    try {
+        storage?.setItem(PROFILE_KEY, JSON.stringify(sanitizeProfile(profile)));
+        if (storage) notifySaved();
+        return !!storage;
+    } catch { return false; }
 }
 
 export function hasUnlock(profile, key) {
@@ -291,6 +313,6 @@ export function recordRun(profile, run, now = new Date()) {
     profile.stats.bestFloor = Math.max(profile.stats.bestFloor, run.stats.floors || 0);
     noteItems(profile, run);
     noteBosses(profile, run);
-    if (won) profile.recentWins = [winSummary(run, earned, now), ...(profile.recentWins || [])].filter(Boolean).slice(0, RECENT_WINS);
+    if (won) profile.bestWins = rankWins([winSummary(run, earned, now), ...(profile.bestWins || [])].filter(Boolean));
     return earned;
 }

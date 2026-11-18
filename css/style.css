@@ -5002,3 +5002,11 @@ body.portrait .se-panel select, body.portrait .se-panel input { max-width: 100%;
 @media (max-height: 500px) {
     .tac3d-compass { top: 86px !important; }
 }
+
+/* Tooltips show while a finger holds them (run/ui-kit.js, tactical/battle-ui.js): no long-press
+   callout or text selection on top of them. */
+[data-tip], .tac-btn {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+}

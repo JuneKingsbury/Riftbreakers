@@ -27,6 +27,8 @@ import { eventsFor, EVENTS } from './data/events.js';
 import { rollRealms, REALMS } from './data/realms.js';
 import { createMember, recruitCandidates } from './data/recruits.js';
 import { autoAllocate } from './skill-plans.js';
+import { battleScore } from './score.js';
+import { notifySaved } from './save-events.js';
 import { runOptions, BASE_JOBS } from './profile.js';
 import { EQUIPMENT, EQUIP_FIELDS, equipmentStatBonuses, itemPrice, itemRarity, itemName, canEnchant, enchantedKey, enchantLevel } from '../tactical/data/equipment.js';
 import { JOB_STATS, ABILITIES, allowedEquipTypes, jobsOfTier } from '../tactical/data-registry.js';
@@ -93,6 +95,7 @@ export class RunState {
         run.scripts = {};
         run.status = 'active';
         run.stats = { floors: 0, battles: 0, elites: 0, bosses: 0 };
+        run.score = 0;   // see score.js; added to by each won battle
         run.seenEncounters = [];
         run.seenEvents = [];
         run.party = [];
@@ -154,7 +157,7 @@ export class RunState {
     }
 
     save(storage = globalThis.localStorage) {
-        try { storage?.setItem(SAVE_KEY, this.serialize()); return true; } catch { return false; }
+        try { storage?.setItem(SAVE_KEY, this.serialize()); notifySaved(); return true; } catch { return false; }
     }
 
     static load(storage = globalThis.localStorage) {
@@ -167,7 +170,7 @@ export class RunState {
     }
 
     static clearSave(storage = globalThis.localStorage) {
-        try { storage?.removeItem(SAVE_KEY); } catch { /* ignore */ }
+        try { storage?.removeItem(SAVE_KEY); notifySaved(); } catch { /* ignore */ }
     }
 
     // ---- Map ----
@@ -431,9 +434,10 @@ export class RunState {
     }
 
     // Called once when the battle ends. A win gives every member XP and fully heals the
-    // party, knocked-out members included. Returns the reward (also left in `pending`), or
-    // null after a defeat.
-    completeBattle(won) {
+    // party, knocked-out members included, and adds to the run score (score.js) from
+    // `result` (TacticalBattle.partyResult: { partySize, survivors, rounds }; none: no points).
+    // Returns the reward (also left in `pending`), or null after a defeat.
+    completeBattle(won, result = null) {
         const p = this.pending;
         if (p?.kind !== 'battle') return null;
         const enc = p.encounter;
@@ -463,6 +467,14 @@ export class RunState {
             (this.bossesDefeated = this.bossesDefeated || []).push(enc.id);
         }
 
+        // The run score. Runs saved before scoring start counting from here.
+        let score = null;
+        if (result?.partySize > 0) {
+            score = { ...battleScore({ kind: enc.kind, ...result, startPartySize: this.startPartySize ?? 3 }),
+                survivors: result.survivors, partySize: result.partySize, rounds: result.rounds };
+            this.score = (this.score || 0) + score.points;
+        }
+
         const choices = Math.max(1, base.itemChoices + (relicsWith(this.relics, 'extraItemChoice').length ? 1 : 0)
             - ((this.options.tier ?? 0) >= 3 ? 1 : 0));   // Rift Tier III
         let relics = [];
@@ -474,6 +486,7 @@ export class RunState {
             encounter: enc,
             boss: enc.kind === 'boss',
             gold,
+            score,
             xp: xpGained,
             levelUps,
             items: this._rollItems(ITEM_RARITY[this.act][enc.kind], choices, enc.kind),

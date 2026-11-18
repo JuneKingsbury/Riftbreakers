@@ -30,6 +30,9 @@ const SPLASH_CROWD = 3;
 // Only rally an ally whose speed gauge is below this.
 const RALLY_BELOW_CT = 70;
 const KILL_BONUS = 1000;
+// A damaging skill that also lowers the target's stats (Hunter's Mark, Sunder, Acid Flask) is
+// worth this much more on a target that doesn't carry its debuff yet and won't die from the hit.
+const DEBUFF_BONUS = 1.5;
 
 function passesFilter(f, cand, ctx) {
     switch (f.kind) {
@@ -282,6 +285,7 @@ function scoreAbility(key, choice, target, ctx) {
     const hits = Math.max(1, Q.unitsAffected(ctx.self, key, target, ctx.units, ctx.map).length);
     let score = amount * hits;
     if (choice === 'best_damage' && damage >= target.hp) score += KILL_BONUS;
+    else if (choice === 'best_damage' && ab.buffs?.some(b => b.value < 0) && !Q.hasBuff(target, key)) score *= DEBUFF_BONUS;
     if (ab.chargeTime > 0) score *= CHARGE_PENALTY;
     return score;
 }

@@ -55,6 +55,20 @@ test('each starting role promotes into two Tier 2 jobs, and every Tier 2 job is 
     for (const job of playerJobs.filter(j => JOB_DATA[j].tier === 2)) assert.ok(reached.has(job), job);
 });
 
+test('no two starting roles share a promotion: every Tier 2 job belongs to exactly one', () => {
+    const from = {};
+    for (const job of playerJobs.filter(j => JOB_DATA[j].tier === 1)) {
+        for (const t2 of JOB_DATA[job].promotions) {
+            assert.ok(!from[t2], `${t2} is offered by both ${from[t2]} and ${job}`);
+            from[t2] = job;
+        }
+    }
+    assert.equal(from.riftcaller, 'evoker');
+    assert.equal(from.lifeseer, 'seer');
+    assert.equal(from.skyhunter, 'runebow');
+    assert.equal(from.bastion, 'warden');
+});
+
 test('every item has a display name', () => {
     for (const [key, item] of Object.entries(EQUIPMENT)) assert.ok(item.name?.trim(), key);
     assert.equal(itemName('scholars_spectacles'), "Scholar's Spectacles");
@@ -229,6 +243,67 @@ test('Phase Shift teleports away; Call of the Pack summons a wolf', () => {
     withRandom(0.1, () => b2.applyEnemyAbility(foe, 'attack', beast.x, beast.y));
     assert.ok(beast.hp > 0 && beast.hp < beast.maxHp * 0.3, `hp ${beast.hp}`);
     assert.ok(b2.units.some(u => u.name === 'Wolf'));
+});
+
+test("Skyhunter: Hunter's Mark and Piercing Shot can't be dodged, and the mark lowers DEF and MDF", () => {
+    const hunter = unit('H', 'skyhunter', 'player', 1, 1);
+    const foe = () => unit('E', 'kingdom_guard', 'enemy', 5, 1, { eva: 100 });
+    // A roll that a 100-evasion target would always dodge.
+    const marked = foe();
+    const mark = withRandom(0.01, () => resolveAbility(hunter, marked, 'hunters_mark', map));
+    assert.ok(!mark.missed);
+    const defBuff = (marked.buffs || []).find(b => b.stat === 'def');
+    assert.ok(defBuff && defBuff.value < 0, 'DEF lowered');
+    assert.ok(!withRandom(0.01, () => resolveAbility(hunter, foe(), 'piercing_shot', map)).missed);
+    assert.ok(withRandom(0.01, () => resolveAbility(hunter, foe(), 'long_shot', map)).missed, 'a plain shot is dodged');
+});
+
+test('Eagle Eye raises physical damage; Unbreakable lowers both kinds taken', () => {
+    const dmg = (src, tgt, key) => withRandom(0.5, () => resolveAbility(src, tgt, key, map).damage);
+    const hunter = unit('H', 'skyhunter', 'player', 1, 1);
+    const target = () => unit('E', 'kingdom_guard', 'enemy', 2, 1);
+    const plain = dmg(hunter, target(), 'attack');
+    hunter.support = 'eagle_eye';
+    assert.ok(dmg(hunter, target(), 'attack') > plain);
+
+    const brute = unit('O', 'orc_captain', 'enemy', 2, 1);
+    const mage = unit('M', 'shadow_mage', 'enemy', 3, 1);
+    const tank = () => unit('B', 'bastion', 'player', 1, 1);
+    const magicKey = Object.keys(ABILITIES).find(k => ABILITIES[k].type === 'magic' && ABILITIES[k].basePower > 0 && ABILITIES[k].targetType === 'enemy');
+    const physBase = dmg(brute, tank(), 'attack'), magBase = dmg(mage, tank(), magicKey);
+    const hardened = () => Object.assign(tank(), { support: 'unbreakable' });
+    assert.ok(dmg(brute, hardened(), 'attack') < physBase);
+    assert.ok(dmg(mage, hardened(), magicKey) < magBase);
+});
+
+test('Overwatch shoots back at an enemy that hits an adjacent ally, from range', () => {
+    // The attacker strikes the ally with an instant spell from 4 tiles away.
+    const hunter = unit('H', 'skyhunter', 'player', 1, 3, { reaction: 'overwatch' });
+    const ally = unit('A', 'warden', 'player', 2, 3);
+    const foe = unit('E', 'shadow_mage', 'enemy', 5, 3, { mp: 999 });
+    const battle = new TacticalBattle(map, [hunter, ally, foe]);
+    const before = foe.hp;
+    withRandom(0.1, () => battle.applyEnemyAbility(foe, 'rune_arrow', ally.x, ally.y));
+    assert.ok(foe.hp < before, 'the attacker took a covering shot');
+});
+
+test('Bastion: Bulwark gives Protect, Ward Circle shells the caster and neighbours, Mana Shell answers spells', () => {
+    const tank = unit('B', 'bastion', 'player', 3, 3);
+    const near = unit('A', 'evoker', 'player', 4, 3);
+    const far = unit('F', 'evoker', 'player', 8, 3);
+    const foe = unit('E', 'shadow_mage', 'enemy', 10, 6);
+    const battle = new TacticalBattle(map, [tank, near, far, foe]);
+    withRandom(0.5, () => battle.applyEnemyAbility(tank, 'bulwark', near.x, near.y));
+    assert.ok(near.status.includes('protect'));
+    withRandom(0.5, () => battle.applyEnemyAbility(tank, 'ward_circle', tank.x, tank.y));
+    assert.ok(tank.status.includes('shell') && near.status.includes('shell'));
+    assert.ok(!far.status.includes('shell'), 'only adjacent allies');
+
+    const warded = unit('W', 'bastion', 'player', 3, 3, { reaction: 'mana_shell' });
+    const caster = unit('M', 'shadow_mage', 'enemy', 5, 3, { mp: 999 });
+    const b2 = new TacticalBattle(map, [warded, caster]);
+    withRandom(0.1, () => b2.applyEnemyAbility(caster, 'rune_arrow', warded.x, warded.y));   // an instant spell
+    assert.ok(warded.status.includes('shell'));
 });
 
 // ---- Movement ----

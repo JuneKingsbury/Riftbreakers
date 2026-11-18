@@ -3,6 +3,7 @@ import { watchLayout } from '../ui/layout.js';
 import { Sound } from '../audio/sound.js';
 import { TITLE_MUSIC } from '../audio/game-sounds.js';
 import { wireSavePanel } from '../ui/save-panel.js';
+import { wireCloudPanel } from '../ui/cloud-panel.js';
 import { mountStartBackdrop } from '../ui/start-backdrop.js';
 import { BACKDROPS, DEFAULT_BACKDROP } from '../run/data/backdrops.js';
 import { loadProfile, hasUnlock } from '../run/profile.js';
@@ -196,6 +197,8 @@ document.addEventListener('DOMContentLoaded', () => {
     refreshContinue();
     // Importing a save can add or remove a run in progress, so Continue follows it.
     wireSavePanel(refreshContinue);
+    // Cloud saves: a download from Google Drive replaces progress the same way an import does.
+    wireCloudPanel(() => { refreshContinue(); fillBackdropSelect(); redrawBackdrop(); });
 
     document.getElementById('new-run')?.addEventListener('click', () => {
         import('../run/start.js').then(({ newRun }) => {

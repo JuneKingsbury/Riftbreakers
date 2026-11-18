@@ -4,6 +4,7 @@
 import { RELICS } from './data/relics.js';
 import { REALMS } from './data/realms.js';
 import { Sound } from '../audio/sound.js';
+import { SCORE_TIP, scoreLine } from './score.js';
 import { canPromote, canSpendPoints } from '../tactical/loadout.js';
 import { JOB_DATA } from '../tactical/data/jobs.js';
 import { MAX_PARTY } from './run-state.js';
@@ -125,6 +126,10 @@ export class NodeScreens {
         const run = this.run;
         let html = H1(p.boss ? '♛ Boss Defeated!' : '✦ Victory!');
         html += `<div style="color:#fd8;margin-bottom:4px;">+${p.gold} gold</div>`;
+        if (p.score) {
+            html += `<div data-tip="${esc(SCORE_TIP)}" style="color:#9cf;margin-bottom:4px;">+${p.score.points} score
+                <span style="color:#778;font-size:10px;">${esc(scoreLine(p.score))}</span></div>`;
+        }
         html += `<div style="color:#8c8;font-size:11px;margin-bottom:6px;">${run.party.map(m => `${esc(m.name)} +${p.xp[m.name] ?? 0} XP${p.levelUps?.[m.name] ? ` <span style="color:#fd4;">→ Lv ${m.level}!</span>` : ''}`).join(' · ')}</div>`;
 
         if (p.items.length) {
@@ -382,6 +387,7 @@ export class NodeScreens {
             <div>Elites slain</div><div style="color:#ddd;">${s.elites}</div>
             <div>Bosses slain</div><div style="color:#ddd;">${s.bosses}</div>
             <div>Relics</div><div style="color:#ddd;">${run.relics.map(k => esc(RELICS[k].name)).join(', ') || 'none'}</div>
+            <div data-tip="${esc(SCORE_TIP)}">Score</div><div style="color:#9cf;font-weight:bold;">${run.score || 0}</div>
         </div>`;
         html += SECTION('Final party');
         for (const m of run.party) {
@@ -391,6 +397,10 @@ export class NodeScreens {
         if (run.renownEarned != null) {
             html += `<div style="margin-top:12px;color:#fc6;font-size:13px;">+${run.renownEarned} renown</div>
                 <div style="color:#888;font-size:10px;">Spend renown on unlocks from the title screen.</div>`;
+        }
+        if (won) {
+            html += `<div style="margin-top:8px;color:#9cf;font-size:11px;">Final score: <b>${run.score || 0}</b></div>
+                <div style="color:#888;font-size:10px;">Your best wins are kept in Feats &gt; Victories, where you can submit them to the online leaderboard.</div>`;
         }
         html += `<div style="height:10px;"></div><button data-finish style="${BTN}${BTN_GOOD}text-align:center;">Return to title</button>`;
         this._show(html, (on) => on('[data-finish]', () => this.hooks.finish()));

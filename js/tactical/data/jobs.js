@@ -109,7 +109,7 @@ export const JOB_DATA = {
         move: 3, eva: 12,
         skillsetName: 'Abjuration',
         tier: 1,
-        promotions: ['paladin', 'lifeseer'],
+        promotions: ['paladin', 'bastion'],
         learnable: {
             ward: { sp: 1 },
             cure: { sp: 1, requires: 'ward' },
@@ -133,7 +133,7 @@ export const JOB_DATA = {
         move: 4, eva: 13,
         skillsetName: 'Runecraft',
         tier: 1,
-        promotions: ['riftcaller', 'beastcaller'],
+        promotions: ['skyhunter', 'beastcaller'],
         learnable: {
             long_shot: { sp: 1 },
             pinning_shot: { sp: 1, requires: 'long_shot' },
@@ -491,6 +491,45 @@ export const JOB_DATA = {
         char: 'C', color: '#cc8833',
         schools: ['conjuration', 'transmutation'],
         desc: 'A shapeshifting fighter with the ferocity of the beasts they call. Wild Surge hits hard and slows, Savage Howl stuns whole groups nearby, and a summoned wolf joins the hunt. Fast and mobile, the Beastcaller belongs in the thick of the enemy line.',
+    },
+
+    skyhunter: {
+        maxHp: 42, maxMp: 40,
+        spd: 9, atk: 12, def: 5, mat: 9, mdf: 7,
+        move: 4, eva: 15,
+        skillsetName: 'Huntcraft',
+        tier: 2,
+        learnable: {
+            hunters_mark: { sp: 1 },
+            piercing_shot: { sp: 1, requires: 'hunters_mark' },
+            starfall: { sp: 2, requires: 'piercing_shot' },
+            overwatch: { sp: 1, requires: 'hunters_mark' },
+            eagle_eye: { sp: 2, requires: 'piercing_shot' },
+        },
+        spriteKey: 'crusader_archer',
+        char: 'H', color: '#ddcc77',
+        schools: ['conjuration', 'divination'],
+        desc: 'An archer who sees where the quarry will be before it moves. The Skyhunter marks a target so the whole party hits it harder, lands arrows that cannot be dodged, and covers allies with Overwatch. The best pure marksman in the roster, but thin-skinned.',
+    },
+
+    bastion: {
+        equipmentExpansions: { armor: ['heavy'], helmet: ['heavy'] },
+        maxHp: 56, maxMp: 38,
+        spd: 6, atk: 9, def: 12, mat: 10, mdf: 13,
+        move: 3, eva: 8,
+        skillsetName: 'Bulwark Rites',
+        tier: 2,
+        learnable: {
+            bulwark: { sp: 1 },
+            ward_circle: { sp: 1, requires: 'bulwark' },
+            grasping_stone: { sp: 2, requires: 'ward_circle' },
+            mana_shell: { sp: 1, requires: 'bulwark' },
+            unbreakable: { sp: 2, requires: 'bulwark' },
+        },
+        spriteKey: 'kingdom_guard',
+        char: 'B', color: '#99bbaa',
+        schools: ['abjuration', 'transmutation'],
+        desc: 'A warden who turns flesh to stone and wards to walls. The Bastion hardens allies against blows and spells, rings the line with Shell, and pins the enemy in place with grasping stone. Slow, but very hard to bring down.',
     },
 
     // ---- Tier 2: promotions of the added classes ----

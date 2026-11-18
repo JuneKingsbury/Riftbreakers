@@ -203,7 +203,7 @@ export class BattleScene {
             if (this._won) Sound.playSfx('loot');
             else Sound.stopMusic(1500);
             this._pendingRewards = this._run
-                ? this._run.completeBattle(this._won)
+                ? this._run.completeBattle(this._won, this._battle.partyResult())
                 : null;
         }
         this._ui?.update(this._battle, () => this._onBattleExit(), {

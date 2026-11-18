@@ -51,6 +51,24 @@ export class TacticalBattle {
         this._ctPreSpent = 0;
         // IDs of player-team summons that should be auto-controlled by the AI.
         this._pendingSummons = [];
+        // For the run score (partyResult): the party members who started the fight (summons
+        // join later and don't count) and how many turns they have taken.
+        this._partyIds = new Set(units.filter(u => u.team === 'player' && u.summonerId == null).map(u => u.id));
+        this.partyTurns = 0;
+    }
+
+    /**
+     * How the party did, for the run score: { partySize, survivors, rounds }. Survivors are the
+     * starting members still conscious; rounds are the party's turns per member, rounded up.
+     */
+    partyResult() {
+        const members = this.units.filter(u => this._partyIds.has(u.id));
+        const partySize = members.length;
+        return {
+            partySize,
+            survivors: members.filter(u => isConscious(u)).length,
+            rounds: partySize ? Math.max(1, Math.ceil(this.partyTurns / partySize)) : 0,
+        };
     }
 
     // Charge time after the caster's support (Swiftcast halves it).
@@ -228,6 +246,7 @@ export class TacticalBattle {
 
     startTurn(unit) {
         this.activeUnit = unit;
+        if (this._partyIds.has(unit.id)) this.partyTurns += 1;
         unit._movedThisTurn = false;
         unit._momentumMult = null;
 

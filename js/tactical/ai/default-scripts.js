@@ -53,9 +53,9 @@ const HEALER = () => ({
 
 const BY_JOB = {
     novice: MELEE, spellblade: MELEE, battlemage: MELEE, earthshaker: MELEE, stoneshaper: MELEE,
-    paladin: MELEE_HEALER,
+    paladin: MELEE_HEALER, bastion: MELEE,
     beastcaller: MELEE_SUMMONER,
-    evoker: RANGED(3), runebow: RANGED(4), riftcaller: RANGED(4), fatebinder: RANGED(3), seer: RANGED(3),
+    evoker: RANGED(3), runebow: RANGED(4), riftcaller: RANGED(4), skyhunter: RANGED(4), fatebinder: RANGED(3), seer: RANGED(3),
     spiritbinder: RANGED_SUMMONER, worldsinger: RANGED_SUMMONER,
     warden: HEALER, sanctifier: HEALER, lifeseer: HEALER,
 };
@@ -68,13 +68,13 @@ export function defaultScriptFor(job) {
 
 // Jobs that fight from range and should keep out of harm's way (see positionStyle in
 // script-runtime.js). Healers aren't listed: holding them back lost fights.
-export const RANGED_ROLES = new Set(['evoker', 'runebow', 'riftcaller', 'fatebinder', 'seer', 'spiritbinder', 'worldsinger',
+export const RANGED_ROLES = new Set(['evoker', 'runebow', 'riftcaller', 'skyhunter', 'fatebinder', 'seer', 'spiritbinder', 'worldsinger',
     'illusionist', 'dreamweaver', 'mirage_oracle', 'gravecaller', 'lich', 'alchemist', 'plaguewright']);
 
-const RANGED_KEEP = { evoker: 3, runebow: 4, riftcaller: 4, fatebinder: 3, seer: 3, spiritbinder: 3, worldsinger: 3, sanctifier: 3, lifeseer: 3, warden: 3,
+const RANGED_KEEP = { evoker: 3, runebow: 4, riftcaller: 4, skyhunter: 4, fatebinder: 3, seer: 3, spiritbinder: 3, worldsinger: 3, sanctifier: 3, lifeseer: 3, warden: 3,
     illusionist: 3, dreamweaver: 3, mirage_oracle: 3, gravecaller: 3, lich: 3, gravewarden: 3, alchemist: 3, plaguewright: 3, field_surgeon: 3 };
 const MELEE_JOBS = new Set(['novice', 'spellblade', 'battlemage', 'earthshaker', 'stoneshaper', 'paladin', 'beastcaller',
-    'warlord', 'marshal', 'tactician']);
+    'warlord', 'marshal', 'tactician', 'bastion']);
 const HEALER_JOBS = new Set(['warden', 'sanctifier', 'lifeseer', 'paladin', 'field_surgeon']);
 
 const statusFilter = (status) => [{ kind: 'status', status, has: false }];

@@ -1,0 +1,9 @@
+# Riftbreak API Worker: Google OAuth token proxy + leaderboard. See README.md here.
+name = "riftbreak-api"
+main = "riftbreak-api.js"
+compatibility_date = "2026-11-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "riftbreak"
+database_id = "09052814-bb9c-4471-8d37-07506c4a301f"

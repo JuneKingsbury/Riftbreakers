@@ -503,3 +503,13 @@ test('a script naming a skill uses whatever rank of it the unit has', () => {
     const intent = runScript(s, me, [me, foe], map);
     assert.equal(intent.act.ability, 'fire@3');
 });
+
+test("best attack opens with Hunter's Mark on an unmarked enemy, then shoots once it is marked", () => {
+    const loadout = { ...fullKit('skyhunter'), abilities: ['attack', 'hunters_mark', 'piercing_shot'] };
+    const me = mk('Hunter', 'skyhunter', 'player', 2, 2, { loadout, abilities: ['attack', 'hunters_mark', 'piercing_shot'], mp: 99 });
+    const foe = mk('Foe', 'orc_captain', 'enemy', 6, 2);
+    const best = script(rule('r1', always, { do: 'ability', ability: 'best_damage', target: enemyNearest }));
+    assert.equal(runScript(best, me, [me, foe], map).act.ability, 'hunters_mark');
+    foe.buffs = [{ key: 'hunters_mark', stat: 'def', value: -4, duration: 3 }];
+    assert.equal(runScript(best, me, [me, foe], map).act.ability, 'piercing_shot');
+});

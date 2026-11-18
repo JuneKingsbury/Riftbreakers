@@ -1,4 +1,5 @@
 import { STATES } from './battle.js';
+import { placeTipAt } from '../ui/tip-place.js';
 import { ABILITIES, passivesOf } from './abilities.js';
 
 // Rule labels and unit names can come from player-authored scripts.
@@ -20,6 +21,8 @@ export function unitSkillsets(unit) {
 }
 
 const SPEEDS = [1, 2, 4];
+// A touch held this long (ms) on a battle button is a look at its tooltip, not a press.
+const TOUCH_HOLD_MS = 450;
 
 export class BattleUI {
     // opts.fullAuto: every player unit is script-controlled, so show pause/speed
@@ -631,6 +634,8 @@ export class BattleUI {
         menu.querySelectorAll('.tac-btn').forEach(btn => {
             btn.addEventListener('mousedown', e => {
                 e.stopPropagation();
+                // Lifting a finger after holding a button only shows its tooltip (see below).
+                if (this._suppressPress) { this._suppressPress = false; return; }
                 this._hideTooltip();
                 if (btn.style.cursor === 'not-allowed') return;
                 const action = btn.dataset.action;
@@ -638,46 +643,51 @@ export class BattleUI {
                 if (this._onAction) this._onAction(action, btn.dataset.key);
             });
 
-            // Ability buttons (attack, skills, etc.)
+            // Ability buttons (attack, skills, etc.), then static-tooltip buttons (defend, etc.)
             const key = btn.dataset.key;
-            if (key && ABILITIES[key]) {
-                btn.addEventListener('mouseenter', e => {
-                    this._tooltip.innerHTML = this._abilityDescription(ABILITIES[key], unit, key);
-                    this._tooltip.style.display = 'block';
-                    this._positionTooltip(e);
-                });
-                btn.addEventListener('mousemove', e => this._positionTooltip(e));
-                return;
-            }
-
-            // Static-tooltip buttons (defend, etc.)
             const action = btn.dataset.action;
-            if (action && STATIC_TOOLTIPS[action]) {
-                btn.addEventListener('mouseenter', e => {
-                    this._tooltip.innerHTML = STATIC_TOOLTIPS[action];
-                    this._tooltip.style.display = 'block';
-                    this._positionTooltip(e);
-                });
-                btn.addEventListener('mousemove', e => this._positionTooltip(e));
-            }
+            const tipHtml = key && ABILITIES[key] ? () => this._abilityDescription(ABILITIES[key], unit, key)
+                : action && STATIC_TOOLTIPS[action] ? () => STATIC_TOOLTIPS[action] : null;
+            if (!tipHtml) return;
+            btn.addEventListener('mouseenter', e => this._showTooltip(tipHtml(), e.clientX, e.clientY, false));
+            btn.addEventListener('mousemove', e => { if (!this._touchHold) placeTipAt(this._tooltip, e.clientX, e.clientY, false); });
+            // Touch has no hover: holding a button shows its tooltip clear of the finger. A quick
+            // tap still presses the button; letting go after a hold doesn't.
+            btn.addEventListener('pointerdown', e => {
+                if (e.pointerType !== 'touch') return;
+                this._touchHold = { id: e.pointerId, at: performance.now() };
+                this._showTooltip(tipHtml(), e.clientX, e.clientY, true);
+            });
+            btn.addEventListener('pointermove', e => {
+                if (this._touchHold?.id === e.pointerId) placeTipAt(this._tooltip, e.clientX, e.clientY, true);
+            });
+            const lift = (e) => {
+                if (this._touchHold?.id !== e.pointerId) return;
+                const held = performance.now() - this._touchHold.at;
+                this._touchHold = null;
+                if (held >= TOUCH_HOLD_MS) {
+                    this._suppressPress = true;
+                    setTimeout(() => { this._suppressPress = false; }, 700);
+                }
+                clearTimeout(this._tipTimer);
+                this._tipTimer = setTimeout(() => this._hideTooltip(), 2500);
+            };
+            btn.addEventListener('pointerup', lift);
+            btn.addEventListener('pointercancel', lift);
+            // No long-press menu or text selection callout over the tooltip.
+            btn.addEventListener('contextmenu', e => e.preventDefault());
         });
+    }
+
+    _showTooltip(html, x, y, touch) {
+        clearTimeout(this._tipTimer);
+        this._tooltip.innerHTML = html;
+        this._tooltip.style.display = 'block';
+        placeTipAt(this._tooltip, x, y, touch);
     }
 
     _hideTooltip() {
         this._tooltip.style.display = 'none';
-    }
-
-    _positionTooltip(e) {
-        const tt = this._tooltip;
-        const margin = 10;
-        let x = e.clientX + margin;
-        let y = e.clientY - tt.offsetHeight - margin;
-        // Flip down if not enough room above
-        if (y < 0) y = e.clientY + margin;
-        // Flip left if not enough room to the right
-        if (x + tt.offsetWidth > window.innerWidth) x = e.clientX - tt.offsetWidth - margin;
-        tt.style.left = x + 'px';
-        tt.style.top  = y + 'px';
     }
 
     _updateLog(battle) {
@@ -705,6 +715,10 @@ export class BattleUI {
             if (rewards.gold > 0) {
                 rewardHtml += `<div style="color:#ffdd88;font-size:12px;">+${rewards.gold} gold</div>`;
             }
+            if (rewards.score) {
+                const sc = rewards.score;
+                rewardHtml += `<div style="color:#99ccff;font-size:12px;">+${sc.points} score <span style="color:#778;font-size:10px;">(${sc.survivors}/${sc.partySize} standing, ${sc.rounds} turns)</span></div>`;
+            }
             rewardHtml += `</div>`;
         }
 
@@ -722,6 +736,7 @@ export class BattleUI {
     }
 
     destroy() {
+        clearTimeout(this._tipTimer);
         this._overlay?.remove();
         this._tooltip?.remove();
         if (this._onDocMouseMove) document.removeEventListener('mousemove', this._onDocMouseMove);
