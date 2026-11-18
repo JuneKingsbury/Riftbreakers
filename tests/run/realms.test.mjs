@@ -16,9 +16,9 @@ import { MAP_DATA } from '../../js/tactical/data/maps/index.js';
 import { JOB_STATS, ABILITIES } from '../../js/tactical/data-registry.js';
 import { buildUnits } from '../../js/tactical/build-units.js';
 
-// Sprite file names in the shipped skin. Zip entry names are stored as plain text.
-const SKIN = readFileSync(new URL('../../skins/16x16_tiny_world.skin.zip', import.meta.url)).toString('latin1');
-const skinHas = (category, key) => SKIN.includes(`${category}/${key}.png`);
+// Sprites the game loads from the shipped skin: the ones its manifest lists.
+const SKIN = JSON.parse(readFileSync(new URL('../../skins/16x16_tiny_world/manifest.json', import.meta.url), 'utf8'));
+const skinHas = (category, key) => SKIN.sprites[category]?.includes(key) ?? false;
 
 const allEncounters = (realm) => ['normal', 'elite', 'boss'].flatMap(kind => ENCOUNTERS[realm][kind].map(def => ({ kind, def })));
 

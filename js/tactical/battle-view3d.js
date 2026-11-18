@@ -9,6 +9,7 @@ import { isAlive, isUnconscious, facingForStep } from './units.js';
 import { viewState } from './view-state.js';
 import { UnitSprites } from './unit-sprites.js';
 import { BattleFx } from './battle-fx.js';
+import { perfSettings, pixelRatio } from '../core/perf-settings.js';
 import {
     abilityColors, projectileSprite, impactSprite, meleeSprite, isHeavyHit, hitShake, statusSprite, areaStyle,
     HEAL_COLORS, BUFF_COLORS, DEATH_COLORS, POISON_COLORS, PHYSICAL_SPARKS,
@@ -211,7 +212,9 @@ export class BattleView3D {
         container.appendChild(this.overlay);
 
         this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: false, alpha: false });
-        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+        // Settings > Graphics > Render resolution caps this; _resize() follows changes.
+        this._pixelRatio = pixelRatio();
+        this.renderer.setPixelRatio(this._pixelRatio);
         this.renderer.setClearColor(DEFAULT_SKY, 1);
 
         this.scene  = new THREE.Scene();
@@ -672,7 +675,14 @@ export class BattleView3D {
 
         this._updateCamera(battle, dt, now);
         this._shaker?.update(now);
-        updateTerrainFx(this._terrain?.fx, now, this._shaker?.busy ? (key) => this._shaker.offsetAt(key, now) : null);
+        // Grass sway and water shimmer are ambient: below Full effects they hold still, but a
+        // quake (the shaker) still moves the tiles it shakes. One more update once a quake
+        // ends puts the grass back on the settled ground.
+        const terrainFxLive = perfSettings().effects === 'full' || !!this._shaker?.busy;
+        if (terrainFxLive || this._terrainFxLive) {
+            updateTerrainFx(this._terrain?.fx, now, this._shaker?.busy ? (key) => this._shaker.offsetAt(key, now) : null);
+        }
+        this._terrainFxLive = terrainFxLive;
         this._updateHighlights(battle);
         this._updateUnits(units, activeUnit, map, dt, now);
         this._updateProjectiles(map, now);
@@ -680,6 +690,23 @@ export class BattleView3D {
         this._updateFloats(units, map, dt);
 
         this.renderer.render(this.scene, this.camera);
+    }
+
+    /**
+     * True while something on screen is still moving on its own: effects, projectiles,
+     * floating numbers, a walking unit, a camera glide or turn, a quake, or a pan in progress.
+     * Low power when idle only slows down once this is false.
+     * @param {object[]} units  The battle's units.
+     */
+    isBusy(units) {
+        const keys = this._panKeys;
+        return this.fx.busy
+            || this._projectiles.length > 0
+            || this._desired != null
+            || this._azTargetSteps !== this._azSteps
+            || !!this._shaker?.busy
+            || this._panning || keys.left || keys.right || keys.up || keys.down
+            || units.some(u => isEntityMoving(u) || viewState(u).floats.length > 0);
     }
 
     dispose() {
@@ -874,9 +901,14 @@ export class BattleView3D {
         const rect = this.container.getBoundingClientRect();
         const w = Math.max(Math.floor(rect.width), 200);
         const h = Math.max(Math.floor(rect.height), 200);
-        if (w !== this._width || h !== this._height) {
+        const ratio = pixelRatio();
+        if (w !== this._width || h !== this._height || ratio !== this._pixelRatio) {
             this._width = w;
             this._height = h;
+            if (ratio !== this._pixelRatio) {
+                this._pixelRatio = ratio;
+                this.renderer.setPixelRatio(ratio);
+            }
             this.renderer.setSize(w, h, false);
         }
         const compassRight = this._insets.right + 16;
@@ -1400,6 +1432,8 @@ export class BattleView3D {
     // Lingering statuses give off a few particles: poison bubbles, and sparks around haste.
     _statusParticles(unit, vs, pose, now) {
         if (unit.status.includes('dead') || unit.status.includes('unconscious')) return;
+        // Minimal effects drops these ambient particles; the status still shows on the unit's tag.
+        if (perfSettings().effects === 'minimal') return;
         const at = { x: pose.x, y: pose.y + 0.5, z: pose.z };
         if (unit.status.includes('poison') && now >= (vs.nextBubble ?? 0)) {
             vs.nextBubble = now + 420 / this._timeScale;

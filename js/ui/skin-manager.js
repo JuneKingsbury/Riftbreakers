@@ -41,35 +41,12 @@ export class SkinManager {
     async init() {
         if (this._initialized) return;
         this._initialized = true;
-        const discovered = await this._discoverSkins();
-        if (discovered.length > 0) {
-            this._skinNames = ['ascii', ...discovered];
-        } else {
-            try {
-                const resp = await fetch('skins/index.json');
-                if (resp.ok) {
-                    const names = await resp.json();
-                    this._skinNames = names;
-                }
-            } catch (e) {
-                // index.json missing or malformed. Just use ascii.
-            }
-        }
-    }
-
-    async _discoverSkins() {
+        // skins/index.json lists the skin folders (skins/<name>/manifest.json).
         try {
-            const resp = await fetch('skins/');
-            if (!resp.ok) return [];
-            const ct = resp.headers.get('content-type') || '';
-            if (!ct.includes('text/html')) return [];
-            const html = await resp.text();
-            if (!html.includes('.skin.zip')) return [];
-            const matches = html.match(/[a-zA-Z0-9][\w.-]*\.skin\.zip/g) || [];
-            const names = [...new Set(matches.map(m => m.replace('.skin.zip', '')))];
-            return names.sort();
+            const resp = await fetch('skins/index.json');
+            if (resp.ok) this._skinNames = await resp.json();
         } catch (e) {
-            return [];
+            // index.json missing or malformed. Just use ascii.
         }
     }
 
@@ -332,7 +309,9 @@ export class SkinManager {
         // Load into a staging map so the current sprites remain visible until
         // the entire skin is ready, preventing a flash back to ASCII mid-load.
         const staging = new Map();
-        const loaded = await this._tryLoadFromZip(skinName, staging) || await this._tryLoadFromFolder(skinName, staging);
+        // A skin is a folder: skins/<name>/manifest.json plus <category>/<key>.png files.
+        // (The skin editor's .skin.zip exports go there through npm run unpack-skin.)
+        const loaded = await this._tryLoadFromFolder(skinName, staging);
         if (!loaded) return;
 
         // Atomic swap: old sprites stay live until the new set is fully decoded.
@@ -353,41 +332,6 @@ export class SkinManager {
         this._bufosBodyCount = bB;
         this._hairCount = h;
         this._shirtCount = s;
-    }
-
-    async _tryLoadFromZip(skinName, target) {
-        if (typeof JSZip === 'undefined') return false;
-        try {
-            const resp = await fetch(`skins/${skinName}.skin.zip`);
-            if (!resp.ok) return false;
-            const buf = await resp.arrayBuffer();
-            const zip = await JSZip.loadAsync(buf);
-
-            const manifestFile = zip.file('manifest.json');
-            if (!manifestFile) return false;
-            const manifest = JSON.parse(await manifestFile.async('string'));
-
-            const loadPromises = [];
-            for (const [category, keys] of Object.entries(manifest.sprites || {})) {
-                for (const key of keys) {
-                    const file = zip.file(`${category}/${key}.png`);
-                    if (!file) continue;
-                    loadPromises.push(
-                        file.async('blob').then(blob => {
-                            const url = URL.createObjectURL(blob);
-                            return this._loadImage(url).then(img => {
-                                URL.revokeObjectURL(url);
-                                if (img) target.set(category + ':' + key, img);
-                            });
-                        })
-                    );
-                }
-            }
-            await Promise.all(loadPromises);
-            return true;
-        } catch (e) {
-            return false;
-        }
     }
 
     async _tryLoadFromFolder(skinName, target) {

@@ -267,3 +267,23 @@ map in the folder.
 `columns[y * width + x]` lists runs `[zFrom, zTo, paletteIndex]` (inclusive). In the example, the
 second column is a dirt stack up to level 2, and the third column is ground plus a floating wall block
 at level 4. Spawn `z` is the level of the surface the unit stands on.
+
+## Skin editor and sprites
+
+The game's sprites are plain PNGs in `skins/16x16_tiny_world/<category>/<key>.png`. The game loads
+the ones listed in that folder's `manifest.json`.
+
+- **Load from game** (in the skin editor, under Settings > Dev Tools > Skin) loads every sprite from
+  the folder to edit.
+- **Save PNG** downloads the current sprite. The status bar names the folder it belongs in. Put it
+  there, then run `npm run skin-manifest` (`npm run dev` also does this at startup) so the manifest
+  lists it.
+- **Enemies** has one sprite per enemy name (`entities/enemy_<name>.png`). **Items** and
+  **Equipment Worn** have one per item. All three tabs are built from the game's data
+  (`run/data/encounters.js`, `tactical/data/equipment.js`), so new enemies and items appear on their
+  own. A `×N` badge marks an enemy whose art is still identical to N-1 others. An enemy with no
+  sprite of its own yet is drawn with its shared, tinted sprite, and opens on that art in the editor.
+- **Legacy** lists the colony builder's old items, which the tactical game doesn't use.
+
+`npm test` fails if a PNG is missing from the manifest, if an enemy or item has no sprite, or if an
+enemy sprite no longer matches any enemy.

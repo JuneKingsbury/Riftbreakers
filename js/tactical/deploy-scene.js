@@ -140,6 +140,12 @@ export class DeployScene {
 
     resume() {}
 
+    /** True while the preview still animates (a camera glide or turn), for Low power when idle. */
+    isBusy() {
+        if (this._stopped || !this._preview) return false;
+        return this._renderer?.isBusy(this._preview.units ?? []) ?? false;
+    }
+
     render(now) {
         if (this._stopped) return;
         // The panel sits on the left in landscape and along the bottom in portrait.

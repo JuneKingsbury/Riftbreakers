@@ -146,6 +146,44 @@
                 <div style="color:#999; font-size:11px; line-height:1.4;">Buy more backdrops in Unlocks.</div>
             </div>
 
+            <div class="settings-section" data-start-tab="graphics" style="display:none;">
+                <div class="settings-section-title">Performance &amp; Battery</div>
+                <div class="settings-row">
+                    <label for="start-battery-saver">Battery saver</label>
+                    <input type="checkbox" id="start-battery-saver">
+                </div>
+                <div style="color:#999; font-size:11px; line-height:1.4;">Caps the game at 30 fps, draws at Low resolution, reduces effects and slows down while idle. Overrides the settings below while on.</div>
+                <div class="settings-row">
+                    <label for="start-fps-cap">Frame rate:</label>
+                    <select id="start-fps-cap" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">
+                        <option value="0" selected>Match display</option>
+                        <option value="60">60 fps</option>
+                        <option value="30">30 fps</option>
+                    </select>
+                </div>
+                <div class="settings-row">
+                    <label for="start-render-scale">Render resolution:</label>
+                    <select id="start-render-scale" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">
+                        <option value="2" selected>High</option>
+                        <option value="1.5">Balanced</option>
+                        <option value="1">Low</option>
+                    </select>
+                </div>
+                <div class="settings-row">
+                    <label for="start-effects">Effects:</label>
+                    <select id="start-effects" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">
+                        <option value="full" selected>Full</option>
+                        <option value="reduced">Reduced</option>
+                        <option value="minimal">Minimal</option>
+                    </select>
+                </div>
+                <div class="settings-row">
+                    <label for="start-idle-throttle">Low power when idle</label>
+                    <input type="checkbox" id="start-idle-throttle">
+                </div>
+                <div style="color:#999; font-size:11px; line-height:1.4;">Lower settings save battery, most of all on phones, tablets and high-refresh screens. Reduced effects halves particles and turns off screen shake and swaying grass. Low power when idle slows the game to 10 fps when nothing is moving and you haven't touched it for a couple of seconds.</div>
+            </div>
+
             <div class="settings-section" data-start-tab="devtools" style="display:none;">
                 <div class="settings-section-title">Dev Tools</div>
                 <table style="width:100%; border-collapse:collapse;">
@@ -158,6 +196,10 @@
                         <td style="padding:4px 0; color:#aaa; font-size:11px;">3D block editor for battle maps. Run npm run dev to save to disk.</td>
                     </tr>
                 </table>
+                <div class="settings-row" style="margin-top:8px;">
+                    <label for="start-show-fps">Show FPS counter</label>
+                    <input type="checkbox" id="start-show-fps">
+                </div>
             </div>
         </div>
     </div>
@@ -189,7 +231,6 @@
     <div id="skin-editor" style="display:none;"></div>
 
     <div id="ui-tooltip"></div>
-    <script src="lib/jszip.min.js"></script>
     <script type="module" src="js/core/main.js"></script>
 </body>
 </html>

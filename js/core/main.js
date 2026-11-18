@@ -9,6 +9,7 @@ import { BACKDROPS, DEFAULT_BACKDROP } from '../run/data/backdrops.js';
 import { loadProfile, hasUnlock } from '../run/profile.js';
 import { renderSkillPlanEditor } from '../ui/skill-plan-panel.js';
 import { runSplash } from '../ui/splash.js';
+import { PERF_DEFAULTS, refreshPerfSettings } from './perf-settings.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     watchLayout();
@@ -41,7 +42,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     fillBackdropSelect();
 
-    // The game always uses its own tile skin (skins/16x16_tiny_world.skin.zip). Players can't
+    // The game always uses its own tile skin (skins/16x16_tiny_world/). Players can't
     // change it; an old saved choice from earlier builds (convocation_skin) is ignored.
     const GAME_SKIN = '16x16_tiny_world';
     skinManager.switchSkin(GAME_SKIN).then(redrawBackdrop).catch(() => {});
@@ -63,8 +64,53 @@ document.addEventListener('DOMContentLoaded', () => {
             colorblindMode: document.getElementById('start-colorblind')?.value || 'none',
             tacticsLog: !!document.getElementById('start-tactics-log')?.checked,
             backdrop: document.getElementById('start-backdrop')?.value || DEFAULT_BACKDROP,
+            ...readPerfControls(),
         };
         localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
+        refreshPerfSettings();
+        syncBatterySaverLock();
+    }
+
+    // --- Performance & Battery (Graphics tab; Show FPS sits in Dev Tools) ---
+    // Each saved key, its control, and whether the control is a checkbox.
+    const PERF_CONTROLS = [
+        ['fpsCap',       'start-fps-cap',       false],
+        ['renderScale',  'start-render-scale',  false],
+        ['effects',      'start-effects',       false],
+        ['batterySaver', 'start-battery-saver', true],
+        ['idleThrottle', 'start-idle-throttle', true],
+        ['showFps',      'start-show-fps',      true],
+    ];
+    function readPerfControls() {
+        const out = {};
+        for (const [key, id, isCheckbox] of PERF_CONTROLS) {
+            const el = document.getElementById(id);
+            out[key] = !el ? PERF_DEFAULTS[key] : isCheckbox ? el.checked : el.value;
+        }
+        return out;
+    }
+    function writePerfControls(values) {
+        for (const [key, id, isCheckbox] of PERF_CONTROLS) {
+            const el = document.getElementById(id);
+            if (!el) continue;
+            const v = values[key] ?? PERF_DEFAULTS[key];
+            if (isCheckbox) el.checked = v === true;
+            // Strings only: an unknown saved value would leave the <select> blank.
+            else if ([...el.options].some(o => o.value === String(v))) el.value = String(v);
+            else el.value = PERF_DEFAULTS[key];
+        }
+        syncBatterySaverLock();
+    }
+    // Battery saver overrides frame rate, resolution, effects and idle, so those grey out
+    // while it's on. Their own values are kept for when it's turned off.
+    function syncBatterySaverLock() {
+        const on = !!document.getElementById('start-battery-saver')?.checked;
+        for (const id of ['start-fps-cap', 'start-render-scale', 'start-effects', 'start-idle-throttle']) {
+            const el = document.getElementById(id);
+            if (!el) continue;
+            el.disabled = on;
+            el.closest('.settings-row')?.style.setProperty('opacity', on ? '0.5' : '');
+        }
     }
     function applySettings(s) {
         if (s.musicVolume != null) {
@@ -80,6 +126,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         const tacticsLog = document.getElementById('start-tactics-log');
         if (tacticsLog) tacticsLog.checked = s.tacticsLog === true;
+        writePerfControls(s);
     }
     // The volume sliders drive the sound buses directly, so a change is heard at once.
     function applyVolumes() {
@@ -113,6 +160,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('start-colorblind').value = 'none';
         document.getElementById('start-tactics-log').checked = false;
         document.getElementById('start-backdrop').value = DEFAULT_BACKDROP;
+        writePerfControls(PERF_DEFAULTS);
         saveSettings();
         redrawBackdrop();
         applyVolumes();

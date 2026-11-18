@@ -12,6 +12,7 @@
 // @par Thread Safety:
 //      Not thread-safe. Main thread only (owns WebGL resources).
 import * as THREE from '../../lib/three/three.module.js';
+import { perfSettings, scaledParticleCount } from '../core/perf-settings.js';
 
 const MAX_PARTICLES = 600;          // per layer; spawns past the cap are dropped (Rifthold: 800)
 const MAX_STEP_MS = 500;            // longest step update() takes in one go
@@ -142,6 +143,8 @@ export class BattleFx {
     burst(at, { layer = 'spark', count = 6, colors = '#ffffff', dir = null, spread = Math.PI, speed = [0.6, 1.4],
         up = [0, 0.3], gravity = 0, life = [0.35, 0.6], radius = 0.05, floor = null, wobble = 0, alpha = 0.95, drag = 1 } = {}) {
         const target = this.layers[layer];
+        count = scaledParticleCount(count);   // Settings > Graphics > Effects
+        if (count <= 0) return;
         const list = Array.isArray(colors) ? colors : [colors];
         const base = dir ? Math.atan2(dir.z, dir.x) : 0;
         for (let i = 0; i < count; i++) {
@@ -230,7 +233,8 @@ export class BattleFx {
 
     /** Adds camera shake, in tiles (a hit ~0.05, a knockout ~0.1, a boss ~0.2). */
     shake(amount) {
-        if (this.reducedMotion) return;
+        // Off for players who ask the OS for less motion, and below Full effects.
+        if (this.reducedMotion || perfSettings().effects !== 'full') return;
         this.shakeAmount = Math.min(0.3, Math.max(this.shakeAmount, amount));
     }
 

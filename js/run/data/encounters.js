@@ -629,7 +629,7 @@ export const ENCOUNTERS = {
         ],
         boss: [
             fight('boss_arcane_construct', 'The Arcane Construct', 6, [
-                e('battlemage', 'Arcane Construct', 'boss_arcane_construct', { level: 8, statMods: { maxHp: 85, atk: 4, mat: 5, def: 4, mdf: 5 } }),
+                e('battlemage', 'Arcane Construct Prime', 'boss_arcane_construct', { level: 8, statMods: { maxHp: 85, atk: 4, mat: 5, def: 4, mdf: 5 } }),
                 e('orc_captain', 'Lab Abomination', 'lab_abomination'),
                 e('kingdom_guard', 'Arcane Construct', 'construct'),
                 e('shadow_mage', 'Spell Wraith', 'spell_wraith'),

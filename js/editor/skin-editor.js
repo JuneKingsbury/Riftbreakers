@@ -1,4 +1,56 @@
 import { BUILDINGS, TERRAIN, RESOURCES, ANIMALS, GOLEM_TYPES, CROPS, COMBAT_VISUALS, WEAPONS, ARMORS, HELMETS, CLOTHES, BOOTS, TOOLS, TRINKETS, POTIONS, CONSUMABLES, SPELL_TOMES, ITEM_CHARS, WEATHER_TYPES, EQUIPMENT_OVERLAY_OFFSETS, ENTITIES, EXPEDITION_ENEMIES } from '../core/config.js';
+import { EQUIPMENT } from '../tactical/data/equipment.js';
+import { listEnemies } from '../tactical/enemy-sprites.js';
+
+// The game's own skin: a folder of PNGs (skins/<name>/<category>/<key>.png) listed by
+// skins/<name>/manifest.json. "Load from game" reads it; Save PNG files go back into it.
+const GAME_SKIN = '16x16_tiny_world';
+
+// Items and Equipment Worn list the tactical game's own items (tactical/data/equipment.js),
+// so a new item shows up here as soon as it is added. Only these slots are drawn on the
+// character, so only they need a worn sprite; boots and trinkets need just an icon.
+const WORN_SLOTS = new Set(['armor', 'helmet', 'weapon', 'tool']);
+const SLOT_LABEL = { armor: 'Armor', helmet: 'Helmet', weapon: 'Weapon', tool: 'Tool', boots: 'Boots', trinket: 'Trinket' };
+const escAttr = (v) => String(v).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+
+// Enemies by sprite key, built on first use (the list walks every encounter).
+let enemyIndex = null;
+function enemyByKey() {
+    enemyIndex ??= new Map(listEnemies().map(e => [e.key, e]));
+    return enemyIndex;
+}
+
+function gameItemEntries(category) {
+    return Object.entries(EQUIPMENT)
+        .filter(([, def]) => category === 'items' || WORN_SLOTS.has(def.slot))
+        .map(([key, def]) => {
+            const look = ITEM_CHARS[def.slot] ?? ITEM_CHARS.trinket;
+            const what = SLOT_LABEL[def.slot] ?? def.slot;
+            return { key, char: look.char, color: look.color, category,
+                desc: `${category === 'items' ? what : 'Worn ' + what.toLowerCase()}: ${def.name}` };
+        });
+}
+
+// The colony builder's items (core/config.js) the tactical game doesn't use: the Legacy tab.
+function legacyItemEntries() {
+    const groups = [
+        ['weapon', WEAPONS, true], ['armor', ARMORS, true], ['helmet', HELMETS, true], ['clothes', CLOTHES, true],
+        ['tool', TOOLS, true], ['trinket', TRINKETS, false], ['boots', BOOTS, false], ['potion', POTIONS, false],
+        ['tome', SPELL_TOMES, false], ['consumable', CONSUMABLES, false],
+    ];
+    const out = [];
+    for (const category of ['items', 'equipment_worn']) {
+        for (const [kind, table, worn] of groups) {
+            if (category === 'equipment_worn' && !worn) continue;
+            for (const [key, def] of Object.entries(table)) {
+                if (key === 'fists' || EQUIPMENT[key]) continue;
+                out.push({ key, char: def.char || ITEM_CHARS[kind].char, color: def.charColor || ITEM_CHARS[kind].color, category,
+                    desc: `Legacy ${category === 'items' ? kind : 'worn ' + kind}: ${def.name}` });
+            }
+        }
+    }
+    return out;
+}
 
 const MATERIAL_ITEMS = [
     { key: 'wood', char: '≡', color: '#8b6b3a', desc: 'Wood resource' },
@@ -359,12 +411,10 @@ class SkinEditor {
             <button id="se-paste" title="Paste entire sprite from clipboard&#10;Shortcut: V">Paste</button>
             <span class="bp-sep"></span>
             <button id="se-clear" title="Clear the entire canvas (confirmation required)">Clear</button>
-            <button id="se-save" title="Save sprite to skin data and download as PNG file">Save PNG</button>
-            <button id="se-export-skin" title="Export all sprites as a .skin.zip file for sharing">Export .zip</button>
-            <button id="se-import-zip" title="Import a .skin.zip file to load sprites">Import .zip</button>
+            <button id="se-save" title="Save sprite to skin data and download it as a PNG file.&#10;Put it in skins/${GAME_SKIN}/&lt;category&gt;/ (the status bar names the folder), then run npm run skin-manifest (npm run dev does this at startup).">Save PNG</button>
+            <button id="se-load-game" title="Load every sprite from the game's skin folder (skins/${GAME_SKIN}/) to edit.&#10;Replaces the sprites saved in this browser for that skin.">Load from game</button>
             <span class="bp-sep"></span>
             <select id="se-load-skin" title="Load a previously saved skin by name"><option value="">Load Skin...</option></select>
-            <input type="file" id="se-import-file" accept=".zip" style="display:none">
         `;
         this.container.appendChild(toolbar);
 
@@ -473,7 +523,7 @@ class SkinEditor {
     }
 
     _buildCategoryFilter() {
-        const categories = ['Buildings', 'Terrain', 'Resources', 'Entities', 'Items', 'Materials', 'Floors', 'Farms', 'Effects', 'Icons', 'Overlays', 'Equipment Worn'];
+        const categories = ['Buildings', 'Terrain', 'Resources', 'Entities', 'Enemies', 'Items', 'Equipment Worn', 'Materials', 'Floors', 'Farms', 'Effects', 'Icons', 'Overlays', 'Legacy'];
         const container = document.getElementById('se-category-filter');
         container.innerHTML = categories.map(c =>
             `<button class="bp-cat${c === this.categoryFilter ? ' active' : ''}" data-cat="${c}">${c}</button>`
@@ -576,41 +626,36 @@ class SkinEditor {
                 items.push({ key: '__add_custom__', char: '+', color: '#888888', desc: 'Add custom sprite', category: 'entities', isAction: true, actionType: 'add-custom' });
                 break;
             case 'Items':
-                for (const [key, def] of Object.entries(WEAPONS)) {
-                    if (key === 'fists') continue;
-                    items.push({ key, char: def.char || ITEM_CHARS.weapon.char, color: def.charColor || ITEM_CHARS.weapon.color, desc: `Weapon: ${def.name}`, category: 'items' });
-                }
-                for (const [key, def] of Object.entries(ARMORS)) {
-                    items.push({ key, char: def.char || ITEM_CHARS.armor.char, color: def.charColor || ITEM_CHARS.armor.color, desc: `Armor: ${def.name}`, category: 'items' });
-                }
-                for (const [key, def] of Object.entries(HELMETS)) {
-                    items.push({ key, char: def.char || ITEM_CHARS.helmet.char, color: def.charColor || ITEM_CHARS.helmet.color, desc: `Helmet: ${def.name}`, category: 'items' });
-                }
-                for (const [key, def] of Object.entries(CLOTHES)) {
-                    items.push({ key, char: def.char || ITEM_CHARS.clothes.char, color: def.charColor || ITEM_CHARS.clothes.color, desc: `Clothes: ${def.name}`, category: 'items' });
-                }
-                for (const [key, def] of Object.entries(TOOLS)) {
-                    items.push({ key, char: def.char || ITEM_CHARS.tool.char, color: def.charColor || ITEM_CHARS.tool.color, desc: `Tool: ${def.name}`, category: 'items' });
-                }
-                for (const [key, def] of Object.entries(TRINKETS)) {
-                    items.push({ key, char: def.char || ITEM_CHARS.trinket.char, color: def.charColor || ITEM_CHARS.trinket.color, desc: `Trinket: ${def.name}`, category: 'items' });
-                }
-                for (const [key, def] of Object.entries(BOOTS)) {
-                    items.push({ key, char: def.char || ITEM_CHARS.boots.char, color: def.charColor || ITEM_CHARS.boots.color, desc: `Boots: ${def.name}`, category: 'items' });
-                }
-                for (const [key, def] of Object.entries(POTIONS)) {
-                    items.push({ key, char: def.char || ITEM_CHARS.potion.char, color: def.charColor || ITEM_CHARS.potion.color, desc: `Potion: ${def.name}`, category: 'items' });
-                }
-                for (const [key, def] of Object.entries(SPELL_TOMES)) {
-                    items.push({ key, char: def.char || ITEM_CHARS.tome.char, color: def.charColor || ITEM_CHARS.tome.color, desc: `Tome: ${def.name}`, category: 'items' });
-                }
-                for (const [key, def] of Object.entries(CONSUMABLES)) {
-                    items.push({ key, char: def.char || ITEM_CHARS.consumable.char, color: def.charColor || ITEM_CHARS.consumable.color, desc: `Consumable: ${def.name}`, category: 'items' });
-                }
+                items.push(...gameItemEntries('items'));
                 for (const k of (this.customSprites['items'] || [])) {
                     items.push({ key: k, char: '?', color: '#aaaaaa', desc: k, category: 'items', isCustom: true });
                 }
                 items.push({ key: '__add_custom__', char: '+', color: '#888888', desc: 'Add custom sprite', category: 'items', isAction: true, actionType: 'add-custom' });
+                break;
+            case 'Enemies': {
+                // One sprite per enemy (entities/enemy_<name>), listed from the encounters.
+                // Enemies whose art is still identical to another's are flagged, so it's easy
+                // to see which ones still need art of their own.
+                const enemies = listEnemies();
+                const byArt = new Map();
+                for (const e of enemies) {
+                    const data = this.savedSprites[`entities:${e.key}`]?.data;
+                    if (data) byArt.set(data, [...(byArt.get(data) ?? []), e.name]);
+                }
+                for (const e of enemies) {
+                    const data = this.savedSprites[`entities:${e.key}`]?.data;
+                    const same = data ? byArt.get(data).filter(n => n !== e.name) : [];
+                    const looks = e.looks.map(l => l.sprite + (l.tint ? ` tinted ${l.tint}` : '')).join(', ');
+                    let desc = `${e.name} (${e.jobs.join(', ')}; ${e.fights} fight${e.fights === 1 ? '' : 's'}). Copied from: ${looks}.`;
+                    if (!data) desc += ' No sprite of its own yet: the game draws the copied-from sprite.';
+                    else if (same.length) desc += ` Same art as: ${same.slice(0, 6).join(', ')}${same.length > 6 ? ` and ${same.length - 6} more` : ''}.`;
+                    items.push({ key: e.key, label: e.name, char: '▲', color: '#ff5555', desc, category: 'entities',
+                        badge: !data ? { text: 'none', color: '#f55' } : same.length ? { text: `×${same.length + 1}`, color: '#fa0' } : null });
+                }
+                break;
+            }
+            case 'Legacy':
+                items.push(...legacyItemEntries());
                 break;
             case 'Materials':
                 for (const item of MATERIAL_ITEMS) {
@@ -678,22 +723,7 @@ class SkinEditor {
                 items.push({ key: '__add_custom__', char: '+', color: '#888888', desc: 'Add custom sprite', category: 'overlays', isAction: true, actionType: 'add-custom' });
                 break;
             case 'Equipment Worn':
-                for (const [key, def] of Object.entries(ARMORS)) {
-                    items.push({ key, char: def.char || ITEM_CHARS.armor.char, color: def.charColor || ITEM_CHARS.armor.color, desc: `Worn: ${def.name}`, category: 'equipment_worn' });
-                }
-                for (const [key, def] of Object.entries(HELMETS)) {
-                    items.push({ key, char: def.char || ITEM_CHARS.helmet.char, color: def.charColor || ITEM_CHARS.helmet.color, desc: `Worn: ${def.name}`, category: 'equipment_worn' });
-                }
-                for (const [key, def] of Object.entries(CLOTHES)) {
-                    items.push({ key, char: def.char || ITEM_CHARS.clothes.char, color: def.charColor || ITEM_CHARS.clothes.color, desc: `Worn: ${def.name}`, category: 'equipment_worn' });
-                }
-                for (const [key, def] of Object.entries(WEAPONS)) {
-                    if (key === 'fists') continue;
-                    items.push({ key, char: def.char || ITEM_CHARS.weapon.char, color: def.charColor || ITEM_CHARS.weapon.color, desc: `Worn: ${def.name}`, category: 'equipment_worn' });
-                }
-                for (const [key, def] of Object.entries(TOOLS)) {
-                    items.push({ key, char: def.char || ITEM_CHARS.tool.char, color: def.charColor || ITEM_CHARS.tool.color, desc: `Worn: ${def.name}`, category: 'equipment_worn' });
-                }
+                items.push(...gameItemEntries('equipment_worn'));
                 for (const k of (this.customSprites['equipment_worn'] || [])) {
                     items.push({ key: k, char: '?', color: '#aaaaaa', desc: k, category: 'equipment_worn', isCustom: true });
                 }
@@ -722,8 +752,9 @@ class SkinEditor {
             const icon = saved
                 ? `<img src="${saved.data}" style="width:16px;height:16px;image-rendering:pixelated;vertical-align:middle;">`
                 : `<span style="color:${item.color || '#aaa'}">${item.char || '?'}</span>`;
-            html += `<div class="bp-palette-item${active}" data-key="${item.key}" data-category="${item.category}" title="${item.desc}">
-                ${icon} ${item.key.replace(/_/g, ' ')}${removeBtn}
+            const badge = item.badge ? ` <span style="color:${item.badge.color};font-size:10px;">${item.badge.text}</span>` : '';
+            html += `<div class="bp-palette-item${active}" data-key="${item.key}" data-category="${item.category}" title="${escAttr(item.desc ?? '')}">
+                ${icon} ${escAttr(item.label ?? item.key.replace(/_/g, ' '))}${badge}${removeBtn}
             </div>`;
         }
         palette.innerHTML = html;
@@ -733,9 +764,7 @@ class SkinEditor {
         document.getElementById('se-back').addEventListener('click', () => this._goBack());
         document.getElementById('se-clear').addEventListener('click', () => this._clearCanvas());
         document.getElementById('se-save').addEventListener('click', () => this._savePNG());
-        document.getElementById('se-export-skin').addEventListener('click', () => this._exportToSkinsFolder());
-        document.getElementById('se-import-zip').addEventListener('click', () => document.getElementById('se-import-file').click());
-        document.getElementById('se-import-file').addEventListener('change', (e) => this._importZip(e));
+        document.getElementById('se-load-game').addEventListener('click', () => this._loadFromGame());
         document.getElementById('se-toggle-grid').addEventListener('click', () => this._toggleGrid());
         document.getElementById('se-undo').addEventListener('click', () => this._undo());
         document.getElementById('se-redo').addEventListener('click', () => this._redo());
@@ -1485,6 +1514,7 @@ class SkinEditor {
             this._loadPixelsFromDataURL(saved.data, saved.size);
         } else {
             this.pixels = new Uint8ClampedArray(this.canvasSize * this.canvasSize * 4);
+            this._startEnemyFromSharedArt(key, category);
         }
 
         if (this._onionSkinKey === '__pending__' && prevSpriteKey && prevSpriteKey !== spriteKey) {
@@ -1495,7 +1525,10 @@ class SkinEditor {
             const colonistSprite = this.savedSprites['entities:colonist_body_1'];
             if (colonistSprite) {
                 this._onionSkinOpacity = 1.0;
-                const slotType = HELMETS[key] ? 'helmet' : WEAPONS[key] ? 'weapon' : TOOLS[key] ? 'tool' : 'armor';
+                // The game's own item slot first; the colony tables cover only the legacy items.
+                const gameSlot = EQUIPMENT[key]?.slot;
+                const slotType = WORN_SLOTS.has(gameSlot) ? gameSlot
+                    : HELMETS[key] ? 'helmet' : WEAPONS[key] ? 'weapon' : TOOLS[key] ? 'tool' : 'armor';
                 const offsets = EQUIPMENT_OVERLAY_OFFSETS[slotType] || {};
                 this._onionSkinOffsetX = -(offsets.offsetX || 0);
                 this._onionSkinOffsetY = -(offsets.offsetY || 0);
@@ -1528,6 +1561,39 @@ class SkinEditor {
         }
         const { key, category } = this.activeObject;
         el.innerHTML = `<strong>${category}/${key}</strong>`;
+    }
+
+    // An enemy without its own sprite yet starts from the art the game draws it with today
+    // (tint included), so Save PNG makes its own copy to redraw.
+    _startEnemyFromSharedArt(key, category) {
+        if (category !== 'entities' || !key.startsWith('enemy_')) return;
+        const enemy = enemyByKey().get(key);
+        const shared = enemy && this.savedSprites[`entities:${enemy.sprite}`];
+        if (!shared) return;
+        const status = document.getElementById('se-status');
+        const show = (dataURL) => {
+            if (this.activeObject?.key !== key || this.activeObject?.category !== category) return;  // moved on
+            this._loadPixelsFromDataURL(dataURL, shared.size);
+            if (status) status.textContent = `${enemy.name} started from ${enemy.sprite}${enemy.tint ? ` tinted ${enemy.tint}` : ''}. Save PNG to give it its own sprite.`;
+        };
+        if (!enemy.tint) { show(shared.data); return; }
+        // Same tint steps as the game (tactical/unit-sprites.js): multiply, then trim back
+        // to the sprite's own outline.
+        const img = new Image();
+        img.onload = () => {
+            const c = document.createElement('canvas');
+            c.width = img.width; c.height = img.height;
+            const g = c.getContext('2d');
+            g.imageSmoothingEnabled = false;
+            g.drawImage(img, 0, 0);
+            g.globalCompositeOperation = 'multiply';
+            g.fillStyle = enemy.tint;
+            g.fillRect(0, 0, c.width, c.height);
+            g.globalCompositeOperation = 'destination-in';
+            g.drawImage(img, 0, 0);
+            show(c.toDataURL('image/png'));
+        };
+        img.src = shared.data;
     }
 
     _loadPixelsFromDataURL(dataURL, savedSize) {
@@ -2803,8 +2869,10 @@ class SkinEditor {
                 for (const k of Object.keys(ANIMALS)) keys.add(k);
                 for (const k of Object.keys(EXPEDITION_ENEMIES)) keys.add(k);
                 keys.add('blight_bloom');
+                for (const e of listEnemies()) keys.add(e.key);
                 break;
             case 'items':
+                for (const k of Object.keys(EQUIPMENT)) keys.add(k);
                 for (const k of Object.keys(WEAPONS)) { if (k !== 'fists') keys.add(k); }
                 for (const k of Object.keys(ARMORS)) keys.add(k);
                 for (const k of Object.keys(HELMETS)) keys.add(k);
@@ -2837,6 +2905,7 @@ class SkinEditor {
                 for (const e of OVERLAY_ITEMS) keys.add(e.key);
                 break;
             case 'equipment_worn':
+                for (const e of gameItemEntries('equipment_worn')) keys.add(e.key);
                 for (const k of Object.keys(ARMORS)) keys.add(k);
                 for (const k of Object.keys(HELMETS)) keys.add(k);
                 for (const k of Object.keys(CLOTHES)) keys.add(k);
@@ -2947,89 +3016,51 @@ class SkinEditor {
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
         }, 'image/png');
+        const status = document.getElementById('se-status');
+        if (status) status.textContent = `Saved ${key}.png. For the game, put it in skins/${GAME_SKIN}/${category}/ and run npm run skin-manifest.`;
     }
 
-    async _exportToSkinsFolder() {
-        const keys = Object.keys(this.savedSprites);
-        if (keys.length === 0) {
-            alert('No sprites saved yet.');
-            return;
-        }
-
-        const zip = new JSZip();
-        const manifest = {};
-
-        for (const spriteKey of keys) {
-            const { data } = this.savedSprites[spriteKey];
-            const [category, key] = spriteKey.split(':');
-            const base64 = data.split(',')[1];
-            zip.file(`${category}/${key}.png`, base64, { base64: true });
-            if (!manifest[category]) manifest[category] = [];
-            manifest[category].push(key);
-        }
-
-        zip.file('manifest.json', JSON.stringify({ sprites: manifest, customSprites: this.customSprites, bodyVariants: this.bodyVariants, humanBodyVariants: this.humanBodyVariants, nymphBodyVariants: this.nymphBodyVariants, ferinBodyVariants: this.ferinBodyVariants, kobalosBodyVariants: this.kobalosBodyVariants, bufosBodyVariants: this.bufosBodyVariants, hairVariants: this.hairVariants, shirtVariants: this.shirtVariants }, null, 2));
-
-        const blob = await zip.generateAsync({ type: 'blob' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${this.skinName}.skin.zip`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-    }
-
-    async _importZip(e) {
-        const file = e.target.files[0];
-        if (!file) return;
-        e.target.value = '';
-
-        if (typeof JSZip === 'undefined') {
-            alert('JSZip not loaded.');
-            return;
-        }
-
+    // Loads every sprite in the game's skin folder into the editor (and this browser's saved
+    // copy of that skin), replacing what was saved here before.
+    async _loadFromGame() {
+        const hasEdits = Object.keys(this.savedSprites).length > 0 && this.skinName === GAME_SKIN;
+        if (hasEdits && !confirm(`Replace the sprites saved in this browser for ${GAME_SKIN} with the game's?`)) return;
+        const status = document.getElementById('se-status');
+        const base = `skins/${GAME_SKIN}`;
         try {
-            const buf = await file.arrayBuffer();
-            const zip = await JSZip.loadAsync(buf);
+            const resp = await fetch(`${base}/manifest.json`, { cache: 'no-cache' });
+            if (!resp.ok) throw new Error(`${base}/manifest.json: HTTP ${resp.status}`);
+            const manifest = await resp.json();
+            if (status) status.textContent = `Loading sprites from ${base}/ ...`;
 
-            const manifestFile = zip.file('manifest.json');
-            if (!manifestFile) {
-                alert('No manifest.json found in zip.');
-                return;
-            }
-            const manifest = JSON.parse(await manifestFile.async('string'));
+            const toDataURL = blob => new Promise(resolve => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.readAsDataURL(blob);
+            });
+            const widthOf = src => new Promise(resolve => {
+                const i = new Image();
+                i.onload = () => resolve(i.width);
+                i.onerror = () => resolve(null);
+                i.src = src;
+            });
+            const entries = Object.entries(manifest.sprites || {}).flatMap(([category, keys]) => keys.map(key => ({ category, key })));
+            const loaded = await Promise.all(entries.map(async ({ category, key }) => {
+                const r = await fetch(`${base}/${category}/${key}.png`, { cache: 'no-cache' });
+                if (!r.ok) return null;
+                const data = await toDataURL(await r.blob());
+                return { spriteKey: `${category}:${key}`, data, size: (await widthOf(data)) ?? this.canvasSize };
+            }));
 
-            let name = file.name.replace(/\.skin\.zip$/i, '').replace(/\.zip$/i, '');
-            name = name.replace(/[^a-z0-9_-]/gi, '_').toLowerCase();
-            this.skinName = name;
-            document.getElementById('se-skin-name').value = name;
+            this.skinName = GAME_SKIN;
+            document.getElementById('se-skin-name').value = GAME_SKIN;
             this.savedSprites = {};
             this.customSprites = manifest.customSprites || {};
-
             let count = 0;
-            for (const [category, keys] of Object.entries(manifest.sprites || {})) {
-                for (const key of keys) {
-                    const zipFile = zip.file(`${category}/${key}.png`);
-                    if (!zipFile) continue;
-                    const blob = await zipFile.async('blob');
-                    const dataURL = await new Promise(resolve => {
-                        const reader = new FileReader();
-                        reader.onload = () => resolve(reader.result);
-                        reader.readAsDataURL(blob);
-                    });
-                    const img = await new Promise(resolve => {
-                        const i = new Image();
-                        i.onload = () => resolve(i);
-                        i.onerror = () => resolve(null);
-                        i.src = dataURL;
-                    });
-                    const size = img ? img.width : this.canvasSize;
-                    this.savedSprites[`${category}:${key}`] = { size, data: dataURL };
-                    count++;
-                }
+            for (const sprite of loaded) {
+                if (!sprite) continue;
+                this.savedSprites[sprite.spriteKey] = { size: sprite.size, data: sprite.data };
+                count++;
             }
 
             if (manifest.bodyVariants != null) {
@@ -3106,10 +3137,9 @@ class SkinEditor {
                 }
             }
 
-            const el = document.getElementById('se-status');
-            el.textContent = `Imported ${count} sprite(s) from ${file.name}`;
+            if (status) status.textContent = `Loaded ${count} sprite(s) from ${base}/`;
         } catch (err) {
-            alert('Failed to import zip: ' + err.message);
+            alert('Failed to load the game sprites: ' + err.message);
         }
     }
 

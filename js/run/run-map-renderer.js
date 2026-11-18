@@ -2,6 +2,7 @@
 // far and the nodes the party can move to. Scrolls vertically.
 import { LANES, BOSS_FLOOR } from './map-gen.js';
 import { NODE_INFO, FONT } from './ui-kit.js';
+import { pixelRatio } from '../core/perf-settings.js';
 
 const ROW_H = 74;
 const MARGIN_Y = 70;
@@ -34,7 +35,7 @@ export class RunMapRenderer {
 
     // insets: pixels the HUD covers on each side ({ top, bottom, right }).
     resize(w, h, insets = {}) {
-        const dpr = window.devicePixelRatio || 1;
+        const dpr = pixelRatio();   // Settings > Graphics > Render resolution
         this.canvas.width = Math.round(w * dpr);
         this.canvas.height = Math.round(h * dpr);
         this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);

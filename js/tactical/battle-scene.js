@@ -16,6 +16,8 @@ import { isPortrait } from '../ui/layout.js';
 
 const SPEEDS = { '1': 1, '2': 2, '3': 4 };
 const BASE_MS_PER_STEP = 180;
+// Hand-controlled battle states that wait on the player; nothing moves until they act.
+const WAITING_FOR_PLAYER = new Set([STATES.PLAYER_TURN, STATES.SELECT_MOVE, STATES.SELECT_ABILITY, STATES.SELECT_ABILITY_TARGET]);
 
 
 // Settings > General > "Show tactics decisions in the battle log" (saved by core/main.js).
@@ -166,6 +168,21 @@ export class BattleScene {
 
     // Called when SceneManager restores this scene from the stack (not used here)
     resume() {}
+
+    /**
+     * True while the fight moves on its own, so Low power when idle keeps full speed: a
+     * real-time battle that is playing, a hand-controlled battle between player inputs
+     * (walks, enemy turns), or anything still animating on screen.
+     */
+    isBusy() {
+        if (this._stopped || !this._battle) return false;
+        const state = this._battle.state;
+        if (state !== STATES.BATTLE_OVER && !this._paused) {
+            if (this._realtime) return true;
+            if (!WAITING_FOR_PLAYER.has(state)) return true;
+        }
+        return this._renderer?.isBusy(this._battle.units) ?? false;
+    }
 
     // The HUD covers the right side in landscape and the bottom in portrait.
     _updateInsets() {

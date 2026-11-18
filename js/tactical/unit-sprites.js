@@ -1,6 +1,8 @@
-// Resolves the 2D image for a unit: composited layers when unit.appearance is set,
+// Resolves the 2D image for a unit: composited layers when unit.appearance is set; an
+// enemy's own sprite (entities/enemy_<name>, see enemy-sprites.js) when the skin has one;
 // otherwise the flat job sprite, recolored by unit.tint when set. Shared by the battle view
 // and the sidebar portraits.
+import { enemySpriteKey } from './enemy-sprites.js';
 
 export class UnitSprites {
     constructor(skinManager) {
@@ -28,6 +30,14 @@ export class UnitSprites {
                 a.weaponKey, a.toolKey, null,
                 outlined
             );
+        }
+        // An enemy with its own sprite is drawn as is: the tint was only there to tell apart
+        // enemies sharing a sprite.
+        if (unit.team === 'enemy') {
+            const own = enemySpriteKey(unit.name);
+            if (sm.getSprite('entities', own)) {
+                return outlined ? this._outlined(own, null, outlineColor) : this._flat(own, null);
+            }
         }
         if (unit.spriteKey) {
             if (outlined) return this._outlined(unit.spriteKey, unit.tint ?? null, outlineColor);

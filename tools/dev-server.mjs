@@ -1,5 +1,6 @@
 // Development server: serves the game like `python3 -m http.server`, plus a small API the
-// map editor uses to save maps straight into js/tactical/data/maps.
+// map editor uses to save maps straight into js/tactical/data/maps. At startup it also
+// rebuilds each skin's manifest.json from its PNGs (tools/skin-files.mjs).
 //
 //   npm run dev               then open http://127.0.0.1:8000
 //   PORT=9000 npm run dev     another port
@@ -19,6 +20,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { validateMapJson } from '../js/tactical/battle-map.js';
 import { listMapIds, writeMapIndex, formatMapJson } from './map-files.mjs';
+import { listSkinFolders, writeSkinManifest } from './skin-files.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -145,6 +147,8 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     const port = Number(process.env.PORT) || 8000;
     // Pick up map files dropped into the folder by hand (e.g. an editor download).
     writeMapIndex(path.join(ROOT, 'js/tactical/data/maps'));
+    // PNGs copied into a skin folder by hand (the skin editor's Save PNG) join its manifest.
+    for (const dir of listSkinFolders()) writeSkinManifest(dir);
     createDevServer().listen(port, '127.0.0.1', () => {
         console.log(`Riftbreakers dev server: http://127.0.0.1:${port}  (map editor saves enabled)`);
     });
