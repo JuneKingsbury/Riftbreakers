@@ -1,4 +1,4 @@
-// Daily runs (js/run/daily.js): one shared run per UTC day, its one attempt per device, and its
+// Daily runs (js/run/daily.js): one shared run per Eastern Time day, its one attempt per device, and its
 // own leaderboard (leaderboard.js and the Worker's /daily endpoint).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -32,20 +32,36 @@ function finishedDaily(date, storage, { score = 3100, now = new Date(`${date}T20
 
 // ---- The day ----
 
-test('the daily date is the UTC day, so it is the same everywhere at the same moment', () => {
-    // GIVEN: one moment, written in three time zones
-    const moments = ['2026-11-18T23:30:00-08:00', '2026-11-19T07:30:00Z', '2026-11-19T16:30:00+09:00'];
+test('the daily date is the Eastern Time day, so it is the same everywhere at the same moment', () => {
+    // GIVEN: one moment, written in three time zones (8:30 PM in New York)
+    const moments = ['2026-11-18T17:30:00-08:00', '2026-11-19T01:30:00Z', '2026-11-19T10:30:00+09:00'];
 
-    // WHEN / THEN: all of them are the same daily, the UTC date
-    for (const m of moments) assert.equal(dailyDate(new Date(m)), '2026-11-19');
+    // WHEN / THEN: all of them are the same daily, the New York date, though UTC has moved on
+    for (const m of moments) assert.equal(dailyDate(new Date(m)), '2026-11-18');
 });
 
-test('the next daily starts at the next UTC midnight', () => {
-    assert.equal(msUntilNextDaily(Date.parse('2026-11-18T23:00:00Z')), 3_600_000);
-    assert.equal(msUntilNextDaily(Date.parse('2026-11-18T00:00:00Z')), 86_400_000, 'just after a reset, a whole day to go');
+test('the day turns over at midnight in New York, in winter and in summer', () => {
+    // Winter (EST, UTC-5): midnight is 05:00 UTC.
+    assert.equal(dailyDate(new Date('2026-11-19T04:59:59Z')), '2026-11-18');
+    assert.equal(dailyDate(new Date('2026-11-19T05:00:00Z')), '2026-11-19');
+    // Summer (EDT, UTC-4): midnight is 04:00 UTC.
+    assert.equal(dailyDate(new Date('2026-07-04T03:59:59Z')), '2026-07-03');
+    assert.equal(dailyDate(new Date('2026-07-04T04:00:00Z')), '2026-07-04');
 });
 
-test('the date label names the UTC day, not the local one', () => {
+test('the next daily starts at the next midnight in New York', () => {
+    assert.equal(msUntilNextDaily(Date.parse('2026-11-19T04:00:00Z')), 3_600_000, '11 PM EST: an hour to go');
+    assert.equal(msUntilNextDaily(Date.parse('2026-11-19T05:00:00Z')), 86_400_000, 'just after a reset, a whole day to go');
+    assert.equal(msUntilNextDaily(Date.parse('2026-07-04T03:00:00Z')), 3_600_000, '11 PM EDT: an hour to go');
+});
+
+test('the days that daylight saving changes are 23 and 25 hours long', () => {
+    // US DST starts 2026-03-08 and ends 2026-11-01, both at 2 AM.
+    assert.equal(msUntilNextDaily(Date.parse('2026-03-08T05:00:00Z')), 23 * 3_600_000, 'spring forward');
+    assert.equal(msUntilNextDaily(Date.parse('2026-11-01T04:00:00Z')), 25 * 3_600_000, 'fall back');
+});
+
+test('the date label names the daily\'s own date, not the local one', () => {
     assert.match(dailyLabel('2026-11-18'), /18/);
     assert.match(dailyLabel('2026-12-01'), /\b1\b/);
 });
@@ -141,8 +157,8 @@ test('a daily entry must be a standard start on a real day', () => {
 
 test('a daily stays open for submissions until two days after it', () => {
     assert.ok(dailyOpen('2026-11-18', Date.parse('2026-11-18T12:00:00Z')));
-    assert.ok(dailyOpen('2026-11-18', Date.parse('2026-11-20T23:00:00Z')), 'finished after the reset');
-    assert.equal(dailyOpen('2026-11-18', Date.parse('2026-11-21T00:00:01Z')), false);
+    assert.ok(dailyOpen('2026-11-18', Date.parse('2026-11-21T04:59:59Z')), 'finished after the reset: 11:59 PM EST two days on');
+    assert.equal(dailyOpen('2026-11-18', Date.parse('2026-11-21T05:00:01Z')), false, 'closed from midnight EST on the third day');
     assert.equal(dailyOpen('2026-11-19', Date.parse('2026-11-18T12:00:00Z')), false, 'not a future day');
 });
 

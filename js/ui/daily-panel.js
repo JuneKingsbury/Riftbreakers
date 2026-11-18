@@ -1,6 +1,6 @@
 // The title screen's daily run: the Daily button (its date, and greyed out once today's daily
 // has been started) and the daily leaderboard panel beside the menu, with this device's result
-// for today on top and a form to submit it. Everything follows the UTC day (run/daily.js), and
+// for today on top and a form to submit it. Everything follows the Eastern Time day (run/daily.js), and
 // both refresh by themselves when it turns over.
 import { dailyDate, dailyJobs, dailyLabel, loadDaily, dailyPlayed, msUntilNextDaily } from '../run/daily.js';
 import { fetchDailyLeaderboard, submitRun, savedName, canSubmit, runResult } from '../run/leaderboard.js';
@@ -58,7 +58,7 @@ export function mountDailyPanel({ button, panel, onPlay }) {
         button.innerHTML = `Daily Run<span class="daily-date">${esc(dailyLabel(date))}${played ? ' · played ✓' : ''}</span>`;
         button.title = played
             ? `You've played today's daily. The next one starts in ${countdownText(msUntilNextDaily())}.`
-            : `Today's daily run (${date}, UTC): the same run for every player, one attempt.`;
+            : `Today's daily run (${date}, Eastern Time): the same run for every player, one attempt.`;
     };
 
     // This device's daily for today: the finished result with its submit form, or a note.
@@ -120,7 +120,7 @@ export function mountDailyPanel({ button, panel, onPlay }) {
             <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;">
                 <span class="daily-title">Daily Leaderboard</span>
                 <button data-daily-refresh class="daily-btn"${loading ? ' disabled' : ''}>Refresh</button></div>
-            <div class="daily-sub">${esc(dailyLabel(date))} (UTC) · new daily in <span data-daily-countdown>${countdownText(msUntilNextDaily())}</span></div>
+            <div class="daily-sub">${esc(dailyLabel(date))} (ET) · new daily in <span data-daily-countdown>${countdownText(msUntilNextDaily())}</span></div>
             <div class="daily-sub">Today's party: <span style="color:#cde;">${esc(jobs)}</span></div>
             <div class="daily-sub" title="${esc(SCORE_TIP)}" style="text-decoration:underline dotted;cursor:help;width:fit-content;">How scoring works</div>
             ${mineHtml()}
@@ -157,7 +157,7 @@ export function mountDailyPanel({ button, panel, onPlay }) {
 
     button.addEventListener('click', () => { if (!dailyPlayed(date)) onPlay(); });
 
-    // The countdown ticks each minute, and when the UTC day turns over everything moves to the new daily.
+    // The countdown ticks each minute, and when the Eastern Time day turns over everything moves to the new daily.
     const tick = () => {
         if (dailyDate() !== date) {
             date = dailyDate();

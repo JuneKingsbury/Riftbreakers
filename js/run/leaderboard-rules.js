@@ -4,7 +4,7 @@
 //
 // An entry: { id, name, score, date, startPartySize, tier, battles, floors, elites, bosses,
 //             realms: [string], party: [{ job, origin, level }], daily? }
-// `daily` (a UTC date, 'YYYY-MM-DD') marks a daily run (daily.js), which goes on that day's own
+// `daily` (an Eastern Time date, 'YYYY-MM-DD', DAILY_TIME_ZONE) marks a daily run (daily.js), which goes on that day's own
 // leaderboard instead of the all-time one.
 
 export const NAME_MAX = 20;
@@ -14,16 +14,59 @@ export const MAX_PARTY_SIZE = 6;
 export const MAX_POINTS_PER_BATTLE = 5000;
 
 // How many days after its own a daily run can still be submitted, so a run finished just
-// after the UTC midnight reset still counts for the day it was started.
+// after the midnight reset still counts for the day it was started.
 export const DAILY_GRACE_DAYS = 2;
 
 const ID_RE = /^[a-z0-9-]{1,40}$/i;
 const DAILY_RE = /^\d{4}-\d{2}-\d{2}$/;
 const DAY_MS = 86_400_000;
 
-/** The UTC date of `ms` as 'YYYY-MM-DD': the daily run every player shares on that day. */
+// The time zone whose calendar day is the daily run's day: midnight on New York clocks, following
+// daylight saving (UTC-5 in winter, UTC-4 in summer). Changing it moves every player's daily.
+export const DAILY_TIME_ZONE = 'America/New_York';
+
+// 'en-CA' formats dates as YYYY-MM-DD. formatToParts keeps this independent of that, though.
+const DAILY_DATE_FORMAT = new Intl.DateTimeFormat('en-CA', {
+    timeZone: DAILY_TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
+});
+
+/** The wall-clock fields of `ms` in DAILY_TIME_ZONE, as numbers. */
+function zonedParts(ms) {
+    const parts = Object.fromEntries(DAILY_DATE_FORMAT.formatToParts(new Date(ms)).map(p => [p.type, p.value]));
+    return { year: +parts.year, month: +parts.month, day: +parts.day, hour: +parts.hour, minute: +parts.minute, second: +parts.second };
+}
+
+/** The UTC date of `ms` as 'YYYY-MM-DD'. Used only for calendar arithmetic on date strings. */
 export function utcDate(ms = Date.now()) {
     return new Date(ms).toISOString().slice(0, 10);
+}
+
+/** The Eastern Time date of `ms` as 'YYYY-MM-DD': the daily run every player shares at that moment. */
+export function dailyDateAt(ms = Date.now()) {
+    const p = zonedParts(ms);
+    return `${p.year}-${String(p.month).padStart(2, '0')}-${String(p.day).padStart(2, '0')}`;
+}
+
+/**
+ * The moment (ms) that the day `daily` ('YYYY-MM-DD') starts: midnight of that date in
+ * DAILY_TIME_ZONE. New York's DST changes happen at 2 AM, so midnight always exists, once.
+ */
+export function dailyStartMs(daily) {
+    const wallAsUtc = Date.parse(`${daily}T00:00:00Z`);
+    // The zone's offset from UTC (ms) at instant `ms`: its wall clock read as if it were UTC, minus `ms`.
+    const offsetAt = (ms) => {
+        const p = zonedParts(ms);
+        return Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second) - ms;
+    };
+    // Guess with the offset at the UTC midnight, then correct once in case the offset differs there.
+    const guess = wallAsUtc - offsetAt(wallAsUtc);
+    return wallAsUtc - offsetAt(guess);
+}
+
+/** The date after `daily` ('YYYY-MM-DD'), by the calendar. */
+export function nextDailyDate(daily) {
+    return utcDate(Date.parse(`${daily}T00:00:00Z`) + DAY_MS);
 }
 
 /** Whether `daily` is a real 'YYYY-MM-DD' date. */
@@ -34,7 +77,7 @@ export function isDailyDate(daily) {
 /** Whether the daily leaderboard for `daily` still takes runs at `nowMs`: from that day until DAILY_GRACE_DAYS after. */
 export function dailyOpen(daily, nowMs = Date.now()) {
     if (!isDailyDate(daily)) return false;
-    return daily <= utcDate(nowMs) && daily >= utcDate(nowMs - DAILY_GRACE_DAYS * DAY_MS);
+    return daily <= dailyDateAt(nowMs) && daily >= dailyDateAt(nowMs - DAILY_GRACE_DAYS * DAY_MS);
 }
 const KEY_RE = /^[a-z0-9_]{1,32}$/;
 // Letters and digits in any script, spaces, and a little punctuation.

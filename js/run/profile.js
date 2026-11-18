@@ -166,7 +166,7 @@ function sanitizeRun(w) {
         startPartySize: Math.min(3, count(w.startPartySize, 3)) || 3,
         tier: Math.min(MAX_RIFT_TIER, count(w.tier)),
         challenge: isChallenge(w.challenge) ? w.challenge : null,
-        // The UTC date of a daily run (daily.js), or null.
+        // The Eastern Time date of a daily run (daily.js), or null.
         daily: isDailyDate(w.daily) ? w.daily : null,
         // A per-run id, so the leaderboard takes each run once (see leaderboard.js).
         id: typeof w.id === 'string' && /^[a-z0-9-]{1,40}$/i.test(w.id) ? w.id : '',

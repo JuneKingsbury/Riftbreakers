@@ -1,5 +1,5 @@
-// Daily runs: one run a day that every player shares. The day is the UTC date, so it changes at
-// the same moment everywhere, and everything about the run comes from that date: the seed, the
+// Daily runs: one run a day that every player shares. The day is the Eastern Time date (DAILY_TIME_ZONE in
+// leaderboard-rules.js), so it changes at the same moment everywhere, and everything about the run comes from that date: the seed, the
 // three starting classes, and the rules (a fresh profile's, with no unlocks or Rift Tier, so
 // one player's unlocks can't change the run's rolls). Each device gets one attempt a day: the
 // attempt counts as soon as the run starts. Finished daily runs go on that day's own leaderboard
@@ -11,20 +11,18 @@ import { Rng } from './rng.js';
 import { RunState, START_PARTY } from './run-state.js';
 import { runOptions, runSummary, defaultStorage } from './profile.js';
 import { jobsOfTier } from '../tactical/data-registry.js';
-import { utcDate, isDailyDate } from './leaderboard-rules.js';
+import { dailyDateAt, dailyStartMs, nextDailyDate, isDailyDate } from './leaderboard-rules.js';
 
 export const DAILY_KEY = 'riftbreak.daily.v1';
-const DAY_MS = 86_400_000;
-
-/** Today's daily run, as its UTC date 'YYYY-MM-DD'. */
+/** Today's daily run, as its Eastern Time date 'YYYY-MM-DD'. */
 export function dailyDate(now = Date.now()) {
-    return utcDate(typeof now === 'number' ? now : now.getTime());
+    return dailyDateAt(typeof now === 'number' ? now : now.getTime());
 }
 
-/** Milliseconds from `now` until the next daily run (the next UTC midnight). */
+/** Milliseconds from `now` until the next daily run (the next midnight Eastern Time). */
 export function msUntilNextDaily(now = Date.now()) {
     const ms = typeof now === 'number' ? now : now.getTime();
-    return DAY_MS - (((ms % DAY_MS) + DAY_MS) % DAY_MS);
+    return dailyStartMs(nextDailyDate(dailyDateAt(ms))) - ms;
 }
 
 /** The seed of the daily run on `date`: a 32-bit FNV-1a hash of the date, the same on every machine. */
@@ -45,7 +43,7 @@ export function dailyJobs(date) {
     return new Rng((dailySeed(date) ^ 0x0DA11E5) >>> 0).sample(jobsOfTier(1), START_PARTY);
 }
 
-/** A short label for a daily's date, such as 'Nov 18', read in UTC so it matches the date itself. */
+/** A short label for a daily's date, such as 'Nov 18'. Formatted in UTC only so the label matches the date string itself. */
 export function dailyLabel(date) {
     return new Date(`${date}T00:00:00Z`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', timeZone: 'UTC' });
 }

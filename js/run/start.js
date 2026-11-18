@@ -141,7 +141,7 @@ export function dailyRun(containerEl, skinManager, { onStart, onExit, onCancel }
             <div style="color:#778;font-size:10px;margin-top:2px;line-height:1.4;">${esc(kit)}</div></div>`;
     }
     if (hasSavedRun()) html += `<div style="color:#f99;font-size:11px;margin:8px 0;">${savedRunWarning()}</div>`;
-    html += `<div style="color:#778;font-size:10px;margin:6px 0;">Finish (win or lose) to post your score on today's daily leaderboard. A new daily starts at midnight UTC.</div>
+    html += `<div style="color:#778;font-size:10px;margin:6px 0;">Finish (win or lose) to post your score on today's daily leaderboard. A new daily starts at midnight Eastern Time.</div>
         <button data-begin style="${BTN}${BTN_GOOD}text-align:center;font-weight:bold;">Set out</button>`;
     const body = modal.show(html, { width: 480, onClose: () => { modal.destroy(); onCancel?.(); }, view: 'daily-run' });
     body.querySelector('[data-begin]').addEventListener('click', () => {
