@@ -4,7 +4,7 @@
 //
 // Landscape screens get a sidebar on the right. Portrait screens (phones held
 // upright) get a top bar with the party and a bottom bar of buttons instead, with
-// relics, the legend and quitting moved into a Menu.
+// the realm's lore, relics, the legend and quitting moved into a Menu.
 import { RunMapRenderer } from './run-map-renderer.js';
 import { Sound } from '../audio/sound.js';
 import { SCORE_TIP } from './score.js';
@@ -280,12 +280,12 @@ export class RunMapScene {
         }
     }
 
-    // The run menu on portrait screens: relics, the map legend, and leaving the run.
+    // The run menu on portrait screens: the realm's lore, relics, the map legend, and leaving the run.
     _openMenu() {
         const run = this.run;
         const back = run.pending ? () => this._screens.show() : null;
         const body = this._modal.show(`<div style="color:#ffcc44;font-weight:bold;font-size:15px;margin-bottom:8px;">Menu</div>
-            ${this._relicsHtml()}${this._legendHtml()}
+            ${this._realmLoreHtml()}${this._relicsHtml()}${this._legendHtml()}
             <div style="margin-top:14px;border-top:1px solid #223;padding-top:8px;">
                 <button data-action="quit" style="${BTN}color:#888;">Save &amp; quit to title</button>
                 <button data-action="abandon" style="${BTN}${BTN_DANGER}">Abandon run</button>
@@ -311,6 +311,16 @@ export class RunMapScene {
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px;font-size:10px;">
             ${Object.values(NODE_INFO).map(i => `<span><span style="color:${i.color};">${i.icon}</span> ${i.label}</span>`).join('')}</div>
             <div style="color:#666;font-size:10px;margin-top:6px;">${isPortrait() ? 'Tap' : 'Click'} a glowing node to travel. ${isPortrait() ? 'Drag' : 'Scroll'} to look ahead.</div>`;
+    }
+
+    // The current realm's lore. Landscape shows it at the top of the sidebar; the portrait top
+    // bar has no room for it, so the Menu carries it instead.
+    _realmLoreHtml() {
+        const realm = this.run.realm;
+        if (!realm?.blurb) return '';
+        return `<div style="color:#fc8;font-size:10px;text-transform:uppercase;margin:10px 0 5px;">${esc(realm.name)}</div>
+            <div style="color:#888;font-size:10px;margin-bottom:3px;">${esc(CHAINS[realm.chain]?.name ?? '')}</div>
+            <div style="color:#99a;font-size:11px;line-height:1.45;">${esc(realm.blurb)}</div>`;
     }
 
     _updateSidebar() {
