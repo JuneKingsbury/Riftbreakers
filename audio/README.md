@@ -30,6 +30,11 @@ and isn't shipped. In battle it falls back further, to `music/combat.ogg`.
 
 ## Sound effects
 
+Every effect file is normalized to −28 LUFS, measured as the loudest 400 ms (momentary)
+loudness with the clip padded by silence, since most effects are too short for integrated LUFS.
+The `gain` in the manifest is therefore purely a mix choice. When adding or replacing a file,
+normalize it to −28 LUFS first, keeping its true peak below 0 dBTP.
+
 Each play shifts the pitch randomly, by up to the sound's `pitch` setting in cents (300 by
 default, as in Rifthold, so up to 3 semitones either way). This keeps sounds heard over and
 over from repeating exactly. The same sound can't restart within 200 ms, and at most 8 play at

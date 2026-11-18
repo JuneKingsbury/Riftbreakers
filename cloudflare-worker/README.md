@@ -36,6 +36,8 @@ Run these from the repo root, since the Worker imports `../js/run/leaderboard-ru
 6. On the OAuth consent screen, set the privacy policy and terms links (Google requires them for verification):
    - `https://junekingsbury.github.io/Riftbreakers/privacy.html`
    - `https://junekingsbury.github.io/Riftbreakers/terms.html`
+7. In the same Cloud project, enable the **Google Drive API** (APIs & Services > Library > Google Drive API > Enable).
+   Without it, sign-in succeeds but every Drive call returns 403 `accessNotConfigured`.
 
 ## Notes
 

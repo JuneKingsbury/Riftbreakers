@@ -2,8 +2,10 @@
 // wired up before its .ogg exists (see audio/README.md).
 //
 // sfx:   name -> { file, gain?, pitch? }
-//          gain   Volume of this sound relative to the SFX slider (default 1). Above 1 lifts a
-//                 file that was exported quiet; keep (peak dB + 20·log10(gain)) below 0.
+//          gain   Volume of this sound relative to the SFX slider (default 1). Every sfx file
+//                 is normalized to −28 LUFS (see audio/README.md), so gain is purely a mix
+//                 choice: 1 plays at −28, 0.5 is 6 dB quieter. The loudest file peaks at
+//                 −10.8 dBTP, so keep gain at or below 3 to stay clear of clipping.
 //          pitch  Random pitch spread in cents, ± (default 300, as in Rifthold: up to three
 //                 semitones either way, so a sound heard over and over never quite repeats)
 // music: name -> file. Every track loops; changing track crossfades.
@@ -11,9 +13,9 @@
 export const SOUND_MANIFEST = {
     sfx: {
         // Combat
-        hit_party:      { file: 'audio/sfx/combat/colonist_damaged.ogg', gain: 1.4 },   // file peaks at −24.6 dB
+        hit_party:      { file: 'audio/sfx/combat/colonist_damaged.ogg' },
         hit_enemy:      { file: 'audio/sfx/work/chop_hit.ogg', gain: 0.55 },
-        miss:           { file: 'audio/sfx/combat/shield_block.ogg', gain: 1.2 },       // file peaks at −22.7 dB
+        miss:           { file: 'audio/sfx/combat/shield_block.ogg' },
         party_down:     { file: 'audio/sfx/combat/colonist_death.ogg' },
         enemy_down:     { file: 'audio/sfx/combat/enemy_death.ogg', gain: 0.8 },
         arrow_fire:     { file: 'audio/sfx/combat/arrow_fire.ogg', gain: 0.7 },

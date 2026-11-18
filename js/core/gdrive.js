@@ -61,13 +61,26 @@ async function driveRequest(method, url, opts = {}) {
     return fetch(url, { method, headers: { Authorization: `Bearer ${token}`, ...opts.headers }, body: opts.body });
 }
 
+// An Error for a failed Drive call, with Google's reason (e.g. accessNotConfigured when the Drive
+// API is off in the Cloud project, insufficientPermissions when the scope wasn't granted).
+async function driveError(what, resp) {
+    let detail = '';
+    try {
+        const err = (await resp.json())?.error;
+        const reason = err?.errors?.[0]?.reason || err?.status;
+        detail = [reason, err?.message].filter(Boolean).join(': ');
+    } catch { /* no JSON body */ }
+    console.warn(`[gdrive] ${what} failed (${resp.status})`, detail);
+    return new Error(`${what} failed (${resp.status})${detail ? `: ${detail}` : ''}`);
+}
+
 // The file's id, or null only when Drive reports no such file. HTTP errors throw, so a failed
 // lookup never reads as "not found" (which would make a write create a duplicate).
 async function findFileId(filename) {
     const escaped = String(filename).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
     const q = encodeURIComponent(`name='${escaped}' and trashed=false`);
     const resp = await driveRequest('GET', `https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=${q}&fields=files(id)`);
-    if (!resp.ok) throw new Error(`Drive lookup failed (${resp.status})`);
+    if (!resp.ok) throw await driveError('Drive lookup', resp);
     const data = await resp.json();
     return data.files?.[0]?.id || null;
 }
@@ -82,7 +95,7 @@ export async function cloudRead(filename) {
     const fileId = await findFileId(filename);
     if (!fileId) return null;
     const resp = await driveRequest('GET', `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`);
-    if (!resp.ok) throw new Error(`Drive read failed (${resp.status})`);
+    if (!resp.ok) throw await driveError('Drive read', resp);
     return resp.text();
 }
 
@@ -103,7 +116,7 @@ export function cloudWrite(filename, data) {
             headers: { Authorization: `Bearer ${token}`, 'Content-Type': `multipart/related; boundary="${boundary}"` },
             body,
         });
-        if (!resp.ok) throw new Error(`Drive write failed (${resp.status})`);
+        if (!resp.ok) throw await driveError('Drive write', resp);
     });
 }
 
@@ -169,6 +182,12 @@ export async function connect() {
     });
     const data = await resp.json().catch(() => ({}));
     if (!resp.ok || !data.access_token) throw new Error(data.error_description || data.error || 'Sign-in failed.');
+    // Google's consent screen lets the user untick the Drive permission; the token then works but
+    // every Drive call returns 403. Catch that here with a clear message instead.
+    if (typeof data.scope === 'string' && !data.scope.split(' ').includes(SCOPE)) {
+        fetch(`https://oauth2.googleapis.com/revoke?token=${encodeURIComponent(data.access_token)}`, { method: 'POST' }).catch(() => {});
+        throw new Error('Google Drive access was not granted. Connect again and tick the box allowing Riftbreak to store its save in your Drive.');
+    }
     saveTokens({ access_token: data.access_token, refresh_token: data.refresh_token || null, expiry_date: Date.now() + (data.expires_in - 60) * 1000 });
     return true;
 }
