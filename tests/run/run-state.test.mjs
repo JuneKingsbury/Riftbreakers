@@ -89,13 +89,89 @@ test('elites give a relic; bosses offer a relic choice, then the next act', () =
     assert.equal(run.stats.bosses, 1);
 });
 
-test('winning the act 3 boss wins the run', () => {
-    const run = newRun(3);
-    run.act = 3;
+// Wins the current act's boss fight and moves on.
+function beatBoss(run) {
     run.currentNodeId = run.map.floors[13][0].id;
     run.enterNode(run.map.bossId);
     run.completeBattle(true);
     run.leaveNode();
+}
+
+test('a run has four acts, ending in the Shifting Labyrinth, and winning the act 4 boss wins it', () => {
+    // GIVEN: a new run at the act 3 boss
+    const run = newRun(3);
+    assert.equal(run.actCount, 4);
+    assert.equal(run.realms[3], 'shifting_labyrinth');
+    run.act = 3;
+
+    // WHEN / THEN: beating it moves on to act 4 instead of ending the run
+    beatBoss(run);
+    assert.equal(run.status, 'active');
+    assert.equal(run.act, 4);
+    assert.equal(run.realmId, 'shifting_labyrinth');
+
+    // WHEN / THEN: beating the act 4 boss wins
+    beatBoss(run);
+    assert.equal(run.status, 'won');
+});
+
+test('beating the final boss wins the run at once, without an item or relic choice', () => {
+    // GIVEN: a run at the act 4 boss
+    const run = newRun(5);
+    run.act = 4;
+    run._startAct();
+    const gold = run.gold;
+    run.currentNodeId = run.map.floors[13][0].id;
+    run.enterNode(run.map.bossId);
+
+    // WHEN: the boss falls
+    const reward = run.completeBattle(true, { partySize: 3, survivors: 3, rounds: 10 });
+
+    // THEN: the run is won with nothing left to claim, but the fight still paid out
+    assert.equal(run.status, 'won');
+    assert.equal(run.pending, null, 'no reward screen');
+    assert.equal(reward.final, true);
+    assert.deepEqual(reward.items, []);
+    assert.deepEqual(reward.relics, []);
+    assert.ok(reward.gold > 0 && run.gold === gold + reward.gold);
+    assert.ok(reward.score.points > 0 && run.score >= reward.score.points);
+    assert.ok(Object.values(reward.xp).every(xp => xp > 0));
+    assert.equal(run.stats.bosses, 1);
+    assert.equal(run.bossesDefeated.length, 1, 'it still counts for the bestiary');
+
+    // AND: an earlier act's boss still offers its loot
+    const early = newRun(5);
+    early.currentNodeId = early.map.floors[13][0].id;
+    early.enterNode(early.map.bossId);
+    const loot = early.completeBattle(true);
+    assert.equal(early.status, 'active');
+    assert.ok(loot.items.length > 0 && loot.relics.length > 0);
+});
+
+test('the last act has no recruits; the acts before it have one on every route', () => {
+    const run = newRun(4);
+    for (let act = 1; act <= 4; act++) {
+        const recruits = Object.values(run.map.nodes).filter(n => n.type === 'recruit').length;
+        if (act < 4) assert.ok(recruits > 0, `act ${act} has a recruit floor`);
+        else assert.equal(recruits, 0, 'act 4 has no recruit nodes');
+        beatBoss(run);
+    }
+    assert.equal(run.status, 'won');
+});
+
+test('a run saved before act 4 existed still ends after its third act', () => {
+    // GIVEN: a saved run with only three realms, in its third act
+    const data = JSON.parse(newRun(3).serialize());
+    data.realms = ['wild_frontiers', 'arcane_library', 'palace_fortress'];
+    data.act = 3;
+    const run = RunState.deserialize(data);
+    assert.ok(run, 'it still loads');
+    assert.equal(run.actCount, 3);
+
+    // WHEN: it beats the act 3 boss
+    beatBoss(run);
+
+    // THEN: the run is won, not sent on to an act with no realm
     assert.equal(run.status, 'won');
 });
 

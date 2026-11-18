@@ -230,10 +230,12 @@ for (const [chain, def] of Object.entries(CHAINS)) {
 export const REALMS = Object.fromEntries(REALM_LIST.map(r => [r.id, r]));
 
 // The realms each act can be set in.
+// The realms each act can be set in. The last act is always the Shifting Labyrinth.
 export const ACT_REALMS = {
     1: ['wild_frontiers', 'verdant_depths', 'crystal_caves'],
-    2: ['arcane_library', 'void_abyss', 'void_sanctum'],
-    3: ['palace_fortress', 'shifting_labyrinth'],
+    2: ['arcane_library', 'void_abyss'],
+    3: ['palace_fortress', 'void_sanctum'],
+    4: ['shifting_labyrinth'],
 };
 
 /** The act a realm's fights are tuned for: the act that uses it, else its tier. */

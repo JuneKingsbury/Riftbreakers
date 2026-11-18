@@ -75,6 +75,15 @@ test('floor rules: combat first, treasure mid-act, rest before the boss, no earl
     }
 });
 
+test('an act generated without recruits has none, and still crosses every floor to the boss', () => {
+    for (const seed of SEEDS) {
+        const m = generateActMap(new Rng(seed), 4, { recruit: false });
+        assert.ok(Object.values(m.nodes).every(n => n.type !== 'recruit'), `seed ${seed}`);
+        assert.ok(m.floors[RECRUIT_FLOOR - 1].length > 0 && m.floors[RECRUIT_FLOOR - 1].every(n => n.type), `seed ${seed}: floor ${RECRUIT_FLOOR} still has nodes`);
+        for (const route of allRoutes(m)) assert.equal(route.at(-1).id, m.bossId);
+    }
+});
+
 test('every route to the boss meets exactly one recruit, on the mid-act recruit floor', () => {
     assert.equal(RECRUIT_FLOOR, 7);
     for (const act of [1, 2, 3]) {

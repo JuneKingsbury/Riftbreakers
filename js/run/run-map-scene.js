@@ -180,7 +180,7 @@ export class RunMapScene {
     _showActIntro() {
         const run = this.run, realm = run.realm;
         const body = this._modal.show(`
-            <div style="color:#888;font-size:11px;text-transform:uppercase;letter-spacing:2px;">Act ${run.act} of 3 · ${esc(CHAINS[realm.chain].name)}</div>
+            <div style="color:#888;font-size:11px;text-transform:uppercase;letter-spacing:2px;">Act ${run.act} of ${run.actCount} · ${esc(CHAINS[realm.chain].name)}</div>
             <div style="color:#ffcc44;font-weight:bold;font-size:20px;margin:4px 0 10px;">${esc(realm.name)}</div>
             <div style="color:#bbc;line-height:1.5;margin-bottom:14px;">${esc(realm.blurb)}</div>
             ${run.options.scoutsReport && SCOUTING[run.actBoss] ? `<div style="border-left:2px solid #c84;padding:4px 10px;margin:-4px 0 14px;background:#140e08;">

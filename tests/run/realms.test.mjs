@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import { CHAINS, REALMS, ACT_REALMS, actOf, realmSources, rollRealms, pickRealmMap, realmLook } from '../../js/run/data/realms.js';
-import { ENCOUNTERS, ACT_COUNT, rollEncounter, realmEncounters, retuneEncounter, rosterPower } from '../../js/run/data/encounters.js';
+import { ENCOUNTERS, ACT_COUNT, WRITTEN_FOR, rollEncounter, realmEncounters, retuneEncounter, rosterPower } from '../../js/run/data/encounters.js';
 import { EVENTS, eventsFor } from '../../js/run/data/events.js';
 import { REALM_EVENTS } from '../../js/run/data/realm-events.js';
 import { RunState } from '../../js/run/run-state.js';
@@ -42,9 +42,11 @@ test('every chain realm exists, belongs to its chain at its tier, and has fights
 test('each act draws from its own list of realms', () => {
     assert.deepEqual(ACT_REALMS, {
         1: ['wild_frontiers', 'verdant_depths', 'crystal_caves'],
-        2: ['arcane_library', 'void_abyss', 'void_sanctum'],
-        3: ['palace_fortress', 'shifting_labyrinth'],
+        2: ['arcane_library', 'void_abyss'],
+        3: ['palace_fortress', 'void_sanctum'],
+        4: ['shifting_labyrinth'],
     });
+    assert.equal(ACT_COUNT, 4);
     for (let act = 1; act <= ACT_COUNT; act++) {
         for (const id of ACT_REALMS[act]) {
             assert.ok(REALMS[id], id);
@@ -255,7 +257,12 @@ test('a folded-in fight keeps its roster but is refitted to the act it is fought
                 for (const { def, zone } of realmEncounters(realm, kind)) {
                     const original = ENCOUNTERS[zone][kind].find(d => d.id === def.id);
                     assert.ok(original, `${realm}: ${def.id} comes from ${zone}`);
-                    if (zone === realm) { assert.equal(def, original, 'own fights are untouched'); continue; }
+                    if (zone === realm) {
+                        // Own fights are as written, apart from levels when the realm moved to a later act.
+                        if (!WRITTEN_FOR[realm]) { assert.equal(def, original, 'own fights are untouched'); continue; }
+                        assert.deepEqual(def.roster.map(r => [r.job, r.name, r.sprite, r.statMods]), original.roster.map(r => [r.job, r.name, r.sprite, r.statMods]));
+                        continue;
+                    }
                     assert.deepEqual(def.roster.map(r => [r.job, r.name, r.sprite]), original.roster.map(r => [r.job, r.name, r.sprite]));
                     assert.ok(!def.easy, 'only act 1 realms\' own fights are easy');
                     // Close to the home realm's range: within the calibration factor (at most 1.5x)
@@ -263,6 +270,26 @@ test('a folded-in fight keeps its roster but is refitted to the act it is fought
                     const p = rosterPower(def, kind, act);
                     assert.ok(p >= own[0] * 0.6 && p <= own[own.length - 1] * 1.7, `${realm} ${kind} ${def.id}: ${Math.round(p)} vs ${own.map(Math.round)}`);
                 }
+            }
+        }
+    }
+});
+
+test('a realm moved to a later act fights its own battles at that act\'s levels', () => {
+    // GIVEN: Void Sanctum, written for act 2 and now an act 3 realm, and the act 4 Shifting Labyrinth
+    for (const [realm, act] of [['void_sanctum', 3], ['shifting_labyrinth', 4]]) {
+        assert.equal(actOf(realm), act);
+        for (const kind of ['normal', 'elite', 'boss']) {
+            // WHEN: its own fights are fielded
+            const own = realmEncounters(realm, kind).filter(e => e.zone === realm);
+            assert.ok(own.length, `${realm} ${kind}`);
+            for (const { def } of own) {
+                const original = ENCOUNTERS[realm][kind].find(d => d.id === def.id);
+                // THEN: the encounter, and any boss with a level of its own, are higher level than written
+                assert.ok(def.enemyLevel > original.enemyLevel, `${realm} ${def.id} level`);
+                def.roster.forEach((r, i) => {
+                    if (original.roster[i].level != null) assert.ok(r.level > original.roster[i].level, `${realm} ${def.id} ${r.name}`);
+                });
             }
         }
     }

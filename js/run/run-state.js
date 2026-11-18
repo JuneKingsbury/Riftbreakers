@@ -54,6 +54,7 @@ const ITEM_RARITY = {
     1: { normal: { common: 70, uncommon: 28, rare: 2 },  elite: { common: 30, uncommon: 55, rare: 15 }, boss: { uncommon: 50, rare: 50 } },
     2: { normal: { common: 35, uncommon: 55, rare: 10 }, elite: { common: 5, uncommon: 55, rare: 40 },  boss: { uncommon: 30, rare: 70 } },
     3: { normal: { common: 10, uncommon: 55, rare: 35 }, elite: { uncommon: 35, rare: 65 },            boss: { rare: 100 } },
+    4: { normal: { uncommon: 40, rare: 60 },             elite: { uncommon: 15, rare: 85 },            boss: { rare: 100 } },
 };
 
 // ---- Rift Tiers (profile RIFT_TIERS) ----
@@ -180,10 +181,17 @@ export class RunState {
         // act intro can name it (Scout's Report) and the boss node fields that same fight.
         const bosses = realmEncounters(this.realmId, 'boss').map(e => e.def.id);
         this.actBoss = bosses.length ? new Rng((this.seed ^ (0xB055 * this.act)) >>> 0).pick(bosses) : null;
-        this.map = generateActMap(this.rng, this.act);
+        // The last act has no recruit floor: the party should be at full size by then.
+        this.map = generateActMap(this.rng, this.act, { recruit: this.act < ACT_COUNT });
         this.currentNodeId = null;
         this.visited = [];
         this.pending = null;
+    }
+
+    // How many acts this run has: one per realm. Runs saved before Act 4 existed keep their
+    // three acts, so they end where they always would have.
+    get actCount() {
+        return this.realms.length;
     }
 
     // The realm the current act is set in (data/realms.js).
@@ -224,12 +232,14 @@ export class RunState {
     }
 
     // Finishes the current node. After the boss this moves to the next act, or wins the run.
+    // (Beating the last act's boss already wins it, in completeBattle; this covers runs saved at
+    // that reward screen before then.)
     leaveNode() {
         if (this.pending?.kind === 'battle') return false;
         const wasBoss = this.currentNode?.type === 'boss';
         this.pending = null;
         if (wasBoss) {
-            if (this.act >= ACT_COUNT) {
+            if (this.act >= this.actCount) {
                 this.status = 'won';
             } else {
                 this.act += 1;
@@ -479,6 +489,14 @@ export class RunState {
             score = { ...battleScore({ kind: enc.kind, ...result, startPartySize: this.startPartySize ?? 3 }),
                 survivors: result.survivors, partySize: result.partySize, rounds: result.rounds };
             this.score = (this.score || 0) + score.points;
+        }
+
+        // The last act's boss ends the run: there is nothing left to spend loot on, so no item or
+        // relic choice. The battle's result screen still shows the XP, gold and score it gave.
+        if (enc.kind === 'boss' && this.act >= this.actCount) {
+            this.pending = null;
+            this.status = 'won';
+            return { kind: 'reward', encounter: enc, boss: true, final: true, gold, score, xp: xpGained, levelUps, items: [], relics: [] };
         }
 
         const choices = Math.max(1, base.itemChoices + (relicsWith(this.relics, 'extraItemChoice').length ? 1 : 0)

@@ -18,6 +18,10 @@
 // ACT_STAT_MODS scale every enemy of an act on top of their job stats; elites (and bosses from
 // act 2) add ELITE_STAT_MODS.
 //
+// A realm's own fights were written for one act (WRITTEN_FOR). When the realm is now fought in
+// a later act, its fights move to that act's levels (see shiftLevels); the act's stat mods do
+// the rest.
+//
 // An act realm also fights the encounters of the unlisted realms of its chain (realmSources
 // in data/realms.js). Those were written for another act, so retuneEncounter fits them to the
 // act they are fought in.
@@ -466,7 +470,7 @@ export const ENCOUNTERS = {
     // ---- University Ruins ----
     // ============================================================
     arcane_library: {
-        // Tuned for act 2 (see ACT_REALMS in data/realms.js).
+        // Written for act 2 (see WRITTEN_FOR).
         normal: [
             fight('stray_wisps', 'Wisp Swarm', 2, [
                 e('spectral_wisp', 'Arcane Wisp', 'arcane_wisp'),
@@ -1215,7 +1219,7 @@ export const ENCOUNTERS = {
         ],
     },
     shifting_labyrinth: {
-        // Tuned for act 3 (see ACT_REALMS in data/realms.js).
+        // Written for act 3, now fought in act 4 (see WRITTEN_FOR).
         normal: [
             fight('rift_crawlers', 'Rift Crawlers', 4, [
                 e('void_stalker', 'Rift Crawler', 'glitch_beast'),
@@ -1329,15 +1333,21 @@ export const ENCOUNTERS = {
     },
 };
 
-export const ACT_COUNT = 3;
+export const ACT_COUNT = 4;
 
 // Enemy stats added per act. The curve climbs evenly: Act 2 sits about halfway between Act 1
-// and Act 3 (a steeper Act 2 used to end most runs there; see the balance study notes).
+// and Act 3 (a steeper Act 2 used to end most runs there; see the balance study notes), and
+// Act 4 continues it.
 export const ACT_STAT_MODS = {
     1: { maxHp: -4, atk: -1 },
     2: { maxHp: 17, atk: 4, def: 2, mat: 4, mdf: 2 },
     3: { maxHp: 36, atk: 8, def: 4, mat: 8, mdf: 4, spd: 1 },
+    4: { maxHp: 55, atk: 12, def: 6, mat: 12, mdf: 6, spd: 1 },
 };
+
+// The act a realm's own fights were written for, where that isn't the act it is now fought in
+// (realms that moved when Act 4 was added). See shiftLevels.
+export const WRITTEN_FOR = { void_sanctum: 2, shifting_labyrinth: 3 };
 
 export const ELITE_STAT_MODS = { maxHp: 8, atk: 1, mat: 1 };
 
@@ -1395,8 +1405,8 @@ function actScale(kind, act) {
 // ---- Retuning fights for another act -------------------------------------------------
 
 // Typical encounter level by kind and act, and the level of a boss on a player job.
-const ACT_LEVEL = { normal: { 1: 1, 2: 2, 3: 4 }, elite: { 1: 2, 2: 3, 3: 6 }, boss: { 1: 2, 2: 4, 3: 6 } };
-const BOSS_LEVEL = { 1: 2, 2: 5, 3: 8 };
+const ACT_LEVEL = { normal: { 1: 1, 2: 2, 3: 4, 4: 6 }, elite: { 1: 2, 2: 3, 3: 6, 4: 8 }, boss: { 1: 2, 2: 4, 3: 6, 4: 8 } };
+const BOSS_LEVEL = { 1: 2, 2: 5, 3: 8, 4: 11 };
 // A retuned fight may be scaled down to half or up to double its power, no further.
 const SCALE_LIMITS = [0.5, 2.5];
 // Power is only a rough guide: kits matter too (a tier 3 boss scaled down keeps tricks its
@@ -1454,10 +1464,8 @@ function targetPower(realm, kind) {
  */
 export function retuneEncounter(def, kind, fromAct, realm, zone = null) {
     const toAct = actOf(realm);
-    const shift = ACT_LEVEL[kind][toAct] - ACT_LEVEL[kind][fromAct];
-    const bossShift = BOSS_LEVEL[toAct] - BOSS_LEVEL[fromAct];
-    const leveled = def.roster.map(r => (r.level == null ? r : { ...r, level: Math.max(1, r.level + bossShift) }));
-    const out = { ...def, enemyLevel: Math.max(1, def.enemyLevel + shift), roster: leveled, easy: false };
+    const out = { ...shiftLevels(def, kind, fromAct, toAct), easy: false };
+    const leveled = out.roster;
 
     const target = targetPower(realm, kind) * (RETUNE_BIAS[zone]?.[kind] ?? 1);
     const k = Math.min(SCALE_LIMITS[1], Math.max(SCALE_LIMITS[0], target / rosterPower(out, kind, toAct)));
@@ -1475,16 +1483,30 @@ export function retuneEncounter(def, kind, fromAct, realm, zone = null) {
     return out;
 }
 
-// Every encounter of `kind` the realm can field: [{ def, zone }], its own first, then those
-// of the realms folded into it, retuned for its act. Bosses are limited to the realm's
-// `bosses` list when it has one.
+/**
+ * A fight written for `fromAct` at `toAct`'s levels: the encounter level moves by the act's
+ * typical level for its kind, and roster entries with their own level (bosses on player jobs)
+ * by BOSS_LEVEL. Stats are left alone: buildEncounter adds the act's stat mods.
+ */
+export function shiftLevels(def, kind, fromAct, toAct) {
+    if (fromAct === toAct) return def;
+    const shift = ACT_LEVEL[kind][toAct] - ACT_LEVEL[kind][fromAct];
+    const bossShift = BOSS_LEVEL[toAct] - BOSS_LEVEL[fromAct];
+    const roster = def.roster.map(r => (r.level == null ? r : { ...r, level: Math.max(1, r.level + bossShift) }));
+    return { ...def, enemyLevel: Math.max(1, def.enemyLevel + shift), roster };
+}
+
+// Every encounter of `kind` the realm can field: [{ def, zone }], its own first (at its act's
+// levels, see WRITTEN_FOR), then those of the realms folded into it, retuned for its act.
+// Bosses are limited to the realm's `bosses` list when it has one.
 export function realmEncounters(realm, kind) {
     const bosses = kind === 'boss' ? REALMS[realm]?.bosses : null;
+    const act = actOf(realm);
     return realmSources(realm).flatMap(zone => (ENCOUNTERS[zone]?.[kind] ?? [])
         .filter(def => !bosses || bosses.includes(def.id))
         .map(def => ({
             zone,
-            def: zone === realm ? def : retuneEncounter(def, kind, actOf(zone), realm, zone),
+            def: zone === realm ? shiftLevels(def, kind, WRITTEN_FOR[realm] ?? act, act) : retuneEncounter(def, kind, actOf(zone), realm, zone),
         })));
 }
 

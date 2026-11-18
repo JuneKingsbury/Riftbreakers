@@ -5,8 +5,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { validateEntry, nameProblem, cleanName, MAX_POINTS_PER_BATTLE } from '../../js/run/leaderboard-rules.js';
-import { entryFromWin, submitWin, fetchLeaderboard, canSubmit, savedName } from '../../js/run/leaderboard.js';
-import { newProfile, saveProfile, loadProfile, winSummary } from '../../js/run/profile.js';
+import { entryFromRun, submitRun, fetchLeaderboard, canSubmit, savedName, runResult } from '../../js/run/leaderboard.js';
+import { newProfile, saveProfile, loadProfile, runSummary } from '../../js/run/profile.js';
 import { RunState } from '../../js/run/run-state.js';
 import worker from '../../cloudflare-worker/riftbreak-api.js';
 
@@ -19,9 +19,31 @@ function aWin(score = 4200) {
     const run = RunState.create({ jobs: ['warden', 'evoker', 'runebow'], seed: 11 });
     run.status = 'won';
     run.score = score;
-    run.stats = { floors: 45, battles: 22, elites: 4, bosses: 3 };
-    return winSummary(run, 80, new Date('2026-11-18T10:00:00Z'));
+    run.act = 4;
+    run.stats = { floors: 60, battles: 30, elites: 4, bosses: 4 };
+    return runSummary(run, 80, new Date('2026-11-18T10:00:00Z'));
 }
+
+// ---- Lost runs ----
+
+test('a lost run can be submitted, and the leaderboard can tell it from a win', () => {
+    // GIVEN: a run that fell in act 3 after beating two bosses
+    const run = RunState.create({ jobs: ['warden', 'evoker', 'runebow'], seed: 12 });
+    run.status = 'lost'; run.score = 2600; run.act = 3;
+    run.stats = { floors: 35, battles: 18, elites: 2, bosses: 2 };
+    const lost = runSummary(run, 40, new Date('2026-11-18T10:00:00Z'));
+
+    // WHEN: it becomes an entry
+    const { entry, error } = validateEntry(entryFromRun(lost, 'June'));
+
+    // THEN: it is a valid entry, read back as a loss in act 3; a win reads as a win
+    assert.equal(error, undefined);
+    assert.ok(canSubmit(lost));
+    assert.deepEqual(runResult(entry), { won: false, act: 3 });
+    assert.deepEqual(runResult(validateEntry(entryFromRun(aWin(), 'June')).entry), { won: true, act: 4 });
+    // An entry from before high scores: a 3-act win with all three bosses beaten.
+    assert.deepEqual(runResult({ realms: ['wild_frontiers', 'arcane_library', 'palace_fortress'], bosses: 3 }), { won: true, act: 3 });
+});
 
 // ---- Rules ----
 
@@ -36,7 +58,7 @@ test('names are trimmed to single spaces and 20 characters; odd characters are r
 });
 
 test('a win becomes a valid entry, keeping only the known fields', () => {
-    const { entry, error } = validateEntry({ ...entryFromWin(aWin(), 'June'), extra: 'dropped' });
+    const { entry, error } = validateEntry({ ...entryFromRun(aWin(), 'June'), extra: 'dropped' });
     assert.equal(error, undefined);
     assert.equal(entry.name, 'June');
     assert.equal(entry.score, 4200);
@@ -46,7 +68,7 @@ test('a win becomes a valid entry, keeping only the known fields', () => {
 });
 
 test('impossible or malformed entries are refused', () => {
-    const good = entryFromWin(aWin(), 'June');
+    const good = entryFromRun(aWin(), 'June');
     const bad = (patch) => validateEntry({ ...good, ...patch }).error;
     assert.ok(bad({ score: good.battles * MAX_POINTS_PER_BATTLE + 1 }), 'more than the battles allow');
     assert.ok(bad({ score: -1 }));
@@ -65,18 +87,18 @@ test('impossible or malformed entries are refused', () => {
 test('submitting sends the entry once, remembers the name and marks the win submitted', async () => {
     const storage = memoryStorage();
     const win = aWin();
-    saveProfile({ ...newProfile(), bestWins: [win] }, storage);
+    saveProfile({ ...newProfile(), bestRuns: [win] }, storage);
     assert.ok(canSubmit(win));
     const sent = [];
     const fetchImpl = async (url, opts) => {
         sent.push({ url, body: JSON.parse(opts.body) });
         return new Response(JSON.stringify({ rank: 3, total: 40 }), { status: 201 });
     };
-    assert.deepEqual(await submitWin(win, '  June  ', { fetchImpl, storage }), { rank: 3, total: 40 });
+    assert.deepEqual(await submitRun(win, '  June  ', { fetchImpl, storage }), { rank: 3, total: 40 });
     assert.match(sent[0].url, /\/leaderboard$/);
     assert.equal(sent[0].body.name, 'June');
     assert.equal(savedName(storage), 'June');
-    const after = loadProfile(storage).bestWins[0];
+    const after = loadProfile(storage).bestRuns[0];
     assert.equal(after.submitted, true);
     assert.equal(canSubmit(after), false);
 });
@@ -84,13 +106,13 @@ test('submitting sends the entry once, remembers the name and marks the win subm
 test('a bad name or a refusal from the server comes back as a message, and nothing is marked', async () => {
     const storage = memoryStorage();
     const win = aWin();
-    saveProfile({ ...newProfile(), bestWins: [win] }, storage);
-    await assert.rejects(submitWin(win, '', { fetchImpl: async () => assert.fail('not sent'), storage }), /Enter a name/);
+    saveProfile({ ...newProfile(), bestRuns: [win] }, storage);
+    await assert.rejects(submitRun(win, '', { fetchImpl: async () => assert.fail('not sent'), storage }), /Enter a name/);
     const refuse = async () => new Response(JSON.stringify({ error: 'This run is already on the leaderboard.' }), { status: 409 });
-    await assert.rejects(submitWin(win, 'June', { fetchImpl: refuse, storage }), /already on the leaderboard/);
+    await assert.rejects(submitRun(win, 'June', { fetchImpl: refuse, storage }), /already on the leaderboard/);
     const offline = async () => { throw new TypeError('Failed to fetch'); };
-    await assert.rejects(submitWin(win, 'June', { fetchImpl: offline, storage }), /Couldn't reach/);
-    assert.equal(loadProfile(storage).bestWins[0].submitted, false);
+    await assert.rejects(submitRun(win, 'June', { fetchImpl: offline, storage }), /Couldn't reach/);
+    assert.equal(loadProfile(storage).bestRuns[0].submitted, false);
 });
 
 test('wins without a score (from before scoring) can\'t be submitted', () => {
@@ -136,8 +158,8 @@ const call = (env, method, path, { origin = ORIGIN, body, ip = '1.2.3.4' } = {})
 
 test('the Worker stores valid entries once and lists them highest first', async () => {
     const env = { DB: fakeDb(), IP_SALT: 'test' };
-    const low = { ...entryFromWin(aWin(900), 'Low'), id: 'run-low' };
-    const high = { ...entryFromWin(aWin(5000), 'High'), id: 'run-high' };
+    const low = { ...entryFromRun(aWin(900), 'Low'), id: 'run-low' };
+    const high = { ...entryFromRun(aWin(5000), 'High'), id: 'run-high' };
     let r = await call(env, 'POST', '/leaderboard', { body: low });
     assert.equal(r.status, 201);
     assert.deepEqual(await r.json(), { rank: 1, total: 1 });
@@ -159,16 +181,16 @@ test('the Worker refuses other sites, bad entries and floods', async () => {
     const env = { DB: fakeDb(), IP_SALT: 'test' };
     assert.equal((await call(env, 'GET', '/leaderboard', { origin: 'https://evil.example' })).status, 403);
     assert.equal((await call(env, 'GET', '/leaderboard', { origin: 'http://localhost:8000' })).status, 200, 'local dev');
-    const bad = await call(env, 'POST', '/leaderboard', { body: { ...entryFromWin(aWin(), 'June'), score: 10_000_000 } });
+    const bad = await call(env, 'POST', '/leaderboard', { body: { ...entryFromRun(aWin(), 'June'), score: 10_000_000 } });
     assert.equal(bad.status, 400);
     assert.match((await bad.json()).error, /higher than the battles allow/);
 
     for (let i = 0; i < 10; i++) {
-        const r = await call(env, 'POST', '/leaderboard', { body: { ...entryFromWin(aWin(), 'June'), id: `run-${i}` }, ip: '9.9.9.9' });
+        const r = await call(env, 'POST', '/leaderboard', { body: { ...entryFromRun(aWin(), 'June'), id: `run-${i}` }, ip: '9.9.9.9' });
         assert.equal(r.status, 201);
     }
-    const flood = await call(env, 'POST', '/leaderboard', { body: { ...entryFromWin(aWin(), 'June'), id: 'run-x' }, ip: '9.9.9.9' });
+    const flood = await call(env, 'POST', '/leaderboard', { body: { ...entryFromRun(aWin(), 'June'), id: 'run-x' }, ip: '9.9.9.9' });
     assert.equal(flood.status, 429);
-    const other = await call(env, 'POST', '/leaderboard', { body: { ...entryFromWin(aWin(), 'June'), id: 'run-y' }, ip: '5.5.5.5' });
+    const other = await call(env, 'POST', '/leaderboard', { body: { ...entryFromRun(aWin(), 'June'), id: 'run-y' }, ip: '5.5.5.5' });
     assert.equal(other.status, 201, 'others can still submit');
 });

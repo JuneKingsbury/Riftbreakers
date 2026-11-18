@@ -8,13 +8,16 @@ Run the headless logic tests with `npm test` (Node 22+).
 
 ## Runs
 
-A run is three acts (`js/run/`). Each act is a generated map of 15 floors (`map-gen.js`): pick a
+A run is four acts (`js/run/`). Each act is a generated map of 15 floors (`map-gen.js`): pick a
 path through battles, elites, events, shops, rest sites, treasure and recruits, ending in a boss.
+Acts 1 to 3 each have one recruit floor. Act 4 has none, since the party should be full by then.
+Runs saved before Act 4 existed keep their three acts (`RunState.actCount`).
 
 - **Realms:** each act is set in a realm from Rifthold (`data/realms.js`), picked at random from that
   act's list (`ACT_REALMS`), never two from the same chain. Act 1: The Wild Frontiers, Verdant Depths
-  or Crystal Caves. Act 2: Arcane Library, Sunken Abyss or Void Sanctum. Act 3: Palace Fortress or
-  Shifting Labyrinth. The other realms of each chain are folded into the listed one
+  or Crystal Caves. Act 2: Arcane Library or Sunken Abyss. Act 3: Palace Fortress or Void Sanctum.
+  Act 4: Shifting Labyrinth. A realm that moved to a later act (`WRITTEN_FOR` in
+  `data/encounters.js`) fights its own battles at that act's levels. The other realms of each chain are folded into the listed one
   (`realmSources`): Crystal Caves also fields Crystal Mines and Crystal Depths fights and events.
   Folded-in fights keep their rosters and their own look and maps, but are retuned for the act
   (`retuneEncounter` in `data/encounters.js`): levels move to the act's, and stats scale so the
@@ -91,11 +94,15 @@ path through battles, elites, events, shops, rest sites, treasure and recruits, 
   (`data/backdrops.js`, picked in Settings > Graphics). The tile skin is fixed to the game's own.
 - **Collection rewards:** in Feats, finding 33% of all items pays 50 renown once, and 66% earns
   the Collector's Loupe, a trinket that only drops once earned (`COLLECTION_REWARDS`).
-- **Feats:** a title-screen panel (`js/run/feats.js`) with three tabs: every item in the game,
-  found or not yet found, with a completion percentage; a bestiary of the 16 bosses with how
-  often each has been beaten; and the last 5 winning runs. The profile keeps `items` (noted
-  whenever the run changes), `bossKills` (counted from `run.bossesDefeated`) and `recentWins`
-  (added by `recordRun`), all cleaned on load and included in save exports.
+- **Feats:** a title-screen panel (`js/run/feats.js`) with tabs for every item in the game,
+  found or not yet found, with a completion percentage; a bestiary of the bosses with how
+  often each has been beaten; High Scores, the 10 best finished runs by score, won or lost
+  (a lost or abandoned run shows the act and realm it fell in); and the online leaderboard,
+  where any scored run can be submitted. The profile keeps `items` (noted whenever the run
+  changes), `bossKills` (counted from `run.bossesDefeated`) and `bestRuns` (added by
+  `recordRun`; older `bestWins` load as wins), all cleaned on load and included in save exports.
+  Leaderboard entries don't store the result: `runResult` reads it from bosses beaten versus
+  realms reached.
 - **Splash:** the studio splash from Rifthold plays on load (`js/ui/splash.js`, with
   `icons/splash.gif`, `icons/splashBackgroundTile.png` and Pixelify Sans in `fonts/`). Any key
   or tap skips it.

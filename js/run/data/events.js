@@ -95,7 +95,7 @@ const GENERAL_EVENTS = [
         id: 'beast_tracks',
         title: 'Beast Tracks',
         text: 'Enormous tracks cross the path. Something large passed through very recently.',
-        acts: [2, 3],
+        acts: [2, 3, 4],
         choices: [
             { label: 'Hunt it (elite battle)', effect: { battle: 'elite' },
               resultText: 'You round a bend and find the beast feeding. It notices you.' },
@@ -142,7 +142,7 @@ const GENERAL_EVENTS = [
         id: 'rift_tremor',
         title: 'Rift Tremor',
         text: 'The ground shudders as a rift discharge crackles overhead.',
-        acts: [2, 3],
+        acts: [2, 3, 4],
         choices: [
             { label: 'Shield the party', effect: { healPct: -0.1 }, resultText: 'The discharge clips everyone. You go into the next fight a little singed.' },
             { label: 'Study the discharge', outcomes: [
@@ -188,7 +188,7 @@ const GENERAL_EVENTS = [
         id: 'arcane_well',
         title: 'Arcane Well',
         text: 'Motes of light drift up out of a dry well.',
-        acts: [2, 3],
+        acts: [2, 3, 4],
         choices: [
             { label: 'Reach in', effect: { memberStatMods: { mat: 2, maxMp: 6 } },
               resultText: 'The light pours into {name}. +2 MAT, +6 max MP.' },
@@ -224,7 +224,7 @@ const GENERAL_EVENTS = [
         id: 'void_merchant',
         title: 'Void Merchant',
         text: 'A figure in a too-still cloak offers wares "from the other side".',
-        acts: [2, 3],
+        acts: [2, 3, 4],
         choices: [
             { label: 'Pay in blood (lose 20% HP)', effect: { healPct: -0.2, relic: 'uncommon' },
               resultText: 'Something cold passes between you. You now carry {relic}.' },
@@ -237,7 +237,7 @@ const GENERAL_EVENTS = [
         id: 'riftscar_echo',
         title: 'Echo of the Rift',
         text: 'For a moment you see yourselves, older and scarred, standing at the end of this road.',
-        acts: [3],
+        acts: [3, 4],
         choices: [
             { label: 'Listen', effect: { xp: 90 }, resultText: 'Your future selves have a lot of advice. Some of it is good. Everyone gains 90 XP.' },
             { label: 'Turn away', effect: { gold: 60 }, resultText: 'You look away and keep walking. A little further on, a dropped purse holds 60 gold.' },

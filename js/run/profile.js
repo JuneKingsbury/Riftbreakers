@@ -11,8 +11,9 @@ import { notifySaved } from './save-events.js';
 
 export const PROFILE_KEY = 'riftbreak.profile.v1';
 
-// Feats: how many winning runs the profile remembers: the best by score (score.js), highest first.
-export const BEST_WINS = 10;
+// Feats: how many finished runs the profile remembers, won or lost: the best by score
+// (score.js), highest first. These are the player's high scores.
+export const BEST_RUNS = 10;
 
 // Every boss fight in the game (each realm fields two), for the bestiary.
 export const BOSS_IDS = [...new Set(Object.values(REALMS).flatMap(r => r.bosses || []))];
@@ -57,7 +58,7 @@ export function newProfile() {
     return {
         renown: 0, unlocked: [], stats: { runs: 0, wins: 0, bestAct: 0, bestFloor: 0, riftTier: 0 },
         items: [],        // every item ever obtained, by base key (an enchanted find counts as its item)
-        bestWins: [],     // summaries of the best winning runs, highest score first (see winSummary)
+        bestRuns: [],     // summaries of the best finished runs, won or lost, highest score first (see runSummary)
         bossKills: {},    // boss fight id → times defeated, across all runs
         rewards: [],      // collection rewards earned (COLLECTION_REWARDS ids)
     };
@@ -86,9 +87,13 @@ export function sanitizeProfile(data) {
     if (p.stats.wins > 0 && p.stats.riftTier === 0) p.stats.riftTier = 1;
     if (Array.isArray(data.rewards)) p.rewards = [...new Set(data.rewards.filter(r => Object.hasOwn(COLLECTION_REWARDS, r)))];
     if (Array.isArray(data.items)) p.items = [...new Set(data.items.filter(isBaseItem))];
-    // Profiles from before scoring kept their latest wins (recentWins): those count with score 0.
-    const wins = Array.isArray(data.bestWins) ? data.bestWins : Array.isArray(data.recentWins) ? data.recentWins : [];
-    p.bestWins = rankWins(wins.map(sanitizeWin).filter(Boolean));
+    // Profiles from before high scores kept only their wins (bestWins), and profiles from before
+    // scoring their latest wins (recentWins, which count with score 0). Both come in as wins.
+    const asWins = (list) => list.map(w => (w && typeof w === 'object' ? { ...w, won: true } : w));
+    const runs = Array.isArray(data.bestRuns) ? data.bestRuns
+        : Array.isArray(data.bestWins) ? asWins(data.bestWins)
+            : Array.isArray(data.recentWins) ? asWins(data.recentWins) : [];
+    p.bestRuns = rankRuns(runs.map(sanitizeRun).filter(Boolean));
     if (data.bossKills && typeof data.bossKills === 'object') {
         for (const id of BOSS_IDS) if (Object.hasOwn(data.bossKills, id) && count(data.bossKills[id]) > 0) p.bossKills[id] = count(data.bossKills[id]);
     }
@@ -112,7 +117,7 @@ const text = (v, max) => (typeof v === 'string' ? v.slice(0, max) : '');
 const isJob = (j) => typeof j === 'string' && Object.hasOwn(JOB_DATA, j);
 
 // One remembered member: enough to show their name, class and portrait.
-function sanitizeWinMember(m) {
+function sanitizeRunMember(m) {
     if (!m || typeof m !== 'object' || !isJob(m.job)) return null;
     const a = m.appearance && typeof m.appearance === 'object' ? m.appearance : {};
     const appearance = {};
@@ -122,36 +127,47 @@ function sanitizeWinMember(m) {
     return { name: text(m.name, 24) || 'Unknown', job: m.job, origin: isJob(m.origin) ? m.origin : null, level: count(m.level, 1) || 1, appearance };
 }
 
-function sanitizeWin(w) {
+// The most realms a remembered run lists (one per act; leaderboard entries allow 5 too).
+const MAX_RUN_REALMS = 5;
+
+function sanitizeRun(w) {
     if (!w || typeof w !== 'object') return null;
-    const party = (Array.isArray(w.party) ? w.party : []).map(sanitizeWinMember).filter(Boolean).slice(0, 6);
+    const party = (Array.isArray(w.party) ? w.party : []).map(sanitizeRunMember).filter(Boolean).slice(0, 6);
     if (!party.length) return null;
+    const realms = (Array.isArray(w.realms) ? w.realms : []).filter(r => typeof r === 'string' && Object.hasOwn(REALMS, r)).slice(0, MAX_RUN_REALMS);
     return {
         date: text(w.date, 40),
         party,
-        realms: (Array.isArray(w.realms) ? w.realms : []).filter(r => typeof r === 'string' && Object.hasOwn(REALMS, r)).slice(0, 3),
+        // The realms the run reached, in act order.
+        realms,
+        won: w.won === true,
+        // The act the run ended in (for a win, its last act).
+        act: Math.min(MAX_RUN_REALMS, count(w.act)) || Math.max(1, realms.length),
         floors: count(w.floors), battles: count(w.battles), elites: count(w.elites), bosses: count(w.bosses),
         relics: count(w.relics), renown: count(w.renown),
         score: count(w.score),
         startPartySize: Math.min(3, count(w.startPartySize, 3)) || 3,
         tier: Math.min(MAX_RIFT_TIER, count(w.tier)),
-        // A per-win id, so the leaderboard takes each run once (see leaderboard.js).
+        // A per-run id, so the leaderboard takes each run once (see leaderboard.js).
         id: typeof w.id === 'string' && /^[a-z0-9-]{1,40}$/i.test(w.id) ? w.id : '',
         submitted: w.submitted === true,
     };
 }
 
-/** Wins ordered best first: highest score, then newest. At most BEST_WINS. */
-export function rankWins(wins) {
-    return [...wins].sort((a, b) => (b.score - a.score) || String(b.date).localeCompare(String(a.date))).slice(0, BEST_WINS);
+/** Runs ordered best first: highest score, then newest. At most BEST_RUNS. */
+export function rankRuns(runs) {
+    return [...runs].sort((a, b) => (b.score - a.score) || String(b.date).localeCompare(String(a.date))).slice(0, BEST_RUNS);
 }
 
-/** What a won run is remembered by in Feats. */
-export function winSummary(run, renown, now = new Date()) {
-    return sanitizeWin({
+/** What a finished run, won or lost, is remembered by in Feats. */
+export function runSummary(run, renown, now = new Date()) {
+    return sanitizeRun({
         date: now.toISOString(),
         party: run.party.map(m => ({ name: m.name, job: m.job, origin: m.origin, level: m.level, appearance: m.appearance })),
-        realms: run.realms,
+        // Only the acts it reached: a lost run doesn't name the realms it never saw.
+        realms: run.realms.slice(0, run.act),
+        won: run.status === 'won',
+        act: run.act,
         ...run.stats,
         relics: run.relics.length,
         renown,
@@ -313,6 +329,10 @@ export function recordRun(profile, run, now = new Date()) {
     profile.stats.bestFloor = Math.max(profile.stats.bestFloor, run.stats.floors || 0);
     noteItems(profile, run);
     noteBosses(profile, run);
-    if (won) profile.bestWins = rankWins([winSummary(run, earned, now), ...(profile.bestWins || [])].filter(Boolean));
+    // Every run that won a battle is a candidate high score, whether it was won, lost or abandoned.
+    // (Abandoning can't raise a score: points only come from winning battles.)
+    if ((run.stats.battles || 0) > 0) {
+        profile.bestRuns = rankRuns([runSummary(run, earned, now), ...(profile.bestRuns || [])].filter(Boolean));
+    }
     return earned;
 }

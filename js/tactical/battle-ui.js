@@ -726,7 +726,7 @@ export class BattleUI {
             <div style="font-size:40px;font-weight:bold;color:${won ? '#ffcc44' : '#f44'};text-shadow:0 0 24px currentColor;letter-spacing:4px;">
                 ${won ? 'VICTORY!' : 'DEFEAT'}
             </div>
-            <div style="color:#aaa;font-size:13px;">${won ? 'All enemies defeated.' : 'Your party has fallen. The run is over.'}</div>
+            <div style="color:#aaa;font-size:13px;">${!won ? 'Your party has fallen. The run is over.' : rewards?.final ? 'The final rift is sealed.' : 'All enemies defeated.'}</div>
             ${rewardHtml}
             <button id="tac-return-btn" style="margin-top:12px;padding:10px 28px;background:#1a1a30;border:1px solid #557;color:#ccc;font-family:inherit;font-size:14px;cursor:pointer;border-radius:4px;pointer-events:auto;">
                 ${won ? 'Continue' : 'Return'}

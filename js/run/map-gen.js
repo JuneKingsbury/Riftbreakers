@@ -8,11 +8,12 @@
 // Node types:
 //   combat, elite, event, shop, rest, treasure, recruit, boss
 // Floor rules:
-//   floor 1 is all combat, RECRUIT_FLOOR is all recruit, TREASURE_FLOOR is all
-//   treasure, the last floor before the boss is all rest; no elite or rest before
-//   floor 5; a shop, elite or rest never follows another of the same type; siblings
-//   avoid sharing those types. Every route crosses each floor once, so it meets exactly
-//   one recruit per act (three per run).
+//   floor 1 is all combat, RECRUIT_FLOOR is all recruit (except in an act generated with
+//   recruit: false, where it rolls like any other floor), TREASURE_FLOOR is all treasure, the
+//   last floor before the boss is all rest; no elite or rest before floor 5; a shop, elite or
+//   rest never follows another of the same type; siblings avoid sharing those types. Every
+//   route crosses each floor once, so it meets exactly one recruit per act that has them
+//   (three per run: the last act has none).
 //
 // Output: { act, floors: [[node]], nodes: { id: node }, bossId }
 //   node: { id, floor, lane, type, next: [ids] }
@@ -29,7 +30,12 @@ const NO_REPEAT = new Set(['elite', 'shop', 'rest']);
 
 const nodeId = (floor, lane) => `${floor}-${lane}`;
 
-export function generateActMap(rng, act = 1) {
+/**
+ * @param {Rng} rng
+ * @param {number} [act=1]
+ * @param {{ recruit?: boolean }} [opts]  recruit: false leaves out the recruit floor.
+ */
+export function generateActMap(rng, act = 1, { recruit = true } = {}) {
     // ---- Paths ----
     const edges = new Map();   // nodeId → Set of next lanes
     const used = new Set();
@@ -77,15 +83,15 @@ export function generateActMap(rng, act = 1) {
 
     // ---- Types ----
     for (const row of floors.slice(0, TOP_FLOOR)) {
-        for (const n of row) n.type = rollType(rng, n, parents[n.id] || [], nodes);
+        for (const n of row) n.type = rollType(rng, n, parents[n.id] || [], nodes, recruit);
     }
 
     return { act, floors, nodes, bossId };
 }
 
-function rollType(rng, n, nodeParents, nodes) {
+function rollType(rng, n, nodeParents, nodes, recruit) {
     if (n.floor === 1) return 'combat';
-    if (n.floor === RECRUIT_FLOOR) return 'recruit';
+    if (n.floor === RECRUIT_FLOOR && recruit) return 'recruit';
     if (n.floor === TREASURE_FLOOR) return 'treasure';
     if (n.floor === TOP_FLOOR) return 'rest';
     const weights = { ...BASE_WEIGHTS };
