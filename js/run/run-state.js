@@ -486,7 +486,7 @@ export class RunState {
         // The run score. Runs saved before scoring start counting from here.
         let score = null;
         if (result?.partySize > 0) {
-            score = { ...battleScore({ kind: enc.kind, ...result, startPartySize: this.startPartySize ?? 3 }),
+            score = { ...battleScore({ kind: enc.kind, ...result, startPartySize: this.startPartySize ?? 3, tier: this.options.tier ?? 0 }),
                 survivors: result.survivors, partySize: result.partySize, rounds: result.rounds };
             this.score = (this.score || 0) + score.points;
         }

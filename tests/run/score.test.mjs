@@ -3,7 +3,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { battleScore, speedMultiplier, partySizeMultiplier } from '../../js/run/score.js';
+import { battleScore, speedMultiplier, partySizeMultiplier, riftTierMultiplier, RIFT_TIER_SCORE, scoreLine } from '../../js/run/score.js';
+import { RIFT_TIERS, renownMultiplier } from '../../js/run/profile.js';
+import { validateEntry } from '../../js/run/leaderboard-rules.js';
 import { RunState } from '../../js/run/run-state.js';
 import { gridMap } from '../map-fixtures.mjs';
 import { createUnit } from '../../js/tactical/units.js';
@@ -36,6 +38,43 @@ test('runs started with one or two heroes score ×2 or ×1.5', () => {
     assert.equal(battleScore({ kind: 'elite', survivors: 2, partySize: 2, rounds: 12, startPartySize: 2 }).points, 375);
 });
 
+test('higher Rift Tiers score more: ×1.25, ×1.5, ×1.75 and ×2.5', () => {
+    assert.deepEqual([0, 1, 2, 3, 4].map(riftTierMultiplier), [1, 1.25, 1.5, 1.75, 2.5]);
+    assert.equal(battleScore({ kind: 'elite', survivors: 3, partySize: 3, rounds: 12, tier: 4 }).points, 625);
+    assert.equal(battleScore({ kind: 'normal', survivors: 3, partySize: 3, rounds: 6, tier: 2 }).points, 150);
+});
+
+test('the Rift Tier and small-party multipliers stack', () => {
+    assert.equal(battleScore({ kind: 'normal', survivors: 1, partySize: 1, rounds: 6, startPartySize: 1, tier: 1 }).points, 250);
+});
+
+test('a missing or out-of-range Rift Tier never breaks the score', () => {
+    assert.equal(riftTierMultiplier(undefined), 1);
+    assert.equal(riftTierMultiplier(-2), 1);
+    assert.equal(riftTierMultiplier(99), 2.5, 'clamped to the top tier');
+});
+
+test('a battle\'s score line names the Rift Tier bonus only when there is one', () => {
+    const at = (tier) => scoreLine({ ...battleScore({ kind: 'normal', survivors: 3, partySize: 3, rounds: 6, tier }), survivors: 3, partySize: 3, rounds: 6 });
+    assert.match(at(3), /×1\.75 Rift Tier/);
+    assert.doesNotMatch(at(0), /Rift Tier/);
+});
+
+test('every Rift Tier scores by the same steps as its renown bonus', () => {
+    // If a tier is added or rebalanced in one table, this fails until the other matches.
+    assert.equal(RIFT_TIER_SCORE.length, RIFT_TIERS.length);
+    RIFT_TIERS.forEach((_, t) => assert.equal(riftTierMultiplier(t), renownMultiplier(t), `tier ${t}`));
+});
+
+test('the leaderboard accepts the best possible battle at the top Rift Tier', () => {
+    // A solo boss win at ×2 speed on Tier IV: 500 × 2 × 2 × 2.5.
+    const best = battleScore({ kind: 'boss', survivors: 1, partySize: 1, rounds: 1, startPartySize: 1, tier: 4 }).points;
+    assert.equal(best, 5000);
+    const entry = { id: 'run-1', name: 'Tester', score: best, date: new Date().toISOString(), startPartySize: 1, tier: 4,
+        battles: 1, floors: 1, elites: 0, bosses: 1, realms: ['wild_frontiers'], party: [{ job: 'warden', origin: 'human', level: 1 }] };
+    assert.ok(!validateEntry(entry).error, validateEntry(entry).error);
+});
+
 test('nonsense input never gives a negative or runaway score', () => {
     const { points } = battleScore({ kind: 'mystery', survivors: 9, partySize: 0, rounds: -3 });
     assert.ok(points >= 0 && points <= 200, `${points}`);
@@ -57,6 +96,17 @@ test('a battle counts party turns per member, and summons are neither turns nor 
     b.hp = 0;
     b.status.push('unconscious');
     assert.deepEqual(battle.partyResult(), { partySize: 2, survivors: 1, rounds: 2 });
+});
+
+test('a won battle on a Rift Tier run scores with that tier\'s multiplier', () => {
+    const run = RunState.create({ jobs: ['warden', 'evoker', 'runebow'], seed: 5 });
+    run.options = { ...run.options, tier: 2 };
+    const id = run.reachable()[0];
+    run.map.nodes[id].type = 'combat';
+    run.enterNode(id);
+    const reward = run.completeBattle(true, { partySize: 3, survivors: 3, rounds: 6 });
+    assert.equal(reward.score.points, 150);
+    assert.equal(run.score, 150);
 });
 
 test('each won battle adds its points to the run score, and the reward shows them', () => {

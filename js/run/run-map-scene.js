@@ -28,6 +28,18 @@ import { riftTransition } from '../ui/rift-transition.js';
 
 const SIDEBAR_W = 230;
 const DRAG_THRESHOLD = 6;
+// How long to wait for the click a touch tap produces before giving up on swallowing it.
+const GHOST_CLICK_MS = 500;
+
+// A touch tap is followed by a browser-made click, aimed at whatever is under the finger by
+// then. When the tap opened a node screen, that is one of the screen's buttons, so the tap
+// would also press it (e.g. use up a rest site before the player sees it). Drops that click.
+function swallowNextClick() {
+    const stop = (e) => { e.stopPropagation(); e.preventDefault(); done(); };
+    const done = () => { window.removeEventListener('click', stop, true); clearTimeout(timer); };
+    window.addEventListener('click', stop, true);
+    const timer = setTimeout(done, GHOST_CLICK_MS);
+}
 
 const BAR = `position:absolute; left:0; right:0; box-sizing:border-box; z-index:10;
     background:rgba(8,8,20,0.95); font-family:${FONT}; font-size:12px; color:#ccc;`;
@@ -444,6 +456,7 @@ export class RunMapScene {
         const d = this._drag;
         this._drag = null;
         if (!d || d.id !== e.pointerId || d.moved) return;
+        if (e.pointerType !== 'mouse') swallowNextClick();
         this._handleTap(e);
     }
 

@@ -43,7 +43,7 @@ Run these from the repo root, since the Worker imports `../js/run/leaderboard-ru
 
 - **Separate from Rifthold.** Riftbreak has its own OAuth client, so its own consent screen and its own hidden Drive app folder. The page origin is shared with Rifthold, though, so the game's localStorage keys and auth channel are all prefixed `riftbreak`.
 - **Allowed origins.** `ALLOWED_ORIGINS` in `riftbreak-api.js` allows `https://junekingsbury.github.io`, plus `localhost`/`127.0.0.1` on any port.
-- **Leaderboard checks.** Entries are checked by `validateEntry` (shared with the game). Each run id is accepted once, and each address can submit 10 entries an hour. Scores are computed by the game, so a determined player could fake one. The plausibility cap (at most 2000 points per battle) only stops obvious nonsense.
+- **Leaderboard checks.** Entries are checked by `validateEntry` (shared with the game). Each run id is accepted once, and each address can submit 10 entries an hour. Scores are computed by the game, so a determined player could fake one. The plausibility cap (`MAX_POINTS_PER_BATTLE`, 5000 points per battle) only stops obvious nonsense.
 - **Removing an entry:**
   ```
   npx wrangler d1 execute riftbreak --remote --command "DELETE FROM entries WHERE id = '...'"
