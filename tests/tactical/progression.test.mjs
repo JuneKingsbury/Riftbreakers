@@ -63,6 +63,28 @@ test('learning spends skill points and follows the skill tree', () => {
     assert.ok(!learnAbility(m, 'draining_edge'), 'cut from the kit: only equipment grants it');
 });
 
+test('learning a reaction, support or movement skill equips it in its slot straight away', () => {
+    // GIVEN: a Spellblade whose reaction slot already holds a skill, and points to spend
+    const m = member({ sp: 6, learned: ['hex', 'sunder', 'counter'], loadout: { reaction: 'counter', support: null, movement: null } });
+
+    // WHEN / THEN: an action skill leaves the slots alone
+    assert.ok(learnAbility(m, 'enfeeble'));
+    assert.deepEqual(m.loadout, { reaction: 'counter', support: null, movement: null });
+
+    // WHEN / THEN: each passive goes into its own slot
+    assert.ok(learnAbility(m, 'rune_edge'));
+    assert.ok(learnAbility(m, 'momentum'));
+    assert.deepEqual(m.loadout, { reaction: 'counter', support: 'rune_edge', movement: 'momentum' });
+    assert.equal(buildLoadout(m).support, 'rune_edge', 'and the unit fights with it');
+
+    // WHEN / THEN: a newly learned skill replaces what the slot held, and a failed learn changes nothing
+    const ev = member({ job: 'evoker', sp: 1, learned: ['fire'], loadout: { reaction: null, support: null, movement: null } });
+    assert.ok(learnAbility(ev, 'flame_retort'));
+    assert.equal(ev.loadout.reaction, 'flame_retort');
+    assert.ok(!learnAbility(ev, 'mana_stride'), 'no points left');
+    assert.equal(ev.loadout.movement, null);
+});
+
 test('every skill tree starts from one root and only points at skills in reach', () => {
     for (const [job, def] of Object.entries(JOB_DATA)) {
         if (!def.learnable) continue;

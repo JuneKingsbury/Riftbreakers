@@ -58,11 +58,14 @@ path through battles, elites, events, shops, rest sites, treasure and recruits, 
   promoted class adds to its starting class's list with `equipmentExpansions` (e.g. Battlemage
   gains blades, Marshal heavy armor). `tests/tactical/equipment-rules.test.mjs` checks that
   starting gear is wearable and that magic-heavy classes can always hold a magic weapon.
-- **Skill plans:** Settings > Skill Plans (or Edit skill plan in the Party menu) sets, per class,
-  an ordered list of skills to learn and upgrade (`js/run/skill-plans.js`). With auto-allocate
-  on, members spend points on the next step as soon as they can afford it, saving up when it
-  costs more than they have. A promoted member finishes their starting class's plan first.
-  Plans are stored on the device (`riftbreak.skillplans.v1`) and travel with save exports.
+- **Skill plans:** Settings > Skill Plans (or Edit skill plan in the Party menu) sets, per starting
+  class, a whole build: one promotion and an ordered list of skills to learn and upgrade from
+  both kits (`js/run/skill-plans.js`). With auto-allocate on, members spend points on the next
+  step as soon as they can afford it, saving up when it costs more than they have or needs a
+  promotion they haven't reached, and promote into the planned class at level 5. A member who
+  promotes into the other class by hand skips the plan's promotion steps. Plans are stored on
+  the device (`riftbreak.skillplans.v1`; older per-promotion plans are merged on load) and
+  travel with save exports.
 - **Rest sites and enchanting:** a rest site offers Train (XP for everyone) or Enchant: one owned
   item, equipped or in the bag, gains a level, up to +2 (about +20% of its main stats per level).
   An enchanted item is its own key (`iron_sword+1`, registered in `data/equipment.js` and hidden

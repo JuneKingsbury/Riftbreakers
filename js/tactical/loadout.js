@@ -78,11 +78,15 @@ export function canLearn(member, key) {
     return learnBlocker(member, key) === null;
 }
 
-// Spends skill points to learn `key`. Returns false if it can't be learned.
+// Spends skill points to learn `key`. Returns false if it can't be learned. A newly learned
+// reaction, support or movement skill goes straight into its slot, replacing what was there
+// (by hand in the Party menu or through a skill plan alike): the player can swap it back.
 export function learnAbility(member, key) {
     if (!canLearn(member, key)) return false;
     member.sp -= learnableFor(member)[key].sp;
     member.learned = [...(member.learned || []), key];
+    const slot = abilitySlot(key);
+    if (LOADOUT_SLOTS.includes(slot)) member.loadout = { ...sanitizeLoadout(member), [slot]: key };
     return true;
 }
 

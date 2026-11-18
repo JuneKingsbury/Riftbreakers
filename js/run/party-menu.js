@@ -17,7 +17,7 @@ import {
     itemSummary, itemIconHtml, portraitHtml, drawSprites, hpBar, xpBar, spBadge, jobDesc, wireTips,
 } from './ui-kit.js';
 
-import { loadPlans, plannedNext, activePlans, stepLabel } from './skill-plans.js';
+import { loadPlans, plannedNext, memberPlan, planJobFor, stepLabel } from './skill-plans.js';
 import { renderSkillPlanEditor } from '../ui/skill-plan-panel.js';
 
 const NUMERAL = ['', 'I', 'II', 'III'];
@@ -119,7 +119,7 @@ export class PartyMenu {
     showPlanEditor(name) {
         const m = this.run.member(name);
         if (!m) return this.showList();
-        const job = plannedNext(m, loadPlans())?.job ?? m.job;
+        const job = planJobFor(m);
         const body = this.modal.show(`<div style="color:#ffcc44;font-weight:bold;font-size:15px;margin-bottom:8px;">Skill Plan</div><div data-plan-host></div>`,
             { width: 520, onBack: () => { this._changed(); this.showMember(name); }, onClose: this.onClose, view: `plan:${name}`, returnTo: `member:${name}` });
         renderSkillPlanEditor(body.querySelector('[data-plan-host]'), { job });
@@ -130,8 +130,12 @@ export class PartyMenu {
         const plans = loadPlans();
         const next = plannedNext(m, plans);
         let text;
-        if (next) text = `<span style="color:#afa;">Next in plan:</span> ${esc(stepLabel(next))} · ${next.cost} SP`;
-        else if (activePlans(m, plans).length) text = `<span style="color:#6a6;">Skill plan complete</span>`;
+        if (next?.waitsForPromotion) {
+            // Only reachable with auto on, so the plan will promote them itself.
+            text = `<span style="color:#fc8;">Next in plan:</span> ${esc(stepLabel(next))} · ${next.cost} SP, after promoting to ${esc(jobLabel(next.job))}`
+                + ` <span style="color:#888;">(automatic at level ${PROMOTION_LEVEL})</span>`;
+        } else if (next) text = `<span style="color:#afa;">Next in plan:</span> ${esc(stepLabel(next))} · ${next.cost} SP`;
+        else if (memberPlan(m, plans)) text = `<span style="color:#6a6;">Skill plan complete</span>`;
         else text = `<span style="color:#777;">No auto skill plan for this class</span>`;
         return `<div style="display:flex;gap:8px;align-items:center;justify-content:space-between;margin:8px 0 2px;font-size:11px;">
             <span>${text}</span>

@@ -133,6 +133,7 @@ export class RunMapScene {
         if (this.run.status === 'active') {
             const bought = this.run.autoAllocate(loadPlans());
             if (bought.length) this._toast?.show(`Skill plan: ${describePurchases(bought)}`, 3600);
+            if (bought.some(b => b.promoted)) Sound.playSfx('promote');
             // Feats: remember every item the party has ever held and every boss it beats.
             // (Bosses first: noting them marks the run, which is saved just after.)
             const profile = loadProfile();

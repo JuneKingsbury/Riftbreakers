@@ -26,7 +26,7 @@ import { RELICS, relicStatMods, relicMult, relicsWith } from './data/relics.js';
 import { eventsFor, EVENTS } from './data/events.js';
 import { rollRealms, REALMS } from './data/realms.js';
 import { createMember, recruitCandidates } from './data/recruits.js';
-import { autoAllocate } from './skill-plans.js';
+import { autoAllocate, plannedPromotion } from './skill-plans.js';
 import { battleScore } from './score.js';
 import { notifySaved } from './save-events.js';
 import { runOptions, BASE_JOBS } from './profile.js';
@@ -294,11 +294,17 @@ export class RunState {
         return !!m && upgradeAbility(m, key);
     }
 
-    // Spends every member's skill points on their class's skill plan (see skill-plans.js).
-    // Plans are the player's, so the caller passes them in. Returns [{ name, key, rank }].
+    // Follows every member's skill plan (see skill-plans.js): promotes them into the plan's
+    // class once they are eligible, then spends their skill points. Plans are the player's, so
+    // the caller passes them in. Returns [{ name, promoted }] for promotions and
+    // [{ name, key, rank }] for skills, in the order they happened.
     autoAllocate(plans) {
         const out = [];
-        for (const m of this.party) for (const b of autoAllocate(m, plans)) out.push({ name: m.name, ...b });
+        for (const m of this.party) {
+            const job = plannedPromotion(m, plans);
+            if (job && this.promote(m.name, job)) out.push({ name: m.name, promoted: job });
+            for (const b of autoAllocate(m, plans)) out.push({ name: m.name, ...b });
+        }
         return out;
     }
 
