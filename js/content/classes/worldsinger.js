@@ -18,6 +18,18 @@ export const job = {
         thorn_hide: { sp: 1, requires: 'verdant_lash' },
         regen_aura: { sp: 2, requires: 'verdant_lash' },
     },
+    builds: [
+        {
+            key: 'poison', name: 'Poison',
+            desc: 'Poison groups of enemies with Toxic Spores and let it work over time. Regen Aura heals you a little every turn, and Verdant Lash slows anything that comes close.',
+            steps: ['toxic_spores', 'toxic_spores+', 'regen_aura', 'verdant_lash+', 'toxic_spores+', 'call_thorn_beast', 'thorn_hide'],
+        },
+        {
+            key: 'summoner', name: 'Summoner',
+            desc: 'Let a Thorn Beast do the fighting: it pelts enemies from range while Verdant Lash slows anything that comes for you. Thorn Hide hurts anyone who hits you in melee.',
+            steps: ['toxic_spores', 'call_thorn_beast', 'regen_aura', 'call_thorn_beast+', 'verdant_lash+', 'thorn_hide', 'call_thorn_beast+'],
+        },
+    ],
     spriteKey: 'npc_ally',
     char: 'W', color: '#66dd22',
     schools: ['enchantment', 'transmutation'],

@@ -96,6 +96,8 @@ export function buildUnits(setup, playerSpawns, enemySpawns) {
             applyAffixes(unit, charData.affixes);
             // Boss phases go on the boss: the encounter's first roster entry.
             if (charData === enemyData[0] && setup?.encounter?.phases) unit.triggers = phaseTriggers(setup.encounter, unit);
+            // The boss is the boss encounter's first roster entry (Doom only wounds it: battle.js).
+            if (charData === enemyData[0] && setup?.encounter?.kind === 'boss') unit.isBoss = true;
         }
         if (isPlayer) {
             if (charData.hp != null) unit.hp = Math.max(1, Math.min(unit.maxHp, charData.hp));

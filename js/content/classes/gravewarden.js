@@ -18,6 +18,18 @@ export const job = {
         death_ward: { sp: 1, requires: 'bone_ward' },
         grave_legion: { sp: 2, requires: 'mass_raise' },
     },
+    builds: [
+        {
+            key: 'army', name: 'Undead Army',
+            desc: 'Build an army of the dead: Mass Raise brings back two fallen enemies as skeletons, and Grave Legion makes everything you summon 80% stronger. It needs fallen enemies, so it gets going mid-fight.',
+            steps: ['mass_raise', 'grave_legion', 'mass_raise+', 'raise_dead+', 'mass_raise+', 'death_ward'],
+        },
+        {
+            key: 'protect', name: 'Ally Protection',
+            desc: 'Keep allies from falling: Soul Tether makes the next killing blow on an ally leave them at 1 HP, and Death Ward can do the same for allies next to you. Bone Ward turns a corpse into a barricade that protects allies.',
+            steps: ['death_ward', 'soul_tether', 'bone_ward+', 'death_ward+', 'soul_tether+', 'death_ward+'],
+        },
+    ],
     spriteKey: 'crypt_warden',
     char: 'G', color: '#ccddcc',
     schools: ['necromancy', 'abjuration'],

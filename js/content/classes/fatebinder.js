@@ -17,6 +17,18 @@ export const job = {
         karmic_rebound: { sp: 1, requires: 'doom_hex' },
         wyrd_drain: { sp: 2, requires: 'doom_hex' },
     },
+    builds: [
+        {
+            key: 'doom', name: 'Doom',
+            desc: 'Sentence the biggest threat: Death Sentence makes a target fall when its 3-turn countdown ends, and a boss loses a quarter of its HP instead. Swiftcast (from the Seer) gets it cast sooner.',
+            steps: ['fate_seal', 'death_sentence', 'swiftcast', 'death_sentence+', 'doom_hex+', 'death_sentence+', 'karmic_rebound'],
+        },
+        {
+            key: 'stuns', name: 'Stun Control',
+            desc: 'Lock down groups: Fate Seal stuns a target and everyone beside it, and Wyrd Drain makes every status you inflict last a turn longer. Doom Hex slows single targets for a long time.',
+            steps: ['fate_seal', 'wyrd_drain', 'fate_seal+', 'doom_hex+', 'fate_seal+', 'karmic_rebound', 'doom_hex+'],
+        },
+    ],
     spriteKey: 'spell_wraith',
     char: 'F', color: '#cc44aa',
     schools: ['enchantment', 'divination'],
@@ -64,7 +76,7 @@ export const abilities = {
         passiveMpCost: 2,
         dmgDealt: null,
         statusDurationBonus: 1,
-        desc: 'Pulls the threads of fate tight around your victims. Statuses you inflict last 1 turn longer. Costs 2 MP per turn.',
+        desc: 'Pulls the threads of fate tight around your victims. Statuses you inflict last 1 turn longer (except Doom). Costs 2 MP per turn.',
     },
 
     death_sentence: {
@@ -74,7 +86,7 @@ export const abilities = {
         targetType: 'enemy', basePower: 0, element: 'shadow',
         animType: 'cast', projectileColor: '#660033', chargeTime: 30,
         applyStatus: 'doom', statusDuration: 3,
-        desc: 'Pronounces Doom on the target. When its {duration} turns run out they fall, unless someone cures it first.',
+        desc: 'Pronounces Doom on the target. When its {duration} turns run out they fall, unless someone cures it first. A boss loses a quarter of its max HP instead.',
     },
 
     karmic_rebound: {

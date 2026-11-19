@@ -17,6 +17,18 @@ export const job = {
         lull: { sp: 1, requires: 'mass_sleep' },
         deep_dreams: { sp: 2, requires: 'bewilder' },
     },
+    builds: [
+        {
+            key: 'sleep', name: 'Sleep & Nightmare',
+            desc: 'Put a group to sleep with Mass Sleep, then hit the sleepers one at a time with Nightmare for double damage. Hitting a sleeper only wakes that one.',
+            steps: ['nightmare', 'nightmare+', 'bewilder', 'deep_dreams', 'mass_sleep+', 'nightmare+', 'mass_sleep+'],
+        },
+        {
+            key: 'charm', name: 'Charm Control',
+            desc: 'Turn enemies against each other: Bewilder charms a target into fighting for you, and Deep Dreams makes it last a turn longer. Lull puts attackers to sleep.',
+            steps: ['bewilder', 'deep_dreams', 'lull', 'bewilder+', 'mass_sleep+', 'bewilder+', 'lull+'],
+        },
+    ],
     spriteKey: 'mirror_shade',
     char: 'D', color: '#cc88ff',
     schools: ['illusion', 'enchantment'],
@@ -53,6 +65,6 @@ export const abilities = {
 
     deep_dreams: {
         extends: 'support', name: 'Deep Dreams', passiveMpCost: 1, dmgDealt: null, statusDurationBonus: 1,
-        desc: 'Your enchantments sink deeper. Statuses you inflict last 1 turn longer. Costs 1 MP per turn.',
+        desc: 'Your enchantments sink deeper. Statuses you inflict last 1 turn longer (except Doom). Costs 1 MP per turn.',
     },
 };

@@ -20,6 +20,18 @@ export const job = {
         concentrate: { sp: 2, requires: 'rune_arrow' },
         fleet_step: { sp: 1 },
     },
+    builds: [
+        {
+            key: 'retaliation', name: 'Retaliation',
+            desc: 'Trade shots from long range: Return Fire answers anyone who hits you from a distance with a Long Shot, and Concentrate makes your arrows hard to dodge. Upgrading Long Shot makes those counters hit harder too.',
+            steps: ['return_fire', 'long_shot+', 'rune_arrow', 'concentrate', 'return_fire+', 'long_shot+', 'return_fire+', 'fleet_step', 'rune_arrow+'],
+        },
+        {
+            key: 'area', name: 'Area Damage',
+            desc: 'Rain arrows on groups of enemies, even behind cover, and slow anyone who gets close with Pinning Shot. Arrows cost no MP, so you can keep it up all battle.',
+            steps: ['pinning_shot', 'arrow_rain', 'arrow_rain+', 'fleet_step', 'pinning_shot+', 'arrow_rain+', 'rune_arrow', 'concentrate', 'long_shot+'],
+        },
+    ],
     spriteKey: 'crusader_archer',
     char: 'J', color: '#aaccff',
     schools: ['conjuration'],

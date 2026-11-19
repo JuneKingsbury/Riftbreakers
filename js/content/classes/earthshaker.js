@@ -18,6 +18,18 @@ export const job = {
         aftershock: { sp: 1, requires: 'tremor' },
         seismic_power: { sp: 2, requires: 'tremor' },
     },
+    builds: [
+        {
+            key: 'area', name: 'Area Damage',
+            desc: 'Shake whole formations: Tremor damages and slows every enemy in a wide area, and Seismic Power makes all your area skills 25% stronger. Landslide is a huge, slow finisher.',
+            steps: ['seismic_power', 'tremor+', 'stone_spike', 'tremor+', 'landslide', 'stone_spike+', 'landslide+'],
+        },
+        {
+            key: 'tank', name: 'Tank',
+            desc: 'Hold the front line: Aftershock slows anyone who hits you in melee, and Earth Skin (from the Stoneshaper) raises your DEF. Stone Spike is your heavy hit.',
+            steps: ['aftershock', 'earth_skin+', 'stone_spike', 'aftershock+', 'stone_spike+', 'earth_skin+', 'aftershock+'],
+        },
+    ],
     spriteKey: 'void_brute',
     char: 'E', color: '#aa7744',
     schools: ['evocation', 'transmutation'],

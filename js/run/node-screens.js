@@ -34,6 +34,9 @@ function relicHtml(key) {
         <div style="color:#889;font-size:10px;">${esc(r.desc)}</div>`;
 }
 
+// A reward the player took: highlighted (and not dimmed like the ones passed over).
+const TAKEN = 'border:2px solid #6c6;background:#122012;box-shadow:0 0 8px rgba(110,220,110,0.5);cursor:default;';
+
 export class NodeScreens {
     // hooks: { fight(), leave(), openParty(onClose), openGear(onClose), changed(), proceed(), finish() }
     //   proceed: save and show whatever comes next (an act's opening card, or the pending screen)
@@ -140,22 +143,31 @@ export class NodeScreens {
         }
         html += `<div style="color:#8c8;font-size:11px;margin-bottom:6px;">${run.party.map(m => `${esc(m.name)} +${p.xp[m.name] ?? 0} XP${p.levelUps?.[m.name] ? ` <span style="color:#fd4;">→ Lv ${m.level}!</span>` : ''}`).join(' · ')}</div>`;
 
+        // Once a reward is taken, the pick is highlighted and the others are grayed out, so it's
+        // clear the choice registered.
+        const pickStyle = (taken, k) => (taken === k ? TAKEN : taken ? BTN_DISABLED : '');
+        const takenTag = (taken, k) => (taken === k ? `<span style="color:#afa;font-size:10px;font-weight:bold;white-space:nowrap;">✓ Taken</span>` : '');
         if (p.items.length) {
             html += SECTION(p.itemClaimed ? 'Item taken' : 'Choose one item');
+            const taken = p.itemClaimed ? (p.itemTaken ?? true) : null;
             for (const k of p.items) {
                 const users = run.party.filter(m => run.canEquip(m, k)).map(m => m.name);
-                html += `<button data-item="${k}" style="${BTN}display:flex;gap:8px;align-items:center;${p.itemClaimed ? BTN_DISABLED : ''}" ${p.itemClaimed ? 'disabled' : ''}>
+                html += `<button data-item="${k}" style="${BTN}display:flex;gap:8px;align-items:center;${pickStyle(taken, k)}" ${p.itemClaimed ? 'disabled' : ''}>
                     ${itemIconHtml(k, 24)}
                     <span style="flex:1;">${itemTitle(k)}<br><span style="color:#889;font-size:10px;">${esc(itemSummary(k))}</span>
                     <br><span style="color:#667;font-size:10px;">${users.length ? `Usable by ${esc(users.join(', '))}` : 'No one in the party can use this'}</span></span>
+                    ${takenTag(taken, k)}
                 </button>`;
             }
         }
         if (p.relics.length) {
             if (p.relicPick) {
                 html += SECTION(p.relicClaimed ? 'Relic taken' : 'Choose a relic');
+                // Older saves don't record which relic: the one the party now holds is it.
+                const taken = p.relicClaimed ? (p.relicTaken ?? p.relics.find(k => run.relics.includes(k)) ?? true) : null;
                 for (const k of p.relics) {
-                    html += `<button data-relic="${k}" style="${BTN}${p.relicClaimed && !run.relics.includes(k) ? BTN_DISABLED : ''}" ${p.relicClaimed ? 'disabled' : ''}>${relicHtml(k)}</button>`;
+                    html += `<button data-relic="${k}" style="${BTN}display:flex;gap:8px;align-items:center;${pickStyle(taken, k)}" ${p.relicClaimed ? 'disabled' : ''}>
+                        <span style="flex:1;">${relicHtml(k)}</span>${takenTag(taken, k)}</button>`;
                 }
             } else {
                 html += SECTION('Relic found');
@@ -362,7 +374,13 @@ export class NodeScreens {
         }
         // Candidates aren't party members yet, so draw their portraits from the pending list.
         const body = this._show(html, (on) => {
-            on('[data-recruit]', (el) => this._act(run.recruit(Number(el.dataset.recruit)), 'event'));
+            // proceed: the new member picks a build (see run/builds.js) before the screen returns.
+            on('[data-recruit]', (el) => {
+                if (!run.recruit(Number(el.dataset.recruit))) return this.show();
+                this.hooks.changed();
+                Sound.playSfx('event');
+                this.hooks.proceed();
+            });
             on('[data-decline]', () => this._act(run.declineRecruit()));
             on('[data-continue]', () => this.hooks.leave());
         }, 520);

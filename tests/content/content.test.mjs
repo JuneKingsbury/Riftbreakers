@@ -41,3 +41,24 @@ test('every content file is listed in its folder\'s index', () => {
         }
     }
 });
+
+// Suggested builds (run/builds.js) must be spending orders the game can follow.
+test('a class\'s builds are checked: two of them, skills from its trees, prerequisites learned first', () => {
+    const broken = (patch) => {
+        const jobs = { ...JOB_DATA, runebow: { ...JOB_DATA.runebow, builds: patch(JOB_DATA.runebow.builds) } };
+        return validateContent({ ...content(), jobs }).filter(e => e.startsWith('job runebow'));
+    };
+    const [a, b] = JOB_DATA.runebow.builds;
+    assert.match(broken(() => [a]).join('\n'), /needs 2 builds, it has 1/);
+    assert.match(broken(() => [a, { ...b, key: a.key }]).join('\n'), /duplicate key/);
+    assert.match(broken(() => [a, { ...b, steps: ['fire'] }]).join('\n'), /'fire' isn't in the class's skill tree/);
+    assert.match(broken(() => [a, { ...b, steps: ['arrow_rain'] }]).join('\n'), /learns arrow_rain before pinning_shot/);
+    assert.match(broken(() => [a, { ...b, steps: ['rune_arrow+'] }]).join('\n'), /upgrades rune_arrow before learning it/);
+    assert.match(broken(() => [a, { ...b, steps: ['rune_arrow', 'rune_arrow'] }]).join('\n'), /learns rune_arrow twice/);
+    assert.match(broken(() => [a, { ...b, steps: ['rune_arrow', 'concentrate', 'eagle_eye'] }]).join('\n'), /isn't in the class's skill tree/);
+    const twoSupports = { ...JOB_DATA, skyhunter: { ...JOB_DATA.skyhunter, builds: [{ ...JOB_DATA.skyhunter.builds[0], steps: ['eagle_eye', 'concentrate'] }, JOB_DATA.skyhunter.builds[1]] } };
+    assert.match(validateContent({ ...content(), jobs: twoSupports }).join('\n'), /learns two support skills \(eagle_eye, concentrate\)/);
+    // A promotion's build may use its starting class's skills without learning them first.
+    const jobs = { ...JOB_DATA, skyhunter: { ...JOB_DATA.skyhunter, builds: [{ ...JOB_DATA.skyhunter.builds[0], steps: ['concentrate', 'long_shot+'] }, JOB_DATA.skyhunter.builds[1]] } };
+    assert.deepEqual(validateContent({ ...content(), jobs }).filter(e => e.startsWith('job skyhunter')), []);
+});

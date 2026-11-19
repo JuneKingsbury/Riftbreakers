@@ -8,6 +8,9 @@ import { tryReaction, tryAllyReactions, tryDownReactions, tryChargeReactions } f
 import { BattleStats } from './battle-stats.js';
 import { onUnitDown, checkHpTriggers } from './triggers.js';
 
+// A boss whose Doom runs out loses this fraction of its max HP instead of falling.
+export const DOOM_BOSS_FRAC = 0.25;
+
 export const STATES = {
     ADVANCE_CT:            'ADVANCE_CT',
     PLAYER_TURN:           'PLAYER_TURN',
@@ -280,6 +283,12 @@ export class TacticalBattle {
         unit._movedThisTurn = false;
         unit._momentumMult = null;
 
+        // Every unit with an MP pool recovers a little at the start of each of its turns
+        // (stunned or not), so casters aren't cut off for the rest of a long fight: 3 MP, plus
+        // any MP regen from gear (unit.mpRegen, see units.js).
+        const regen = unit.mpRegen ?? 0;
+        if (regen > 0 && unit.maxMp > 0 && unit.hp > 0 && unit.mp < unit.maxMp) unit.mp = Math.min(unit.maxMp, unit.mp + regen);
+
         // Remove defend status at the start of each turn
         unit.status = unit.status.filter(s => s !== 'defend');
 
@@ -304,8 +313,23 @@ export class TacticalBattle {
                 if (s === 'frog') {
                     unit.buffs = (unit.buffs || []).filter(b => !b.key.startsWith('frog_'));
                 }
+                // doom runs out on a boss: it takes a heavy blow instead of falling outright
+                if (s === 'doom' && unit.hp > 0 && unit.isBoss) {
+                    const doomer = this._unitById(unit._statusBy?.doom);
+                    const amt = Math.min(unit.hp, Math.max(1, Math.round(unit.maxHp * DOOM_BOSS_FRAC)));
+                    unit.hp -= amt;
+                    this.stats.damage(doomer, unit, amt, 'status:doom');
+                    this.logMsg(`${unit.name}'s doom comes to pass, but they endure it! (${amt} damage)`);
+                    this._spawnFloat(unit, `Doom -${amt}`, '#c06');
+                    if (unit.hp <= 0) {
+                        this.stats.knockout(doomer, unit, 'status:doom', { inert: false });
+                        if (!unit.status.includes('unconscious')) unit.status.push('unconscious');
+                        unit.deathTimer = 3;
+                        this._onDown(unit, null);
+                        this._checkVictory();
+                    }
                 // doom runs out: the unit falls
-                if (s === 'doom' && unit.hp > 0) {
+                } else if (s === 'doom' && unit.hp > 0) {
                     const doomer = this._unitById(unit._statusBy?.doom);
                     this.stats.damage(doomer, unit, unit.hp, 'status:doom');
                     this.stats.knockout(doomer, unit, 'status:doom', { inert: !!JOB_STATS[unit.job]?.inert });

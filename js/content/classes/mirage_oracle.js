@@ -17,6 +17,18 @@ export const job = {
         shattered_image: { sp: 1, requires: 'hall_of_mirrors' },
         lasting_images: { sp: 2, requires: 'mass_blur' },
     },
+    builds: [
+        {
+            key: 'decoys', name: 'Decoys',
+            desc: 'Fill the field with copies of yourself that enemies would rather attack: Hall of Mirrors makes two at once and Lasting Images doubles their HP. Shattered Image slows whoever breaks one.',
+            steps: ['mass_blur', 'lasting_images', 'shattered_image', 'hall_of_mirrors+', 'mirror_image+', 'hall_of_mirrors+', 'mass_blur+'],
+        },
+        {
+            key: 'magic', name: 'Magic Damage',
+            desc: 'Deal steady magic damage: True Strike ignores half the target\'s MDF and can\'t be reflected, and Mass Blur keeps nearby allies hard to hit.',
+            steps: ['true_strike', 'true_strike+', 'mass_blur', 'true_strike+', 'phantasm+', 'shattered_image', 'mass_blur+'],
+        },
+    ],
     spriteKey: 'mirror_twin',
     char: 'M', color: '#ddddff',
     schools: ['illusion', 'divination'],

@@ -26,6 +26,7 @@ import { setScriptBacking } from '../tactical/ai/script-store.js';
 import { canSpendPoints } from '../tactical/loadout.js';
 import { isPortrait } from '../ui/layout.js';
 import { riftTransition } from '../ui/rift-transition.js';
+import { showBuildSetup, showPromotionChoice } from '../ui/build-picker.js';
 
 const SIDEBAR_W = 230;
 const DRAG_THRESHOLD = 6;
@@ -145,7 +146,7 @@ export class RunMapScene {
     _changed() {
         if (this.run.status === 'active') {
             const bought = this.run.autoAllocate(loadPlans());
-            if (bought.length) this._toast?.show(`Skill plan: ${describePurchases(bought)}`, 3600);
+            if (bought.length) this._toast?.show(`Skill points: ${describePurchases(bought)}`, 3600);
             if (bought.some(b => b.promoted)) Sound.playSfx('promote');
             // Feats: remember every item the party has ever held and every boss it beats.
             // (Bosses first: noting them marks the run, which is saved just after.)
@@ -166,8 +167,29 @@ export class RunMapScene {
         if (this.run.status !== 'active') return this._endRun();
         // The act realm's track, also on returning from a battle and when a new act begins.
         Sound.playMusic(mapMusic(this.run));
+        if (this._showBuildPrompts()) return;
         if (this._needsActIntro()) return this._showActIntro();
         this._screens.show();
+    }
+
+    // Build focus (run/builds.js): members who just joined pick a build (the whole party at the
+    // start of a run), and a member who can promote picks a class and its build. Each screen
+    // comes back here, so the next prompt (or the pending screen) follows. Returns true when one
+    // is shown.
+    _showBuildPrompts() {
+        const run = this.run;
+        const onDone = () => { this._modal.close(); this._afterChange(); };
+        const joining = run.membersNeedingBuild();
+        if (joining.length) {
+            showBuildSetup(this._modal, run, joining, { skin: this._skin, onDone });
+            return true;
+        }
+        const ready = run.memberReadyToPromote();
+        if (ready) {
+            showPromotionChoice(this._modal, run, ready, { skin: this._skin, onDone });
+            return true;
+        }
+        return false;
     }
 
     _leaveNode() {

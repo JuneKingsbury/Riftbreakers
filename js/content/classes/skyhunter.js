@@ -17,6 +17,18 @@ export const job = {
         overwatch: { sp: 1, requires: 'hunters_mark' },
         eagle_eye: { sp: 2, requires: 'piercing_shot' },
     },
+    builds: [
+        {
+            key: 'single', name: 'Single Target',
+            desc: 'Focus fire: Hunter\'s Mark lowers a target\'s DEF and MDF so the whole party hits it harder, Piercing Shot can\'t be dodged, and Eagle Eye adds 20% to your physical damage.',
+            steps: ['piercing_shot', 'eagle_eye', 'hunters_mark+', 'piercing_shot+', 'piercing_shot+', 'hunters_mark+'],
+        },
+        {
+            key: 'cover', name: 'Covering Fire',
+            desc: 'Guard your allies: stand next to one, and Overwatch shoots whoever hits them from up to 5 tiles away. Starfall hits groups of enemies over any cover.',
+            steps: ['overwatch', 'piercing_shot', 'overwatch+', 'eagle_eye', 'starfall', 'overwatch+', 'starfall+'],
+        },
+    ],
     spriteKey: 'crusader_archer',
     char: 'H', color: '#ddcc77',
     schools: ['conjuration', 'divination'],

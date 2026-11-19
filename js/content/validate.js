@@ -67,6 +67,43 @@ export function validateContent(t) {
         for (const [k, spec] of Object.entries(fields)) if (spec.required && value[k] == null) errors.push(`${where}: missing '${k}'`);
     }
 
+    // A class's suggested builds: two of them, each a valid spending order over the class's
+    // skill tree (a Tier 2 build may also use its Tier 1 class's). A skill must be learned, by an
+    // earlier step, before the build upgrades it or learns what needs it. A tree's first skill
+    // and a Tier 1 class's skills (in a Tier 2 build) count as known: the game learns them first
+    // when they aren't. Upgrade limits are checked in tests/run/builds.test.mjs.
+    function checkBuilds(k, job) {
+        const builds = Array.isArray(job.builds) ? job.builds : [];
+        if (builds.length !== 2) errors.push(`job ${k}: a player class needs 2 builds, it has ${builds.length}`);
+        const origin = job.tier === 2 ? Object.entries(t.jobs).find(([, j]) => j.promotions?.includes(k))?.[1] : null;
+        const kit = { ...(origin?.learnable ?? {}), ...(job.learnable ?? {}) };
+        const keys = new Set();
+        for (const b of builds) {
+            const where = `job ${k}: build ${b?.key}`;
+            if (keys.has(b?.key)) errors.push(`${where}: duplicate key`);
+            keys.add(b?.key);
+            const given = new Set([Object.keys(job.learnable ?? {})[0], ...Object.keys(origin?.learnable ?? {})]);
+            const learned = new Set(), slotted = {};
+            for (const step of Array.isArray(b?.steps) ? b.steps : []) {
+                if (typeof step !== 'string') continue;
+                const up = step.endsWith('+'), a = up ? step.slice(0, -1) : step;
+                if (!Object.hasOwn(kit, a)) { errors.push(`${where}: '${a}' isn't in the class's skill tree`); continue; }
+                if (up) {
+                    if (!learned.has(a) && !given.has(a)) errors.push(`${where}: upgrades ${a} before learning it`);
+                    continue;
+                }
+                if (learned.has(a)) errors.push(`${where}: learns ${a} twice`);
+                // Each passive a build learns goes into its slot, so a second one would replace the first.
+                const slot = known.ability(a) ? slotOf(a) : 'action';
+                if (slot !== 'action' && slotted[slot]) errors.push(`${where}: learns two ${slot} skills (${slotted[slot]}, ${a}); only the last would stay slotted`);
+                if (slot !== 'action') slotted[slot] = a;
+                const req = kit[a].requires;
+                if (req && !learned.has(req) && !given.has(req)) errors.push(`${where}: learns ${a} before ${req}, which it needs`);
+                learned.add(a);
+            }
+        }
+    }
+
     // ---- Schemas ----
     for (const [k, v] of Object.entries(t.abilities)) checkFields(`ability ${k}`, v, SCHEMAS.ability);
     for (const [k, v] of Object.entries(t.jobs)) checkFields(`job ${k}`, v, SCHEMAS.job);
@@ -127,6 +164,7 @@ export function validateContent(t) {
             if (key && t.items[key] && t.items[key].slot !== slot) errors.push(`job ${k}: starting ${slot} ${key} is a ${t.items[key].slot}`);
         }
         if (job.tier && !job.desc) errors.push(`job ${k}: a player class needs a desc`);
+        if (job.tier) checkBuilds(k, job);
     }
     const seen = new Set();
     for (const id of [...Object.values(t.encounters).flatMap(z => Object.values(z).flat()).map(e => e.id)]) {

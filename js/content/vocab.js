@@ -25,10 +25,11 @@ export const STATS = {
     move:  { short: 'Move', long: 'Move',   desc: 'Tiles the unit can move in a turn.' },
     eva:   { short: 'EVA',  long: 'EVA',    desc: 'Evasion: the chance, in percent, to dodge physical attacks (modified by facing).' },
     crit:  { short: 'CRIT', long: 'CRIT',   desc: 'Critical hit chance in percent, on top of the base 5%. Only gear raises it.' },
+    mpRegen: { short: 'MP/turn', long: 'MP per turn', desc: 'MP recovered at the start of each of the unit\'s turns: 3, plus gear. Units without MP recover none.' },
 };
 
 // Stats an item can raise or lower (positive or negative numbers), in display order.
-export const ITEM_STATS = ['atk', 'def', 'mat', 'mdf', 'spd', 'move', 'eva', 'crit', 'maxHp', 'maxMp'];
+export const ITEM_STATS = ['atk', 'def', 'mat', 'mdf', 'spd', 'move', 'eva', 'crit', 'maxHp', 'maxMp', 'mpRegen'];
 // Stats a relic, an event reward or an enemy's statMods may change.
 export const MOD_STATS = ['maxHp', 'maxMp', 'atk', 'def', 'mat', 'mdf', 'spd', 'move', 'eva', 'crit'];
 // Stats a timed buff or debuff (an ability's buffs / selfBuff) may change: the ones combat reads
@@ -51,7 +52,7 @@ export const STATUSES = {
     charm:     { name: 'Charm',    harmful: true,  desc: 'Fights for the other side and cannot react.' },
     frog:      { name: 'Frog',     harmful: true,  desc: 'Turned into a frog: ATK and MAT drop by 60% and DEF by 50%.' },
     enfeebled: { name: 'Enfeeble', harmful: true,  desc: 'ATK is lowered by 5.' },
-    doom:      { name: 'Doom',     harmful: true,  desc: 'Falls when the countdown runs out, unless cured first.' },
+    doom:      { name: 'Doom',     harmful: true,  desc: 'Falls when the countdown runs out, unless cured first. A boss loses a quarter of its max HP instead.' },
     taunted:   { name: 'Taunt',    harmful: true,  desc: 'Must attack the unit that taunted it if it can.' },
     // Helpful
     haste:     { name: 'Haste',    harmful: false, desc: 'The turn gauge fills 50% faster.' },
@@ -364,6 +365,12 @@ const JOB = {
     role: str('Short role line on the new-run screen (Tier 1).'),
     learnable: map(null, LEARNABLE, 'The skill tree: ability key → { sp, requires? }. The first entry is known from the start.'),
     promotions: list(ref('job', ''), 'Tier 1: the two Tier 2 classes it can promote into.'),
+    builds: list(obj({
+        key: str('Id of the build, unique in the class. Saved in runs, so don\'t rename it.', { required: true }),
+        name: str('Display name, e.g. Retaliation.', { required: true }),
+        desc: str('One line on how the build plays.', { required: true }),
+        steps: list(str(''), 'The order to spend skill points in: \'skill\' learns it, \'skill+\' upgrades it one rank. A Tier 2 build may use its Tier 1 class\'s skills. Skills a build leaves out are bought after it, in skill-tree order.', { required: true }),
+    }, ''), 'Player classes: the two suggested builds a player can follow (run/builds.js). A Tier 1 build runs until promotion, a Tier 2 build after it.'),
     allowedEquipment: map(Object.keys(EQUIP_SLOTS), list(oneOf(EQUIP_TYPES, '')), 'Equipment types per slot. Tier 2 classes inherit their Tier 1 class\'s.'),
     equipmentExpansions: map(Object.keys(EQUIP_SLOTS), list(oneOf(EQUIP_TYPES, '')), 'Types a Tier 2 class adds to the inherited list.'),
     startingGear: map(Object.keys(EQUIP_SLOTS), ref('item', ''), 'Tier 1: what a new member carries.'),

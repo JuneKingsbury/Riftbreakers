@@ -20,6 +20,8 @@ import {
 
 import { loadPlans, plannedNext, memberPlan, planJobFor, stepLabel } from './skill-plans.js';
 import { renderSkillPlanEditor } from '../ui/skill-plan-panel.js';
+import { buildNext, buildSummary, buildFromValue, buildsFor, buildPreview } from './builds.js';
+import { buildChoiceHtml, defaultChoice } from '../ui/build-picker.js';
 
 const NUMERAL = ['', 'I', 'II', 'III'];
 
@@ -104,7 +106,7 @@ export class PartyMenu {
             if (run.upgrade(m.name, b.dataset.upgrade)) { Sound.playSfx('skill_learned', { semitones: 2 }); this._changed(); this.showMember(m.name); }
         }));
         body.querySelectorAll('[data-promote]').forEach(b => b.addEventListener('click', () => {
-            if (run.promote(m.name, b.dataset.promote)) { Sound.playSfx('promote'); this._changed(); this.showMember(m.name); }
+            if (run.promoteWithBuild(m.name, b.dataset.promote, b.dataset.focus ?? null)) { Sound.playSfx('promote'); this._changed(); this.showMember(m.name); }
         }));
         body.querySelectorAll('select[data-slot]').forEach(sel => sel.addEventListener('change', () => {
             m.loadout[sel.dataset.slot] = sel.value || null;
@@ -113,6 +115,25 @@ export class PartyMenu {
         }));
         body.querySelectorAll('[data-equip-slot]').forEach(b => b.addEventListener('click', () => this.showEquipPicker(m.name, b.dataset.equipSlot)));
         body.querySelector('[data-edit-plan]')?.addEventListener('click', () => this.showPlanEditor(m.name));
+        body.querySelector('[data-edit-build]')?.addEventListener('click', () => this.showBuildPicker(m.name));
+    }
+
+    // Change a member's build (run/builds.js): a suggested build for their current class, their
+    // skill plan, or manual. Takes effect at once (onChange spends their points).
+    showBuildPicker(name) {
+        const m = this.run.member(name);
+        if (!m) return this.showList();
+        const plans = loadPlans();
+        const before = m.origin ? `<div style="color:#888;font-size:10px;margin-bottom:6px;">Builds for ${esc(jobLabel(m.job))}. Before promotion: ${esc(buildSummary(m)?.split(' → ')[0] ?? 'none')}.</div>` : '';
+        const body = this.modal.show(`<div style="color:#ffcc44;font-weight:bold;font-size:15px;margin-bottom:4px;">${esc(m.name)}'s build</div>
+            <div style="color:#999;font-size:11px;line-height:1.45;margin-bottom:6px;">With a focus, skill points are spent for you as soon as they come in.
+            Skills you buy by hand count toward it.</div>${before}
+            ${buildChoiceHtml(m, plans, defaultChoice(m))}`,
+        { width: 480, onBack: () => this.showMember(name), onClose: this.onClose, view: `build:${name}`, returnTo: `member:${name}` });
+        body.querySelectorAll('[data-build-choice]').forEach(b => b.addEventListener('click', () => {
+            if (this.run.setBuild(name, buildFromValue(m, b.dataset.buildChoice))) this._changed();
+            this.showBuildPicker(name);
+        }));
     }
 
     // The skill plan editor for this member's class (the same one as in Settings). Going back
@@ -126,9 +147,23 @@ export class PartyMenu {
         renderSkillPlanEditor(body.querySelector('[data-plan-host]'), { job });
     }
 
-    // One line on the member's skill plan: what it buys next, or that there is none.
+    // One line on how the member spends skill points: their build and what it buys next, or
+    // (runs from before build focus) their class's skill plan.
     _planHtml(m) {
         const plans = loadPlans();
+        const button = (attr, label) => `<button ${attr} style="padding:2px 8px;font-family:inherit;font-size:10px;border-radius:3px;background:#151528;border:1px solid #447;color:#ccc;cursor:pointer;white-space:nowrap;">${label}</button>`;
+        if (m.build || this.run.buildFocus) {
+            const next = m.build ? buildNext(m, plans) : null;
+            let text = `<span style="color:#9bd;">Build:</span> ${esc(buildSummary(m) ?? 'not chosen yet')}`;
+            if (next?.waitsForPromotion) text += ` · <span style="color:#fc8;">next:</span> ${esc(stepLabel(next))}, after promoting`;
+            else if (next) text += ` · <span style="color:#afa;">next:</span> ${esc(stepLabel(next))} (${next.cost} SP)`;
+            else if (m.build?.mode === 'plan') text += ` · <span style="color:#6a6;">plan complete</span>`;
+            else if (m.build?.mode === 'focus') text += ` · <span style="color:#6a6;">every skill bought</span>`;
+            return `<div style="display:flex;gap:6px;align-items:center;justify-content:space-between;margin:8px 0 2px;font-size:11px;">
+                <span>${text}</span>
+                <span style="display:flex;gap:4px;">${button('data-edit-build', 'Change build')}${button('data-edit-plan', 'Edit skill plan')}</span>
+            </div>`;
+        }
         const next = plannedNext(m, plans);
         let text;
         if (next?.waitsForPromotion) {
@@ -159,10 +194,15 @@ export class PartyMenu {
         } else {
             html += `<div style="color:#fc6;font-size:11px;">Ready to promote! Pick a Tier 2 class. Every learned skill carries over.</div>`;
         }
+        // A member on build focus promotes into one of the class's builds.
+        const focus = m.build?.mode === 'focus';
         for (const job of promotionOptions(m)) {
             const kit = Object.keys(JOB_DATA[job].learnable).map(abilityName).join(', ');
+            const buttons = focus
+                ? buildsFor(job).map(b => `<button data-promote="${job}" data-focus="${esc(b.key)}" data-tip="${esc(`${b.desc}\nFirst: ${buildPreview(b.steps)}`)}" style="${BTN}${ready ? BTN_GOLD : BTN_DISABLED}margin-bottom:2px;" ${ready ? '' : 'disabled'}>★ ${jobLabel(job)} · ${esc(b.name)}</button>`).join('')
+                : `<button data-promote="${job}" style="${BTN}${ready ? BTN_GOLD : BTN_DISABLED}margin-bottom:2px;" ${ready ? '' : 'disabled'}>★ ${jobLabel(job)}</button>`;
             html += `<div style="margin-top:6px;">
-                <button data-promote="${job}" style="${BTN}${ready ? BTN_GOLD : BTN_DISABLED}margin-bottom:2px;" ${ready ? '' : 'disabled'}>★ ${jobLabel(job)}</button>
+                ${buttons}
                 <div style="color:#888;font-size:10px;line-height:1.4;">${esc(jobDesc(job))}<br><span style="color:#99a;">Skills: ${esc(kit)}</span></div>
             </div>`;
         }

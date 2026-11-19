@@ -7,7 +7,7 @@ import { battleRewards } from '../../js/run/data/encounters.js';
 import { runOptions, newProfile, buyUnlock, recordRun, renownFor } from '../../js/run/profile.js';
 import { EVENTS } from '../../js/run/data/events.js';
 import { PROMOTION_LEVEL, XP_PER_LEVEL, buildLoadout } from '../../js/tactical/loadout.js';
-import { EQUIPMENT } from '../../js/tactical/data/equipment.js';
+import { EQUIPMENT, itemPrice } from '../../js/tactical/data/equipment.js';
 
 const totalXp = (m) => (m.level - 1) * XP_PER_LEVEL + m.xp;
 
@@ -442,4 +442,31 @@ test('a lone hero\'s first battle is a real fight that plays to the end', async 
     const battle = new TacticalBattle(map, buildUnits({ party: run.party, encounter: enc }, map.playerSpawns, map.enemySpawns));
     assert.equal(battle.units.filter(u => u.team === 'player').length, 1);
     assert.ok(runRealtimeBattle(battle, {}).over);
+});
+
+test('buying a relic that changes shop prices reprices what is still on sale in that shop', () => {
+    // GIVEN: a shop selling Lucky Coin (20% off), and gold to buy everything
+    const run = RunState.create({ jobs: ['evoker'], seed: 9 });
+    const shop = run._rollShop();
+    shop.relic = { key: 'lucky_coin', price: 220, sold: false };
+    run.pending = shop;
+    run.gold = 10000;
+    run.buy(0);
+    const soldPrice = shop.stock[0].price;
+
+    // WHEN: the coin is bought
+    assert.ok(run.buyRelic());
+
+    // THEN: every unsold item is 20% cheaper; the one already bought keeps its price
+    assert.deepEqual(shop.stock.slice(1).map(e => e.price), shop.stock.slice(1).map(e => Math.round(itemPrice(e.key) * 0.8)));
+    assert.equal(shop.stock[0].price, soldPrice);
+});
+
+test('the reward screen knows which item and relic were taken', () => {
+    const run = RunState.create({ jobs: ['evoker'], seed: 9 });
+    run.pending = { kind: 'reward', items: ['short_bow', 'leather_cap'], relics: ['lucky_coin', 'gamblers_crown'], relicPick: true };
+    assert.ok(run.claimRewardItem('leather_cap'));
+    assert.ok(run.claimRewardRelic('gamblers_crown'));
+    assert.equal(run.pending.itemTaken, 'leather_cap');
+    assert.equal(run.pending.relicTaken, 'gamblers_crown');
 });

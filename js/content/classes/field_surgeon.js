@@ -17,6 +17,18 @@ export const job = {
         triage: { sp: 1, requires: 'elixir' },
         steady_hands: { sp: 2, requires: 'panacea_mist' },
     },
+    builds: [
+        {
+            key: 'healer', name: 'Healer',
+            desc: 'Keep single allies alive: Elixir heals and cures one ally, and Triage patches up allies next to you when a hit leaves them low. Steady Hands stops your splashes from helping enemies.',
+            steps: ['triage', 'elixir+', 'panacea_mist', 'steady_hands', 'elixir+', 'triage+', 'triage+'],
+        },
+        {
+            key: 'buffs', name: 'Party Buffs',
+            desc: 'Buff your whole side: with Steady Hands your splashes only touch allies, so Stimulant and Quicksilver (from the Alchemist) speed up your party alone, and Panacea Mist cleanses them.',
+            steps: ['panacea_mist', 'steady_hands', 'stimulant', 'quicksilver', 'healing_draught+', 'healing_draught+', 'elixir+'],
+        },
+    ],
     spriteKey: 'npc_wandering_druid',
     char: 'F', color: '#88ffcc',
     schools: ['abjuration'],

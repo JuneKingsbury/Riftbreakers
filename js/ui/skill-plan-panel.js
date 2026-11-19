@@ -6,6 +6,7 @@ import {
     loadPlans, savePlans, sanitizeSteps, describeSteps, stepOptions, planCost, stepLabel, plannableJobs, planPromotions,
 } from '../run/skill-plans.js';
 import { rankChanges } from '../tactical/data-registry.js';
+import { buildsFor, suggestedPlanSteps } from '../run/builds.js';
 import { PROMOTION_LEVEL } from '../tactical/loadout.js';
 import { esc, jobLabel, abilityTooltip, wireTips, hideTip } from '../run/ui-kit.js';
 
@@ -70,6 +71,17 @@ export function renderSkillPlanEditor(container, { job, storage, onChange } = {}
                 </label>
             </div>`;
 
+        // Start from a suggested build (run/builds.js): the class's builds, each paired with
+        // the promotion's builds when a promotion is picked. Replaces the steps.
+        const pairs = buildsFor(current).flatMap(a => (promotion ? buildsFor(promotion).map(b => [a, b]) : [[a, null]]));
+        if (pairs.length) {
+            html += `<div style="display:flex;gap:6px;align-items:center;margin-bottom:8px;">
+                <select data-plan-suggest aria-label="Start from a suggested build" style="${SELECT}">
+                    ${opt('', 'Start from a suggested build…', true)}
+                    ${pairs.map(([a, b], i) => opt(i, b ? `${a.name} → ${b.name}` : a.name, false)).join('')}
+                </select></div>`;
+        }
+
         html += `<div style="border:1px solid #333;border-radius:4px;padding:4px 6px;margin-bottom:8px;min-height:24px;">`;
         if (!rows.length) html += `<div style="color:#666;font-size:11px;padding:4px 0;">No steps yet. Add some below.</div>`;
         const firstPromo = rows.findIndex(r => r.job !== current);
@@ -129,6 +141,12 @@ export function renderSkillPlanEditor(container, { job, storage, onChange } = {}
                 return;
             }
             save(steps, auto, next);
+        });
+        container.querySelector('[data-plan-suggest]')?.addEventListener('change', (e) => {
+            const pair = pairs[+e.target.value];
+            if (!pair) return;
+            if (rows.length && !window.confirm('Replace this plan\'s steps with the suggested build?')) { e.target.value = ''; return; }
+            save(suggestedPlanSteps(current, pair[0].key, promotion, pair[1]?.key ?? null), auto, promotion);
         });
         const move = (i, d) => { const s = [...steps]; [s[i], s[i + d]] = [s[i + d], s[i]]; save(s, auto, promotion); };
         on('[data-plan-up]', el => move(+el.dataset.planUp, -1));

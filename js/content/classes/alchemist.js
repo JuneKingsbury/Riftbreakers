@@ -22,6 +22,18 @@ export const job = {
         potent_brews: { sp: 2, requires: 'acid_flask' },
         light_pack: { sp: 1 },
     },
+    builds: [
+        {
+            key: 'healer', name: 'Healer',
+            desc: 'Heal with splash potions: Healing Draught heals everyone it lands on, and Potent Brews makes it 25% stronger. It heals enemies in the splash too, so aim it at your side.',
+            steps: ['healing_draught+', 'reflex_tonic', 'acid_flask', 'potent_brews', 'healing_draught+', 'smoke_bomb', 'quicksilver', 'light_pack'],
+        },
+        {
+            key: 'area', name: 'Area Damage',
+            desc: 'Throw Acid Flasks into enemy groups: they burn everyone in the splash and lower their DEF. Allies in the splash get burned too, so throw where the enemies are bunched up.',
+            steps: ['acid_flask', 'acid_flask+', 'potent_brews', 'light_pack', 'smoke_bomb', 'acid_flask+', 'quicksilver', 'healing_draught+'],
+        },
+    ],
     spriteKey: 'raider_poisoner',
     char: 'L', color: '#ccff66',
     schools: [],

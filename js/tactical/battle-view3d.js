@@ -137,6 +137,10 @@ const CSS = `
 .tac3d-charge i{display:block;height:100%;background:currentColor}
 .tac3d-cname{font-size:9px;font-weight:bold;text-shadow:-1px -1px 0 #000,1px -1px 0 #000,-1px 1px 0 #000,1px 1px 0 #000;white-space:nowrap;}
 .tac3d-status{font-size:10px;font-weight:bold;color:#fd6;text-shadow:0 0 2px #000,0 0 2px #000;white-space:nowrap;}
+.tac3d-doom{font-size:12px;font-weight:bold;color:#f6c;background:rgba(40,0,30,.85);border:1px solid #c06;border-radius:9px;padding:0 6px;line-height:16px;
+    white-space:nowrap;text-shadow:0 0 3px #000;box-shadow:0 0 6px rgba(204,0,102,.7);animation:tac3d-doom-pulse 1.4s ease-in-out infinite;}
+.tac3d-doom.last{color:#fff;background:rgba(110,0,50,.9);animation-duration:.6s;}
+@keyframes tac3d-doom-pulse{0%,100%{transform:scale(1);box-shadow:0 0 4px rgba(204,0,102,.5)}50%{transform:scale(1.12);box-shadow:0 0 10px rgba(255,60,160,.9)}}
 .tac3d-float{position:absolute;left:0;top:0;font-size:15px;font-weight:bold;text-shadow:-1px -1px 0 #000,1px -1px 0 #000,-1px 1px 0 #000,1px 1px 0 #000;white-space:nowrap;will-change:transform,opacity;}
 .tac3d-compass{position:absolute;top:14px;display:flex;gap:6px;pointer-events:auto;}
 .tac3d-compass button{width:34px;height:34px;border-radius:50%;border:1px solid #335;background:rgba(8,8,24,.8);color:#cde;font:bold 16px 'Courier New',monospace;cursor:pointer;padding:0;}
@@ -1096,7 +1100,8 @@ export class BattleView3D {
 
         const tag = document.createElement('div');
         tag.className = 'tac3d-tag';
-        tag.innerHTML = `<div class="tac3d-name ${unit.team === 'player' ? 'player' : 'enemy'}"></div>`
+        tag.innerHTML = `<div class="tac3d-doom" style="display:none"></div>`
+            + `<div class="tac3d-name ${unit.team === 'player' ? 'player' : 'enemy'}"></div>`
             + `<div class="tac3d-cname" style="display:none"></div><div class="tac3d-charge" style="display:none"><i></i></div>`
             + `<div class="tac3d-status"></div><div class="tac3d-bar tac3d-hp"><i></i></div><div class="tac3d-bar tac3d-mp"><i></i></div>`;
         this.overlay.appendChild(tag);
@@ -1105,6 +1110,7 @@ export class BattleView3D {
             sprite, ghost, outline, flash, shadow, arrow, tag,
             els: {
                 cname: tag.querySelector('.tac3d-cname'),
+                doom: tag.querySelector('.tac3d-doom'),
                 charge: tag.querySelector('.tac3d-charge'),
                 chargeFill: tag.querySelector('.tac3d-charge i'),
                 status: tag.querySelector('.tac3d-status'),
@@ -1464,6 +1470,17 @@ export class BattleView3D {
             set('chargeFrac', Math.min(1, ch.ct / ch.needed), v => { els.chargeFill.style.width = (v * 100) + '%'; });
             set('chargeName', ABILITIES[ch.ability]?.name || 'Charging', v => { els.cname.textContent = v; });
         }
+
+        // Doom's countdown, above everything else on the tag: the turns the unit has left. It
+        // pulses faster on the last one.
+        const doom = !ko && unit.status.includes('doom') ? (unit.statusTimers?.doom ?? 0) : 0;
+        set('doom', doom, v => {
+            els.doom.style.display = v > 0 ? '' : 'none';
+            els.doom.textContent = `☠ ${v}`;
+            els.doom.classList.toggle('last', v === 1);
+            const what = unit.isBoss ? 'loses a quarter of its HP' : 'falls';
+            els.doom.title = v === 1 ? `Doom: ${what} on its next turn` : `Doom: ${what} in ${v} turns`;
+        });
 
         const marks = [];
         if (unit.status.includes('stun'))     marks.push('*');

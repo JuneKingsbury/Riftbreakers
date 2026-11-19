@@ -21,6 +21,18 @@ export const job = {
         field_command: { sp: 2, requires: 'rally' },
         vanguard_step: { sp: 1 },
     },
+    builds: [
+        {
+            key: 'tank', name: 'Tank',
+            desc: 'Pull the enemy onto you: Taunt forces nearby enemies to attack you, Hold the Line strikes back when an ally next to you is hit, and Cleave hits everyone around you.',
+            steps: ['taunt', 'hold_the_line', 'cleave+', 'vanguard_step', 'taunt+', 'hold_the_line+', 'cleave+', 'hold_the_line+', 'taunt+'],
+        },
+        {
+            key: 'speed', name: 'Ally Speed',
+            desc: 'Give your allies extra turns: Rally makes one act sooner, and Field Command gives the whole party a head start each battle. Reposition swaps you with an ally to pull them out of danger.',
+            steps: ['rally', 'field_command', 'rally+', 'reposition', 'rally+', 'reposition+', 'vanguard_step'],
+        },
+    ],
     spriteKey: 'knight',
     char: 'W', color: '#ffbb55',
     schools: [],

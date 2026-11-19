@@ -17,6 +17,18 @@ export const job = {
         phylactery: { sp: 1, requires: 'soul_nova' },
         necrotic_power: { sp: 2, requires: 'wither' },
     },
+    builds: [
+        {
+            key: 'area', name: 'Area Drain',
+            desc: 'Drain whole groups: Soul Nova damages every enemy in an area and heals you for part of it. Soul Harvest (from the Gravecaller) refills MP as enemies fall, and Phylactery brings you back once.',
+            steps: ['soul_nova+', 'phylactery', 'soul_harvest', 'soul_nova+', 'wither', 'corpse_burst'],
+        },
+        {
+            key: 'single', name: 'Single Target',
+            desc: 'Destroy single targets: Bone Spear hits from 5 tiles away with no wait, and Wither drains a huge amount of HP after a short charge. Necrotic Power makes your drains heal more.',
+            steps: ['bone_spear', 'wither', 'bone_spear+', 'phylactery', 'wither+', 'necrotic_power', 'bone_spear+'],
+        },
+    ],
     spriteKey: 'void_herald',
     char: 'X', color: '#88ee99',
     schools: ['necromancy', 'evocation'],

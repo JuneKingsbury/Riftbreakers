@@ -20,6 +20,18 @@ export const job = {
         earthen_footing: { sp: 2, requires: 'stone_fist' },
         stone_stride: { sp: 1 },
     },
+    builds: [
+        {
+            key: 'tank', name: 'Tank',
+            desc: 'Stand in front and soak hits: Earth Skin and Stone Reflex pile on DEF, so enemies wear themselves out on you. Stone Fist gives you a heavy hit back.',
+            steps: ['earth_skin', 'stone_reflex', 'stone_fist', 'earth_skin+', 'stone_stride', 'stone_reflex+', 'earth_skin+', 'stone_reflex+', 'stone_fist+'],
+        },
+        {
+            key: 'melee', name: 'Melee Damage',
+            desc: 'Hit hard up close: Stone Fist is a crushing blow and Calcify stuns. Stone Stride gets you onto high ground, where Earthen Footing makes your hits land harder.',
+            steps: ['stone_fist', 'stone_fist+', 'calcify', 'stone_stride', 'earthen_footing', 'stone_fist+', 'calcify+', 'calcify+'],
+        },
+    ],
     spriteKey: 'void_brute',
     char: 'T', color: '#aa8855',
     schools: ['transmutation'],

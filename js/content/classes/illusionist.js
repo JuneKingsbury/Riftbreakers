@@ -20,6 +20,18 @@ export const job = {
         glamour: { sp: 2, requires: 'mirror_image' },
         mirage_step: { sp: 1 },
     },
+    builds: [
+        {
+            key: 'decoys', name: 'Decoys',
+            desc: 'Make the enemy hit the wrong target: Mirror Image puts a copy of you on the field that enemies would rather attack, and Glamour makes it far tougher. Phantasm is your damage.',
+            steps: ['mirror_image', 'glamour', 'displacement', 'phantasm+', 'mirror_image+', 'phantasm+', 'displacement+'],
+        },
+        {
+            key: 'evasion', name: 'Evasion Support',
+            desc: 'Keep allies from being hit at all: Blur makes one hard to hit and Vanish hides one from enemies for 2 turns. Mirage Step and Displacement keep you out of reach too.',
+            steps: ['blur', 'mirage_step', 'vanish', 'blur+', 'displacement', 'vanish+', 'blur+', 'vanish+'],
+        },
+    ],
     spriteKey: 'mirror_shade',
     char: 'I', color: '#e0a0ff',
     schools: ['illusion'],

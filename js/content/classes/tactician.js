@@ -17,6 +17,18 @@ export const job = {
         read_the_battle: { sp: 1, requires: 'seize_the_moment' },
         initiative: { sp: 2, requires: 'delay' },
     },
+    builds: [
+        {
+            key: 'speed', name: 'Ally Speed',
+            desc: 'Give your allies extra turns: Initiative gives the whole party a big head start each battle, and Seize the Moment sends one ally into action right away. Rally (from the Warlord) is a cheaper version.',
+            steps: ['delay', 'initiative', 'seize_the_moment+', 'rally', 'seize_the_moment+', 'rally+'],
+        },
+        {
+            key: 'disrupt', name: 'Disrupt Enemies',
+            desc: 'Slow down the enemy\'s turns: Delay pushes an enemy\'s next turn back, and Read the Battle breaks up spells while they charge. Exploit Opening is a quick strike that brings your own turn sooner.',
+            steps: ['read_the_battle', 'delay', 'delay+', 'exploit_opening', 'read_the_battle+', 'delay+', 'exploit_opening+'],
+        },
+    ],
     spriteKey: 'royal_mage',
     char: 'T', color: '#aa88ff',
     schools: ['divination'],

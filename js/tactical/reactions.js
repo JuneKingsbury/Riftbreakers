@@ -26,6 +26,13 @@ function triggerMatches(rx, hit, d, reactor, result) {
     }
 }
 
+// The reactor's own rank of the skill a reaction uses (counterWith, allyCast, selfCast):
+// 'long_shot@3' when they have Long Shot III, so a counter or a reflex heal is as strong (and
+// costs as little) as the same skill used on their turn. Skills they don't know stay rank I.
+function counterKey(reactor, key) {
+    return (reactor.abilities ?? []).find(k => k === key || k.startsWith(`${key}@`)) ?? key;
+}
+
 // Returns true if `reactor` can use `abKey` right now (MP and silence).
 function canCast(reactor, abKey) {
     const ab = ABILITIES[abKey];
@@ -131,10 +138,10 @@ function tryOneReaction(battle, reactor, key, attacker, abKey, result) {
 
     // Check the effect is possible before rolling, so a failed check costs nothing.
     if (rx.counterWith) {
-        const ab = ABILITIES[rx.counterWith];
-        if (!isConscious(attacker) || !canCast(reactor, rx.counterWith) || d > (ab.range || 1)) return false;
+        const ab = ABILITIES[counterKey(reactor, rx.counterWith)];
+        if (!isConscious(attacker) || !canCast(reactor, counterKey(reactor, rx.counterWith)) || d > (ab.range || 1)) return false;
     }
-    if (rx.selfCast && !canCast(reactor, rx.selfCast)) return false;
+    if (rx.selfCast && !canCast(reactor, counterKey(reactor, rx.selfCast))) return false;
     const phaseTo = rx.phaseAway
         ? freeCells(battle, reactor, rx.phaseAway, c => dist(c, attacker) * 10 - dist(c, reactor))[0]
         : null;
@@ -145,8 +152,8 @@ function tryOneReaction(battle, reactor, key, attacker, abKey, result) {
 
     announce(battle, reactor, rx, key);
 
-    if (rx.counterWith) castOn(battle, reactor, rx.counterWith, attacker);
-    if (rx.selfCast) castOn(battle, reactor, rx.selfCast, reactor);
+    if (rx.counterWith) castOn(battle, reactor, counterKey(reactor, rx.counterWith), attacker);
+    if (rx.selfCast) castOn(battle, reactor, counterKey(reactor, rx.selfCast), reactor);
     if (rx.selfStatus && !reactor.status.includes(rx.selfStatus)) reactor.status.push(rx.selfStatus);
     if (rx.selfBuff) {
         reactor.buffs = reactor.buffs || [];
@@ -196,7 +203,7 @@ export function tryAllyReactions(battle, victim, attacker, abKey, result) {
 function tryAllyReaction(battle, reactor, key, victim, result, attacker) {
     const rx = ABILITIES[key];
     if (rx?.trigger !== 'allyHit') return false;
-    if (rx.allyCast && !canCast(reactor, rx.allyCast)) return false;
+    if (rx.allyCast && !canCast(reactor, counterKey(reactor, rx.allyCast))) return false;
     // Triage: only for an ally left badly hurt (but still standing).
     if (rx.whenAllyBelow != null && !(victim.hp > 0 && victim.hp < victim.maxHp * rx.whenAllyBelow)) return false;
     // Death Ward: only for an ally the blow knocked out.
@@ -204,17 +211,17 @@ function tryAllyReaction(battle, reactor, key, victim, result, attacker) {
     // Hold the Line: strike back at the attacker, if it is in reach. The reactor stands beside the
     // ally and the attacker beside the ally, so they are 2 apart: counterReach lets it lunge in.
     if (rx.counterWith) {
-        const ab = ABILITIES[rx.counterWith];
+        const ab = ABILITIES[counterKey(reactor, rx.counterWith)];
         const reach = rx.counterReach ?? (ab.range || 1);
-        if (!attacker || !isConscious(attacker) || !canCast(reactor, rx.counterWith) || dist(reactor, attacker) > reach) return false;
+        if (!attacker || !isConscious(attacker) || !canCast(reactor, counterKey(reactor, rx.counterWith)) || dist(reactor, attacker) > reach) return false;
     }
     const share = rx.shareDamageFrac ? Math.min(reactor.hp - 1, Math.round(result.damage * rx.shareDamageFrac)) : 0;
     if (rx.shareDamageFrac && share <= 0) return false;
     if (Math.random() >= (rx.chance ?? 1)) return false;
 
     announce(battle, reactor, rx, key);
-    if (rx.allyCast) castOn(battle, reactor, rx.allyCast, victim);
-    if (rx.counterWith) castOn(battle, reactor, rx.counterWith, attacker);
+    if (rx.allyCast) castOn(battle, reactor, counterKey(reactor, rx.allyCast), victim);
+    if (rx.counterWith) castOn(battle, reactor, counterKey(reactor, rx.counterWith), attacker);
     if (rx.saveFromDown) {
         battle.stats?.heal(reactor, victim, 1 - victim.hp, key);
         victim.hp = 1;

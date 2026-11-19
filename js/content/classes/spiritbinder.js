@@ -18,6 +18,18 @@ export const job = {
         spirit_hush: { sp: 1, requires: 'spirit_lash' },
         spirit_pact: { sp: 2, requires: 'spirit_lash' },
     },
+    builds: [
+        {
+            key: 'summoner', name: 'Summoner',
+            desc: 'Fight alongside a spirit: Call Wisp summons a wisp that chills enemies and can put them to sleep, and Spirit Pact makes it 30% stronger. Spirit Lash slows targets in the meantime.',
+            steps: ['call_wisp', 'spirit_pact', 'spirit_lash+', 'call_wisp+', 'spirit_lash+', 'haunting', 'spirit_hush'],
+        },
+        {
+            key: 'stuns', name: 'Area Stuns',
+            desc: 'Stun groups of enemies: Haunting damages and stuns a target and everyone next to it. Spirit Lash slows single targets, and Spirit Hush silences casters who hit you.',
+            steps: ['call_wisp', 'haunting', 'haunting+', 'spirit_hush', 'spirit_lash+', 'haunting+', 'spirit_hush+'],
+        },
+    ],
     spriteKey: 'shadow_imp',
     char: 'X', color: '#aaccff',
     schools: ['enchantment', 'conjuration'],

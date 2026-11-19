@@ -20,6 +20,18 @@ export const job = {
         swiftcast: { sp: 2, requires: 'time_lapse' },
         featherstep: { sp: 1 },
     },
+    builds: [
+        {
+            key: 'control', name: 'Crowd Control',
+            desc: 'Take enemies out of the fight: Dream Veil puts one to sleep and Time Lapse slows another, so they act far less often. Hitting a sleeping enemy wakes it up.',
+            steps: ['time_lapse', 'dream_veil', 'premonition', 'dream_veil+', 'time_lapse+', 'featherstep', 'dream_veil+', 'time_lapse+', 'swiftcast'],
+        },
+        {
+            key: 'support', name: 'Ally Support',
+            desc: 'Make your allies better: Swift Grace hastes one so they act 50% more often, and Temporal Slip makes the next physical attack on an ally miss. Premonition keeps you safe.',
+            steps: ['time_lapse', 'swift_grace', 'premonition', 'temporal_slip+', 'swift_grace+', 'premonition+', 'swift_grace+', 'temporal_slip+'],
+        },
+    ],
     spriteKey: 'npc_ally',
     char: 'D', color: '#99ccff',
     schools: ['divination'],

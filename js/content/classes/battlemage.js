@@ -18,6 +18,18 @@ export const job = {
         arcane_rebuke: { sp: 1, requires: 'arcane_strike' },
         arcane_weapon: { sp: 2, requires: 'arcane_strike' },
     },
+    builds: [
+        {
+            key: 'melee', name: 'Melee Damage',
+            desc: 'Fight in melee with an enchanted weapon: Arcane Weapon adds half your MAT to every physical hit, so Arcane Strike hits hard, and Arcane Rebuke strikes back when you\'re hit in melee.',
+            steps: ['arcane_weapon', 'arcane_strike+', 'arcane_rebuke', 'arcane_strike+', 'arcane_rebuke+', 'force_pulse', 'arcane_rebuke+'],
+        },
+        {
+            key: 'area', name: 'Area Damage',
+            desc: 'Wade into groups: Force Pulse stuns every enemy in an area, then Blade Storm cuts through all of them. Arcane Weapon makes Blade Storm hit much harder.',
+            steps: ['force_pulse', 'blade_storm', 'blade_storm+', 'arcane_weapon', 'force_pulse+', 'blade_storm+', 'force_pulse+'],
+        },
+    ],
     spriteKey: 'royal_mage',
     char: 'B', color: '#aa88ff',
     schools: ['evocation', 'enchantment'],

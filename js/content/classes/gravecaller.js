@@ -20,6 +20,18 @@ export const job = {
         soul_harvest: { sp: 2, requires: 'grave_chill' },
         wraithwalk: { sp: 1 },
     },
+    builds: [
+        {
+            key: 'drain', name: 'Life Drain',
+            desc: 'Stay alive by draining your foes: Life Drain heals you for half the damage it deals, Grave Chill slows anyone chasing you, and Soul Harvest refills MP whenever anyone falls.',
+            steps: ['grave_chill', 'life_drain+', 'soul_harvest', 'life_drain+', 'lingering_spite', 'grave_chill+', 'wraithwalk'],
+        },
+        {
+            key: 'corpses', name: 'Corpse Master',
+            desc: 'Turn every fallen enemy into an advantage: Raise Dead brings one back as a skeleton that fights for you, or Corpse Burst blows it up to hurt the enemies around it.',
+            steps: ['raise_dead', 'corpse_burst', 'grave_chill', 'soul_harvest', 'corpse_burst+', 'raise_dead+', 'corpse_burst+'],
+        },
+    ],
     spriteKey: 'void_acolyte',
     char: 'N', color: '#7acc7a',
     schools: ['necromancy'],

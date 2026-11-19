@@ -19,6 +19,9 @@ function memoryStorage(initial = {}) {
 // A fresh Evoker: knows Fire, has 0 SP (so tests control every point).
 const evoker = () => ({ name: 'Ava', job: 'evoker', origin: null, level: 1, xp: 0, sp: 0, learned: ['fire'], ranks: {} });
 const L = (key) => ({ learn: key }), U = (key) => ({ upgrade: key });
+// A run from before build focus (run/builds.js): its members follow their class's skill plan
+// when it has auto-allocate on. (New runs follow each member's build choice instead.)
+const legacyRun = (opts) => { const run = RunState.create(opts); delete run.buildFocus; return run; };
 
 test('a plan buys its steps in order as points come in, one level at a time', () => {
     const m = evoker();
@@ -121,7 +124,7 @@ test('a member who promoted into the other class skips the planned promotion\'s 
 });
 
 test('with auto on, a run promotes members into the planned class once eligible, then spends on its skills', () => {
-    const run = RunState.create({ jobs: ['evoker'], seed: 3 });
+    const run = legacyRun({ jobs: ['evoker'], seed: 3 });
     const [ev] = run.party;
     const plans = { evoker: { auto: true, promotion: 'battlemage', steps: [L('fire'), L('arcane_strike')] } };
     ev.sp = 1;
@@ -138,7 +141,7 @@ test('with auto on, a run promotes members into the planned class once eligible,
         'Ava promoted to Battlemage, learned Arcane Strike');
 
     // With auto off, nobody is promoted.
-    const run2 = RunState.create({ jobs: ['evoker'], seed: 3 });
+    const run2 = legacyRun({ jobs: ['evoker'], seed: 3 });
     run2.party[0].level = PROMOTION_LEVEL;
     assert.deepEqual(run2.autoAllocate({ evoker: { ...plans.evoker, auto: false } }), []);
     assert.equal(run2.party[0].job, 'evoker');
@@ -210,7 +213,7 @@ test('steps and purchases read naturally', () => {
 });
 
 test('a run spends its party\'s points on their plans, and still saves and loads', () => {
-    const run = RunState.create({ jobs: ['evoker', 'warden'], seed: 3 });
+    const run = legacyRun({ jobs: ['evoker', 'warden'], seed: 3 });
     const [ev, wa] = run.party;
     const plans = { evoker: { auto: true, steps: [L('fire'), L('ice'), L('thunder')] } };
     const sp = wa.sp;

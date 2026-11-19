@@ -20,6 +20,18 @@ export const job = {
         rune_edge: { sp: 2, requires: 'sunder' },
         momentum: { sp: 1 },
     },
+    builds: [
+        {
+            key: 'breaker', name: 'Armor Breaker',
+            desc: 'Fight up close and strip armor: Sunder lowers a target\'s DEF so the whole party hits it harder, and Counter strikes back whenever you\'re hit in melee.',
+            steps: ['sunder', 'counter', 'sunder+', 'momentum', 'rune_edge', 'sunder+', 'counter+', 'counter+'],
+        },
+        {
+            key: 'debuffer', name: 'Debuffer',
+            desc: 'Weaken the enemy\'s biggest threats from 3 tiles away: Mute stops a caster from casting and Enfeeble cuts a fighter\'s ATK. Counter covers you when they get close.',
+            steps: ['enfeeble', 'mute', 'enfeeble+', 'sunder', 'counter', 'mute+', 'enfeeble+', 'mute+'],
+        },
+    ],
     spriteKey: 'spell_wraith',
     char: 'C', color: '#cc88dd',
     schools: ['enchantment'],

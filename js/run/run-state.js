@@ -27,6 +27,7 @@ import { eventsFor, EVENTS } from './data/events.js';
 import { rollRealms, REALMS, ACT_REALMS, appearsIn } from './data/realms.js';
 import { createMember, recruitCandidates } from './data/recruits.js';
 import { autoAllocate, plannedPromotion } from './skill-plans.js';
+import { buildAllocate, buildPromotion, sanitizeBuild, findBuild } from './builds.js';
 import { battleScore } from './score.js';
 import { notifySaved } from './save-events.js';
 import { runOptions, BASE_JOBS } from './profile.js';
@@ -88,6 +89,9 @@ export function riftTierMods(tier, kind) {
     return Object.keys(mods).length ? mods : null;
 }
 
+// A relic's base price in a shop, before discounts.
+const shopRelicPrice = (key) => (RELICS[key]?.rarity === 'common' ? 150 : 220);
+
 export class RunState {
     // opts.jobs     The starting roles: MIN_START_PARTY to START_PARTY of them (none: BASE_JOBS)
     // opts.options  runOptions(profile); defaults to a fresh profile
@@ -117,6 +121,9 @@ export class RunState {
             run.party.push(m);
         }
         run.startPartySize = run.party.length;   // for the small-party renown bonus
+        // Build focus (builds.js): each member's build is picked when they join. Runs from
+        // before it don't have this, and keep the old skill plan rules.
+        run.buildFocus = true;
         run._startAct();
         if (options.heirloom) {
             // Relic Codex swaps one of the three common choices for an uncommon relic.
@@ -388,18 +395,68 @@ export class RunState {
         return !!m && upgradeAbility(m, key);
     }
 
-    // Follows every member's skill plan (see skill-plans.js): promotes them into the plan's
-    // class once they are eligible, then spends their skill points. Plans are the player's, so
-    // the caller passes them in. Returns [{ name, promoted }] for promotions and
-    // [{ name, key, rank }] for skills, in the order they happened.
+    // Spends every member's skill points by their build (see builds.js): a suggested build, their
+    // skill plan, or nothing (manual). A plan with a promotion promotes them once they are
+    // eligible. Members of runs from before build focus follow their class's skill plan when it
+    // has auto-allocate on (skill-plans.js). Members still waiting for a build choice, or for
+    // their promotion choice (memberReadyToPromote), buy nothing yet, so the points they just
+    // earned can go to the class they pick. Plans are the player's, so the caller passes them
+    // in. Returns [{ name, promoted }] for promotions and [{ name, key, rank }] for skills, in order.
     autoAllocate(plans) {
         const out = [];
         for (const m of this.party) {
-            const job = plannedPromotion(m, plans);
+            if (!m.build && this.buildFocus) continue;
+            const job = m.build ? buildPromotion(m, plans) : plannedPromotion(m, plans);
             if (job && this.promote(m.name, job)) out.push({ name: m.name, promoted: job });
-            for (const b of autoAllocate(m, plans)) out.push({ name: m.name, ...b });
+            if (this._awaitsPromotionChoice(m)) continue;
+            const bought = m.build ? buildAllocate(m, plans) : autoAllocate(m, plans);
+            for (const b of bought) out.push({ name: m.name, ...b });
         }
         return out;
+    }
+
+    // ---- Build focus (builds.js) ----
+
+    // Members who joined without a build choice yet (the starting party, then each recruit).
+    membersNeedingBuild() {
+        return this.buildFocus && this.status === 'active' ? this.party.filter(m => !m.build) : [];
+    }
+
+    // The first member who can promote and hasn't been offered it yet, or null.
+    memberReadyToPromote() {
+        if (this.status !== 'active') return null;
+        return this.party.find(m => this._awaitsPromotionChoice(m)) ?? null;
+    }
+
+    _awaitsPromotionChoice(m) {
+        return !!m.build && !m.build.promoAsked && this.canPromote(m) && promotionOptions(m).length > 0;
+    }
+
+    // Sets a member's build choice ({ mode, focus?, promoFocus? }). Returns false when it isn't valid.
+    setBuild(memberName, build) {
+        const m = this.member(memberName);
+        const clean = m && sanitizeBuild(m, { ...(m.build ?? {}), ...build });
+        if (!clean) return false;
+        m.build = clean;
+        return true;
+    }
+
+    // The player passed on promoting for now: they can still promote from the Party menu.
+    declinePromotion(memberName) {
+        const m = this.member(memberName);
+        if (!m?.build) return false;
+        m.build = { ...m.build, promoAsked: true };
+        return true;
+    }
+
+    // Promotes a member and, when `focus` names one of the new class's builds, follows it from
+    // now on (switching a manual or plan member to build focus).
+    promoteWithBuild(memberName, job, focus = null) {
+        if (!this.promote(memberName, job)) return false;
+        const m = this.member(memberName);
+        if (focus && findBuild(job, focus)) m.build = sanitizeBuild(m, { ...(m.build ?? {}), mode: 'focus', promoFocus: focus, promoAsked: true });
+        else if (m.build) m.build = { ...m.build, promoAsked: true };
+        return true;
     }
 
     learn(memberName, key) {
@@ -634,6 +691,7 @@ export class RunState {
         if (p?.kind !== 'reward' || p.itemClaimed || !p.items.includes(key)) return false;
         this.addItem(key);
         p.itemClaimed = true;
+        p.itemTaken = key;   // which one, so the reward screen can highlight it
         return true;
     }
 
@@ -642,6 +700,7 @@ export class RunState {
         if (p?.kind !== 'reward' || !p.relicPick || p.relicClaimed || !p.relics.includes(key)) return false;
         this.addRelic(key);
         p.relicClaimed = true;
+        p.relicTaken = key;
         return true;
     }
 
@@ -659,7 +718,7 @@ export class RunState {
         const stock = this._rollItems(weights, this.options.fineWares ? 6 : 5)
             .map(key => ({ key, price: this._discount(itemPrice(key)), sold: false }));
         const relicKey = this._rollRelics(['common', 'uncommon'], 1)[0] ?? null;
-        const relic = relicKey ? { key: relicKey, price: this._discount(RELICS[relicKey].rarity === 'common' ? 150 : 220), sold: false } : null;
+        const relic = relicKey ? { key: relicKey, price: this._discount(shopRelicPrice(relicKey)), sold: false } : null;
         return { kind: 'shop', stock, relic, restocked: false };
     }
 
@@ -697,7 +756,17 @@ export class RunState {
         this.gold -= r.price;
         r.sold = true;
         this.addRelic(r.key);
+        // A relic that changes shop prices (Lucky Coin, Gambler's Crown) applies to this shop
+        // too: everything still for sale is priced again.
+        if (RELICS[r.key]?.shopDiscount) this._repriceShop();
         return true;
+    }
+
+    _repriceShop() {
+        const p = this.pending;
+        if (p?.kind !== 'shop') return;
+        for (const e of p.stock) if (!e.sold) e.price = this._discount(itemPrice(e.key));
+        if (p.relic && !p.relic.sold) p.relic.price = this._discount(shopRelicPrice(p.relic.key));
     }
 
     sell(key) {

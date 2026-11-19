@@ -17,6 +17,7 @@ How to add content: [README.md](README.md).
 | `move` | Move | yes | yes |  | Tiles the unit can move in a turn. |
 | `eva` | EVA | yes | yes | yes | Evasion: the chance, in percent, to dodge physical attacks (modified by facing). |
 | `crit` | CRIT | yes | yes | yes | Critical hit chance in percent, on top of the base 5%. Only gear raises it. |
+| `mpRegen` | MP/turn | yes |  |  | MP recovered at the start of each of the unit's turns: 3, plus gear. Units without MP recover none. |
 
 `statMods` covers relics, event rewards (`memberStatMods`), enemy roster entries and summons (`summonMods`).
 
@@ -35,7 +36,7 @@ Any of these can be inflicted (`applyStatus`, `attackProc`, `attackerStatus`, `o
 | `charm` | Charm | harmful | Fights for the other side and cannot react. | Bewilder, Bind Will |
 | `frog` | Frog | harmful | Turned into a frog: ATK and MAT drop by 60% and DEF by 50%. | Hexform |
 | `enfeebled` | Enfeeble | harmful | ATK is lowered by 5. | Enfeeble |
-| `doom` | Doom | harmful | Falls when the countdown runs out, unless cured first. | Death Sentence |
+| `doom` | Doom | harmful | Falls when the countdown runs out, unless cured first. A boss loses a quarter of its max HP instead. | Death Sentence |
 | `taunted` | Taunt | harmful | Must attack the unit that taunted it if it can. | Taunt, Challenge |
 | `haste` | Haste | helpful | The turn gauge fills 50% faster. | Swift Grace, Quicksilver |
 | `protect` | Protect | helpful | Takes 25% less physical damage. | Stone Aegis, Bulwark, Bone Ward, Shield Wall |
@@ -553,6 +554,11 @@ Every field each kind of content may have. `validate.js` rejects anything else.
 | `role` | string | Short role line on the new-run screen (Tier 1). |
 | `learnable` | key → { sp, requires } | The skill tree: ability key → { sp, requires? }. The first entry is known from the start. |
 | `promotions` | list of job key | Tier 1: the two Tier 2 classes it can promote into. |
+| `builds` | list of { key, name, desc, steps } | Player classes: the two suggested builds a player can follow (run/builds.js). A Tier 1 build runs until promotion, a Tier 2 build after it. |
+| `builds[].key` * | string | Id of the build, unique in the class. Saved in runs, so don't rename it. |
+| `builds[].name` * | string | Display name, e.g. Retaliation. |
+| `builds[].desc` * | string | One line on how the build plays. |
+| `builds[].steps` * | list of string | The order to spend skill points in: 'skill' learns it, 'skill+' upgrades it one rank. A Tier 2 build may use its Tier 1 class's skills. Skills a build leaves out are bought after it, in skill-tree order. |
 | `allowedEquipment` | { armor, helmet, weapon, tool, boots, trinket } → list of `cloth` / `light` / `medium` / `heavy` / `blade` / `heavy_weapon` / `magic` / `bow` / `crossbow` / `shield` / `implement` / `quiver` / `offhand_weapon` / `boots` / `trinket` | Equipment types per slot. Tier 2 classes inherit their Tier 1 class's. |
 | `equipmentExpansions` | { armor, helmet, weapon, tool, boots, trinket } → list of `cloth` / `light` / `medium` / `heavy` / `blade` / `heavy_weapon` / `magic` / `bow` / `crossbow` / `shield` / `implement` / `quiver` / `offhand_weapon` / `boots` / `trinket` | Types a Tier 2 class adds to the inherited list. |
 | `startingGear` | { armor, helmet, weapon, tool, boots, trinket } → item key | Tier 1: what a new member carries. |
@@ -598,6 +604,7 @@ Every field each kind of content may have. `validate.js` rejects anything else.
 | `crit` | number | CRIT bonus. |
 | `maxHp` | number | max HP bonus. |
 | `maxMp` | number | max MP bonus. |
+| `mpRegen` | number | MP per turn bonus. |
 
 ### Relic (relics.js)
 

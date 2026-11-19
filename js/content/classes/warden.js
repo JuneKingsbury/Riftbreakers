@@ -20,6 +20,18 @@ export const job = {
         iron_will: { sp: 2, requires: 'cure' },
         sentinel_step: { sp: 1 },
     },
+    builds: [
+        {
+            key: 'healer', name: 'Healer',
+            desc: 'Keep the party standing: Ward heals one ally, Guardian Ward heals allies next to you on its own when they\'re hit, and Cure removes harmful statuses.',
+            steps: ['guardian_ward', 'ward+', 'cure', 'ward+', 'sentinel_step', 'guardian_ward+', 'iron_will', 'cure+', 'guardian_ward+'],
+        },
+        {
+            key: 'shields', name: 'Damage Shields',
+            desc: 'Stop damage before it lands: Stone Aegis cuts the physical damage an ally takes, Arcane Veil cuts magic damage, and Sentinel Step raises DEF for allies around you.',
+            steps: ['stone_aegis', 'sentinel_step', 'arcane_veil', 'guardian_ward', 'stone_aegis+', 'arcane_veil+', 'stone_aegis+', 'arcane_veil+'],
+        },
+    ],
     spriteKey: 'npc_ally',
     char: 'A', color: '#88ccaa',
     schools: ['abjuration'],

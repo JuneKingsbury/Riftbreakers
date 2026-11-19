@@ -20,6 +20,18 @@ export const job = {
         mana_surge: { sp: 2, requires: 'ice' },
         mana_stride: { sp: 1 },
     },
+    builds: [
+        {
+            key: 'area', name: 'Area Damage',
+            desc: 'Hit groups of enemies with Fire and Thunder from range. Flame Retort answers enemy casters with a Fire of your own, and Mana Stride refills MP as you move.',
+            steps: ['thunder', 'fire+', 'mana_stride', 'thunder+', 'flame_retort', 'ice', 'mana_surge', 'fire+', 'thunder+', 'flame_retort+'],
+        },
+        {
+            key: 'single', name: 'Single Target',
+            desc: 'Take down one dangerous enemy at a time: Ice slows it, then Flare hits harder than any other Evoker spell. Upgrades cut Flare\'s high MP cost.',
+            steps: ['ice', 'thunder', 'flare', 'ice+', 'mana_stride', 'flare+', 'mana_surge', 'flare+', 'ice+'],
+        },
+    ],
     spriteKey: 'royal_mage',
     char: 'V', color: '#ff8844',
     schools: ['evocation'],

@@ -18,6 +18,18 @@ export const job = {
         interpose: { sp: 1, requires: 'shield_wall' },
         iron_discipline: { sp: 2, requires: 'challenge' },
     },
+    builds: [
+        {
+            key: 'guard', name: 'Bodyguard',
+            desc: 'Protect the allies beside you: Shield Wall gives you and them Protect, Iron Discipline raises their DEF and MDF every turn, and Interpose lets you take a blow meant for them.',
+            steps: ['interpose', 'shield_wall+', 'challenge', 'iron_discipline', 'interpose+', 'shield_wall+', 'interpose+'],
+        },
+        {
+            key: 'taunt', name: 'Taunt & Stun',
+            desc: 'Lock down the biggest threat: Challenge forces one enemy to attack only you and lowers its DEF, then Bulwark Bash stuns it.',
+            steps: ['challenge', 'bulwark_bash', 'bulwark_bash+', 'challenge+', 'iron_discipline', 'bulwark_bash+', 'challenge+'],
+        },
+    ],
     spriteKey: 'palace_champion',
     char: 'K', color: '#ccccff',
     schools: ['abjuration'],

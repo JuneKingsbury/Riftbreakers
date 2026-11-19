@@ -17,6 +17,18 @@ export const job = {
         toxic_blood: { sp: 1, requires: 'plague_flask' },
         virulence: { sp: 2, requires: 'miasma' },
     },
+    builds: [
+        {
+            key: 'poison', name: 'Poison Spread',
+            desc: 'Poison wide areas: Plague Flask and Miasma poison everyone in the splash, and Virulence makes it last longer. Allies in the splash are poisoned too, so throw it at the enemy\'s side.',
+            steps: ['miasma', 'virulence', 'plague_flask+', 'catalyst', 'plague_flask+', 'miasma+', 'toxic_blood'],
+        },
+        {
+            key: 'burst', name: 'Poison Burst',
+            desc: 'Poison, then detonate: Plague Flask poisons a group, and Catalyst deals double damage to every poisoned enemy without touching your allies. Potent Brews (from the Alchemist) adds 25% to it all.',
+            steps: ['catalyst', 'catalyst+', 'potent_brews', 'catalyst+', 'toxic_blood', 'plague_flask+', 'miasma'],
+        },
+    ],
     spriteKey: 'raider_poisoner',
     char: 'Q', color: '#99dd33',
     schools: ['transmutation'],
@@ -52,6 +64,6 @@ export const abilities = {
 
     virulence: {
         extends: 'support', name: 'Virulence', passiveMpCost: 0, dmgDealt: null, statusDurationBonus: 1,
-        desc: 'Your poisons and other statuses last 1 turn longer.',
+        desc: 'Your poisons and other statuses last 1 turn longer (except Doom).',
     },
 };

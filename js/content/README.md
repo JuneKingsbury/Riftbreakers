@@ -46,6 +46,11 @@ out of its index never loads, and a test catches that.
    - Tier 1 only: `role` (one line), `startingGear`, and `unlock: { type: 'base' | 'renown', order }`.
    - `ai`: how automatic battles play it (`script`, `ranged`, `keep`, `melee`, `healer`; see
      `SCHEMAS.job.ai` in `vocab.js`).
+   - `builds`: two suggested builds, `{ key, name, desc, steps }`, that players can pick so skill
+     points are spent for them (`run/builds.js`). `steps` is the spending order: `'skill'` learns
+     it, `'skill+'` upgrades it one rank. A Tier 2 build may use its Tier 1 class's skills. Name at
+     most one reaction, support and movement skill per build (each one takes its slot). Skills a
+     build leaves out are bought after it. `key` is saved in runs, so don't rename it.
 3. In `abilities`, define each ability its tree learns that isn't defined elsewhere. Abilities
    are shared by key, so a class can learn another file's ability, and enemies and items can use
    this class's.

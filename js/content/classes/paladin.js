@@ -17,6 +17,18 @@ export const job = {
         retribution: { sp: 1, requires: 'smite' },
         divine_ward: { sp: 2, requires: 'smite' },
     },
+    builds: [
+        {
+            key: 'tank', name: 'Retaliation Tank',
+            desc: 'Hold the front line: Divine Ward cuts the physical damage you take, and Retribution answers attackers next to you with a Smite. Each Smite upgrade lowers its MP cost and makes those counters hit harder.',
+            steps: ['divine_ward', 'retribution', 'smite+', 'retribution+', 'smite+', 'heal', 'retribution+'],
+        },
+        {
+            key: 'healer', name: 'Healer',
+            desc: 'Heal from the front line: Heal restores a solid amount of HP, and Guardian Ward (from the Warden) heals allies next to you on its own when they\'re hit. Smite is there when you need to hit back.',
+            steps: ['heal', 'guardian_ward', 'heal+', 'heal+', 'smite+', 'divine_ward', 'guardian_ward+'],
+        },
+    ],
     spriteKey: 'knight',
     char: 'P', color: '#ffee88',
     schools: ['evocation', 'abjuration'],

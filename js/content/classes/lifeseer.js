@@ -17,6 +17,18 @@ export const job = {
         second_sight: { sp: 1, requires: 'foresight_heal' },
         providence: { sp: 2, requires: 'foresight_heal' },
     },
+    builds: [
+        {
+            key: 'healer', name: 'Healer',
+            desc: 'The strongest heals in the game: Foresight Heal for one ally and Mass Foresight for a group. Swiftcast (from the Seer) makes Mass Foresight land in half the time.',
+            steps: ['foresight_heal+', 'renewing_light', 'mass_foresight', 'swiftcast', 'foresight_heal+', 'mass_foresight+', 'mass_foresight+'],
+        },
+        {
+            key: 'regen', name: 'Regen & Survival',
+            desc: 'Heal steadily and refuse to fall: Renewing Light heals an ally a little every turn, cheap enough to keep up on the whole party. Second Sight and Providence keep you alive when enemies go for the healer.',
+            steps: ['renewing_light', 'second_sight', 'providence', 'renewing_light+', 'foresight_heal+', 'renewing_light+', 'mass_foresight'],
+        },
+    ],
     spriteKey: 'npc_ally',
     char: 'L', color: '#aaddff',
     schools: ['abjuration', 'divination'],

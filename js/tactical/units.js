@@ -1,4 +1,4 @@
-import { JOB_STATS, ABILITIES, BASE_CRIT } from './data-registry.js';
+import { JOB_STATS, ABILITIES, BASE_CRIT, BASE_MP_REGEN } from './data-registry.js';
 import { buildLoadout, scaledLoadout, isPartyMember, levelStatMods } from './loadout.js';
 import { viewState } from './view-state.js';
 
@@ -45,6 +45,8 @@ export function createUnit(name, job, team, x, y, { statMods = {}, extraAbilitie
         eva:  base.eva  + mod('eva'),
         // Critical hit chance in percent (see critChance in abilities.js).
         crit: (base.crit ?? BASE_CRIT) + mod('crit'),
+        // MP recovered at the start of each turn (battle.js startTurn). Gear can raise it.
+        mpRegen: maxMp > 0 ? Math.max(0, BASE_MP_REGEN + mod('mpRegen')) : 0,
         ct,
         char: base.char,
         color: base.color,

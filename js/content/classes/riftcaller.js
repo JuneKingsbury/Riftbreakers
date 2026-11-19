@@ -18,6 +18,18 @@ export const job = {
         phase_shift: { sp: 1, requires: 'rift_bolt' },
         spell_pierce: { sp: 2, requires: 'rift_bolt' },
     },
+    builds: [
+        {
+            key: 'area', name: 'Area Damage',
+            desc: 'Blast big groups from range: Void Burst hits a wide area after a long charge, and Gravity Well slows everything it hits so they can\'t get out of the way. Spell Pierce helps every spell past magic defense.',
+            steps: ['void_burst', 'spell_pierce', 'void_burst+', 'gravity_well', 'void_burst+', 'gravity_well+', 'phase_shift'],
+        },
+        {
+            key: 'single', name: 'Single Target',
+            desc: 'Pick enemies off from 5 tiles away with Rift Bolt, and save Flare (from the Evoker) for anything tough. Phase Shift teleports you away when something reaches you.',
+            steps: ['rift_bolt+', 'phase_shift', 'spell_pierce', 'rift_bolt+', 'flare', 'flare+', 'phase_shift+'],
+        },
+    ],
     spriteKey: 'spell_wraith',
     char: 'R', color: '#55aaff',
     schools: ['evocation', 'conjuration'],

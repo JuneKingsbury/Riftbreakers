@@ -35,6 +35,8 @@ export const ABILITIES = buildTable(ABILITY_DATA, ABILITY_TEMPLATES);
 
 // Every unit's critical hit chance, in percent, before gear (see critChance in abilities.js).
 export const BASE_CRIT = 5;
+// MP every unit with an MP pool recovers at the start of each of its turns, before gear.
+export const BASE_MP_REGEN = 3;
 
 // ---- Skill ranks ----
 // Learned action skills and reactions can be upgraded to rank II and III with skill
@@ -92,7 +94,8 @@ function rankedEntry(ab, rank) {
     if (ab.basePower) out.basePower = Math.round(ab.basePower * (1 + 0.2 * step) * 100) / 100;
     if (ab.mpCost) out.mpCost = Math.max(1, Math.round(ab.mpCost * (1 - 0.15 * step)));
     if (ab.chance != null) out.chance = Math.min(1, ab.chance + 0.1 * step);
-    if (ab.applyStatus && ab.statusDuration && rank === MAX_RANK) out.statusDuration = ab.statusDuration + 1;
+    // Rank III makes the status last a turn longer, except Doom, where longer would be worse.
+    if (ab.applyStatus && ab.statusDuration && rank === MAX_RANK && ab.applyStatus !== 'doom') out.statusDuration = ab.statusDuration + 1;
     if (ab.buffs) out.buffs = ab.buffs.map(b => ({ ...b, value: Math.round(b.value * (1 + 0.25 * step)) || b.value }));
     if (ab.descTemplate) out.desc = fillDesc(ab.descTemplate, out);
     return out;

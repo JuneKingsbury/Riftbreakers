@@ -32,11 +32,11 @@ export const items = {
     runic_crossbow:       { name: 'Runic Crossbow',        slot: 'weapon', type: 'crossbow',     atk: 14, mat:  3, rarity: 'rare' },
     runic_wand:           { name: 'Runic Wand',            slot: 'weapon', type: 'magic',        mat: 10, maxMp: 8, rarity: 'uncommon', grants: ['mirror_ward'] },
     frostfang_wand:       { name: 'Frostfang Wand',        slot: 'weapon', type: 'magic',        mat: 12, maxMp: 10, rarity: 'uncommon' },
-    crystal_staff:        { name: 'Crystal Staff',         slot: 'weapon', type: 'magic',        mat: 13, mdf:  3, maxMp: 12, rarity: 'uncommon' },
-    void_staff:           { name: 'Void Staff',            slot: 'weapon', type: 'magic',        mat: 15, mdf:  4, maxMp: 16, rarity: 'rare' },
+    crystal_staff:        { name: 'Crystal Staff',         slot: 'weapon', type: 'magic',        mat: 13, mdf:  3, maxMp: 12, mpRegen: 1, rarity: 'uncommon' },
+    void_staff:           { name: 'Void Staff',            slot: 'weapon', type: 'magic',        mat: 15, mdf:  4, maxMp: 16, mpRegen: 2, rarity: 'rare' },
     ashen_staff:          { name: 'Ashen Staff',           slot: 'weapon', type: 'magic',        mat: 14, atk:  4, maxMp: 10, rarity: 'uncommon' },
     heartwood_staff:      { name: 'Heartwood Staff',       slot: 'weapon', type: 'magic',        mat: 12, mdf:  5, maxMp: 14, rarity: 'uncommon', grants: ['spore_cloud'] },
-    staff_of_regrowth:    { name: 'Staff of Regrowth',     slot: 'weapon', type: 'magic',        mat: 11, mdf:  6, maxMp: 16, rarity: 'uncommon', grants: ['purify'] },
+    staff_of_regrowth:    { name: 'Staff of Regrowth',     slot: 'weapon', type: 'magic',        mat: 11, mdf:  6, maxMp: 16, mpRegen: 1, rarity: 'uncommon', grants: ['purify'] },
     staff_of_distortion:  { name: 'Staff of Distortion',   slot: 'weapon', type: 'magic',        mat: 14, spd:  1, maxMp: 12, crit: 6, rarity: 'rare', grants: ['unravel'] },
     soulbond_scepter:     { name: 'Soulbond Scepter',      slot: 'weapon', type: 'magic',        mat: 13, mdf:  5, maxHp: 10, maxMp: 10, rarity: 'rare', grants: ['bind_will'] },
 
@@ -53,5 +53,5 @@ export const items = {
     abyssal_piercer:      { name: 'Abyssal Piercer',       slot: 'weapon', type: 'heavy_weapon', atk: 14, eva:  2, move: 1, crit: 8, rarity: 'rare' },
     abyssal_longbow:      { name: 'Abyssal Longbow',       slot: 'weapon', type: 'bow',          atk: 15, move: 1, rarity: 'rare' },
     void_recurve:         { name: 'Void Recurve',          slot: 'weapon', type: 'bow',          atk: 13, eva:  3, spd:  1, crit: 8, rarity: 'rare', grantsPassive: ['concentrate'] },
-    abyssal_staff:        { name: 'Abyssal Staff',         slot: 'weapon', type: 'magic',        mat: 18, mdf:  5, maxMp: 18, rarity: 'legendary', grants: ['gravity_well'], grantsPassive: ['mana_surge'] },
+    abyssal_staff:        { name: 'Abyssal Staff',         slot: 'weapon', type: 'magic',        mat: 18, mdf:  5, maxMp: 18, mpRegen: 3, rarity: 'legendary', grants: ['gravity_well'], grantsPassive: ['mana_surge'] },
 };

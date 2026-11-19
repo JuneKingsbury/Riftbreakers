@@ -61,7 +61,7 @@ export function itemLabel(key) {
 export function itemStats(key) {
     const item = EQUIPMENT[key];
     if (!item) return '';
-    const label = { maxHp: 'HP', maxMp: 'MP' };
+    const label = { maxHp: 'HP', maxMp: 'MP', mpRegen: 'MP/turn' };
     return EQUIP_STAT_KEYS.filter(s => item[s])
         .map(s => `${(label[s] || s).toUpperCase()} ${item[s] > 0 ? '+' : ''}${item[s]}`).join(', ');
 }

@@ -131,7 +131,8 @@ function swapPlaces(a, b) {
 // longer duration wins. Returns true if the status was applied or refreshed.
 export function inflictStatus(target, status, duration, source = null) {
     if (supportOf(target)?.statusImmune?.includes(status)) return false;
-    const dur = duration + (supportOf(source)?.statusDurationBonus ?? 0);
+    // Status duration bonuses (Wyrd Drain, Deep Dreams, Virulence) don't delay Doom.
+    const dur = duration + (status === 'doom' ? 0 : supportOf(source)?.statusDurationBonus ?? 0);
     target.statusTimers = target.statusTimers || {};
     const fresh = !target.status.includes(status);
     if (!fresh && dur <= (target.statusTimers[status] ?? 0)) return false;
