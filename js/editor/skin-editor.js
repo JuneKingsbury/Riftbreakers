@@ -20,15 +20,47 @@ function enemyByKey() {
     return enemyIndex;
 }
 
-function gameItemEntries(category) {
-    return Object.entries(EQUIPMENT)
+// Palette entries whose saved art is byte-identical to another's in the same list, so sprites
+// still copied from another (a new item or enemy started from the closest existing one) stand
+// out as needing art of their own. Returns entry -> { data, same: [labels of the others] }.
+function sameArtIndex(entries, savedSprites) {
+    const artOf = (e) => savedSprites[`${e.category}:${e.key}`]?.data;
+    const byArt = new Map();
+    for (const e of entries) {
+        const data = artOf(e);
+        if (data) byArt.set(data, [...(byArt.get(data) ?? []), e]);
+    }
+    return (e) => {
+        const data = artOf(e);
+        return { data, same: data ? byArt.get(data).filter(o => o !== e).map(o => o.label) : [] };
+    };
+}
+
+// The palette badge and description suffix for an entry's sameArtIndex() result.
+function sameArtNote({ data, same }) {
+    if (!data) return { badge: { text: 'none', color: '#f55' }, text: '' };
+    if (!same.length) return { badge: null, text: '' };
+    const names = same.slice(0, 6).join(', ') + (same.length > 6 ? ` and ${same.length - 6} more` : '');
+    return { badge: { text: `×${same.length + 1}`, color: '#fa0' }, text: ` Same art as: ${names}.` };
+}
+
+// The game's items for the Items or Equipment Worn tab, flagged where two share a sprite.
+function gameItemEntries(category, savedSprites) {
+    const entries = Object.entries(EQUIPMENT)
         .filter(([, def]) => category === 'items' || WORN_SLOTS.has(def.slot))
         .map(([key, def]) => {
             const look = ITEM_CHARS[def.slot] ?? ITEM_CHARS.trinket;
             const what = SLOT_LABEL[def.slot] ?? def.slot;
-            return { key, char: look.char, color: look.color, category,
-                desc: `${category === 'items' ? what : 'Worn ' + what.toLowerCase()}: ${def.name}` };
+            return { key, label: def.name, char: look.char, color: look.color, category,
+                desc: `${category === 'items' ? what : 'Worn ' + what.toLowerCase()}: ${def.name}.` };
         });
+    const art = sameArtIndex(entries, savedSprites);
+    for (const e of entries) {
+        const note = sameArtNote(art(e));
+        e.badge = note.badge;
+        e.desc += note.badge?.text === 'none' ? ' No sprite yet.' : note.text;
+    }
+    return entries;
 }
 
 // The colony builder's items (core/config.js) the tactical game doesn't use: the Legacy tab.
@@ -626,7 +658,7 @@ class SkinEditor {
                 items.push({ key: '__add_custom__', char: '+', color: '#888888', desc: 'Add custom sprite', category: 'entities', isAction: true, actionType: 'add-custom' });
                 break;
             case 'Items':
-                items.push(...gameItemEntries('items'));
+                items.push(...gameItemEntries('items', this.savedSprites));
                 for (const k of (this.customSprites['items'] || [])) {
                     items.push({ key: k, char: '?', color: '#aaaaaa', desc: k, category: 'items', isCustom: true });
                 }
@@ -636,21 +668,14 @@ class SkinEditor {
                 // One sprite per enemy (entities/enemy_<name>), listed from the encounters.
                 // Enemies whose art is still identical to another's are flagged, so it's easy
                 // to see which ones still need art of their own.
-                const enemies = listEnemies();
-                const byArt = new Map();
+                const enemies = listEnemies().map(e => ({ ...e, label: e.name, category: 'entities' }));
+                const art = sameArtIndex(enemies, this.savedSprites);
                 for (const e of enemies) {
-                    const data = this.savedSprites[`entities:${e.key}`]?.data;
-                    if (data) byArt.set(data, [...(byArt.get(data) ?? []), e.name]);
-                }
-                for (const e of enemies) {
-                    const data = this.savedSprites[`entities:${e.key}`]?.data;
-                    const same = data ? byArt.get(data).filter(n => n !== e.name) : [];
+                    const note = sameArtNote(art(e));
                     const looks = e.looks.map(l => l.sprite + (l.tint ? ` tinted ${l.tint}` : '')).join(', ');
                     let desc = `${e.name} (${e.jobs.join(', ')}; ${e.fights} fight${e.fights === 1 ? '' : 's'}). Copied from: ${looks}.`;
-                    if (!data) desc += ' No sprite of its own yet: the game draws the copied-from sprite.';
-                    else if (same.length) desc += ` Same art as: ${same.slice(0, 6).join(', ')}${same.length > 6 ? ` and ${same.length - 6} more` : ''}.`;
-                    items.push({ key: e.key, label: e.name, char: '▲', color: '#ff5555', desc, category: 'entities',
-                        badge: !data ? { text: 'none', color: '#f55' } : same.length ? { text: `×${same.length + 1}`, color: '#fa0' } : null });
+                    desc += note.badge?.text === 'none' ? ' No sprite of its own yet: the game draws the copied-from sprite.' : note.text;
+                    items.push({ key: e.key, label: e.name, char: '▲', color: '#ff5555', desc, category: 'entities', badge: note.badge });
                 }
                 break;
             }
@@ -723,7 +748,7 @@ class SkinEditor {
                 items.push({ key: '__add_custom__', char: '+', color: '#888888', desc: 'Add custom sprite', category: 'overlays', isAction: true, actionType: 'add-custom' });
                 break;
             case 'Equipment Worn':
-                items.push(...gameItemEntries('equipment_worn'));
+                items.push(...gameItemEntries('equipment_worn', this.savedSprites));
                 for (const k of (this.customSprites['equipment_worn'] || [])) {
                     items.push({ key: k, char: '?', color: '#aaaaaa', desc: k, category: 'equipment_worn', isCustom: true });
                 }

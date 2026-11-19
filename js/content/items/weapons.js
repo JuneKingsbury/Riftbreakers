@@ -50,8 +50,16 @@ export const items = {
     void_edge:            { name: 'Void Edge',             slot: 'weapon', type: 'blade',        atk: 14, eva:  4, spd:  1, crit: 8, rarity: 'rare' },
     void_glaive:          { name: 'Void Glaive',           slot: 'weapon', type: 'blade',        atk: 13, mat:  4, move: 1, rarity: 'rare' },
     abyssal_greatsword:   { name: 'Abyssal Greatsword',    slot: 'weapon', type: 'heavy_weapon', atk: 21, def: -2, maxHp: 10, rarity: 'legendary', grantsPassive: ['bloodlust'] },
-    abyssal_piercer:      { name: 'Abyssal Piercer',       slot: 'weapon', type: 'heavy_weapon', atk: 14, eva:  2, move: 1, crit: 8, rarity: 'rare' },
+    abyssal_piercer:      { name: 'Abyssal Lance',         slot: 'weapon', type: 'heavy_weapon', atk: 14, eva:  2, move: 1, crit: 8, rarity: 'rare' },
     abyssal_longbow:      { name: 'Abyssal Longbow',       slot: 'weapon', type: 'bow',          atk: 15, move: 1, rarity: 'rare' },
     void_recurve:         { name: 'Void Recurve',          slot: 'weapon', type: 'bow',          atk: 13, eva:  3, spd:  1, crit: 8, rarity: 'rare', grantsPassive: ['concentrate'] },
     abyssal_staff:        { name: 'Abyssal Staff',         slot: 'weapon', type: 'magic',        mat: 18, mdf:  5, maxMp: 18, mpRegen: 3, rarity: 'legendary', grants: ['gravity_well'], grantsPassive: ['mana_surge'] },
+
+    short_sword:          { name: 'Short Sword',           slot: 'weapon', type: 'blade',        atk:  6, eva:  2 },
+    hunting_knife:        { name: 'Hunting Knife',         slot: 'weapon', type: 'blade',        atk:  5, eva:  3, crit: 4 },
+    oak_staff:            { name: 'Oak Staff',             slot: 'weapon', type: 'magic',        mat:  5, mdf:  1, maxMp: 6 },
+    bone_wand:            { name: 'Bone Wand',             slot: 'weapon', type: 'magic',        mat:  4, maxMp: 6 },
+    apprentice_rod:       { name: "Apprentice's Rod",      slot: 'weapon', type: 'magic',        mat:  4, mdf:  1, maxMp: 4 },
+    starfire_wand:        { name: 'Starfire Wand',         slot: 'weapon', type: 'magic',        mat: 15, maxMp: 12, crit: 6, rarity: 'rare' },
+    verdant_scepter:      { name: 'Verdant Scepter',       slot: 'weapon', type: 'magic',        mat: 13, mdf:  6, maxMp: 14, mpRegen: 2, rarity: 'rare' },
 };

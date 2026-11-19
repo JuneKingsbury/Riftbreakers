@@ -62,3 +62,17 @@ test('a class\'s builds are checked: two of them, skills from its trees, prerequ
     const jobs = { ...JOB_DATA, skyhunter: { ...JOB_DATA.skyhunter, builds: [{ ...JOB_DATA.skyhunter.builds[0], steps: ['concentrate', 'long_shot+'] }, JOB_DATA.skyhunter.builds[1]] } };
     assert.deepEqual(validateContent({ ...content(), jobs }).filter(e => e.startsWith('job skyhunter')), []);
 });
+
+// The game skin draws each item from its own PNGs (README: "Adding an item"): an items icon
+// for every item, and an equipment_worn sprite for the slots drawn on the character. A
+// missing one silently falls back to a text glyph, so it is caught here instead.
+test('every item has an icon in the game skin, and a worn sprite if its slot is drawn on the character', () => {
+    const icons = new Set(SKIN.sprites.items);
+    const worn = new Set(SKIN.sprites.equipment_worn);
+    const missing = [];
+    for (const [key, item] of Object.entries(EQUIPMENT)) {
+        if (!icons.has(key)) missing.push(`${key}: no items/${key}.png`);
+        if (['armor', 'helmet', 'weapon', 'tool'].includes(item.slot) && !worn.has(key)) missing.push(`${key}: no equipment_worn/${key}.png`);
+    }
+    assert.deepEqual(missing, [], `\n${missing.join('\n')}`);
+});

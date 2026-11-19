@@ -36,7 +36,7 @@ export const job = {
     char: 'J', color: '#aaccff',
     schools: ['conjuration'],
     desc: 'An archer who inscribes runes onto arrows to strike from afar. The Runebow mixes plain arrows with conjured magic shots and moves faster than most mages, but lacks raw magical punch.',
-    allowedEquipment: { armor: ['light'], helmet: ['light'], weapon: ['bow', 'crossbow'], tool: ['quiver', 'implement'] },
+    allowedEquipment: { armor: ['light'], helmet: ['light'], weapon: ['bow', 'crossbow'], tool: ['implement'] },
     role: 'Long-range archer',
     unlock: { type: 'base', order: 3 },
     startingGear: { armor: 'leather_jacket', helmet: 'leather_cap', weapon: 'short_bow', tool: 'hunters_quiver' },

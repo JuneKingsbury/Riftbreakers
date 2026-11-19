@@ -92,10 +92,10 @@ Set by the engine, not by content (except `defend`, which a reaction can grant w
 
 | Slot | Appearance field | Items |
 |---|---|---|
-| `armor` | `armorKey` | 34 |
-| `helmet` | `helmetKey` | 25 |
-| `weapon` | `weaponKey` | 49 |
-| `tool` | `toolKey` | 25 |
+| `armor` | `armorKey` | 54 |
+| `helmet` | `helmetKey` | 44 |
+| `weapon` | `weaponKey` | 56 |
+| `tool` | `toolKey` | 44 |
 | `boots` | `bootsKey` | 8 |
 | `trinket` | `trinketKey` | 16 |
 
@@ -111,8 +111,7 @@ Set by the engine, not by content (except `defend`, which a reaction can grant w
 | `bow` | weapon | Runebow | Bows. |
 | `crossbow` | weapon | Runebow | Crossbows. |
 | `shield` | tool | Warden, Warlord | Shields. |
-| `implement` | tool | Evoker, Spellblade, Warden, Runebow, Stoneshaper, Seer, Illusionist, Gravecaller, Alchemist, Warlord | Lanterns, orbs, tomes and other casting focuses. |
-| `quiver` | tool | Runebow | Quivers, for archers. |
+| `implement` | tool | Evoker, Spellblade, Warden, Runebow, Stoneshaper, Seer, Illusionist, Gravecaller, Alchemist, Warlord | Lanterns, orbs, quivers, banners and other focuses. Every class can use them. |
 | `offhand_weapon` | tool | Spellblade, Stoneshaper | A second, smaller weapon. |
 | `boots` | boots | everyone | Boots. Every class can wear them. |
 | `trinket` | trinket | everyone | Rings, charms and amulets. Every class can wear them. |
@@ -209,7 +208,7 @@ An item's `grants` takes action abilities (they join the wearer's skill list); `
 | `plague_flask` | Plague Flask | action | classes/plaguewright.js |  |
 | `pounce` | Pounce | action | enemies/beasts.js |  |
 | `primal_rage` | Primal Rage | action | abilities/unused.js |  |
-| `purify` | Purify | action | items/abilities.js | Staff of Regrowth |
+| `purify` | Purify | action | items/abilities.js | Staff of Regrowth, Warden's Censer |
 | `quicksilver` | Quicksilver | action | classes/alchemist.js |  |
 | `radiant_heal` | Radiant Heal | action | classes/sanctifier.js |  |
 | `raise_dead` | Raise Dead | action | classes/gravecaller.js |  |
@@ -278,13 +277,13 @@ An item's `grants` takes action abilities (they join the wearer's skill list); `
 |---|---|---|---|---|
 | `move_plus_2` | Beast Lope | movement | items/abilities.js | Void Longbow |
 | `blink` | Blink | movement | items/abilities.js | Void Crown |
-| `fleet_step` | Fleet Step | movement | classes/runebow.js |  |
+| `fleet_step` | Fleet Step | movement | classes/runebow.js | Nightstalker Leathers |
 | `force_leap` | Force Leap | movement | abilities/unused.js |  |
 | `ghost_step` | Ghost Step | movement | items/abilities.js | Cloak of Shadows |
 | `hallowed_step` | Hallowed Step | movement | abilities/unused.js |  |
 | `featherstep` | Levitate | movement | classes/seer.js |  |
 | `light_pack` | Light Pack | movement | classes/alchemist.js |  |
-| `mana_stride` | Mana Stride | movement | classes/evoker.js |  |
+| `mana_stride` | Mana Stride | movement | classes/evoker.js | Emberweave Robe |
 | `mirage_step` | Mirage Step | movement | classes/illusionist.js |  |
 | `momentum` | Momentum | movement | classes/spellblade.js | Shadowstrike Vest |
 | `move_plus_1` | Move +1 | movement | abilities/common.js | Bottomless Quiver |
@@ -296,19 +295,19 @@ An item's `grants` takes action abilities (they join the wearer's skill list); `
 | `stone_stride` | Stone Stride | movement | classes/stoneshaper.js |  |
 | `take_root` | Take Root | movement | items/abilities.js | Living Bark Armor |
 | `vanguard_step` | Vanguard Step | movement | classes/warlord.js |  |
-| `wraithwalk` | Wraithwalk | movement | classes/gravecaller.js |  |
+| `wraithwalk` | Wraithwalk | movement | classes/gravecaller.js | Mourning Shroud |
 | `aftershock` | Aftershock | reaction | classes/earthshaker.js |  |
 | `arcane_rebuke` | Arcane Rebuke | reaction | classes/battlemage.js |  |
 | `brace` | Brace | reaction | abilities/common.js | Parrying Dagger |
 | `call_of_the_pack` | Call of the Pack | reaction | items/abilities.js | Huntsman's Leathers |
-| `counter` | Counter | reaction | classes/spellblade.js |  |
+| `counter` | Counter | reaction | classes/spellblade.js | Abyssal Fang |
 | `death_ward` | Death Ward | reaction | classes/gravewarden.js |  |
 | `displacement` | Displacement | reaction | classes/illusionist.js |  |
 | `feral_counter` | Feral Counter | reaction | classes/beastcaller.js |  |
 | `flame_retort` | Flame Retort | reaction | classes/evoker.js |  |
-| `guardian_ward` | Guardian Ward | reaction | classes/warden.js |  |
-| `hold_the_line` | Hold the Line | reaction | classes/warlord.js |  |
-| `interpose` | Interpose | reaction | classes/marshal.js |  |
+| `guardian_ward` | Guardian Ward | reaction | classes/warden.js | Warden's Mail |
+| `hold_the_line` | Hold the Line | reaction | classes/warlord.js | Warlord's Helm |
+| `interpose` | Interpose | reaction | classes/marshal.js | Void Bulwark |
 | `karmic_rebound` | Karmic Rebound | reaction | classes/fatebinder.js |  |
 | `lingering_spite` | Lingering Spite | reaction | classes/gravecaller.js |  |
 | `lull` | Lull | reaction | classes/dreamweaver.js |  |
@@ -344,16 +343,16 @@ An item's `grants` takes action abilities (they join the wearer's skill list); `
 | `concentrate` | Concentrate | support | classes/runebow.js | Void Recurve |
 | `deep_dreams` | Deep Dreams | support | classes/dreamweaver.js |  |
 | `divine_ward` | Divine Ward | support | classes/paladin.js |  |
-| `eagle_eye` | Eagle Eye | support | classes/skyhunter.js |  |
+| `eagle_eye` | Eagle Eye | support | classes/skyhunter.js | Crown of the Hunt |
 | `earthen_footing` | Earthen Footing | support | classes/stoneshaper.js |  |
-| `farsight` | Farsight | support | items/abilities.js | Duelist's Silks |
-| `field_command` | Field Command | support | classes/warlord.js |  |
+| `farsight` | Farsight | support | items/abilities.js | Duelist's Silks, Hawkeye Visor |
+| `field_command` | Field Command | support | classes/warlord.js | Warlord's Banner |
 | `glamour` | Glamour | support | classes/illusionist.js |  |
 | `grave_legion` | Grave Legion | support | classes/gravewarden.js |  |
 | `relic_high_ground` | Hunter's Perch | support | relics.js |  |
 | `initiative` | Initiative | support | classes/tactician.js |  |
 | `iron_discipline` | Iron Discipline | support | classes/marshal.js |  |
-| `iron_will` | Iron Will | support | classes/warden.js |  |
+| `iron_will` | Iron Will | support | classes/warden.js | Ward of the Sentinel |
 | `lasting_images` | Lasting Images | support | classes/mirage_oracle.js |  |
 | `relic_lifesteal` | Leech Fang | support | relics.js |  |
 | `enemy_leeching` | Leeching | support | enemies/realm.js |  |
@@ -362,7 +361,7 @@ An item's `grants` takes action abilities (they join the wearer's skill list); `
 | `potent_brews` | Potent Brews | support | classes/alchemist.js |  |
 | `providence` | Providence | support | classes/lifeseer.js |  |
 | `jp_boost` | Quick Study | support | items/abilities.js | Scholar's Spectacles |
-| `regen_aura` | Regen Aura | support | classes/worldsinger.js |  |
+| `regen_aura` | Regen Aura | support | classes/worldsinger.js | Worldroot Mail |
 | `rune_edge` | Rune Edge | support | classes/spellblade.js | World Piercer |
 | `seismic_power` | Seismic Power | support | classes/earthshaker.js |  |
 | `enemy_slippery` | Slippery | support | enemies/realm.js |  |
@@ -371,7 +370,7 @@ An item's `grants` takes action abilities (they join the wearer's skill list); `
 | `spirit_pact` | Spirit Pact | support | classes/spiritbinder.js |  |
 | `enemy_spore_aura` | Spore Aura | support | enemies/realm.js |  |
 | `steady_hands` | Steady Hands | support | classes/field_surgeon.js |  |
-| `swiftcast` | Swiftcast | support | classes/seer.js |  |
+| `swiftcast` | Swiftcast | support | classes/seer.js | Dimensional Orb |
 | `unbreakable` | Unbreakable | support | classes/bastion.js |  |
 | `affix_undying` | Undying | support | affixes.js |  |
 | `enemy_unhushed` | Unhushed | support | enemies/realm.js |  |
@@ -559,8 +558,8 @@ Every field each kind of content may have. `validate.js` rejects anything else.
 | `builds[].name` * | string | Display name, e.g. Retaliation. |
 | `builds[].desc` * | string | One line on how the build plays. |
 | `builds[].steps` * | list of string | The order to spend skill points in: 'skill' learns it, 'skill+' upgrades it one rank. A Tier 2 build may use its Tier 1 class's skills. Skills a build leaves out are bought after it, in skill-tree order. |
-| `allowedEquipment` | { armor, helmet, weapon, tool, boots, trinket } → list of `cloth` / `light` / `medium` / `heavy` / `blade` / `heavy_weapon` / `magic` / `bow` / `crossbow` / `shield` / `implement` / `quiver` / `offhand_weapon` / `boots` / `trinket` | Equipment types per slot. Tier 2 classes inherit their Tier 1 class's. |
-| `equipmentExpansions` | { armor, helmet, weapon, tool, boots, trinket } → list of `cloth` / `light` / `medium` / `heavy` / `blade` / `heavy_weapon` / `magic` / `bow` / `crossbow` / `shield` / `implement` / `quiver` / `offhand_weapon` / `boots` / `trinket` | Types a Tier 2 class adds to the inherited list. |
+| `allowedEquipment` | { armor, helmet, weapon, tool, boots, trinket } → list of `cloth` / `light` / `medium` / `heavy` / `blade` / `heavy_weapon` / `magic` / `bow` / `crossbow` / `shield` / `implement` / `offhand_weapon` / `boots` / `trinket` | Equipment types per slot. Tier 2 classes inherit their Tier 1 class's. |
+| `equipmentExpansions` | { armor, helmet, weapon, tool, boots, trinket } → list of `cloth` / `light` / `medium` / `heavy` / `blade` / `heavy_weapon` / `magic` / `bow` / `crossbow` / `shield` / `implement` / `offhand_weapon` / `boots` / `trinket` | Types a Tier 2 class adds to the inherited list. |
 | `startingGear` | { armor, helmet, weapon, tool, boots, trinket } → item key | Tier 1: what a new member carries. |
 | `unlock` | { type, order } | Tier 1: how the class becomes a starting pick. |
 | `unlock.type` * | `base` / `renown` | base: open from the start. renown: bought in Unlocks (each class bought makes the next dearer). |
@@ -587,7 +586,7 @@ Every field each kind of content may have. `validate.js` rejects anything else.
 |---|---|---|
 | `name` * | string | Display name. |
 | `slot` * | `armor` / `helmet` / `weapon` / `tool` / `boots` / `trinket` | Slot it goes in. |
-| `type` * | `cloth` / `light` / `medium` / `heavy` / `blade` / `heavy_weapon` / `magic` / `bow` / `crossbow` / `shield` / `implement` / `quiver` / `offhand_weapon` / `boots` / `trinket` | Equipment type; classes restrict which types they wear. |
+| `type` * | `cloth` / `light` / `medium` / `heavy` / `blade` / `heavy_weapon` / `magic` / `bow` / `crossbow` / `shield` / `implement` / `offhand_weapon` / `boots` / `trinket` | Equipment type; classes restrict which types they wear. |
 | `rarity` | `common` / `uncommon` / `rare` / `legendary` | Loot and shop pool. Default common. Legendary never sells in shops. |
 | `featOnly` | bool | Only drops once earned in Feats. |
 | `grants` | list of ability key | Action abilities usable while worn. |
@@ -918,4 +917,4 @@ Every field each kind of content may have. `validate.js` rejects anything else.
 | Hulking | 1, 2, 3, 4 | +40% max HP and +2 DEF, but -1 SPD. |
 | Splitting | 2, 3, 4 | When knocked out, it breaks into two weaker copies of itself (35% of its max HP, 70% of its power) that fight on. |
 
-Items: 157. Abilities: 247. Events: 62 (44 realm events).
+Items: 222. Abilities: 247. Events: 62 (44 realm events).
