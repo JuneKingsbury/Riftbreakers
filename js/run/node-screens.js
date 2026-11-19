@@ -1,6 +1,9 @@
 // The screen for whatever the run has pending at the current node: the battle
 // briefing, rewards, shop, event, rest site, treasure, recruits, and the end of
 // the run. Every action goes through RunState; `hooks` tell the scene what to do next.
+import { canOfferEquip, autoEquip } from './equip-options.js';
+import { autoEquipEnabled, setGameSetting } from './game-settings.js';
+import { showEquipPicker } from '../ui/equip-picker.js';
 import { RELICS } from './data/relics.js';
 import { runWon } from './profile.js';
 import { AFFIXES, knownAffixes, affixedName } from './data/affixes.js';
@@ -78,6 +81,67 @@ export class NodeScreens {
             if (sfx) Sound.playSfx(sfx);
         }
         this.show();
+    }
+
+    // After the party gains an item: with auto-equip on (Settings, or the Equipment screen), hand
+    // it to whoever it's the biggest strict upgrade for, and pass along anything that displaces
+    // (see autoEquip). What happened is kept on `holder` (the reward, shop entry or event) so the
+    // screen can say so instead of offering "Equip now".
+    _gained(holder, key) {
+        if (!holder || !autoEquipEnabled()) return;
+        const moves = autoEquip(this.run, key);
+        if (!moves.length) return;
+        holder.autoEquipped = moves;
+        Sound.playSfx('equip');
+    }
+
+    // "Equipped to Isolde (Warden). Isolde's Wooden Wand → Quill (Evoker)."
+    _autoEquipNote(moves) {
+        const who = (m) => `<span style="color:#cfe;">${esc(m.name)}</span> (${esc(jobLabel(m.job))})`;
+        let text = `✓ Equipped to ${who(moves[0])}.`;
+        for (let i = 1; i < moves.length; i++) {
+            const from = moves[i - 1].name, item = EQUIPMENT[moves[i].key]?.name ?? moves[i].key;
+            text += ` ${esc(from)}'s ${esc(item)} → ${moves[i].name ? who(moves[i]) : 'the bag'}.`;
+        }
+        return `<div style="flex:1;color:#afa;font-size:11px;line-height:1.5;padding:6px 8px;border:1px solid #3a5a3a;border-radius:4px;background:#0e180e;">${text}</div>`;
+    }
+
+    // The auto-equip switch beside "Equip now" (the same setting as in Settings). Switching it
+    // on also hands out this item right away. `holder` is remembered per render for _wireEquip.
+    _autoToggle(key, holder) {
+        const on = autoEquipEnabled();
+        const i = (this._holders ??= []).push({ key, holder }) - 1;
+        return `<button data-auto-toggle="${i}" title="Auto-equip: give each new item to whoever it's a clear upgrade for. Also in Settings."
+            style="${BTN}width:auto;flex-shrink:0;margin:0;padding:6px 10px;font-size:11px;white-space:nowrap;${on ? 'color:#afa;border-color:#4a8;' : 'color:#99a;'}">Auto-equip: ${on ? 'On' : 'Off'}</button>`;
+    }
+
+    // "Equip now" for an item the party just got (see ui/equip-picker.js), or what auto-equip
+    // did with it. Nothing when it's no longer in the bag or no one can wear it. Wire the
+    // button with _wireEquip.
+    _equipButton(key, holder = null) {
+        const row = (inner) => `<div style="display:flex;gap:6px;align-items:stretch;margin:-2px 0 8px;">${inner}${this._autoToggle(key, holder)}</div>`;
+        if (holder?.autoEquipped?.length && holder.autoEquipped[0].key === key) return row(this._autoEquipNote(holder.autoEquipped));
+        if (!canOfferEquip(this.run, key)) return '';
+        return row(`<button data-equip-now="${esc(key)}" style="${BTN}${BTN_GOOD}flex:1;margin:0;text-align:center;">⚔ Equip ${esc(EQUIPMENT[key].name)} now…</button>`);
+    }
+
+    _wireEquip(on) {
+        const holders = this._holders ?? [];
+        this._holders = [];   // the next render numbers its own
+        on('[data-equip-now]', (el) => showEquipPicker(this.modal, this.run, el.dataset.equipNow, {
+            skin: this.skin,
+            onDone: (equipped) => { if (equipped) this.hooks.changed(); this.show(); },
+        }));
+        on('[data-auto-toggle]', (el) => {
+            const turnOn = !autoEquipEnabled();
+            setGameSetting('autoEquip', turnOn);
+            const h = holders[Number(el.dataset.autoToggle)];
+            if (turnOn && h?.holder && !h.holder.autoEquipped) {
+                this._gained(h.holder, h.key);
+                if (h.holder.autoEquipped) this.hooks.changed();
+            }
+            this.show();
+        });
     }
 
     _partyButton() {
@@ -159,6 +223,7 @@ export class NodeScreens {
                     ${takenTag(taken, k)}
                 </button>`;
             }
+            if (typeof taken === 'string') html += this._equipButton(taken, p);
         }
         if (p.relics.length) {
             if (p.relicPick) {
@@ -183,7 +248,13 @@ export class NodeScreens {
             <button data-continue style="${BTN}${BTN_GOOD}text-align:center;">Continue ›</button>`;
         this._show(html, (on) => {
             this._wireParty(on);
-            on('[data-item]', (el) => this._act(run.claimRewardItem(el.dataset.item), 'loot'));
+            this._wireEquip(on);
+            on('[data-item]', (el) => {
+                const key = el.dataset.item;
+                const ok = run.claimRewardItem(key);
+                if (ok) this._gained(p, key);
+                this._act(ok, 'loot');
+            });
             on('[data-relic]', (el) => this._act(run.claimRewardRelic(el.dataset.relic), 'loot'));
             on('[data-continue]', () => {
                 const unclaimed = (!p.itemClaimed && p.items.length) || (p.relicPick && !p.relicClaimed && p.relics.length);
@@ -209,6 +280,7 @@ export class NodeScreens {
                 <br><span style="color:#667;font-size:10px;">${users.length ? esc(users.join(', ')) : 'No one can use this'}</span></span>
                 <span style="color:#fd8;">${e.sold ? 'SOLD' : `${e.price}g`}</span>
             </button>`;
+            if (e.sold) html += this._equipButton(e.key, e);
         });
         if (p.relic) {
             html += SECTION('Relic');
@@ -231,7 +303,13 @@ export class NodeScreens {
             <button data-continue style="${BTN}${BTN_GOOD}text-align:center;">Leave shop ›</button>`;
         this._show(html, (on) => {
             this._wireParty(on);
-            on('[data-buy]', (el) => this._act(run.buy(Number(el.dataset.buy)), 'loot'));
+            this._wireEquip(on);
+            on('[data-buy]', (el) => {
+                const entry = p.stock[Number(el.dataset.buy)];
+                const ok = run.buy(Number(el.dataset.buy));
+                if (ok) this._gained(entry, entry.key);
+                this._act(ok, 'loot');
+            });
             on('[data-relic]', () => this._act(run.buyRelic(), 'loot'));
             on('[data-sell]', (el) => this._act(run.sell(el.dataset.sell), 'loot'));
             on('[data-restock]', () => this._act(run.restockShop(), 'loot'));
@@ -248,6 +326,7 @@ export class NodeScreens {
         html += `<div style="color:#ccc;line-height:1.7;margin-bottom:12px;padding:10px 12px;background:#0a0a1a;border-left:2px solid #447;">${esc(ev.text)}</div>`;
         if (p.resolved) {
             html += `<div style="color:#dda;line-height:1.7;margin-bottom:12px;">${esc(p.result)}</div>`;
+            html += this._equipButton(p.itemGained, p);
             if (run.party.some(m => m.hp != null)) {
                 html += `<div style="color:#f99;font-size:11px;margin-bottom:10px;">Your wounds last until your next victory or rest.</div>`;
             }
@@ -259,10 +338,12 @@ export class NodeScreens {
             });
         }
         this._show(html, (on) => {
+            this._wireEquip(on);
             on('[data-choice]', (el) => {
                 const res = run.chooseEvent(Number(el.dataset.choice));
                 if (res) Sound.playSfx('event');
                 if (!res) return;
+                if (p.itemGained) this._gained(p, p.itemGained);
                 this.hooks.changed();
                 if (res.next) this._eventFollowUp(ev, res);
                 else this.show();
@@ -296,21 +377,29 @@ export class NodeScreens {
         const xp = run.options.enchantXp ?? (run.options.trainXp ? 25 : 0);
         html += SECTION(`Enchant: one item gains a level, up to +${MAX_ENCHANT}${xp ? `. Everyone gains ${xp} XP` : ''}`);
         const choices = [];
-        const itemRow = (key, where, owner) => {
+        // Each row says who wears the item (and their class), so it's easy to see which enchant
+        // helps someone right away. Worn gear comes first, by member; then the bag.
+        const itemRow = (key, where, wearer) => {
             const i = choices.push(where) - 1;
             const ok = canEnchant(key);
+            const tag = wearer
+                ? `<span style="color:#9df;font-size:10px;white-space:nowrap;">Worn by <span style="color:${wearer.appearance?.nameColor || '#cfe'};">${esc(wearer.name)}</span> (${esc(jobLabel(wearer.job))})</span>`
+                : `<span style="color:#777;font-size:10px;white-space:nowrap;">In the bag</span>`;
             return `<button data-enchant="${i}" ${ok ? '' : 'disabled'} style="${BTN}display:flex;gap:8px;align-items:center;${ok ? '' : BTN_DISABLED}">${itemIconHtml(key)}
-                <span style="flex:1;">${itemTitle(key)}${owner ? ` <span style="color:#777;font-size:10px;">· ${esc(owner)}</span>` : ''}<br>
-                <span style="color:${ok ? '#d9a6ff' : '#666'};font-size:10px;">${ok ? esc(enchantPreview(key)) : `+${MAX_ENCHANT} (max)`}</span></span></button>`;
+                <span style="flex:1;">${itemTitle(key)}<br>
+                <span style="color:${ok ? '#d9a6ff' : '#666'};font-size:10px;">${ok ? esc(enchantPreview(key)) : `+${MAX_ENCHANT} (max)`}</span></span>
+                ${tag}</button>`;
         };
         let rows = '';
         for (const m of run.party) {
             for (const field of EQUIP_FIELDS) {
                 const key = m.appearance?.[field];
-                if (key && EQUIPMENT[key]) rows += itemRow(key, { member: m.name, field }, m.name);
+                if (key && EQUIPMENT[key]) rows += itemRow(key, { member: m.name, field }, m);
             }
         }
-        for (const key of Object.keys(run.inventory)) if (EQUIPMENT[key]) rows += itemRow(key, { item: key }, 'in the bag');
+        const bagKeys = Object.keys(run.inventory).filter(k => EQUIPMENT[k]);
+        if (bagKeys.length && rows) rows += `<div style="color:#777;font-size:10px;text-transform:uppercase;margin:6px 0 3px;">In the bag</div>`;
+        for (const key of bagKeys) rows += itemRow(key, { item: key }, null);
         html += rows || `<div style="color:#777;font-size:11px;margin-bottom:6px;">Nothing to enchant yet.</div>`;
         const ready = run.party.filter(m => run.canPromote(m));
         if (ready.length) {

@@ -9,6 +9,7 @@
 import { Sound } from '../audio/sound.js';
 import { EQUIPMENT, EQUIP_FIELDS } from '../tactical/data/equipment.js';
 import { STATS, equipDelta, previewUnit } from './member-stats.js';
+import { autoEquipEnabled, setGameSetting } from './game-settings.js';
 import { EQUIP_SLOTS } from '../content/vocab.js';
 import { BTN, esc, jobLabel, titleCase, abilityName, itemTitle, itemSummary, itemIconHtml, portraitHtml, drawSprites, drawPortrait, FONT } from './ui-kit.js';
 
@@ -17,10 +18,13 @@ const fieldOf = (key) => `${EQUIPMENT[key]?.slot}Key`;
 const CHIP = `padding:3px 8px;font-family:${FONT};font-size:11px;border-radius:3px;cursor:pointer;width:auto;`;
 const UP = '#7e7', DOWN = '#f77';
 
-function deltaText(delta) {
+// Stat changes as colored text: "ATK +3 DEF −1". Shared with the equip picker.
+// unused: stats to show dimmed (ones the member's class doesn't use, see run/equip-options.js).
+export function deltaText(delta, unused = []) {
     const bits = STATS.filter(([s]) => delta[s]).map(([s, label]) => {
         const v = delta[s];
-        return `<span style="color:${v > 0 ? UP : DOWN};">${label} ${v > 0 ? '+' : '−'}${Math.abs(v)}</span>`;
+        const color = unused.includes(s) ? '#556' : v > 0 ? UP : DOWN;
+        return `<span style="color:${color};"${unused.includes(s) ? ' title="Not used by this class"' : ''}>${label} ${v > 0 ? '+' : '−'}${Math.abs(v)}</span>`;
     });
     return bits.length ? bits.join(' ') : '<span style="color:#667;">no stat change</span>';
 }
@@ -71,6 +75,8 @@ export class GearScreen {
 
         let html = `<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
             <div style="color:#ffcc44;font-weight:bold;font-size:15px;flex:1;">Equipment</div>
+            <label title="When the party gets an item, give it to whoever it's a clear upgrade for (nothing they use gets worse), and pass along what they took off. Also in Settings." style="display:flex;gap:5px;align-items:center;color:${autoEquipEnabled() ? '#afa' : '#99a'};font-size:11px;cursor:pointer;">
+                <input type="checkbox" data-gear-auto ${autoEquipEnabled() ? 'checked' : ''}> Auto-equip upgrades</label>
             <span style="color:#556;font-size:10px;">← → to switch</span></div>`;
 
         // Character tabs.
@@ -248,6 +254,7 @@ export class GearScreen {
     _wire(body, m) {
         const on = (sel, fn) => body.querySelectorAll(sel).forEach(el => el.addEventListener('click', () => fn(el)));
         on('[data-gear-member]', el => { this._name = el.dataset.gearMember; this._armed = null; this._render(); });
+        body.querySelector('[data-gear-auto]')?.addEventListener('change', (e) => { setGameSetting('autoEquip', e.target.checked); this._render(); });
         on('[data-gear-step]', el => this._step(Number(el.dataset.gearStep)));
         on('[data-gear-filter]', el => { this._filter = el.dataset.gearFilter || null; this._render(); });
         on('[data-gear-slot]', el => {

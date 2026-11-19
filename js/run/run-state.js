@@ -903,6 +903,7 @@ export class RunState {
         if (fx.goldLost) text += ' (Empty Purse: the gold slips away.)';
         this.pending.resolved = true;
         this.pending.result = text;
+        if (fx.item) this.pending.itemGained = fx.item;   // for the event screen's "Equip now"
         let next = null;
         if (effect?.battle) { this._startEventBattle(effect.battle); next = 'battle'; }
         return { text, next };

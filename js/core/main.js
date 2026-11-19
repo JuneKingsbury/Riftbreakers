@@ -63,10 +63,12 @@ document.addEventListener('DOMContentLoaded', () => {
             sfxVolume:   sliderValue('start-sfx-vol', 80),
             colorblindMode: document.getElementById('start-colorblind')?.value || 'none',
             tacticsLog: !!document.getElementById('start-tactics-log')?.checked,
+            autoEquip: !!document.getElementById('start-auto-equip')?.checked,
             backdrop: document.getElementById('start-backdrop')?.value || DEFAULT_BACKDROP,
             ...readPerfControls(),
         };
-        localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
+        // Merged into what's saved, so settings changed elsewhere (run/game-settings.js) survive.
+        localStorage.setItem(SETTINGS_KEY, JSON.stringify({ ...loadSettings(), ...s }));
         refreshPerfSettings();
         syncBatterySaverLock();
     }
@@ -126,6 +128,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         const tacticsLog = document.getElementById('start-tactics-log');
         if (tacticsLog) tacticsLog.checked = s.tacticsLog === true;
+        const autoEquip = document.getElementById('start-auto-equip');
+        if (autoEquip) autoEquip.checked = s.autoEquip === true;
         writePerfControls(s);
     }
     // The volume sliders drive the sound buses directly, so a change is heard at once.
@@ -192,7 +196,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (panel) panel.style.display = 'block';
         if (modalBackdrop) modalBackdrop.style.display = 'block';
     }
-    document.getElementById('start-settings')?.addEventListener('click', () => { fillBackdropSelect(); openModal(settingsPanel); });
+    // Re-read on opening: the Equipment screen can change auto-equip during a run.
+    document.getElementById('start-settings')?.addEventListener('click', () => {
+        const autoEquip = document.getElementById('start-auto-equip');
+        if (autoEquip) autoEquip.checked = loadSettings().autoEquip === true;
+        fillBackdropSelect();
+        openModal(settingsPanel);
+    });
     document.getElementById('start-backdrop')?.addEventListener('change', () => { saveSettings(); redrawBackdrop(); });
     document.getElementById('start-credits')?.addEventListener('click',  () => openModal(creditsPanel));
     document.querySelectorAll('[data-modal-close]').forEach(btn => {
