@@ -39,7 +39,7 @@ export const TILE_RENDER = {
     verdant_tile: { label: 'Verdant tiles', char: '_', color: '#74a987', tex: 'floors:verdant_floor', side: '#4a6a56' },
     crystal_floor: { label: 'Crystal floor', char: '_', color: '#8ab0d8', tex: 'floors:crystal_floor', tint: '#b8d8ff', side: '#5a7090' },
     abyss_tile: { label: 'Abyss stone', char: '_', color: '#412c4f', tex: 'floors:abyss_floor', side: '#2a1c34' },
-    glyph:   { label: 'Rift glyph', char: '_', color: '#c070d0', tex: 'floors:ritual_chalk', tint: '#e0a0ff', side: '#5a3a68' },
+    glyph:   { label: 'Rift glyph', char: '_', color: '#c070d0', tex: 'floors:ritual_chalk', side: '#5a3a68', sideTex: true  },
     // Walls
     wall:    { label: 'Rock wall',  char: '#', color: '#666677', tex: 'terrain:tall_rock', side: '#5a5a6a' },
     stone_wall: { label: 'Stone wall', char: '#', color: '#8a8a88', tex: 'buildings:stone_wall', side: '#6a6a6a', sideTex: true },
