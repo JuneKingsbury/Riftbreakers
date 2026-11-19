@@ -13,6 +13,7 @@ import { viewState } from './view-state.js';
 import { attachTouchGestures } from './touch-gestures.js';
 import { RealtimeBattle } from './realtime.js';
 import { isPortrait } from '../ui/layout.js';
+import { loadBattleSpeed, saveBattleSpeed } from './battle-speed.js';
 
 const SPEEDS = { '1': 1, '2': 2, '3': 4 };
 const BASE_MS_PER_STEP = 180;
@@ -44,7 +45,7 @@ export class BattleScene {
         // Camera from the deploy screen (BattleView3D.getCameraState), kept instead of reframing.
         this._cameraState        = opts.camera ?? null;
         this._paused             = false;
-        this._speed              = 1;
+        this._speed              = loadBattleSpeed();
         this._battle     = null;
         this._renderer   = null;
         this._ui         = null;
@@ -257,6 +258,7 @@ export class BattleScene {
         if (ctl === 'pause') this._paused = !this._paused;
         else if (ctl === 'speed' && value > 0) {
             this._speed = value;
+            saveBattleSpeed(value);
             this._applySpeed();
         }
     }
