@@ -102,7 +102,7 @@ export function itemRarity(key) {
 export function itemPrice(key) {
     const item = EQUIPMENT[key];
     if (!item) return 0;
-    const base = { common: 60, uncommon: 120, rare: 220 }[itemRarity(key)];
+    const base = { common: 60, uncommon: 120, rare: 220, legendary: 400 }[itemRarity(key)];
     // Each enchant level adds half the price again.
     return Math.round((base + ((item.grants || item.grantsPassive) ? 40 : 0)) * (1 + 0.5 * enchantLevel(key)));
 }

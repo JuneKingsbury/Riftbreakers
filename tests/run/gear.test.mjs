@@ -66,7 +66,7 @@ test('boots and trinkets fit every class, and their stats count like any other g
     assert.ok(run.equip(m.name, 'trinketKey', 'ember_sigil'));
     const after = previewUnit(run, m);
     assert.equal(after.move, before.move + 1);
-    assert.equal(after.spd, before.spd + 2);
+    assert.equal(after.spd, before.spd + 3);
     assert.equal(after.mat, before.mat + 6);
     assert.ok(!run.equip(m.name, 'trinketKey', 'leather_boots'), 'boots only go on feet');
 });

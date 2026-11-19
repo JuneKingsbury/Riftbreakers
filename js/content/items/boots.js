@@ -13,5 +13,5 @@ export const items = {
     runic_striders:       { name: 'Runic Striders',        slot: 'boots',  type: 'boots',  spd:  2, eva:  3, rarity: 'uncommon' },
     striders_greaves:     { name: "Strider's Greaves",     slot: 'boots',  type: 'boots',  spd:  1, def:  3, eva:  5, rarity: 'uncommon' },
     void_treads:          { name: 'Void Treads',           slot: 'boots',  type: 'boots',  move: 1, spd:  1, def:  3, rarity: 'rare' },
-    boots_of_haste:       { name: 'Boots of Haste',        slot: 'boots',  type: 'boots',  move: 1, spd:  2, rarity: 'rare' },
+    boots_of_haste:       { name: 'Boots of Haste',        slot: 'boots',  type: 'boots',  move: 1, spd:  3, eva:  3, rarity: 'legendary' },
 };

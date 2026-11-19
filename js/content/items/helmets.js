@@ -10,7 +10,7 @@ export const items = {
     runic_helm:           { name: 'Runic Helm',            slot: 'helmet', type: 'heavy',  def:  7, mdf:  3, maxHp: 8, rarity: 'uncommon' },
     runic_hood:           { name: 'Runic Hood',            slot: 'helmet', type: 'cloth',  def:  2, mdf:  6, maxMp: 10, rarity: 'uncommon' },
     mages_circlet:        { name: "Mage's Circlet",        slot: 'helmet', type: 'cloth',  mat:  4, mdf:  4, maxMp: 12, rarity: 'uncommon' },
-    void_crown:           { name: 'Void Crown',            slot: 'helmet', type: 'cloth',  mat:  7, mdf:  5, maxMp: 16, rarity: 'rare', grantsPassive: ['blink'] },
+    void_crown:           { name: 'Void Crown',            slot: 'helmet', type: 'cloth',  mat:  9, mdf:  6, maxMp: 18, rarity: 'legendary', grantsPassive: ['blink'] },
     mycelium_crown:       { name: 'Mycelium Crown',        slot: 'helmet', type: 'cloth',  mat:  5, mdf:  6, maxMp: 10, maxHp: 6, rarity: 'rare', grants: ['hexform'] },
     void_hunters_cowl:    { name: "Void Hunter's Cowl",    slot: 'helmet', type: 'light',  def:  3, eva:  6, spd:  1, rarity: 'uncommon' },
     sharpshooters_visor:  { name: "Sharpshooter's Visor",  slot: 'helmet', type: 'light',  atk:  3, eva:  4, rarity: 'uncommon' },
@@ -28,6 +28,6 @@ export const items = {
     void_sages_tiara:     { name: "Void Sage's Tiara",     slot: 'helmet', type: 'cloth',  mat:  6, mdf:  6, maxMp: 14, rarity: 'rare' },
     voidpulse_circlet:    { name: 'Voidpulse Circlet',     slot: 'helmet', type: 'cloth',  mat:  8, mdf:  3, maxMp: 10, rarity: 'rare' },
     void_dancers_mask:    { name: "Void Dancer's Mask",    slot: 'helmet', type: 'light',  def:  2, eva:  8, spd:  1, rarity: 'rare', grantsPassive: ['phase_shift'] },
-    commanders_crown:     { name: "Commander's Crown",     slot: 'helmet', type: 'medium', def:  4, mdf:  4, atk:  2, mat:  2, rarity: 'rare', grantsPassive: ['sentinel_step'] },
+    commanders_crown:     { name: "Commander's Crown",     slot: 'helmet', type: 'medium', def:  6, mdf:  5, atk:  3, mat:  3, maxHp: 8, rarity: 'legendary', grantsPassive: ['sentinel_step'] },
     abyss_wardens_helm:   { name: "Abyss Warden's Helm",   slot: 'helmet', type: 'heavy',  def:  8, mdf:  4, maxHp: 10, rarity: 'rare' },
 };

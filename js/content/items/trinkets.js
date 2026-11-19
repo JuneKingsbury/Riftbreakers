@@ -19,7 +19,7 @@ export const items = {
     strikers_band:        { name: "Striker's Band",        slot: 'trinket', type: 'trinket', atk:  3, crit: 5, rarity: 'uncommon' },
     ember_sigil:          { name: 'Ember Sigil',           slot: 'trinket', type: 'trinket', mat:  6, rarity: 'rare' },
     void_charm:           { name: 'Void Charm',            slot: 'trinket', type: 'trinket', atk:  5, def:  2, rarity: 'rare' },
-    bloodstone_pendant:   { name: 'Bloodstone Pendant',    slot: 'trinket', type: 'trinket', atk:  3, maxHp: 12, rarity: 'rare' },
+    bloodstone_pendant:   { name: 'Bloodstone Pendant',    slot: 'trinket', type: 'trinket', atk:  5, maxHp: 18, crit: 4, rarity: 'legendary' },
     // A Feats reward (profile COLLECTION_REWARDS): drops only once 66% of all items are found.
     jewelers_loupe:       { name: "Collector's Loupe",     slot: 'trinket', type: 'trinket', atk:  3, mat:  3, eva:  3, crit: 6, rarity: 'rare', featOnly: true },
 };

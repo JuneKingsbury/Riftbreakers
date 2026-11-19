@@ -49,12 +49,14 @@ export const MIN_START_PARTY = 1;
 
 const BATTLE_TYPES = { combat: 'normal', elite: 'elite', boss: 'boss' };
 
-// Item rarity weights for rewards and shop stock, by act and fight kind.
+// Item rarity weights for rewards and shop stock, by act and fight kind. Each reward choice
+// rolls separately. Legendary appears only in elite and boss rewards from act 2 on; shops use
+// the `normal` weights, so they never stock it.
 const ITEM_RARITY = {
-    1: { normal: { common: 70, uncommon: 28, rare: 2 },  elite: { common: 30, uncommon: 55, rare: 15 }, boss: { uncommon: 50, rare: 50 } },
-    2: { normal: { common: 35, uncommon: 55, rare: 10 }, elite: { common: 5, uncommon: 55, rare: 40 },  boss: { uncommon: 30, rare: 70 } },
-    3: { normal: { common: 10, uncommon: 55, rare: 35 }, elite: { uncommon: 35, rare: 65 },            boss: { rare: 100 } },
-    4: { normal: { uncommon: 40, rare: 60 },             elite: { uncommon: 15, rare: 85 },            boss: { rare: 100 } },
+    1: { normal: { common: 70, uncommon: 28, rare: 2 },  elite: { common: 30, uncommon: 55, rare: 15 },           boss: { uncommon: 50, rare: 50 } },
+    2: { normal: { common: 35, uncommon: 55, rare: 10 }, elite: { common: 5, uncommon: 55, rare: 40 },            boss: { uncommon: 30, rare: 68, legendary: 2 } },
+    3: { normal: { common: 10, uncommon: 55, rare: 35 }, elite: { uncommon: 35, rare: 64, legendary: 1 },        boss: { rare: 95, legendary: 5 } },
+    4: { normal: { uncommon: 40, rare: 60 },             elite: { uncommon: 15, rare: 83, legendary: 2 },        boss: { rare: 94, legendary: 6 } },
 };
 
 // ---- Rift Tiers (profile RIFT_TIERS) ----

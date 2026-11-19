@@ -116,7 +116,7 @@ Set by the engine, not by content (except `defend`, which a reaction can grant w
 | `boots` | boots | everyone | Boots. Every class can wear them. |
 | `trinket` | trinket | everyone | Rings, charms and amulets. Every class can wear them. |
 
-Rarities: `common`, `uncommon`, `rare`.
+Item rarities: `common`, `uncommon`, `rare`, `legendary`. Relic rarities: `common`, `uncommon`, `rare`.
 
 ## Abilities items can grant
 
@@ -325,7 +325,7 @@ An item's `grants` takes action abilities (they join the wearer's skill list); `
 | `void_siphon` | Void Siphon | reaction | items/abilities.js | Void Armor |
 | `arcane_weapon` | Arcane Weapon | support | classes/battlemage.js |  |
 | `benediction` | Benediction | support | classes/sanctifier.js |  |
-| `bloodlust` | Bloodlust | support | classes/beastcaller.js |  |
+| `bloodlust` | Bloodlust | support | classes/beastcaller.js | Abyssal Greatsword |
 | `concentrate` | Concentrate | support | classes/runebow.js | Void Recurve |
 | `deep_dreams` | Deep Dreams | support | classes/dreamweaver.js |  |
 | `divine_ward` | Divine Ward | support | classes/paladin.js |  |
@@ -339,13 +339,13 @@ An item's `grants` takes action abilities (they join the wearer's skill list); `
 | `iron_discipline` | Iron Discipline | support | classes/marshal.js |  |
 | `iron_will` | Iron Will | support | classes/warden.js |  |
 | `lasting_images` | Lasting Images | support | classes/mirage_oracle.js |  |
-| `mana_surge` | Mana Surge | support | classes/evoker.js |  |
+| `mana_surge` | Mana Surge | support | classes/evoker.js | Abyssal Staff |
 | `necrotic_power` | Necrotic Power | support | classes/lich.js |  |
 | `potent_brews` | Potent Brews | support | classes/alchemist.js |  |
 | `providence` | Providence | support | classes/lifeseer.js |  |
 | `jp_boost` | Quick Study | support | items/abilities.js | Scholar's Spectacles |
 | `regen_aura` | Regen Aura | support | classes/worldsinger.js |  |
-| `rune_edge` | Rune Edge | support | classes/spellblade.js |  |
+| `rune_edge` | Rune Edge | support | classes/spellblade.js | World Piercer |
 | `seismic_power` | Seismic Power | support | classes/earthshaker.js |  |
 | `soul_harvest` | Soul Harvest | support | classes/gravecaller.js |  |
 | `spell_pierce` | Spell Pierce | support | classes/riftcaller.js |  |
@@ -549,7 +549,7 @@ Every field each kind of content may have. `validate.js` rejects anything else.
 | `name` * | string | Display name. |
 | `slot` * | `armor` / `helmet` / `weapon` / `tool` / `boots` / `trinket` | Slot it goes in. |
 | `type` * | `cloth` / `light` / `medium` / `heavy` / `blade` / `heavy_weapon` / `magic` / `bow` / `crossbow` / `shield` / `implement` / `quiver` / `offhand_weapon` / `boots` / `trinket` | Equipment type; classes restrict which types they wear. |
-| `rarity` | `common` / `uncommon` / `rare` | Loot and shop pool. Default common. |
+| `rarity` | `common` / `uncommon` / `rare` / `legendary` | Loot and shop pool. Default common. Legendary never sells in shops. |
 | `featOnly` | bool | Only drops once earned in Feats. |
 | `grants` | list of ability key | Action abilities usable while worn. |
 | `grantsPassive` | list of ability key | Reaction, support or movement abilities always on while worn. |
@@ -601,7 +601,7 @@ Every field each kind of content may have. `validate.js` rejects anything else.
 | `choices[].effect.gold` | number | Gold gained (negative: spent). |
 | `choices[].effect.healPct` | number | Every member heals this fraction of max HP (negative: damage, never below 1 HP). |
 | `choices[].effect.xp` | number | XP for every member. |
-| `choices[].effect.item` | `common` / `uncommon` / `rare` | Rarity of a random item gained. |
+| `choices[].effect.item` | `common` / `uncommon` / `rare` / `legendary` | Rarity of a random item gained. |
 | `choices[].effect.relic` | `common` / `uncommon` / `rare` | Rarity of a random relic gained. |
 | `choices[].effect.loseItem` | bool | Lose a random unequipped item. |
 | `choices[].effect.memberStatMods` | { maxHp, maxMp, atk, def, mat, mdf, spd, move, eva, crit } → number | Permanent stat bonus for one random member ({name} in resultText). |
@@ -613,7 +613,7 @@ Every field each kind of content may have. `validate.js` rejects anything else.
 | `choices[].outcomes[].effect.gold` | number | Gold gained (negative: spent). |
 | `choices[].outcomes[].effect.healPct` | number | Every member heals this fraction of max HP (negative: damage, never below 1 HP). |
 | `choices[].outcomes[].effect.xp` | number | XP for every member. |
-| `choices[].outcomes[].effect.item` | `common` / `uncommon` / `rare` | Rarity of a random item gained. |
+| `choices[].outcomes[].effect.item` | `common` / `uncommon` / `rare` / `legendary` | Rarity of a random item gained. |
 | `choices[].outcomes[].effect.relic` | `common` / `uncommon` / `rare` | Rarity of a random relic gained. |
 | `choices[].outcomes[].effect.loseItem` | bool | Lose a random unequipped item. |
 | `choices[].outcomes[].effect.memberStatMods` | { maxHp, maxMp, atk, def, mat, mdf, spd, move, eva, crit } → number | Permanent stat bonus for one random member ({name} in resultText). |

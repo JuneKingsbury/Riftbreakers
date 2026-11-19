@@ -11,7 +11,7 @@ export const items = {
     iron_shield:          { name: 'Iron Shield',           slot: 'tool',   type: 'shield',         def:  7, eva:  3, grantsPassive: ['martyr'] },
     crystal_aegis:        { name: 'Crystal Aegis',         slot: 'tool',   type: 'shield',         def:  6, mdf:  7, rarity: 'rare', grants: ['aegis_ward'] },
     runic_buckler:        { name: 'Runic Buckler',         slot: 'tool',   type: 'shield',         def:  5, eva:  5, rarity: 'uncommon' },
-    aegis_of_the_vanguard:{ name: 'Aegis of the Vanguard', slot: 'tool',   type: 'shield',         def: 10, maxHp: 14, spd: -1, rarity: 'rare', grantsPassive: ['martyr'] },
+    aegis_of_the_vanguard:{ name: 'Aegis of the Vanguard', slot: 'tool',   type: 'shield',         def: 12, mdf:  4, maxHp: 18, rarity: 'legendary', grantsPassive: ['martyr'] },
     hunters_quiver:       { name: "Hunter's Quiver",       slot: 'tool',   type: 'quiver',         atk:  3 },
     bottomless_quiver:    { name: 'Bottomless Quiver',     slot: 'tool',   type: 'quiver',         atk:  5, move:  1, rarity: 'uncommon', grantsPassive: ['move_plus_1'] },
     void_hammer:          { name: 'Void Hammer',           slot: 'tool',   type: 'offhand_weapon', atk:  8, spd: -1, rarity: 'uncommon' },

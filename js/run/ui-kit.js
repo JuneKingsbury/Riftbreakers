@@ -22,7 +22,9 @@ export const BTN_DANGER = 'color:#f99;border-color:#744;';
 // Highlight for anything the player can act on now (e.g. unspent skill points).
 export const GLOW = 'box-shadow:0 0 7px rgba(110,255,110,0.55);border-color:#6f6;';
 
-export const RARITY_COLOR = { common: '#ccc', uncommon: '#7bf', rare: '#fc6' };
+export const RARITY_COLOR = { common: '#ccc', uncommon: '#7bf', rare: '#fc6', legendary: '#ff6a2b' };
+// Extra inline style per rarity, on top of its colour: legendary names smoulder.
+export const RARITY_STYLE = { legendary: 'text-shadow:0 0 5px rgba(255,80,20,0.75);font-weight:bold;' };
 
 export const NODE_INFO = {
     combat:   { label: 'Battle',   icon: '⚔', color: '#d66' },
@@ -80,7 +82,7 @@ export function itemTitle(key) {
     // Enchanted items get a violet "+N" after their rarity-coloured base name.
     const lv = item?.enchant || 0;
     const name = lv ? esc(itemLabel(key).replace(/ \+\d$/, '')) + ` <span style="color:#d9a6ff;font-weight:bold;">+${lv}</span>` : esc(itemLabel(key));
-    return `<span style="color:${RARITY_COLOR[rarity]};">${name}</span>`
+    return `<span style="color:${RARITY_COLOR[rarity]};${RARITY_STYLE[rarity] ?? ''}">${name}</span>`
         // Boots and trinkets have no sub-type, so just the slot ("boots", not "boots · Boots").
         + ` <span style="color:#667;font-size:10px;">${esc(item?.slot)}${item?.type && item.type !== item.slot ? ` · ${esc(titleCase(item.type))}` : ''}</span>`;
 }

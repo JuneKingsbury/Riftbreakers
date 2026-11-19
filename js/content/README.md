@@ -97,7 +97,10 @@ is also fielded in a fight.
 Add it to `items/<slot>.js`: `name`, `slot`, `type` (decides who can wear it), `rarity`, stat
 bonuses, and `grants` / `grantsPassive` for abilities. The item also needs an `items` icon in
 the skin, and an `equipment_worn` sprite for armor, helmets, weapons and tools.
-`CONTENT.md` lists which abilities can go in `grants` and `grantsPassive`. Optional `acts` and
+`CONTENT.md` lists which abilities can go in `grants` and `grantsPassive`.
+`rarity` is `common` (the default), `uncommon`, `rare` or `legendary`. Legendary is the top tier: it
+drops only from elite and boss rewards from act 2 on and is never sold, so keep it to a few items
+that clearly beat the best rare of their type. Optional `acts` and
 `realms` limit where it can drop or be sold (default: anywhere).
 
 ## Adding a relic or event

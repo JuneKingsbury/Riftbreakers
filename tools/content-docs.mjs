@@ -55,7 +55,7 @@ out.push('');
 table(['Type', 'Slots', 'Worn by (starting classes)', 'Meaning'], Object.entries(V.EQUIP_TYPES).map(([k, t]) => [code(k), t.slots.join(', '),
     ['boots', 'trinket'].includes(k) ? 'everyone' : Object.keys(JOB_DATA).filter(j => JOB_DATA[j].tier === 1 && Object.values(JOB_DATA[j].allowedEquipment ?? {}).flat().includes(k)).map(title).join(', '),
     t.desc]));
-out.push('', `Rarities: ${V.RARITIES.map(code).join(', ')}.`);
+out.push('', `Item rarities: ${V.ITEM_RARITIES.map(code).join(', ')}. Relic rarities: ${V.RARITIES.map(code).join(', ')}.`);
 
 h(2, 'Abilities items can grant');
 out.push('An item\'s `grants` takes action abilities (they join the wearer\'s skill list); `grantsPassive` takes reaction, support and movement abilities (always on while worn). Any ability of the right slot works.', '');

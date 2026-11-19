@@ -4,7 +4,7 @@
 // runs, won or lost, by score. All come from the profile (items, bossKills, challenges,
 // bestRuns), so they last between runs and travel with save exports.
 import { EQUIPMENT, EQUIP_FIELDS } from '../tactical/data/equipment.js';
-import { RARITIES } from '../content/vocab.js';
+import { ITEM_RARITIES } from '../content/vocab.js';
 import { REALMS, ACT_REALMS } from './data/realms.js';
 import { ENCOUNTERS } from './data/encounters.js';
 import { loadProfile, BEST_RUNS, BOSS_IDS, COLLECTION_REWARDS, RIFT_TIERS, CHALLENGES } from './profile.js';
@@ -13,11 +13,11 @@ import { canSubmit, submitRun, fetchLeaderboard, savedName, runResult } from './
 import { NAME_MAX, nameProblem } from './leaderboard-rules.js';
 import { dailyLabel } from './daily.js';
 import {
-    Modal, Toast, FONT, RARITY_COLOR, esc, jobLabel, itemLabel, itemSummary, itemIconHtml, portraitHtml, drawSprites, wireTips,
+    Modal, Toast, FONT, RARITY_COLOR, RARITY_STYLE, esc, jobLabel, itemLabel, itemSummary, itemIconHtml, portraitHtml, drawSprites, wireTips,
 } from './ui-kit.js';
 
 const SLOTS = [['weapon', 'Weapons'], ['armor', 'Armor'], ['helmet', 'Helmets'], ['tool', 'Tools'], ['boots', 'Boots'], ['trinket', 'Trinkets']];
-const RARITY_ORDER = Object.fromEntries(RARITIES.map((r, i) => [r, i]));
+const RARITY_ORDER = Object.fromEntries(ITEM_RARITIES.map((r, i) => [r, i]));
 const TAB = `padding:5px 12px;font-family:${FONT};font-size:12px;border-radius:4px 4px 0 0;cursor:pointer;width:auto;`;
 
 /** Every item in the game, grouped by slot and sorted by rarity then name. */
@@ -131,7 +131,7 @@ export function showFeats(skinManager = globalThis._sharedSkinManager, onClose, 
                 html += `<div data-tip="${esc(tip)}" style="display:flex;gap:6px;align-items:center;padding:4px 6px;border-radius:3px;
                         background:${got ? '#121226' : '#0b0b16'};border:1px solid ${got ? '#334' : '#1c1c2a'};">
                     <span style="${got ? '' : 'filter:grayscale(1) brightness(0.35);'}">${itemIconHtml(k, 20)}</span>
-                    <span style="font-size:10px;line-height:1.25;color:${got ? RARITY_COLOR[rarity] : '#555'};${got ? '' : 'font-style:italic;'}">${got ? esc(item.name) : 'Not found yet'}</span>
+                    <span style="font-size:10px;line-height:1.25;color:${got ? RARITY_COLOR[rarity] : '#555'};${got ? (RARITY_STYLE[rarity] ?? '') : 'font-style:italic;'}">${got ? esc(item.name) : 'Not found yet'}</span>
                 </div>`;
             }
             html += `</div>`;

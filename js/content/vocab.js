@@ -125,6 +125,9 @@ export const EQUIP_TYPES = {
 
 // Rarities of items and relics, from most to least common. They decide loot and shop pools.
 export const RARITIES = ['common', 'uncommon', 'rare'];
+// Items have one rarer tier than relics: legendary, the best gear in the game. It only drops
+// from elites and bosses in later acts, and shops never stock it.
+export const ITEM_RARITIES = [...RARITIES, 'legendary'];
 
 // Which abilities an item may grant:
 //   grants         action abilities (slot 'action'): added to the wearer's skill list
@@ -380,7 +383,7 @@ const ITEM = {
     name: str('Display name.', { required: true }),
     slot: oneOf(EQUIP_SLOTS, 'Slot it goes in.', { required: true }),
     type: oneOf(EQUIP_TYPES, 'Equipment type; classes restrict which types they wear.', { required: true }),
-    rarity: oneOf(RARITIES, 'Loot and shop pool. Default common.'),
+    rarity: oneOf(ITEM_RARITIES, 'Loot and shop pool. Default common. Legendary never sells in shops.'),
     featOnly: bool('Only drops once earned in Feats.'),
     grants: list(ref('ability', ''), 'Action abilities usable while worn.'),
     grantsPassive: list(ref('ability', ''), 'Reaction, support or movement abilities always on while worn.'),
@@ -407,7 +410,7 @@ const EFFECT = obj({
     gold: num('Gold gained (negative: spent).'),
     healPct: num('Every member heals this fraction of max HP (negative: damage, never below 1 HP).'),
     xp: num('XP for every member.'),
-    item: oneOf(RARITIES, 'Rarity of a random item gained.'),
+    item: oneOf(ITEM_RARITIES, 'Rarity of a random item gained.'),
     relic: oneOf(RARITIES, 'Rarity of a random relic gained.'),
     loseItem: bool('Lose a random unequipped item.'),
     memberStatMods: statMods(MOD_STATS, 'Permanent stat bonus for one random member ({name} in resultText).'),
