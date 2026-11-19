@@ -1,7 +1,7 @@
 // Pure battlefield queries for the scripted-AI layer. Nothing here mutates a
 // unit or the battle, and nothing animates. `units` is always the list of
 // non-dead units (battle.livingUnits), `map` is the battle map.
-import { computeMoveRange, computeAttackRange, computeAoeArea, abilityAffects, summonCapped } from '../abilities.js';
+import { computeMoveRange, computeAttackRange, computeAoeArea, abilityStrikes, summonCapped } from '../abilities.js';
 import { ABILITIES, baseKey, ownKey } from '../data-registry.js';
 import { hasLineOfSight, unitCell, stepNeighbors, posKey, parseKey, cellKey } from '../battle-map.js';
 import { isConscious, isAlive } from '../units.js';
@@ -120,13 +120,13 @@ export function tilesToUseFrom(unit, target, abilityKey, map, units) {
     return result;
 }
 
-// Units an AoE ability centred on `center` ({x,y,z}) would affect, using the same team
-// filter as TacticalBattle.applyEnemyAbility.
+// Units an AoE ability centred on `center` ({x,y,z}) would affect, using the same rule
+// as TacticalBattle._targetsIn (abilityStrikes).
 export function unitsAffected(caster, abilityKey, center, units, map) {
     const ab = ABILITIES[abilityKey];
     if (!ab) return [];
     const tiles = ab.aoe > 0 ? computeAoeArea(map, center, ab.aoe) : new Set([posKey(center)]);
-    return units.filter(u => tiles.has(posKey(u)) && abilityAffects(caster, ab, u));
+    return units.filter(u => tiles.has(posKey(u)) && abilityStrikes(caster, ab, u));
 }
 
 // Longest range among the unit's offensive abilities (it can pay for), min 1 for a basic strike.

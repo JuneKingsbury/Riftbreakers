@@ -58,6 +58,7 @@ export function battleEventSound(type, data = {}) {
         case 'revive': return 'spell_revive';
         case 'buff':   return 'spell_buff';
         case 'summon': return 'summon';
+        case 'phase':  return 'battle_alert';   // a boss changes phase
         // Earth spells rumble as the ground heaves (terrain spells already did, as they were
         // cast); thunder cracks across the area.
         case 'area': {

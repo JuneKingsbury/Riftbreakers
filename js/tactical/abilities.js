@@ -31,12 +31,12 @@ export function passivesOf(unit, slot) {
 }
 
 // Supports with an MP upkeep switch off while the unit is out of MP.
-function activeSupports(unit) {
+export function activeSupports(unit) {
     return passivesOf(unit, 'support').filter(k => !(ABILITIES[k].passiveMpCost > 0 && unit.mp <= 0));
 }
 
 const MULT_FIELDS = ['xpMult', 'chargeMult', 'highGroundMult', 'aoeDmgMult', 'healMult', 'drainMult'];
-const ADD_FIELDS = ['evaBonus', 'statusDurationBonus', 'turnRegenHp', 'passiveMpCost', 'matToPhysical', 'summonBoost', 'mpOnFall'];
+const ADD_FIELDS = ['evaBonus', 'statusDurationBonus', 'turnRegenHp', 'passiveMpCost', 'matToPhysical', 'summonBoost', 'mpOnFall', 'lifestealFrac'];
 const MAP_FIELDS = ['dmgDealt', 'dmgTaken', 'lowHpDmgDealt'];
 
 // Several supports combined into one profile: multipliers multiply, bonuses add,
@@ -100,6 +100,16 @@ export function abilityAffects(source, ab, unit) {
     return true;
 }
 
+/**
+ * Whether `ab` used by `source` actually lands on `unit`: abilityAffects' team rule, and a
+ * harmful ability passes over knocked-out units (finishing a body is for corpse rites).
+ * Helpful ones still reach them, so a heal can revive.
+ */
+export function abilityStrikes(source, ab, unit) {
+    if (!abilityAffects(source, ab, unit)) return false;
+    return !isUnconscious(unit) || isHelpful(ab);
+}
+
 /** True for abilities that help whoever they reach: heals, cures, boons, a faster gauge. */
 export function isHelpful(ab) {
     if (ab.isHeal || ab.isCure) return true;
@@ -128,6 +138,8 @@ export function inflictStatus(target, status, duration, source = null) {
     if (fresh) target.status.push(status);
     target.statusTimers[status] = dur;
     if (status === 'taunted' && source) target._tauntedBy = source.id;
+    // Who applied it, so damage over time (poison, doom) is credited in the battle's stats.
+    if (source) (target._statusBy ??= {})[status] = source.id;
     if (fresh && status === 'enfeebled') {
         target.buffs = target.buffs || [];
         target.buffs.push({ key: 'enfeebled', stat: 'atk', value: -5, duration: dur });
@@ -360,7 +372,22 @@ export function computeAoeArea(map, center, aoe) {
     return cellsNear(map, columns, center.z);
 }
 
+/**
+ * Resolves `ability` from `source` on `target`, changing their HP and statuses, and returns
+ * what happened. Besides the result's own fields (damage and healing as rolled, before
+ * clamping to HP), it reports the HP each side actually lost or gained, for the battle's
+ * stats: targetHpChange and sourceHpChange (negative is HP lost). A reflected spell shows
+ * up as a change to the source, a drain as a gain for it.
+ */
 export function resolveAbility(source, target, ability, map) {
+    const targetBefore = target.hp, sourceBefore = source.hp;
+    const result = resolveAbilityCore(source, target, ability, map);
+    result.targetHpChange = target.hp - targetBefore;
+    result.sourceHpChange = source === target ? 0 : source.hp - sourceBefore;
+    return result;
+}
+
+function resolveAbilityCore(source, target, ability, map) {
     const ab = ABILITIES[ability];
     if (!ab) return { damage: 0, healing: 0, statusApplied: null };
 
@@ -450,7 +477,7 @@ export function resolveAbility(source, target, ability, map) {
     // reflect: magic spells bounce back to the caster
     if (ab.type === 'magic' && !ab.ignoreReflect && target.status.includes('reflect') && target.team !== source.team) {
         faceToward(source, target.x, target.y);
-        return resolveAbility(target, source, ability, map);
+        return resolveAbilityCore(target, source, ability, map);
     }
 
     let defMult = target.status.includes('defend') ? 1.5 : 1.0;
@@ -529,8 +556,10 @@ export function resolveAbility(source, target, ability, map) {
     if (ab.buffs && standing) applyBuffs(target, ab, ability);
 
     let drained = 0;
-    if (ab.drainFrac && damage > 0 && source.hp > 0) {
-        drained = Math.min(source.maxHp - source.hp, Math.round(damage * ab.drainFrac * (srcSup?.drainMult ?? 1)));
+    // Lifesteal (a Vampiric leader): every damaging hit drains, on top of the ability's own drainFrac.
+    const drainFrac = (ab.drainFrac ?? 0) + (srcSup?.lifestealFrac ?? 0);
+    if (drainFrac > 0 && damage > 0 && source.hp > 0) {
+        drained = Math.min(source.maxHp - source.hp, Math.round(damage * drainFrac * (srcSup?.drainMult ?? 1)));
         source.hp += drained;
     }
 

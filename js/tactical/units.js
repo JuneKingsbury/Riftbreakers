@@ -55,10 +55,12 @@ export function createUnit(name, job, team, x, y, { statMods = {}, extraAbilitie
         reaction:  loadout?.reaction ?? null,
         support:   loadout?.support  ?? null,
         movement:  loadout?.movement ?? null,
-        // Passives granted by equipment, active on top of the chosen slots.
-        bonusPassives: loadout?.bonusPassives ?? [],
-        status: [],
-        statusTimers: {},
+        // Passives granted by equipment, active on top of the chosen slots, and an enemy
+        // job's own (its `passives`: e.g. a Shieldbearer's Interpose).
+        bonusPassives: [...(loadout?.bonusPassives ?? []), ...(base.passives ?? [])],
+        // An enemy job's `battleStart` statuses (e.g. a Prism Golem's Reflect).
+        status: (base.battleStart ?? []).map(s => s.status),
+        statusTimers: Object.fromEntries((base.battleStart ?? []).map(s => [s.status, s.duration ?? 99])),
         buffs: [],
         facing: 'south',
         appearance,

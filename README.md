@@ -22,6 +22,17 @@ path through battles, elites, events, shops, rest sites, treasure and recruits, 
 Acts 1 to 3 each have one recruit floor. Act 4 has none, since the party should be full by then.
 Runs saved before Act 4 existed keep their three acts (`RunState.actCount`).
 
+**Endless mode:** sealing the final rift (not on a daily run) offers a choice: end the run, or go
+deeper (`RunState.goEndless`). Going deeper records the run right then (`_recordRun` in `run-map-scene.js`): a
+four-act win with the score, renown and high score it had, which can go on the online
+leaderboard. Endless play is just for fun. It goes on until the party falls or the run is
+abandoned, and adds only the depth reached (`noteEndlessDepth`, `profile.stats.bestDepth`); the
+end screen shows the sealed score (`sealedScore`) and what was scored deeper, not counted.
+Each endless act is a late realm (Acts 3 and 4's) other than the last, picked from its own
+stream of the seed, with no recruit floor; its enemies get `ENDLESS_STEP` per depth on top of
+the last act's scaling, and its rewards, item rarities, map shape and events are the last act's
+(`tableAct`). Its depth shows on the act card and the map.
+
 - **Realms:** each act is set in a realm from Rifthold (`js/content/realms/`), picked at random from that
   act's list (`ACT_REALMS` in `content/realms/index.js`), never two from the same chain. Act 1: The Wild Frontiers, Verdant Depths
   or Crystal Caves. Act 2: Arcane Library or Sunken Abyss. Act 3: Palace Fortress or Void Sanctum.
@@ -60,6 +71,11 @@ Runs saved before Act 4 existed keep their three acts (`RunState.actCount`).
   into one of two Tier 2 jobs, at any time from the Party menu (it costs nothing). Equipment adds stats and can grant
   abilities (`js/content/items/`): actions join the skill list, and passives (e.g. Ghost Step) are
   always on, on top of the reaction/support/movement the character chose, and relics are party-wide modifiers (`js/content/relics.js`).
+  Besides stats and opening statuses, a relic can give every member passives (e.g. Leech Fang's
+  lifesteal) and battle triggers (`tactical/triggers.js`): when an ally or enemy is knocked out,
+  when the member lands a knockout, or the first time they drop below an HP threshold, the
+  member gains a status, healing, MP or buffs. Some rare relics carry a drawback (Glass Sigil,
+  Gambler's Crown). Boss phases can use the same triggers.
 - **Equipment screen:** Equipment (G on the map, the Change buttons in the Party menu, or the
   button on node screens) shows one character on a paper doll beside the party's shared bag
   (`js/run/gear-screen.js`). Tabs or ← → switch characters. Hovering an item (a first tap on
@@ -84,17 +100,54 @@ Runs saved before Act 4 existed keep their three acts (`RunState.actCount`).
   rarely already enchanted: 3% +1 and 0.5% +2, doubled from elites and bosses (`run-state.js`).
 - **Real time:** battles run in real time (`js/tactical/realtime.js`). Everyone acts at the
   opening, then each unit acts whenever its speed gauge fills, while others are still moving.
-  A move-and-attack lands when the walker arrives. Commanding units by hand (the manual test
+  A move-and-attack lands when the walker arrives.
+  A charged ability aims when it goes off, not when it begins (`_aimCharge` in `battle.js`): it
+  follows the unit it was aimed at, if that unit can still be struck and is in range. A harmful one
+  whose target has fallen or left keeps its cell if a standing foe is there, otherwise turns to the
+  standing foe in range nearest that cell, and fizzles (MP refunded) if there is none. Helpful ones
+  follow their ally or keep their cell. Harmful abilities pass over knocked-out units
+  (`abilityStrikes`), so only corpse rites finish a body. Heals still reach them to revive. Commanding units by hand (the manual test
   harness) keeps the turn-by-turn flow.
 - **Behavior:** by default each character follows rules generated from their current skills
   (`ai/default-scripts.js` `autoScriptFor`). The Tactics editor lets you replace them with your own.
   Each ability or move rule has a positioning style (`positionStyle` in `ai/script-runtime.js`):
   ranged roles default to Careful (stay out of enemy reach, attack from near max range, don't run
   ahead of the group, melee only as a last resort); everyone else defaults to Bold.
+- **Battle breakdown:** the result screen, won or lost, shows what each unit did: damage dealt,
+  damage taken, healing and knockouts, for allies or (with the toggle) enemies. Clicking a row
+  opens that unit's split by ability, with each ability's share and number of uses. Only HP that
+  actually changed counts (no overkill or overheal). A summon's numbers go to its summoner,
+  damage over time to whoever inflicted it, and splashing your own side isn't damage dealt.
+  The battle records it as it happens (`TacticalBattle.stats`, `tactical/battle-stats.js`),
+  from the HP changes `resolveAbility` reports, and the panel is `tactical/battle-breakdown.js`.
+  `tests/harness/breakdown.html` shows it for one headless fight.
+- **Realm enemies:** each act realm fields an enemy with a trick of its own (`enemies/realm.js`):
+  the Cutthroat (evasive, poisons), Spore Mother (heals its brood), Prism Golem (Reflect),
+  Living Tome (silences casters), Abyssal Leech (lifesteal), Void Martyr (bursts when it falls),
+  Shieldbearer (takes blows for allies) and Echo Mimic (counters). Each leads a new normal fight
+  in its realm. Their tricks are enemy job fields: `passives` and `battleStart`.
+- **Boss phases:** every act boss has one or two `phases` (on its fight in the realm file): the
+  first time its HP falls below a phase's `at`, it announces it (with an alert) and can heal,
+  cleanse, gain statuses or buffs, strengthen its allies, and call reinforcements. Those join
+  near it as full enemies, scaled like the roster (`buildEncounter`, Rift Tiers). Phases are
+  unit triggers (`tactical/triggers.js`) that `buildUnits` gives the boss. The four Act 1 bosses
+  on plain enemy jobs also have a signature ability (`enemies/bosses.js`, through their roster
+  entry's `extraAbilities`).
+- **Elite affixes:** an elite fight's leader (its first roster entry) gets one affix in Acts 1
+  and 2 and two different ones in Acts 3 and 4 (one more at Rift Tier VI) (`js/content/affixes.js`; bosses get none):
+  Thorned, Shielded, Hasted, Vampiric, Regenerating, Commanding, Undying and Splitting (both
+  Act 2 on), Warded and Hulking. Rift Tier VI adds one more. Splitting is a knockout reaction
+  (`splitInto`): the leader breaks into two weaker copies of itself, full enemies that fight on
+  and don't split again. They go before its name ("Thorned Bandit Captain"), its sprite is still found by its
+  own name (`unit.spriteName`), and the battle briefing says what each does. They are rolled
+  when the fight is (`_rollEncounter`) from their own stream of the run's seed
+  (`run/data/affixes.js`), so they never shift the run's other rolls, and applied by
+  `buildUnits`. An affix a save names that no longer exists is ignored.
 - **Rift Tiers and renown bonuses:** after a first win, the New Run screen offers Rift Tiers
   (`RIFT_TIERS` in `profile.js`): each keeps the ones below and adds a twist (tougher elites and
   bosses, dearer shops, fewer reward choices, then tougher enemies everywhere and bigger boss
-  fights), for +25% to +100% renown. Winning at a tier opens the next. Starting with one or two
+  fights, and at Tier VI one more affix on every elite leader), for +25% to +200% renown, with
+  battle scores rising by the same steps (`RIFT_TIER_SCORE`). Winning at a tier opens the next. Starting with one or two
   members adds +50% or +25%. The enemy and shop effects live in `run-state.js` (`riftTierMods`).
 - **More unlocks:** Traveler's Pack, Masterwork, Haggler, Relic Codex (after Heirloom), Scout's
   Report (each boss fight's `scouting`: a line on each act's boss, chosen when the act begins), Tactician's

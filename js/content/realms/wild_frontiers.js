@@ -56,6 +56,13 @@ export const encounters = {
             { job: 'raider', name: 'Sellsword', ct: 25 },
             { job: 'novice', name: 'Deserter', sprite: 'npc_defecting_soldier', ct: 5 },
         ] },
+        { id: 'cutthroat_ambush', name: 'Cutthroat Ambush', enemyLevel: 1, roster: [
+            { job: 'bandit_cutthroat', name: 'Cutthroat', sprite: 'raider', tint: '#e0b090', ct: 25 },
+            { job: 'raider', name: 'Bandit', ct: 40 },
+            { job: 'bandit_cutthroat', name: 'Cutthroat', sprite: 'raider', tint: '#e0b090', ct: 10 },
+            { job: 'raider_archer', name: 'Bandit Archer', ct: 30 },
+            { job: 'raider', name: 'Bandit', ct: 55 },
+        ] },
     ],
     elite: [
         { id: 'thornwood_stalkers', name: 'Thornwood Stalkers', enemyLevel: 2, roster: [
@@ -79,21 +86,30 @@ export const encounters = {
         { id: 'boss_bandit_king', name: 'The Bandit King', enemyLevel: 2,
             scouting: 'The Bandit King holds court on the road, with archers on the flanks and a hexer at his ear. Cut down his bodyguards before they close in.',
             roster: [
-            { job: 'orc_captain', name: 'Bandit King', sprite: 'raider_brute', ct: 30, statMods: { maxHp: 40, atk: 3, def: 2, spd: 1 } },
+            { job: 'orc_captain', name: 'Bandit King', sprite: 'raider_brute', ct: 30, extraAbilities: ['royal_cleave'], statMods: { maxHp: 40, atk: 3, def: 2, spd: 1 } },
             { job: 'raider_archer', name: 'Royal Archer', ct: 10 },
             { job: 'raider_hexer', name: 'Court Hexer', ct: 40 },
             { job: 'raider', name: 'Bodyguard', ct: 20 },
             { job: 'raider', name: 'Bodyguard', ct: 50 },
-        ] },
+        ],
+          phases: [
+            { at: 0.5, name: 'Bring Me Their Heads', say: 'The Bandit King roars for his reserves. A fresh bodyguard comes running from the camp!',
+              summon: [{ job: 'raider', name: 'Bodyguard' }] },
+          ] },
         { id: 'boss_dire_wolf', name: 'The Dire Wolf', enemyLevel: 2,
             scouting: 'The Dire Wolf hunts with its pack and an old boar called Tusk. Wolves bite at the legs to slow you, so keep the party together.',
             roster: [
-            { job: 'canopy_stalker', name: 'Dire Wolf', sprite: 'wolf', tint: '#6a6272', ct: 30, statMods: { maxHp: 50, atk: 3, def: 3 } },
+            { job: 'canopy_stalker', name: 'Dire Wolf', sprite: 'wolf', tint: '#6a6272', ct: 30, extraAbilities: ['rending_maul'], statMods: { maxHp: 50, atk: 3, def: 3 } },
             { job: 'wolf', name: 'Pack Wolf', ct: 10 },
             { job: 'wolf', name: 'Pack Wolf', ct: 40 },
             { job: 'boar', name: 'Old Tusk', ct: 20 },
             { job: 'wolf', name: 'Pack Wolf', ct: 55 },
-        ] },
+        ],
+          phases: [
+            { at: 0.5, name: 'Howl', say: 'The Dire Wolf howls, and the pack answers from the trees!',
+              status: { status: 'haste', duration: 2 },
+              summon: [{ job: 'wolf', name: 'Pack Wolf' }] },
+          ] },
     ],
 };
 

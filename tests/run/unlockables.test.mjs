@@ -50,7 +50,7 @@ test('a win opens the next Rift Tier, up to the last', () => {
     assert.equal(profile.stats.riftTier, MAX_RIFT_TIER);
     const lost = run({ tier: 4 }); lost.status = 'lost'; recordRun(profile, lost);
     assert.equal(profile.stats.riftTier, MAX_RIFT_TIER);
-    assert.equal(RIFT_TIERS.length, 6);
+    assert.equal(RIFT_TIERS.length, 7);
 });
 
 test('Tier I toughens elites and bosses, Tier IV every enemy', () => {

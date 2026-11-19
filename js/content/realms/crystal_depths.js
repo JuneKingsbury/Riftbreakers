@@ -64,7 +64,13 @@ export const encounters = {
             e('kingdom_guard', 'Crystal Golem', 'crystal_golem'),
             e('stoneshaper', 'Runite Elemental', 'runite_elemental'),
             e('canopy_stalker', 'Crystal Beast', 'crystal_beast'),
-        ], { scouting: 'The Crystal Colossus is the cave itself, stood up. Its quakes slow the whole party, and runite elementals hurl stone from range.' }),
+        ], { scouting: 'The Crystal Colossus is the cave itself, stood up. Its quakes slow the whole party, and runite elementals hurl stone from range.',
+          phases: [
+            { at: 0.6, name: 'Fracture', say: 'Cracks race across the Colossus. It sheds its broken plates and comes on harder!',
+              cleanse: true, buffs: [{ stat: 'atk', value: 4, duration: 5 }, { stat: 'mat', value: 4, duration: 5 }] },
+            { at: 0.3, name: 'Shardborn', say: 'A golem tears itself out of the cavern wall to defend the Colossus!',
+              summon: [e('kingdom_guard', 'Crystal Golem', 'crystal_golem')] },
+          ] }),
     ],
 };
 

@@ -562,6 +562,7 @@ export class BattleView3D {
         const ms = (n) => n / this._timeScale;
         const now = performance.now();
         if (type === 'area') { this.fxArea(data); return; }
+        if (type === 'phase') { this.fxAlert(0.15); return; }   // a boss changes phase
         if (type === 'summon' && data.unit) {
             const vs = viewState(data.unit);
             vs.spawnAt = now;

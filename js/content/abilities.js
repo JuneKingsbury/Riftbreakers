@@ -4,6 +4,8 @@
 //   items/abilities.js     abilities only equipment grants
 //   abilities/common.js    Attack and the plain skills others extend
 //   abilities/unused.js    abilities nothing uses yet
+//   affixes.js             the passives elite affixes give a fight's leader
+//   relics.js              the passives relics give the party
 // An ability is defined once, wherever it belongs; anything else uses it by key. Every
 // field is described in vocab.js (SCHEMAS.ability). data-registry.js resolves `extends`
 // (against these and ABILITY_TEMPLATES) and adds the ranked versions.
@@ -12,6 +14,8 @@ import { ENEMY_FILES } from './enemies/index.js';
 import * as common from './abilities/common.js';
 import * as unused from './abilities/unused.js';
 import * as itemAbilities from './items/abilities.js';
+import * as affixes from './affixes.js';
+import * as relics from './relics.js';
 
 export { ABILITY_TEMPLATES } from './abilities/templates.js';
 
@@ -22,6 +26,8 @@ const sources = [
     ...Object.entries(ENEMY_FILES).map(([name, f]) => [`enemies/${name}.js`, f]),
     ['items/abilities.js', itemAbilities],
     ['abilities/unused.js', unused],
+    ['affixes.js', affixes],
+    ['relics.js', relics],
 ];
 // Ability key → the file that defines it (for error messages and CONTENT.md).
 export const ABILITY_FILE = {};

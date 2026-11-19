@@ -18,9 +18,10 @@ in. Game code reads it but never defines content of its own.
 | Folder / file | Holds |
 |---|---|
 | `classes/<class>.js` | One player class each: `job` (stats, skill tree, gear rules, unlock, AI hints) and `abilities` (its skill tree's abilities) |
-| `enemies/*.js` | Enemy jobs (`jobs`) and the abilities only they use (`abilities`), by kind; `summons.js` holds creatures only player summons call |
+| `enemies/*.js` | Enemy jobs (`jobs`) and the abilities only they use (`abilities`), by kind; `summons.js` holds creatures only player summons call; `bosses.js` the signature abilities of bosses on plain enemy jobs |
 | `items/<slot>.js` | Items of one slot. `items/abilities.js`: abilities only items grant |
-| `relics.js` | Relics |
+| `relics.js` | Relics, and the passives only relics give (`abilities`). Battle triggers: `tactical/triggers.js` |
+| `affixes.js` | Elite affixes (a twist on an elite fight's leader) and the passives only they give |
 | `events.js` | General `?` events. Realm-only events are in the realm's file |
 | `realms/<realm>.js` | One realm each: `realm` (look, maps, bosses), `encounters` (normal, elite, boss fights) and `events` |
 | `realms/index.js` | The world: chains of realms, and which realms each act can be set in |
@@ -66,7 +67,9 @@ or `items/abilities.js` if only an item grants it. Fields are in `SCHEMAS.abilit
 ## Adding an enemy
 
 Add a job to the `jobs` of a file in `enemies/` (stats, `abilities` list, `spriteKey`), and
-define any new abilities in the same file. Put it in a fight's `roster` to field it. Its
+define any new abilities in the same file. An enemy job can also have `passives` (reactions or
+supports it always has, e.g. Interpose) and `battleStart` statuses (e.g. Reflect); `enemies/realm.js`
+holds one such enemy per act realm. Put it in a fight's `roster` to field it. Its
 sprite in battle comes from its roster name (see `tactical/enemy-sprites.js`), so a new
 enemy name also needs a sprite in the skin.
 
@@ -83,6 +86,10 @@ is also fielded in a fight.
   takes the first N entries, N growing with the party.
 - **Boss:** a boss fight's first roster entry is the boss. List its id in the realm's
   `bosses` to make it a possible finale for the act, and give it `scouting` text.
+  Give it `phases` too: `{ at: 0.5, name, say, status?, buffs?, healPct?, cleanse?, allies?,
+  summon?: [e(...)] }` happens the first time the boss falls below half HP (fields in
+  `SCHEMAS.encounter`). Reinforcements are roster entries, scaled like the roster; reuse a
+  roster name so they keep its sprite.
 - **Realm:** copy a realm file, import it in `realms/index.js` and add it to a chain (its place
   in the chain is its tier). Then either:
   - make it an act's setting: add it to that act in `ACT_REALMS` and give it `draws`, the

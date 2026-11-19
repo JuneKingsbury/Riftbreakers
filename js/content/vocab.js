@@ -290,6 +290,11 @@ const ABILITY = {
     saveFromDown: bool('Fires when the ally is knocked out, saving them.'),
     reviveFrac: num('The owner gets back up with this fraction of max HP (onDown).'),
     downBurst: ref('ability', 'Ability that bursts from the owner onto nearby enemies (onDown).'),
+    splitInto: obj({
+        count: num('How many copies.', { required: true }),
+        hpFrac: num('Each copy\'s max HP, as a fraction of the owner\'s.', { required: true }),
+        statFrac: num('Each copy\'s ATK, DEF, MAT and MDF, as a fraction of the owner\'s.', { required: true }),
+    }, 'The owner breaks into weaker copies of itself, which fight on as full units of its side (onDown). Copies do not split again.'),
     attackerStatus: statusFor,
     thornsFrac: num('The attacker takes this fraction of the damage dealt.'),
     phaseAway: num('The owner teleports up to this many tiles away from the attacker.'),
@@ -309,6 +314,7 @@ const ABILITY = {
     aoeDmgMult: num('Damage multiplier for area abilities.'),
     healMult: num('Healing multiplier.'),
     drainMult: num('Multiplier for drainFrac healing.'),
+    lifestealFrac: num('Your damaging hits heal you this fraction of the damage they deal (on top of any drainFrac).'),
     attackProc: statusFor,
     statusImmune: list(ref('status', ''), 'Statuses that cannot be inflicted on you.'),
     statusDurationBonus: num('Extra turns on statuses you inflict.'),
@@ -375,6 +381,8 @@ const JOB = {
     }, 'How automatic battles play the class (js/tactical/ai/default-scripts.js).'),
     // Enemies and summons
     abilities: list(ref('ability', ''), 'Enemies: the fixed ability list it fights with.'),
+    passives: list(ref('ability', ''), 'Enemies: reaction, support or movement abilities it always has.'),
+    battleStart: list(statusFor, 'Enemies: statuses it starts every battle with (only ones without side effects, e.g. reflect, protect, shell, regen).'),
     inert: bool('Summons: never acts (Mirror Image\'s copies).'),
     lure: num('Summons: how strongly enemies prefer to attack it.'),
 };
@@ -392,6 +400,24 @@ const ITEM = {
     ...Object.fromEntries(ITEM_STATS.map(s => [s, num(`${STATS[s].long} bonus.`)])),
 };
 
+// A unit trigger (tactical/triggers.js): when something happens, an effect on the holder.
+export const TRIGGER_EVENTS = {
+    allyDown: 'Another unit of its side (not a summon or copy) is knocked out.',
+    enemyDown: 'A unit of the other side (not a summon or copy) is knocked out.',
+    kill: 'The holder knocked out a foe (not a summon or copy).',
+    hpBelow: 'The holder\'s HP falls below pct of its max (once per battle).',
+};
+const TRIGGER = obj({
+    on: oneOf(Object.keys(TRIGGER_EVENTS), 'What sets it off (TRIGGER_EVENTS).', { required: true }),
+    pct: num('For hpBelow: the HP threshold, 0-1.'),
+    once: bool('At most once per battle (hpBelow always is).'),
+    status: statusFor,
+    healPct: num('Heals the holder this fraction of its max HP.'),
+    mp: num('MP restored to the holder.'),
+    buffs: list(buff, 'Buffs for the holder, refreshed rather than stacked.'),
+    text: str('Floating text when it fires (default: the relic\'s name).'),
+}, 'When something happens in battle, an effect on the holder.');
+
 const RELIC = {
     name: str('Display name.', { required: true }),
     desc: str('What it does.', { required: true }),
@@ -400,10 +426,24 @@ const RELIC = {
     battleStart: statusFor,
     xpMult: num('Multiplies XP from battles.'),
     goldMult: num('Multiplies gold from battles.'),
-    shopDiscount: num('Fraction off shop prices.'),
+    shopDiscount: num('Fraction off shop prices (negative: dearer).'),
     extraItemChoice: bool('Battle rewards offer one more item to choose from.'),
+    passives: list(ref('ability', ''), 'Reaction, support or movement abilities every member has on top of their own.'),
+    triggers: list(TRIGGER, 'Battle triggers every member has (each fires for that member).'),
     acts: list(oneOf([1, 2, 3, 4], ''), 'Acts it can be found in. Default: all.'),
     realms: list(ref('realm', ''), 'Realms it can be found in. Default: all.'),
+};
+
+// Elite affixes (affixes.js): a twist on an elite fight's leader, named before it.
+const AFFIX = {
+    name: str('The word put before the leader\'s name, e.g. Thorned.', { required: true }),
+    desc: str('What it does, shown before the fight.', { required: true }),
+    statMods: statMods(MOD_STATS, 'Stat changes for the leader.'),
+    maxHpPct: num('Raises the leader\'s max HP by this fraction (after statMods).'),
+    battleStart: list(statusFor, 'Statuses the leader starts the battle with.'),
+    passives: list(ref('ability', ''), 'Reaction, support or movement abilities the leader has on top of its own.'),
+    extraAbilities: list(ref('ability', ''), 'Actions the leader can use on top of its own.'),
+    acts: list(oneOf([1, 2, 3, 4], ''), 'Acts it can appear in. Default: all.'),
 };
 
 const EFFECT = obj({
@@ -446,6 +486,19 @@ const ROSTER_ENTRY = obj({
     extraAbilities: list(ref('ability', ''), 'Abilities on top of the job\'s.'),
 }, '');
 
+// A boss phase (tactical/triggers.js): what the boss does the first time its HP falls below `at`.
+const PHASE = obj({
+    at: num('HP fraction (0-1) that sets it off.', { required: true }),
+    name: str('Its name, for the battle breakdown (default: the boss\'s name).'),
+    say: str('Announced when it happens.', { required: true }),
+    status: statusFor,
+    buffs: list(buff, 'Buffs for the boss.'),
+    healPct: num('The boss heals this fraction of its max HP.'),
+    cleanse: bool('The boss sheds its harmful statuses.'),
+    allies: obj({ status: statusFor, buffs: list(buff, ''), healPct: num('') }, 'Effects for the boss\'s conscious allies.'),
+    summon: list(ROSTER_ENTRY, 'Reinforcements that appear near the boss, scaled like the roster.'),
+}, '');
+
 const ENCOUNTER = {
     id: str('Unique id.', { required: true }),
     name: str('Display name.', { required: true }),
@@ -454,6 +507,7 @@ const ENCOUNTER = {
     map: ref('map', 'A fixed battle map; otherwise one of the realm\'s maps.'),
     easy: bool('Gentle enough for a run\'s opening fights.'),
     scouting: str('Bosses: what the Scout\'s Report says about the fight.'),
+    phases: list(PHASE, 'Bosses: what the boss (the first roster entry) does as its HP falls.'),
 };
 
 const REALM = {
@@ -474,4 +528,4 @@ const REALM = {
     retuneBias: map(Object.keys(ENCOUNTER_KINDS), num(''), 'When folded into another realm, its fights of a kind are retuned to this times the usual power.'),
 };
 
-export const SCHEMAS = { ability: ABILITY, job: JOB, item: ITEM, relic: RELIC, event: EVENT, encounter: ENCOUNTER, realm: REALM };
+export const SCHEMAS = { ability: ABILITY, job: JOB, item: ITEM, relic: RELIC, affix: AFFIX, event: EVENT, encounter: ENCOUNTER, realm: REALM };

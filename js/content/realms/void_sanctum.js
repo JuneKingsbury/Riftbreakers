@@ -43,6 +43,13 @@ export const encounters = {
             e('raider_archer', 'Bailiff', 'void_penitent'),
             e('void_stalker', 'Enforcer', 'void_brute'),
         ]),
+        fight('martyrs_procession', 'Martyrs\' Procession', 2, [
+            e('void_martyr', 'Void Martyr', 'void_acolyte', { tint: '#d0a0f0' }),
+            e('kingdom_guard', 'Bone Sentinel', 'bone_sentinel', { statMods: { maxHp: -10 } }),
+            e('void_martyr', 'Void Martyr', 'void_acolyte', { tint: '#d0a0f0' }),
+            e('raider', 'Prisoner', 'void_penitent'),
+            e('void_martyr', 'Void Martyr', 'void_acolyte', { tint: '#d0a0f0' }),
+        ]),
     ],
     elite: [
         fight('chapel_guardians', 'Chapel Guardians', 3, [
@@ -70,7 +77,12 @@ export const encounters = {
             e('shadow_mage', 'Acolyte', 'void_acolyte'),
             e('spectral_wisp', 'Lost Soul', 'ghost'),
             e('shadow_mage', 'Acolyte', 'void_acolyte'),
-        ], { scouting: 'The Hollow Abbot leads fallen knights and acolytes in a hymn no one should finish. The knights are slow. The acolytes are not.' }),
+        ], { scouting: 'The Hollow Abbot leads fallen knights and acolytes in a hymn no one should finish. The knights are slow. The acolytes are not.',
+          phases: [
+            { at: 0.5, name: 'Rite of the Hollow', say: 'The Hollow Abbot chants, and the fallen knights rise to serve again!',
+              allies: { status: { status: 'regen', duration: 3 } },
+              summon: [e('kingdom_guard', 'Fallen Knight', 'revenant_knight'), e('kingdom_guard', 'Fallen Knight', 'revenant_knight')] },
+          ] }),
     ],
 };
 

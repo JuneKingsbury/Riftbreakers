@@ -2,6 +2,8 @@
 // briefing, rewards, shop, event, rest site, treasure, recruits, and the end of
 // the run. Every action goes through RunState; `hooks` tell the scene what to do next.
 import { RELICS } from './data/relics.js';
+import { runWon } from './profile.js';
+import { AFFIXES, knownAffixes, affixedName } from './data/affixes.js';
 import { REALMS } from './data/realms.js';
 import { Sound } from '../audio/sound.js';
 import { SCORE_TIP, scoreLine } from './score.js';
@@ -95,13 +97,19 @@ export class NodeScreens {
         const titles = { normal: ['Battle', '#f88'], elite: ['Elite Battle', '#f80'], boss: ['Boss Battle', '#f44'] };
         const [title, color] = titles[enc.kind];
         const counts = {};
-        for (const r of enc.roster) counts[r.name] = (counts[r.name] || 0) + 1;
+        for (const r of enc.roster) { const n = affixedName(r.name, r.affixes); counts[n] = (counts[n] || 0) + 1; }
         let html = H1(`⚔ ${title}: ${esc(enc.name)}`, color);
         html += SUB(enc.kind === 'boss'
             ? `The guardian of ${esc(REALMS[enc.realm]?.name ?? `Act ${enc.act}`)} bars the way.`
             : 'Your party fights on its own, following each member\'s tactics. Win and everyone heals. Lose and the run ends.');
         html += SECTION('Enemy forces');
         for (const [name, n] of Object.entries(counts)) html += `<div style="color:#f99;margin-bottom:2px;">${esc(name)}${n > 1 ? ` ×${n}` : ''}</div>`;
+        // Elite affixes on the leader: what each one does.
+        const affixes = enc.roster.flatMap(r => knownAffixes(r.affixes));
+        for (const k of affixes) {
+            html += `<div style="font-size:11px;margin:0 0 3px 10px;"><span style="color:#fb6;">✦ ${esc(AFFIXES[k].name)}:</span>
+                <span style="color:#aaa;">${esc(AFFIXES[k].desc)}</span></div>`;
+        }
         html += SECTION('Your party');
         for (const m of this.run.party) {
             const hp = this.run.hp(m), max = this.run.maxHp(m);
@@ -376,24 +384,32 @@ export class NodeScreens {
 
     runOver() {
         const run = this.run;
-        const won = run.status === 'won';
+        const won = runWon(run);
         const s = run.stats;
-        let html = H1(won ? '♛ The Rift is Sealed' : '✝ The Company Falls', won ? '#fc6' : '#f66');
-        html += SUB(won
-            ? 'Against all odds, your company closed the final rift.'
-            : `Your party fell in ${esc(run.realm.name)}, act ${run.act}.`);
+        const depth = run.endless?.depth ?? 0;
+        let html = H1(depth ? '♛ Lost in the Endless Rift' : won ? '♛ The Rift is Sealed' : '✝ The Company Falls', won ? '#fc6' : '#f66');
+        html += SUB(depth
+            ? `Your company sealed the final rift, then went ${depth} realm${depth === 1 ? '' : 's'} deeper before its journey ended in ${esc(run.realm.name)}.`
+            : won
+                ? 'Against all odds, your company closed the final rift.'
+                : `Your party fell in ${esc(run.realm.name)}, act ${run.act}.`);
         html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:3px 12px;margin-bottom:10px;">
             <div>Floors climbed</div><div style="color:#ddd;">${s.floors}</div>
             <div>Battles won</div><div style="color:#ddd;">${s.battles}</div>
             <div>Elites slain</div><div style="color:#ddd;">${s.elites}</div>
             <div>Bosses slain</div><div style="color:#ddd;">${s.bosses}</div>
             <div>Relics</div><div style="color:#ddd;">${run.relics.map(k => esc(RELICS[k].name)).join(', ') || 'none'}</div>
-            <div data-tip="${esc(SCORE_TIP)}">Score</div><div style="color:#9cf;font-weight:bold;">${run.score || 0}</div>
+            <div data-tip="${esc(SCORE_TIP)}">Score</div><div style="color:#9cf;font-weight:bold;">${depth ? run.sealedScore ?? 0 : run.score || 0}</div>
+            ${depth ? `<div>Scored deeper</div><div style="color:#889;">${Math.max(0, (run.score || 0) - (run.sealedScore ?? 0))} (not counted)</div>` : ''}
         </div>`;
         html += SECTION('Final party');
         for (const m of run.party) {
             html += `<div style="display:flex;gap:8px;align-items:center;margin-bottom:3px;">${portraitHtml(m, 20)}
                 <span style="color:${m.appearance?.nameColor};">${esc(m.name)}</span> <span style="color:#777;font-size:10px;">${esc(m.origin ? `${jobLabel(m.origin)} → ${jobLabel(m.job)}` : jobLabel(m.job))}</span></div>`;
+        }
+        if (depth) {
+            html += `<div style="margin-top:12px;color:#c9a;font-size:11px;line-height:1.5;">This run was recorded when it sealed the final rift.
+                The endless rift was just for fun.</div>`;
         }
         if (run.renownEarned != null) {
             html += `<div style="margin-top:12px;color:#fc6;font-size:13px;">+${run.renownEarned} renown</div>
@@ -403,7 +419,7 @@ export class NodeScreens {
             html += `<div style="margin-top:8px;color:#9cf;font-size:11px;">Daily run score: <b>${run.score || 0}</b></div>
                 <div style="color:#888;font-size:10px;">Submit it from the daily leaderboard on the title screen.</div>`;
         } else if (won) {
-            html += `<div style="margin-top:8px;color:#9cf;font-size:11px;">Final score: <b>${run.score || 0}</b></div>
+            html += `<div style="margin-top:8px;color:#9cf;font-size:11px;">Final score: <b>${depth ? run.sealedScore ?? 0 : run.score || 0}</b></div>
                 <div style="color:#888;font-size:10px;">Your best wins are kept in Feats &gt; Victories, where you can submit them to the online leaderboard.</div>`;
         }
         html += `<div style="height:10px;"></div><button data-finish style="${BTN}${BTN_GOOD}text-align:center;">Return to title</button>`;

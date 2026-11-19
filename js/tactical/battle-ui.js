@@ -1,6 +1,7 @@
 import { STATES } from './battle.js';
 import { placeTipAt } from '../ui/tip-place.js';
 import { ABILITIES, passivesOf } from './abilities.js';
+import { mountBreakdown } from './battle-breakdown.js';
 
 // Rule labels and unit names can come from player-authored scripts.
 function esc(text) {
@@ -169,8 +170,9 @@ export class BattleUI {
         el.style.cssText = `
             display: none; position: absolute; inset: 0;
             background: rgba(0,0,0,0.75);
-            align-items: center; justify-content: center;
+            align-items: center; justify-content: safe center;
             flex-direction: column; gap: 18px;
+            overflow-y: auto; padding: 12px 0; box-sizing: border-box;
             pointer-events: auto;
         `;
         this._overlay.appendChild(el);
@@ -728,10 +730,13 @@ export class BattleUI {
             </div>
             <div style="color:#aaa;font-size:13px;">${!won ? 'Your party has fallen. The run is over.' : rewards?.final ? 'The final rift is sealed.' : 'All enemies defeated.'}</div>
             ${rewardHtml}
+            <div id="tac-breakdown"></div>
             <button id="tac-return-btn" style="margin-top:12px;padding:10px 28px;background:#1a1a30;border:1px solid #557;color:#ccc;font-family:inherit;font-size:14px;cursor:pointer;border-radius:4px;pointer-events:auto;">
                 ${won ? 'Continue' : 'Return'}
             </button>
         `;
+        const breakdown = r.querySelector('#tac-breakdown');
+        if (breakdown && battle.stats) mountBreakdown(breakdown, battle.stats);
         document.getElementById('tac-return-btn')?.addEventListener('click', () => { if (onExit) onExit(); });
     }
 

@@ -41,6 +41,13 @@ export const encounters = {
             e('wolf', 'Jungle Hound', 'chaos_hound'),
             e('boar', 'Striped Okapi', 'okapi', { statMods: { maxHp: -8, spd: 2 } }),
         ]),
+        fight('spore_nursery', 'Spore Nursery', 1, [
+            e('spore_mother', 'Spore Mother', 'vine_creeper', { tint: '#c8f0a0' }),
+            e('goblin', 'Vine Creeper', 'vine_creeper'),
+            e('goblin', 'Vine Creeper', 'vine_creeper'),
+            e('spore_walker', 'Spore Walker'),
+            e('goblin', 'Vine Creeper', 'vine_creeper'),
+        ]),
     ],
     elite: [
         fight('blighted_grove', 'Blighted Grove', 2, [
@@ -62,12 +69,17 @@ export const encounters = {
     ],
     boss: [
         fight('boss_thorn_warden', 'The Thorn Warden', 2, [
-            e('canopy_stalker', 'Thorn Warden', 'thorn_warden', { statMods: { maxHp: 45, atk: 2, def: 3, mdf: 2 } }),
+            e('canopy_stalker', 'Thorn Warden', 'thorn_warden', { extraAbilities: ['bramble_lash'], statMods: { maxHp: 45, atk: 2, def: 3, mdf: 2 } }),
             e('kingdom_guard', 'Briar Sentinel', 'briar_sentinel', { statMods: { maxHp: -4 } }),
             e('spore_walker', 'Spore Walker'),
             e('goblin', 'Vine Creeper', 'vine_creeper'),
             e('kingdom_guard', 'Briar Sentinel', 'briar_sentinel', { statMods: { maxHp: -4 } }),
-        ], { scouting: 'The Thorn Warden guards the deep green. Briar Sentinels hold the line while spores drift in from behind them.' }),
+        ], { scouting: 'The Thorn Warden guards the deep green. Briar Sentinels hold the line while spores drift in from behind them.',
+          phases: [
+            { at: 0.5, name: 'Bramble Wall', say: 'Thorns burst from the Thorn Warden\'s hide, and the vines answer!',
+              buffs: [{ stat: 'def', value: 3, duration: 4 }],
+              summon: [e('goblin', 'Vine Creeper', 'vine_creeper')] },
+          ] }),
     ],
 };
 

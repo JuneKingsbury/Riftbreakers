@@ -41,6 +41,13 @@ export const encounters = {
             e('shard_spider', 'Shard Spider'),
             e('wolf', 'Crystal Bat', 'crystal_bat', { statMods: { maxHp: -6 } }),
         ]),
+        fight('prism_hall', 'Hall of Prisms', 1, [
+            e('prism_golem', 'Prism Golem', 'crystal_golem', { tint: '#cfe8ff' }),
+            e('shard_spider', 'Shard Spider'),
+            e('wolf', 'Crystal Bat', 'crystal_bat', { statMods: { maxHp: -6 } }),
+            e('prism_golem', 'Prism Golem', 'crystal_golem', { tint: '#cfe8ff' }),
+            e('shard_spider', 'Shard Spider'),
+        ]),
     ],
     elite: [
         fight('geode_guardians', 'Geode Guardians', 2, [
@@ -62,12 +69,17 @@ export const encounters = {
     ],
     boss: [
         fight('boss_crystal_warden', 'The Crystal Warden', 2, [
-            e('orc_captain', 'Crystal Warden', 'crystal_warden', { statMods: { maxHp: 60, atk: 5, def: 5, mdf: 3, spd: 1 } }),
+            e('orc_captain', 'Crystal Warden', 'crystal_warden', { extraAbilities: ['crystal_slam'], statMods: { maxHp: 60, atk: 5, def: 5, mdf: 3, spd: 1 } }),
             e('wolf', 'Crystal Beast', 'crystal_beast'),
             e('shard_spider', 'Shard Spider'),
             e('kingdom_guard', 'Crystal Golem', 'crystal_golem'),
             e('wolf', 'Crystal Bat', 'crystal_bat'),
-        ], { scouting: 'The Crystal Warden keeps the caves with golems and shard spiders. The spiders slow whatever they bite.' }),
+        ], { scouting: 'The Crystal Warden keeps the caves with golems and shard spiders. The spiders slow whatever they bite.',
+          phases: [
+            { at: 0.5, name: 'Crystal Armor', say: 'The Crystal Warden\'s armor hardens, and a bat bursts from the cracks!',
+              status: { status: 'protect', duration: 3 },
+              summon: [e('wolf', 'Crystal Bat', 'crystal_bat')] },
+          ] }),
     ],
 };
 

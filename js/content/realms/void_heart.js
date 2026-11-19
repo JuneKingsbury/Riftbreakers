@@ -64,7 +64,14 @@ export const encounters = {
             e('void_walker', 'Void Walker'),
             e('riftcaller', 'Void Herald', 'void_herald'),
             e('void_stalker', 'Void Champion'),
-        ], { scouting: 'The Void Arbiter weighs every debt. A herald tears rifts open for it, and its champions collect.' }),
+        ], { scouting: 'The Void Arbiter weighs every debt. A herald tears rifts open for it, and its champions collect.',
+          phases: [
+            { at: 0.5, name: 'Judgment', say: 'Judgment! The Void Arbiter casts off every curse laid on it.',
+              cleanse: true, buffs: [{ stat: 'mat', value: 5, duration: 5 }, { stat: 'mdf', value: 5, duration: 5 }],
+              summon: [e('void_walker', 'Void Walker')] },
+            { at: 0.25, name: 'Final Verdict', say: 'The Arbiter speeds toward its final verdict.',
+              status: { status: 'haste', duration: 3 } },
+          ] }),
     ],
 };
 

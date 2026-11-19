@@ -54,6 +54,13 @@ export const encounters = {
             e('spectral_wisp', 'Reality Shred', 'reality_shred'),
             e('shard_spider', 'Glitch Mite', 'glitch_beast'),
         ]),
+        fight('mirror_maze', 'Mirror Maze', 4, [
+            e('echo_mimic', 'Echo Mimic', 'mirror_twin', { tint: '#e0c0ff' }),
+            e('void_walker', 'Void Walker'),
+            e('echo_mimic', 'Echo Mimic', 'mirror_twin', { tint: '#e0c0ff' }),
+            e('shadow_mage', 'Fracture Wraith', 'fracture_wraith'),
+            e('void_stalker', 'Rift Crawler', 'glitch_beast'),
+        ]),
     ],
     elite: [
         fight('labyrinth_horrors', 'Labyrinth Horrors', 6, [
@@ -81,7 +88,13 @@ export const encounters = {
             e('canopy_stalker', 'Echo Beast', 'echo_beast'),
             e('void_stalker', 'Rift Crawler', 'glitch_beast'),
             e('canopy_stalker', 'Echo Beast', 'echo_beast'),
-        ], { scouting: 'The Shifting Horror never keeps one shape for long. Echo beasts run ahead of it, and the wraiths behind it blink through rifts.' }),
+        ], { scouting: 'The Shifting Horror never keeps one shape for long. Echo beasts run ahead of it, and the wraiths behind it blink through rifts.',
+          phases: [
+            { at: 0.66, name: 'Split', say: 'The Shifting Horror tears off a piece of itself, and the piece gets up!',
+              summon: [e('canopy_stalker', 'Echo Beast', 'echo_beast')] },
+            { at: 0.33, name: 'Split Again', say: 'Again the Horror splits, faster now.',
+              summon: [e('canopy_stalker', 'Echo Beast', 'echo_beast')], status: { status: 'haste', duration: 3 } },
+          ] }),
     ],
 };
 

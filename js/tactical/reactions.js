@@ -5,10 +5,11 @@
 // results go back through _applyResult flagged as reactions, so a counter can
 // never trigger another counter.
 import { ABILITIES, resolveAbility, inflictStatus, cleanseStatuses, passivesOf, NEGATIVE_STATUSES } from './abilities.js';
-import { isConscious, isDead, isUnconscious } from './units.js';
+import { isConscious, isDead, isUnconscious, createUnit } from './units.js';
 import { JOB_STATS } from './data-registry.js';
 import { columnCells, posKey } from './battle-map.js';
 import { moveEntity } from '../systems/movement-lerp.js';
+import { checkHpTriggers, placeNear } from './triggers.js';
 
 const LOW_HP_FRAC = 0.3;
 
@@ -57,20 +58,48 @@ function freeCells(battle, around, radius, score) {
 
 function castOn(battle, reactor, key, target) {
     reactor.mp = Math.max(0, reactor.mp - (ABILITIES[key].mpCost || 0));
+    battle.stats?.use(reactor, key);
     const res = resolveAbility(reactor, target, key, battle.map);
     battle._applyResult(reactor, target, key, res, { isReaction: true });
 }
 
-// Deal reaction damage that bypasses the ability system (thorns).
-function dealDamage(battle, target, amt) {
+// Deal reaction damage that bypasses the ability system (thorns), credited to `reactor`'s
+// reaction `key` in the battle's stats.
+function dealDamage(battle, target, amt, reactor, key) {
+    const before = target.hp;
     target.hp = Math.max(0, target.hp - amt);
+    battle.stats?.damage(reactor, target, before - target.hp, key);
+    if (target.hp === 0) battle.stats?.knockout(reactor, target, key, { inert: !!JOB_STATS[target.job]?.inert });
     battle._spawnFloat(target, `-${amt}`, '#f88');
     if (target.hp === 0 && !isUnconscious(target) && !isDead(target)) {
         target.status.push('unconscious');
         target.deathTimer = 3;
         battle.logMsg(`${target.name} is knocked unconscious!`);
-        battle._onDown?.(target, null);
+        battle._onDown?.(target, reactor);
     }
+    checkHpTriggers(battle, target);
+}
+
+// The unit breaks into weaker copies of itself beside where it fell: same job, kit and look,
+// at a fraction of its HP and power, without the ability to split again.
+function splitApart(battle, unit, { count, hpFrac, statFrac }) {
+    const base = unit.spriteName ?? unit.name;
+    const splits = (k) => !!ABILITIES[k]?.splitInto;
+    placeNear(battle, unit, count, (cell) => {
+        const copy = createUnit(`${base} Fragment`, unit.job, unit.team, cell.x, cell.y, { spriteKey: unit.spriteKey, tint: unit.tint });
+        copy.spriteName = base;
+        copy.maxHp = copy.hp = Math.max(1, Math.round(unit.maxHp * hpFrac));
+        for (const s of ['atk', 'def', 'mat', 'mdf']) copy[s] = Math.max(0, Math.round(unit[s] * statFrac));
+        for (const s of ['spd', 'move', 'eva', 'crit']) copy[s] = unit[s];
+        copy.maxMp = copy.mp = unit.maxMp;
+        copy.abilities = [...unit.abilities];
+        copy.skillsets = unit.skillsets;
+        copy.reaction = splits(unit.reaction) ? null : unit.reaction;
+        copy.support = unit.support;
+        copy.movement = unit.movement;
+        copy.bonusPassives = (unit.bonusPassives ?? []).filter(k => !splits(k));
+        return copy;
+    }, 'breaks away');
 }
 
 function announce(battle, reactor, rx, key) {
@@ -136,7 +165,7 @@ function tryOneReaction(battle, reactor, key, attacker, abKey, result) {
     if (rx.thornsFrac && isConscious(attacker)) {
         const amt = Math.max(1, Math.round(result.damage * rx.thornsFrac));
         battle.logMsg(`${attacker.name} takes ${amt} damage from the thorns.`);
-        dealDamage(battle, attacker, amt);
+        dealDamage(battle, attacker, amt, reactor, key);
     }
     if (rx.cleanseSelf && cleanseStatuses(reactor).length) battle.logMsg(`${reactor.name} is purified.`);
     if (phaseTo) {
@@ -187,6 +216,7 @@ function tryAllyReaction(battle, reactor, key, victim, result, attacker) {
     if (rx.allyCast) castOn(battle, reactor, rx.allyCast, victim);
     if (rx.counterWith) castOn(battle, reactor, rx.counterWith, attacker);
     if (rx.saveFromDown) {
+        battle.stats?.heal(reactor, victim, 1 - victim.hp, key);
         victim.hp = 1;
         victim.status = victim.status.filter(s => s !== 'unconscious');
         battle.logMsg(`${reactor.name} holds ${victim.name}'s soul in place!`);
@@ -195,6 +225,8 @@ function tryAllyReaction(battle, reactor, key, victim, result, attacker) {
     if (share > 0) {
         reactor.hp -= share;
         victim.hp = Math.min(victim.maxHp, victim.hp + share);
+        // The blow is the attacker's either way; the reactor took part of it instead.
+        battle.stats?.shiftTaken(victim, reactor, share);
         if (isUnconscious(victim) && victim.hp > 0) victim.status = victim.status.filter(s => s !== 'unconscious');
         battle.logMsg(`${reactor.name} takes ${share} of the blow meant for ${victim.name}.`);
         battle._spawnFloat(reactor, `-${share}`, '#f88');
@@ -208,6 +240,15 @@ function tryAllyReaction(battle, reactor, key, victim, result, attacker) {
 // then, if it was a copy (an inert summon), its summoner's 'decoyDown' reactions against
 // whoever broke it (Shattered Image).
 export function tryDownReactions(battle, unit, source) {
+    // Splitting (an affix) happens on top of any other knockout reaction.
+    if (isUnconscious(unit) && !isDead(unit)) {
+        for (const key of passivesOf(unit, 'reaction')) {
+            const rx = ABILITIES[key];
+            if (rx?.trigger !== 'onDown' || !rx.splitInto || unit._reactionsUsed?.[key]) continue;
+            announce(battle, unit, rx, key);
+            splitApart(battle, unit, rx.splitInto);
+        }
+    }
     if (isUnconscious(unit) && !isDead(unit)) {
         for (const key of passivesOf(unit, 'reaction')) {
             const rx = ABILITIES[key];
@@ -223,6 +264,7 @@ export function tryDownReactions(battle, unit, source) {
             }
             if (rx.reviveFrac) {
                 unit.hp = Math.max(1, Math.round(unit.maxHp * rx.reviveFrac));
+                battle.stats?.heal(unit, unit, unit.hp, key);
                 unit.status = unit.status.filter(s => s !== 'unconscious');
                 battle.logMsg(`${unit.name} rises again!`);
                 battle._spawnFloat(unit, `+${unit.hp}`, '#8f8');

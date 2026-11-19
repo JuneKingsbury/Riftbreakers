@@ -10,6 +10,7 @@ import { ABILITY_DATA, ABILITY_TEMPLATES } from '../../js/content/abilities.js';
 import { JOB_DATA } from '../../js/content/jobs.js';
 import { EQUIPMENT } from '../../js/tactical/data/equipment.js';
 import { RELICS } from '../../js/run/data/relics.js';
+import { AFFIXES } from '../../js/content/affixes.js';
 import { EVENTS } from '../../js/run/data/events.js';
 import { ENCOUNTERS } from '../../js/run/data/encounters.js';
 import { REALMS, CHAINS, ACT_REALMS } from '../../js/run/data/realms.js';
@@ -19,7 +20,7 @@ import { MATERIALS } from '../../js/tactical/battle-map.js';
 const SKIN = JSON.parse(readFileSync(new URL('../../skins/16x16_tiny_world/manifest.json', import.meta.url), 'utf8'));
 
 const content = () => ({
-    abilities: ABILITY_DATA, templates: ABILITY_TEMPLATES, jobs: JOB_DATA, items: EQUIPMENT, relics: RELICS, events: EVENTS,
+    abilities: ABILITY_DATA, templates: ABILITY_TEMPLATES, jobs: JOB_DATA, items: EQUIPMENT, relics: RELICS, affixes: AFFIXES, events: EVENTS,
     encounters: ENCOUNTERS, realms: REALMS, chains: CHAINS, maps: MAP_DATA.map(m => m.id), materials: MATERIALS,
     actRealms: ACT_REALMS, sprites: SKIN.sprites.entities,
 });

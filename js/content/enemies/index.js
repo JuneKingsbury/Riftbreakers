@@ -7,6 +7,8 @@ import * as monsters from './monsters.js';
 import * as beasts from './beasts.js';
 import * as humans from './humans.js';
 import * as summons from './summons.js';
+import * as bosses from './bosses.js';
+import * as realm from './realm.js';
 
 // File name → module, in the order their jobs are listed in JOB_DATA (after the classes).
-export const ENEMY_FILES = { novice, monsters, beasts, humans, summons };
+export const ENEMY_FILES = { novice, monsters, beasts, humans, summons, bosses, realm };

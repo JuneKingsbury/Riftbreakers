@@ -52,7 +52,7 @@ test('the Rift Tier and small-party multipliers stack', () => {
 test('a missing or out-of-range Rift Tier never breaks the score', () => {
     assert.equal(riftTierMultiplier(undefined), 1);
     assert.equal(riftTierMultiplier(-2), 1);
-    assert.equal(riftTierMultiplier(99), 2.5, 'clamped to the top tier');
+    assert.equal(riftTierMultiplier(99), 3, 'clamped to the top tier');
 });
 
 test('a battle\'s score line names the Rift Tier bonus only when there is one', () => {
@@ -68,10 +68,10 @@ test('every Rift Tier scores by the same steps as its renown bonus', () => {
 });
 
 test('the leaderboard accepts the best possible battle at the top Rift Tier', () => {
-    // A solo boss win at ×2 speed on Tier V: 500 × 2 × 2 × 2.5.
-    const best = battleScore({ kind: 'boss', survivors: 1, partySize: 1, rounds: 1, startPartySize: 1, tier: 5 }).points;
-    assert.equal(best, 5000);
-    const entry = { id: 'run-1', name: 'Tester', score: best, date: new Date().toISOString(), startPartySize: 1, tier: 5,
+    // A solo boss win at ×2 speed on Tier VI: 500 × 2 × 2 × 3.
+    const best = battleScore({ kind: 'boss', survivors: 1, partySize: 1, rounds: 1, startPartySize: 1, tier: 6 }).points;
+    assert.equal(best, 6000);
+    const entry = { id: 'run-1', name: 'Tester', score: best, date: new Date().toISOString(), startPartySize: 1, tier: 6,
         battles: 1, floors: 1, elites: 0, bosses: 1, realms: ['wild_frontiers'], party: [{ job: 'warden', origin: 'human', level: 1 }] };
     assert.ok(!validateEntry(entry).error, validateEntry(entry).error);
 });

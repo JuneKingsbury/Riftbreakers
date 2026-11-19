@@ -1,10 +1,12 @@
-import { computeMoveRange, computeMovePath, computeAttackRange, computeAoeArea, computePatternArea, resolveAbility, ABILITIES, supportOf, passivesOf, inflictStatus, cleanseStatuses, abilityAffects, summonCapped } from './abilities.js';
+import { activeSupports, computeMoveRange, computeMovePath, computeAttackRange, computeAoeArea, computePatternArea, resolveAbility, ABILITIES, supportOf, passivesOf, inflictStatus, cleanseStatuses, abilityAffects, abilityStrikes, isHelpful, summonCapped } from './abilities.js';
 import { JOB_STATS } from './data-registry.js';
 import { viewState } from './view-state.js';
 import { isDead, isAlive, isConscious, isUnconscious, isStunned, faceToward, setFacing, createUnit } from './units.js';
 import { getCell, applyTerrainEffect, settleZ, posKey, parseKey, cellKey, columnCells } from './battle-map.js';
 import { moveEntity, moveEntityAlongPath } from '../systems/movement-lerp.js';
 import { tryReaction, tryAllyReactions, tryDownReactions, tryChargeReactions } from './reactions.js';
+import { BattleStats } from './battle-stats.js';
+import { onUnitDown, checkHpTriggers } from './triggers.js';
 
 export const STATES = {
     ADVANCE_CT:            'ADVANCE_CT',
@@ -55,6 +57,29 @@ export class TacticalBattle {
         // join later and don't count) and how many turns they have taken.
         this._partyIds = new Set(units.filter(u => u.team === 'player' && u.summonerId == null).map(u => u.id));
         this.partyTurns = 0;
+        // What each unit did, for the breakdown on the result screen (battle-stats.js).
+        this.stats = new BattleStats();
+        this.stats.track(units);
+    }
+
+    _unitById(id) {
+        return id == null ? null : this.units.find(u => u.id === id) ?? null;
+    }
+
+    // Records one resolved ability in the stats from the HP each side actually lost or
+    // gained (resolveAbility's targetHpChange and sourceHpChange).
+    _recordResult(source, target, abKey, result) {
+        const inert = u => !!JOB_STATS[u.job]?.inert;
+        const dt = result.targetHpChange ?? 0, ds = result.sourceHpChange ?? 0;
+        if (dt < 0) {
+            this.stats.damage(source, target, -dt, abKey);
+            if (target.hp === 0) this.stats.knockout(source, target, abKey, { inert: inert(target) });
+        } else if (dt > 0) this.stats.heal(source, target, dt, abKey);
+        // A reflected spell hurts its caster (credited to the reflector); a drain heals it.
+        if (ds < 0) {
+            this.stats.damage(target, source, -ds, abKey);
+            if (source.hp === 0) this.stats.knockout(target, source, abKey, { inert: inert(source) });
+        } else if (ds > 0) this.stats.heal(source, source, ds, abKey);
     }
 
     /**
@@ -100,6 +125,7 @@ export class TacticalBattle {
             const amt = Math.min(u.maxHp - u.hp, Math.max(1, Math.round(u.maxHp * pct)));
             if (amt <= 0) return;
             u.hp += amt;
+            this.stats.heal(u, u, amt, key);
             this._spawnFloat(u, `+${amt}`, '#8f8');
         };
         if (fx.hpPct) heal(unit, fx.hpPct);
@@ -148,6 +174,7 @@ export class TacticalBattle {
     }
 
     _applyResult(source, target, abKey, result, { isReaction = false } = {}) {
+        this._recordResult(source, target, abKey, result);
         if (result.silenced) {
             this.logMsg(`${source.name} is silenced and cannot cast!`);
             return;
@@ -205,6 +232,9 @@ export class TacticalBattle {
             this.logMsg(`${target.name} is knocked unconscious!`);
         }
         if (result.damage > 0 && target.hp === 0) this._onDown(target, source);
+        // Relic (and boss) triggers on falling below an HP threshold (triggers.js).
+        if ((result.targetHpChange ?? 0) < 0) checkHpTriggers(this, target);
+        if ((result.sourceHpChange ?? 0) < 0) checkHpTriggers(this, source);
         if (!isReaction) {
             tryReaction(this, target, source, abKey, result);
             tryAllyReactions(this, target, source, abKey, result);
@@ -276,6 +306,9 @@ export class TacticalBattle {
                 }
                 // doom runs out: the unit falls
                 if (s === 'doom' && unit.hp > 0) {
+                    const doomer = this._unitById(unit._statusBy?.doom);
+                    this.stats.damage(doomer, unit, unit.hp, 'status:doom');
+                    this.stats.knockout(doomer, unit, 'status:doom', { inert: !!JOB_STATS[unit.job]?.inert });
                     unit.hp = 0;
                     if (!unit.status.includes('unconscious')) unit.status.push('unconscious');
                     unit.deathTimer = 3;
@@ -288,35 +321,36 @@ export class TacticalBattle {
         }
         unit.statusTimers = timers;
 
-        // Iron Discipline: the unit and adjacent allies brace for the coming turn.
-        const turnBuffs = isConscious(unit) ? supportOf(unit)?.turnAlliesBuff : null;
-        if (turnBuffs) {
-            for (const a of [unit, ...this._adjacent(unit, u => u.team === unit.team && isConscious(u))]) {
-                a.buffs = a.buffs || [];
-                for (const b of turnBuffs) a.buffs.push({ key: 'iron_discipline', ...b });
-            }
-        }
-
         // Support start-of-turn healing (Regen Aura)
         const regenHp = supportOf(unit)?.turnRegenHp;
         if (regenHp && unit.hp > 0) {
+            const before = unit.hp;
             unit.hp = Math.min(unit.maxHp, unit.hp + regenHp);
+            this.stats.heal(unit, unit, unit.hp - before, activeSupports(unit).find(k => ABILITIES[k]?.turnRegenHp) ?? null);
             this.logMsg(`${unit.name} regenerates ${regenHp} HP from ${supportOf(unit).name}.`);
         }
 
         // regen status: heal ~8% max HP
         if (unit.status.includes('regen')) {
             const amt = Math.max(1, Math.round(unit.maxHp * 0.08));
+            const before = unit.hp;
             unit.hp = Math.min(unit.maxHp, unit.hp + amt);
+            // Credited to whoever cast it; Regen from a relic is the unit's own.
+            this.stats.heal(this._unitById(unit._statusBy?.regen) ?? unit, unit, unit.hp - before, 'status:regen');
             this.logMsg(`${unit.name} regenerates ${amt} HP.`);
         }
 
         // poison: deal ~6% max HP each turn
         if (unit.status.includes('poison')) {
             const dmg = Math.max(1, Math.round(unit.maxHp * 0.06));
+            const before = unit.hp;
             unit.hp = Math.max(0, unit.hp - dmg);
+            const poisoner = this._unitById(unit._statusBy?.poison);
+            this.stats.damage(poisoner, unit, before - unit.hp, 'status:poison');
+            if (unit.hp === 0) this.stats.knockout(poisoner, unit, 'status:poison', { inert: !!JOB_STATS[unit.job]?.inert });
             this.logMsg(`${unit.name} takes ${dmg} poison damage!`);
             this._spawnFloat(unit, `-${dmg}`, '#88ff44');
+            checkHpTriggers(this, unit);
             if (unit.hp <= 0) {
                 if (!unit.status.includes('unconscious')) unit.status.push('unconscious');
                 unit.deathTimer = 3;
@@ -329,6 +363,17 @@ export class TacticalBattle {
             if (b.duration === null) return true;
             return --b.duration > 0;
         });
+
+        // Iron Discipline (and Commanding): the unit and adjacent allies brace for the coming
+        // turn. Given after the unit's own buffs count down, or its share would expire at once,
+        // and refreshed rather than stacked, since it comes again every turn.
+        const turnBuffs = isConscious(unit) ? supportOf(unit)?.turnAlliesBuff : null;
+        if (turnBuffs) {
+            for (const a of [unit, ...this._adjacent(unit, u => u.team === unit.team && isConscious(u))]) {
+                a.buffs = (a.buffs || []).filter(b => b.key !== 'iron_discipline');
+                for (const b of turnBuffs) a.buffs.push({ key: 'iron_discipline', ...b });
+            }
+        }
 
         if (isUnconscious(unit)) {
             unit.deathTimer = (unit.deathTimer || 0) - 1;
@@ -463,7 +508,7 @@ export class TacticalBattle {
         for (const key of this.aoePreview) {
             const hit = ab.targetType === 'corpse'
                 ? this._bodiesIn(source, new Set([key])).length > 0
-                : this.livingUnits.some(u => posKey(u) === key && abilityAffects(source, ab, u));
+                : this.livingUnits.some(u => posKey(u) === key && abilityStrikes(source, ab, u));
             if (hit) this.hitPreview.add(key);
         }
     }
@@ -527,6 +572,7 @@ export class TacticalBattle {
                 targetX: tx,
                 targetY: ty,
                 targetZ: tz,
+                targetId: this._chargeTargetId(source, ab, tx, ty, tz),
                 ct: 0,
                 needed: this._chargeTime(source, ab),
             };
@@ -583,6 +629,7 @@ export class TacticalBattle {
             this.logMsg(`${source.name}'s ${ab.name} hits nothing.`);
         }
 
+        this.stats.use(source, this.selectedAbility);
         for (const target of targets) {
             const result = resolveAbility(source, target, this.selectedAbility, this.map);
             this._applyResult(source, target, this.selectedAbility, result);
@@ -610,13 +657,32 @@ export class TacticalBattle {
             if (!unit._charging) continue;
             if (unit._charging.ct < unit._charging.needed) continue;
 
-            const { ability, rotation, targetX, targetY } = unit._charging;
-            const targetZ = unit._charging.targetZ ?? getCell(this.map, targetX, targetY)?.z ?? 0;
+            const charge = unit._charging;
+            const { ability, rotation } = charge;
             const ab = ABILITIES[ability];
+            // Where it goes off (see _aimCharge); the view animates toward it.
+            let targetX = charge.targetX, targetY = charge.targetY;
             unit.status = unit.status.filter(s => s !== 'charging');
             unit._charging = null;
 
             if (ab) {
+                const aimedZ = charge.targetZ ?? getCell(this.map, charge.targetX, charge.targetY)?.z ?? 0;
+                const aim = this._aimCharge(unit, ab, { ...charge, targetZ: aimedZ });
+                if (!aim) {
+                    // No foe left in reach: the spell fizzles and its MP comes back.
+                    unit.mp = Math.min(unit.maxMp, unit.mp + (ab.mpCost || 0));
+                    this.logMsg(`${unit.name}'s ${ab.name} fizzles with no target in reach.`);
+                    this._spawnFloat(unit, 'Fizzle', '#aaa');
+                    continue;
+                }
+                const targetZ = aim.z;
+                targetX = aim.x;
+                targetY = aim.y;
+                if (targetX !== charge.targetX || targetY !== charge.targetY) {
+                    faceToward(unit, targetX, targetY);
+                    const now = this.livingUnits.find(u => posKey(u) === cellKey(targetX, targetY, targetZ));
+                    if (now && now.id !== charge.targetId) this.logMsg(`${unit.name} turns ${ab.name} on ${now.name}!`);
+                }
                 this.logMsg(`${unit.name}'s ${ab.name} fires!`);
 
                 if (ab.isSummon) {
@@ -634,6 +700,7 @@ export class TacticalBattle {
                 const targets = this._targetsIn(unit, ab, affectedTiles);
                 this._emitArea(unit, ability, affectedTiles, { x: targetX, y: targetY, z: targetZ });
 
+                this.stats.use(unit, ability);
                 for (const target of targets) {
                     const result = resolveAbility(unit, target, ability, this.map);
                     this._applyResult(unit, target, ability, result);
@@ -662,7 +729,8 @@ export class TacticalBattle {
         unit.mp = Math.max(0, unit.mp - ab.mpCost);
 
         if (ab.chargeTime && ab.chargeTime > 0) {
-            unit._charging = { ability: abilityKey, targetX: tx, targetY: ty, targetZ: tz, ct: 0, needed: this._chargeTime(unit, ab) };
+            unit._charging = { ability: abilityKey, targetX: tx, targetY: ty, targetZ: tz, ct: 0, needed: this._chargeTime(unit, ab),
+                targetId: this._chargeTargetId(unit, ab, tx, ty, tz) };
             if (!unit.status.includes('charging')) unit.status.push('charging');
             this.logMsg(`${unit.name} begins channeling ${ab.name}!`);
             this._revealOnAct(unit);
@@ -685,6 +753,7 @@ export class TacticalBattle {
         const targets = this._targetsIn(unit, ab, affectedTiles);
         this._emitArea(unit, abilityKey, affectedTiles, { x: tx, y: ty, z: tz });
 
+        this.stats.use(unit, abilityKey);
         for (const target of targets) {
             const result = resolveAbility(unit, target, abilityKey, this.map);
             this._applyResult(unit, target, abilityKey, result);
@@ -729,6 +798,7 @@ export class TacticalBattle {
             if (rooted && !u._movedThisTurn && isConscious(u) && u.hp < u.maxHp) {
                 const amt = Math.min(u.maxHp - u.hp, Math.max(1, Math.round(u.maxHp * rooted)));
                 u.hp += amt;
+                this.stats.heal(u, u, amt, passivesOf(u, 'movement').find(k => ABILITIES[k].rootedHealPct) ?? null);
                 this.logMsg(`${u.name} draws ${amt} HP from the soil.`);
                 this._spawnFloat(u, `+${amt}`, '#8f8');
             }
@@ -792,6 +862,7 @@ export class TacticalBattle {
         }
         faceToward(summon, source.x, source.y);
         this.units.push(summon);
+        this.stats.track([summon]);
         this.logMsg(`${source.name} summons a ${ab.summonName}!`);
         this._emit('summon', { source, unit: summon });
 
@@ -831,9 +902,45 @@ export class TacticalBattle {
 
     // ---- Targets ---------------------------------------------------------------------
 
-    // The units an ability touches inside its affected cells (see abilityAffects).
+    // The units an ability touches inside its affected cells (see abilityStrikes).
     _targetsIn(source, ab, affectedTiles) {
-        return this.livingUnits.filter(u => affectedTiles.has(posKey(u)) && abilityAffects(source, ab, u));
+        return this.livingUnits.filter(u => affectedTiles.has(posKey(u)) && abilityStrikes(source, ab, u));
+    }
+
+    // The unit a charge is aimed at: whoever it would land on at the target cell, standing
+    // units first. Null when aimed at an empty cell (an area spell placed between foes).
+    _chargeTargetId(source, ab, tx, ty, tz) {
+        const key = cellKey(tx, ty, tz);
+        const here = this.livingUnits.filter(u => posKey(u) === key && abilityAffects(source, ab, u));
+        return (here.find(u => isConscious(u)) ?? here[0])?.id ?? null;
+    }
+
+    /**
+     * Where a charged ability goes off, decided when it fires rather than when it began.
+     * It follows the unit it was aimed at, if that unit can still be struck and is in range.
+     * A harmful one that has lost its target keeps its cell if a standing foe is there,
+     * and otherwise turns to the standing foe in range nearest that cell. Returns the cell
+     * {x, y, z}, or null when a harmful ability has no foe in range at all (it fizzles).
+     * Helpful ones, and ones aimed at the ground or the caster, keep their cell.
+     */
+    _aimCharge(unit, ab, charge) {
+        const cell = { x: charge.targetX, y: charge.targetY, z: charge.targetZ };
+        if (ab.isSummon || ab.targetType === 'corpse' || ab.targetType === 'tile' || ab.targetType === 'self' || ab.terrainEffect) return cell;
+        const reach = computeAttackRange(new Set([posKey(unit)]), ab.range, false, ab.requiresLos !== false, this.map);
+        const canStrike = u => abilityStrikes(unit, ab, u) && reach.has(posKey(u));
+        const at = u => ({ x: u.x, y: u.y, z: u.z ?? 0 });
+
+        const target = this._unitById(charge.targetId);
+        if (target && !isDead(target) && canStrike(target)) return at(target);
+        if (isHelpful(ab)) return cell;
+
+        const foe = u => u.team !== unit.team && isConscious(u);
+        const area = this._affectedCells(ab, cell.x, cell.y, cell.z, charge.rotation);
+        if (this._targetsIn(unit, ab, area).some(foe)) return cell;
+        const dist = u => Math.abs(u.x - cell.x) + Math.abs(u.y - cell.y);
+        const next = this.livingUnits.filter(u => foe(u) && canStrike(u))
+            .sort((a, b) => dist(a) - dist(b) || a.hp - b.hp || a.id - b.id)[0];
+        return next ? at(next) : null;
     }
 
     // Knocked-out enemies of `source` lying in the given cells: the bodies corpse abilities use.
@@ -857,6 +964,7 @@ export class TacticalBattle {
      */
     _resolveCorpse(source, key, tx, ty, tz) {
         const ab = ABILITIES[key];
+        this.stats.use(source, key);
         const center = { x: tx, y: ty, z: tz ?? 0 };
         const area = ab.aoe > 0 ? computeAoeArea(this.map, center, ab.aoe) : new Set([cellKey(tx, ty, center.z)]);
         // The body on the target cell goes first.
@@ -906,6 +1014,9 @@ export class TacticalBattle {
      * (Soul Harvest, Shattered Image) happen here.
      */
     _onDown(unit, source = null) {
+        // Relic (and boss) triggers on someone going down (triggers.js), while it's still a
+        // knockout: before a copy shatters or a Phylactery brings it back.
+        if (isUnconscious(unit)) onUnitDown(this, unit, source);
         // A copy (Mirror Image) shatters: there is no body to revive or raise.
         if (JOB_STATS[unit.job]?.inert && !isDead(unit)) {
             unit.status = unit.status.filter(s => s !== 'unconscious');

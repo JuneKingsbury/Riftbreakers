@@ -79,7 +79,13 @@ export const encounters = {
             e('orc_captain', 'Shifting Horror', 'shifting_horror'),
             e('shadow_mage', 'Fracture Wraith', 'fracture_wraith'),
             e('canopy_stalker', 'Echo Beast', 'echo_beast'),
-        ], { scouting: 'The Unraveler pulls at the edges of the world. Echoes of old champions fight for it, and nothing stays where you left it.' }),
+        ], { scouting: 'The Unraveler pulls at the edges of the world. Echoes of old champions fight for it, and nothing stays where you left it.',
+          phases: [
+            { at: 0.5, name: 'Reality Frays', say: 'Reality frays. Echoes of fallen champions step out of the seams!',
+              summon: [e('void_stalker', 'Echo of a Champion', 'mirror_twin'), e('void_stalker', 'Echo of a Champion', 'mirror_twin')] },
+            { at: 0.2, name: 'Rewoven', say: 'The Unraveler pulls its own threads back together.',
+              healPct: 0.2, cleanse: true },
+          ] }),
     ],
 };
 

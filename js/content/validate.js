@@ -7,7 +7,7 @@ import { SCHEMAS, STATUSES, EQUIP_TYPES, ITEM_GRANT_SLOTS } from './vocab.js';
 /**
  * @brief Validates content tables against the vocabulary.
  *
- * @param {object} t  The content: { abilities, templates (ABILITY_TEMPLATES), jobs, items, relics, events, encounters (realm →
+ * @param {object} t  The content: { abilities, templates (ABILITY_TEMPLATES), jobs, items, relics, affixes?, events, encounters (realm →
  *                    { normal, elite, boss }), realms, chains, maps (map ids), materials,
  *                    actRealms (act → realm ids), sprites? (entity sprite keys; sprite refs
  *                    are skipped when absent) }.
@@ -72,6 +72,7 @@ export function validateContent(t) {
     for (const [k, v] of Object.entries(t.jobs)) checkFields(`job ${k}`, v, SCHEMAS.job);
     for (const [k, v] of Object.entries(t.items)) checkFields(`item ${k}`, v, SCHEMAS.item);
     for (const [k, v] of Object.entries(t.relics)) checkFields(`relic ${k}`, v, SCHEMAS.relic);
+    for (const [k, v] of Object.entries(t.affixes ?? {})) checkFields(`affix ${k}`, v, SCHEMAS.affix);
     for (const e of t.events) checkFields(`event ${e.id}`, e, SCHEMAS.event);
     for (const [k, v] of Object.entries(t.realms)) checkFields(`realm ${k}`, v, SCHEMAS.realm);
     for (const [realm, kinds] of Object.entries(t.encounters)) {
@@ -93,7 +94,30 @@ export function validateContent(t) {
             }
         }
     }
+    for (const [k, relic] of Object.entries(t.relics)) {
+        for (const a of relic.passives ?? []) {
+            if (known.ability(a) && slotOf(a) === 'action') errors.push(`relic ${k}: passives takes reaction/support/movement abilities, but ${a} is an action`);
+        }
+        for (const [i, tr] of (relic.triggers ?? []).entries()) {
+            if (tr.on === 'hpBelow' && !(tr.pct > 0 && tr.pct < 1)) errors.push(`relic ${k}: triggers[${i}] (hpBelow) needs a pct between 0 and 1`);
+        }
+    }
+    // An affix's passives are reactions, supports or movement skills; its extra abilities are actions.
+    for (const [k, affix] of Object.entries(t.affixes ?? {})) {
+        for (const a of affix.passives ?? []) {
+            if (known.ability(a) && slotOf(a) === 'action') errors.push(`affix ${k}: passives takes reaction/support/movement abilities, but ${a} is an action`);
+        }
+        for (const a of affix.extraAbilities ?? []) {
+            if (known.ability(a) && slotOf(a) !== 'action') errors.push(`affix ${k}: extraAbilities takes actions, but ${a} is ${slotOf(a)}`);
+        }
+    }
     for (const [k, job] of Object.entries(t.jobs)) {
+        for (const a of job.passives ?? []) {
+            if (known.ability(a) && slotOf(a) === 'action') errors.push(`job ${k}: passives takes reaction/support/movement abilities, but ${a} is an action`);
+        }
+        for (const s of job.battleStart ?? []) {
+            if (['frog', 'enfeebled', 'taunted'].includes(s.status)) errors.push(`job ${k}: battleStart can't start with ${s.status} (it has side effects only inflictStatus applies)`);
+        }
         for (const p of job.promotions ?? []) if (t.jobs[p] && t.jobs[p].tier !== 2) errors.push(`job ${k}: promotion ${p} is not a Tier 2 class`);
         for (const [a, def] of Object.entries(job.learnable ?? {})) {
             if (!known.ability(a)) errors.push(`job ${k}: learns unknown ability '${a}'`);

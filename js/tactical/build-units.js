@@ -4,23 +4,53 @@ import { getScriptFor } from './ai/script-store.js';
 import { CHARACTER_DATA } from './data/characters.js';
 import { equipmentStatBonuses } from './data/equipment.js';
 import { RELICS, relicStatMods } from '../run/data/relics.js';
+import { AFFIXES, knownAffixes, affixedName } from '../run/data/affixes.js';
 
 // Enemy character entries for an encounter (see run/data/encounters.js buildEncounter).
 export function encounterEnemies(encounter) {
     if (!encounter?.roster) return CHARACTER_DATA.filter(c => c.team === 'enemy');
-    return encounter.roster.map(r => ({
-        name:           r.name,
-        job:            r.job,
-        team:           'enemy',
-        x:              20, y: 8,   // overwritten by spawn positions
-        ct:             r.ct ?? 0,
-        level:          r.level ?? encounter.enemyLevel ?? 1,
-        statMods:       r.statMods ?? {},
-        extraAbilities: r.extraAbilities ?? [],
-        appearance:     r.appearance ?? null,
-        spriteKey:      r.sprite ?? null,
-        tint:           r.tint ?? null,
+    return encounter.roster.map(r => {
+        // Elite affixes (run/data/affixes.js) on the fight's leader.
+        const affixes = knownAffixes(r.affixes).map(k => AFFIXES[k]);
+        return {
+            name:           affixedName(r.name, r.affixes),
+            baseName:       r.name,   // its sprite is found by this name (enemy-sprites.js)
+            affixes:        knownAffixes(r.affixes),
+            job:            r.job,
+            team:           'enemy',
+            x:              20, y: 8,   // overwritten by spawn positions
+            ct:             r.ct ?? 0,
+            level:          r.level ?? encounter.enemyLevel ?? 1,
+            statMods:       addMods(r.statMods, ...affixes.map(a => a.statMods)),
+            extraAbilities: [...(r.extraAbilities ?? []), ...affixes.flatMap(a => a.extraAbilities ?? [])],
+            appearance:     r.appearance ?? null,
+            spriteKey:      r.sprite ?? null,
+            tint:           r.tint ?? null,
+        };
+    });
+}
+
+// A boss's phases (encounter.phases) as hpBelow triggers (tactical/triggers.js), with its
+// reinforcements made ready to place as characters.
+function phaseTriggers(encounter, boss) {
+    return encounter.phases.map((p, i) => ({
+        ...p, on: 'hpBelow', pct: p.at, id: `phase:${i}`, label: p.name ?? boss.name, text: p.name ?? '!',
+        summon: (p.summon ?? []).map(r => encounterEnemies({ ...encounter, roster: [r] })[0]),
     }));
+}
+
+// What a leader's affixes do once it's a unit: more max HP, passives, opening statuses.
+function applyAffixes(unit, keys) {
+    if (!keys?.length) return;
+    unit.affixes = [...keys];
+    for (const a of keys.map(k => AFFIXES[k])) {
+        if (a.maxHpPct) {
+            unit.maxHp = Math.round(unit.maxHp * (1 + a.maxHpPct));
+            unit.hp = unit.maxHp;
+        }
+        if (a.passives?.length) unit.bonusPassives = [...(unit.bonusPassives ?? []), ...a.passives];
+        for (const fx of a.battleStart ?? []) inflictStatus(unit, fx.status, fx.duration ?? 3);
+    }
 }
 
 function addMods(...mods) {
@@ -61,13 +91,25 @@ export function buildUnits(setup, playerSpawns, enemySpawns) {
             y: spawn ? spawn.y : charData.y,
         });
         unit.z = spawn?.z ?? null;   // null: the battle settles it from the map
+        if (!isPlayer) {
+            if (charData.baseName) unit.spriteName = charData.baseName;
+            applyAffixes(unit, charData.affixes);
+            // Boss phases go on the boss: the encounter's first roster entry.
+            if (charData === enemyData[0] && setup?.encounter?.phases) unit.triggers = phaseTriggers(setup.encounter, unit);
+        }
         if (isPlayer) {
             if (charData.hp != null) unit.hp = Math.max(1, Math.min(unit.maxHp, charData.hp));
             // Player characters fight by their battle script. Enemies keep the scoring AI.
             unit.script = getScriptFor(charData);
             for (const key of relics) {
-                const fx = RELICS[key]?.battleStart;
+                const r = RELICS[key];
+                const fx = r?.battleStart;
                 if (fx) inflictStatus(unit, fx.status, fx.duration);
+                // Passives and battle triggers (tactical/triggers.js) every member has.
+                if (r?.passives?.length) unit.bonusPassives = [...(unit.bonusPassives ?? []), ...r.passives];
+                for (const [i, t] of (r?.triggers ?? []).entries()) {
+                    (unit.triggers ??= []).push({ ...t, id: `relic:${key}:${i}`, label: r.name });
+                }
             }
         }
         return unit;

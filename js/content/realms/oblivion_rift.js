@@ -66,7 +66,13 @@ export const encounters = {
             e('shadow_mage', 'Shade', 'shade'),
             e('void_stalker', 'Void Champion'),
             e('kingdom_guard', 'Black Knight', 'revenant_knight'),
-        ], { scouting: 'The Oblivion Sovereign commands spirits and void champions. Strike quickly: the longer the fight, the more it binds.' }),
+        ], { scouting: 'The Oblivion Sovereign commands spirits and void champions. Strike quickly: the longer the fight, the more it binds.',
+          phases: [
+            { at: 0.6, name: 'Call of Oblivion', say: 'The Oblivion Sovereign calls its champions from the rift!',
+              summon: [e('void_stalker', 'Void Champion')] },
+            { at: 0.3, name: 'Oblivion Answers', say: 'Oblivion answers its Sovereign. Its wounds close as it surges forward!',
+              healPct: 0.2, status: { status: 'haste', duration: 3 } },
+          ] }),
     ],
 };
 

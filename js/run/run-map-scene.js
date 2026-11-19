@@ -16,7 +16,7 @@ import { RELICS } from './data/relics.js';
 import { CHAINS } from './data/realms.js';
 import { SCOUTING } from './data/encounters.js';
 import { recordDailyResult } from './daily.js';
-import { loadProfile, saveProfile, recordRun, noteItems, noteBosses, claimCollectionRewards, CHALLENGES } from './profile.js';
+import { loadProfile, saveProfile, recordRun, noteItems, noteBosses, claimCollectionRewards, noteEndlessDepth, CHALLENGES } from './profile.js';
 import { loadPlans, describePurchases } from './skill-plans.js';
 import { Modal, Toast, BTN, BTN_GOOD, BTN_DANGER, GLOW, RARITY_COLOR, NODE_INFO, FONT, esc, jobLabel, hpBar, portraitHtml, drawSprites } from './ui-kit.js';
 import { DeployScene } from '../tactical/deploy-scene.js';
@@ -193,7 +193,8 @@ export class RunMapScene {
     _showActIntro() {
         const run = this.run, realm = run.realm;
         const body = this._modal.show(`
-            <div style="color:#888;font-size:11px;text-transform:uppercase;letter-spacing:2px;">Act ${run.act} of ${run.actCount} · ${esc(CHAINS[realm.chain].name)}</div>
+            <div style="color:#888;font-size:11px;text-transform:uppercase;letter-spacing:2px;">${run.endless ? `Endless rift · depth ${run.endless.depth}` : `Act ${run.act} of ${run.actCount}`} · ${esc(CHAINS[realm.chain].name)}</div>
+            ${run.endless ? `<div style="color:#c9a;font-size:11px;margin-top:4px;">Every enemy here is stronger than the last realm's. The run ends when your party falls.</div>` : ''}
             <div style="color:#ffcc44;font-weight:bold;font-size:20px;margin:4px 0 10px;">${esc(realm.name)}</div>
             <div style="color:#bbc;line-height:1.5;margin-bottom:14px;">${esc(realm.blurb)}</div>
             ${run.options.scoutsReport && SCOUTING[run.actBoss] ? `<div style="border-left:2px solid #c84;padding:4px 10px;margin:-4px 0 14px;background:#140e08;">
@@ -209,17 +210,56 @@ export class RunMapScene {
     }
 
     _endRun() {
+        // Sealing the final rift: stop here, or go on into the endless rift.
+        if (this.run.canGoEndless) return this._offerEndless();
         if (this.run.renownEarned == null) {
+            this._recordRun();
+            RunState.clearSave();
+        } else if (this.run.endless && !this.run.endless.ended) {
+            // An endless run was recorded when it sealed the rift; now only its depth is kept.
             const profile = loadProfile();
-            const now = new Date();   // shared, so the daily result has the same id as the high score
-            this.run.renownEarned = recordRun(profile, this.run, now);
+            noteEndlessDepth(profile, this.run);
             saveProfile(profile);
-            if (this.run.options?.daily) recordDailyResult(this.run, this.run.renownEarned, now);
+            this.run.endless.ended = true;
             RunState.clearSave();
         }
         if (this.run.status === 'won') Sound.playMusic(VICTORY_MUSIC);
         else Sound.stopMusic(2000);
         this._screens.runOver();
+    }
+
+    // Records the run in the profile (renown, high score, the daily result).
+    _recordRun() {
+        const profile = loadProfile();
+        const now = new Date();   // shared, so the daily result has the same id as the high score
+        this.run.renownEarned = recordRun(profile, this.run, now);
+        saveProfile(profile);
+        if (this.run.options?.daily) recordDailyResult(this.run, this.run.renownEarned, now);
+    }
+
+    _offerEndless() {
+        const body = this._modal.show(`
+            <div style="color:#ffcc44;font-weight:bold;font-size:18px;margin-bottom:8px;">♛ The final rift is sealed</div>
+            <div style="color:#bbc;line-height:1.5;margin-bottom:10px;">Your company can stop here and be remembered for it, or go deeper.
+                Past the last rift, every realm's enemies are stronger than the one before.</div>
+            <div style="color:#999;font-size:11px;line-height:1.5;margin-bottom:14px;">Either way, this win is recorded now, with its score and renown, and can go
+                on the online leaderboard. Going deeper is just for fun: it lasts until your party falls, and nothing it scores is added.</div>
+            <button data-endless style="${BTN}${BTN_DANGER}text-align:center;padding:10px;margin-bottom:6px;">Go deeper (endless)</button>
+            <button data-seal style="${BTN}${BTN_GOOD}text-align:center;padding:10px;">Seal the rift and end the run</button>`,
+            { dismissible: false, width: 440 });
+        body.querySelector('[data-seal]').addEventListener('click', () => {
+            this.run.endlessDeclined = true;
+            this._modal.close();
+            this._endRun();
+        });
+        body.querySelector('[data-endless]').addEventListener('click', () => {
+            // The sealed run is what counts: record it before going on.
+            this._recordRun();
+            this.run.goEndless();
+            this._modal.close();
+            this._changed();
+            riftTransition({ skinManager: this._skin, onMidpoint: () => this._afterChange() });
+        });
     }
 
     _finish() {
@@ -270,7 +310,7 @@ export class RunMapScene {
             case 'menu': this._openMenu(); break;
             case 'resume': this._screens.show(); break;
             case 'abandon':
-                if (window.confirm('Abandon this run? It counts as a defeat.')) {
+                if (window.confirm(this.run.endless ? 'End this endless run here? It still counts as a win.' : 'Abandon this run? It counts as a defeat.')) {
                     this.run.status = 'lost';
                     this._modal.close();
                     this._endRun();
@@ -352,7 +392,7 @@ export class RunMapScene {
         const floor = run.currentNode?.floor ?? 0;
         const spend = run.party.some(canSpendPoints);
         let top = `<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:5px;">
-            <span style="color:#ffcc44;font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Act ${run.act}: ${esc(run.realm.name)} · ${floor}/15</span>
+            <span style="color:#ffcc44;font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${run.actLabel}: ${esc(run.realm.name)} · ${floor}/15</span>
             <span style="white-space:nowrap;"><span style="color:#fc8;">★ ${run.gold}</span>
             <span data-action="menu" style="color:#7bf;margin-left:8px;cursor:pointer;">◆ ${run.relics.length}</span></span>
         </div>
@@ -387,7 +427,7 @@ export class RunMapScene {
         const run = this.run;
 
         const floor = run.currentNode?.floor ?? 0;
-        let html = `<div style="color:#ffcc44;font-weight:bold;font-size:13px;">Act ${run.act}: ${esc(run.realm.name)}</div>
+        let html = `<div style="color:#ffcc44;font-weight:bold;font-size:13px;">${run.actLabel}: ${esc(run.realm.name)}</div>
             <div style="color:#888;font-size:10px;">${esc(CHAINS[run.realm.chain].name)} · Floor ${floor} of 15</div>
             ${this._challengeHtml()}
             <div style="color:#99a;font-size:10px;line-height:1.4;margin:5px 0 8px;">${esc(run.realm.blurb)}</div>

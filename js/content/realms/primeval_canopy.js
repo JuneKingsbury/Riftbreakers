@@ -64,7 +64,13 @@ export const encounters = {
             e('thorn_beast', 'Thorn Beast'),
             e('canopy_stalker', 'Canopy Stalker'),
             e('spore_walker', 'Spore Walker'),
-        ], { scouting: 'The Ancient Treant wakes when the forest is threatened. It shakes the ground under you, and the canopy above is full of stalkers.' }),
+        ], { scouting: 'The Ancient Treant wakes when the forest is threatened. It shakes the ground under you, and the canopy above is full of stalkers.',
+          phases: [
+            { at: 0.5, name: 'Deep Roots', say: 'The Ancient Treant drives its roots deep and the canopy stirs.',
+              healPct: 0.1, summon: [e('thorn_beast', 'Thorn Beast'), e('spore_walker', 'Spore Walker')] },
+            { at: 0.2, name: 'Last Bloom', say: 'The Treant\'s last blossoms open. Its allies are healed by the falling petals.',
+              allies: { status: { status: 'regen', duration: 3 } } },
+          ] }),
     ],
 };
 

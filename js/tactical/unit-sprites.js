@@ -34,7 +34,7 @@ export class UnitSprites {
         // An enemy with its own sprite is drawn as is: the tint was only there to tell apart
         // enemies sharing a sprite.
         if (unit.team === 'enemy') {
-            const own = enemySpriteKey(unit.name);
+            const own = enemySpriteKey(unit.spriteName ?? unit.name);   // without affix words
             if (sm.getSprite('entities', own)) {
                 return outlined ? this._outlined(own, null, outlineColor) : this._flat(own, null);
             }

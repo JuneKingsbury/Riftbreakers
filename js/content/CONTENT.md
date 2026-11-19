@@ -26,8 +26,8 @@ Any of these can be inflicted (`applyStatus`, `attackProc`, `attackerStatus`, `o
 
 | Key | Name | Kind | Effect | Inflicted by |
 |---|---|---|---|---|
-| `poison` | Poison | harmful | Loses about 6% of max HP at the start of each turn. | Toxic Spores, Plague Flask, Miasma, Venom Strike |
-| `slow` | Slow | harmful | The turn gauge fills at half speed. | Ice, Hex, Pinning Shot, Time Lapse, Grave Chill, Arcane Strike, Gravity Well, Tremor, Spirit Lash, Verdant Lash, Doom Hex, Wild Surge, Grasping Stone, Bite, Thorn Volley, Spore Burst, Venom Bite, Soul Drain, Spore Cloud |
+| `poison` | Poison | harmful | Loses about 6% of max HP at the start of each turn. | Toxic Spores, Plague Flask, Miasma, Venom Strike, Rending Maul, Cutthroat Stab |
+| `slow` | Slow | harmful | The turn gauge fills at half speed. | Ice, Hex, Pinning Shot, Time Lapse, Grave Chill, Arcane Strike, Gravity Well, Tremor, Spirit Lash, Verdant Lash, Doom Hex, Wild Surge, Grasping Stone, Bite, Thorn Volley, Spore Burst, Venom Bite, Soul Drain, Bramble Lash, Crystal Slam, Spore Cloud |
 | `silence` | Silence | harmful | Cannot use magic skills or magic reactions. | Mute, Spellbreaker |
 | `sleep` | Sleep | harmful | Skips turns and cannot react. Any damage wakes the unit. | Dream Veil, Mass Sleep |
 | `stun` | Stun | harmful | Loses its next turn and cannot react. | Calcify, Force Pulse, Holy Bind, Holy Chains, Haunting, Fate Seal, Savage Howl, Bulwark Bash, Shield Bash, Charge |
@@ -139,6 +139,7 @@ An item's `grants` takes action abilities (they join the wearer's skill list); `
 | `blur` | Blur | action | classes/illusionist.js |  |
 | `bone_spear` | Bone Spear | action | classes/lich.js |  |
 | `bone_ward` | Bone Ward | action | classes/gravewarden.js |  |
+| `bramble_lash` | Bramble Lash | action | enemies/bosses.js |  |
 | `bulwark` | Bulwark | action | classes/bastion.js |  |
 | `bulwark_bash` | Bulwark Bash | action | classes/marshal.js |  |
 | `calcify` | Calcify | action | classes/stoneshaper.js |  |
@@ -152,7 +153,9 @@ An item's `grants` takes action abilities (they join the wearer's skill list); `
 | `cleave` | Cleave | action | classes/warlord.js |  |
 | `consecrate` | Consecrate | action | classes/paladin.js |  |
 | `corpse_burst` | Corpse Burst | action | classes/gravecaller.js |  |
+| `crystal_slam` | Crystal Slam | action | enemies/bosses.js |  |
 | `cure` | Cure | action | classes/warden.js |  |
+| `cutthroat_stab` | Cutthroat Stab | action | enemies/realm.js |  |
 | `death_sentence` | Death Sentence | action | classes/fatebinder.js |  |
 | `delay` | Delay | action | classes/tactician.js |  |
 | `doom_hex` | Doom Hex | action | classes/fatebinder.js |  |
@@ -186,10 +189,12 @@ An item's `grants` takes action abilities (they join the wearer's skill list); `
 | `last_rites` | Last Rites | action | items/abilities.js | Spiritweave Hat |
 | `life_drain` | Life Drain | action | classes/gravecaller.js |  |
 | `long_shot` | Long Shot | action | classes/runebow.js |  |
+| `martyr_burst` | Martyr's Burst | action | enemies/realm.js |  |
 | `mass_blur` | Mass Blur | action | classes/mirage_oracle.js |  |
 | `mass_foresight` | Mass Foresight | action | classes/lifeseer.js |  |
 | `mass_raise` | Mass Raise | action | classes/gravewarden.js |  |
 | `mass_sleep` | Mass Sleep | action | classes/dreamweaver.js |  |
+| `mending_spores` | Mending Spores | action | enemies/realm.js |  |
 | `miasma` | Miasma | action | classes/plaguewright.js |  |
 | `mirror_image` | Mirror Image | action | classes/illusionist.js |  |
 | `mirror_ward` | Mirror Ward | action | items/abilities.js | Runic Wand |
@@ -209,11 +214,13 @@ An item's `grants` takes action abilities (they join the wearer's skill list); `
 | `raise_dead` | Raise Dead | action | classes/gravecaller.js |  |
 | `rally` | Rally | action | classes/warlord.js |  |
 | `rallying_beat` | Rallying Beat | action | items/abilities.js | Drum of Rallying |
+| `rending_maul` | Rending Maul | action | enemies/bosses.js |  |
 | `renewing_light` | Renewing Light | action | classes/lifeseer.js |  |
 | `reposition` | Reposition | action | classes/warlord.js |  |
 | `rift_bolt` | Rift Bolt | action | classes/riftcaller.js |  |
 | `rock_toss` | Rock Toss | action | classes/stoneshaper.js |  |
 | `root_field` | Root Field | action | abilities/unused.js |  |
+| `royal_cleave` | Royal Cleave | action | enemies/bosses.js |  |
 | `rune_arrow` | Rune Arrow | action | classes/runebow.js |  |
 | `rush` | Rush | action | enemies/novice.js | Stone Spear |
 | `savage_howl` | Savage Howl | action | classes/beastcaller.js |  |
@@ -306,6 +313,8 @@ An item's `grants` takes action abilities (they join the wearer's skill list); `
 | `lull` | Lull | reaction | classes/dreamweaver.js |  |
 | `mana_shell` | Mana Shell | reaction | classes/bastion.js |  |
 | `martyr` | Martyr | reaction | items/abilities.js | Iron Shield, Aegis of the Vanguard |
+| `enemy_martyrdom` | Martyrdom | reaction | enemies/realm.js |  |
+| `enemy_mirror_strike` | Mirror Strike | reaction | enemies/realm.js |  |
 | `overwatch` | Overwatch | reaction | classes/skyhunter.js |  |
 | `phase_shift` | Phase Shift | reaction | classes/riftcaller.js | Void Dancer's Mask |
 | `phylactery` | Phylactery | reaction | classes/lich.js |  |
@@ -317,15 +326,20 @@ An item's `grants` takes action abilities (they join the wearer's skill list); `
 | `return_fire` | Return Fire | reaction | classes/runebow.js |  |
 | `second_sight` | Second Sight | reaction | classes/lifeseer.js | Unraveler's Eye |
 | `shattered_image` | Shattered Image | reaction | classes/mirage_oracle.js |  |
+| `enemy_shield_ally` | Shield Ally | reaction | enemies/realm.js |  |
 | `spirit_hush` | Spirit Hush | reaction | classes/spiritbinder.js |  |
+| `affix_split` | Splitting | reaction | affixes.js |  |
 | `stone_reflex` | Stone Reflex | reaction | classes/stoneshaper.js |  |
 | `thorn_hide` | Thorn Hide | reaction | classes/worldsinger.js | Barbed Chaincoat |
+| `affix_thorns` | Thorned | reaction | affixes.js |  |
 | `toxic_blood` | Toxic Blood | reaction | classes/plaguewright.js |  |
 | `triage` | Triage | reaction | classes/field_surgeon.js |  |
 | `void_siphon` | Void Siphon | reaction | items/abilities.js | Void Armor |
 | `arcane_weapon` | Arcane Weapon | support | classes/battlemage.js |  |
+| `relic_summon_boost` | Beast Whistle | support | relics.js |  |
 | `benediction` | Benediction | support | classes/sanctifier.js |  |
 | `bloodlust` | Bloodlust | support | classes/beastcaller.js | Abyssal Greatsword |
+| `affix_command` | Commanding | support | affixes.js |  |
 | `concentrate` | Concentrate | support | classes/runebow.js | Void Recurve |
 | `deep_dreams` | Deep Dreams | support | classes/dreamweaver.js |  |
 | `divine_ward` | Divine Ward | support | classes/paladin.js |  |
@@ -335,10 +349,13 @@ An item's `grants` takes action abilities (they join the wearer's skill list); `
 | `field_command` | Field Command | support | classes/warlord.js |  |
 | `glamour` | Glamour | support | classes/illusionist.js |  |
 | `grave_legion` | Grave Legion | support | classes/gravewarden.js |  |
+| `relic_high_ground` | Hunter's Perch | support | relics.js |  |
 | `initiative` | Initiative | support | classes/tactician.js |  |
 | `iron_discipline` | Iron Discipline | support | classes/marshal.js |  |
 | `iron_will` | Iron Will | support | classes/warden.js |  |
 | `lasting_images` | Lasting Images | support | classes/mirage_oracle.js |  |
+| `relic_lifesteal` | Leech Fang | support | relics.js |  |
+| `enemy_leeching` | Leeching | support | enemies/realm.js |  |
 | `mana_surge` | Mana Surge | support | classes/evoker.js | Abyssal Staff |
 | `necrotic_power` | Necrotic Power | support | classes/lich.js |  |
 | `potent_brews` | Potent Brews | support | classes/alchemist.js |  |
@@ -347,13 +364,19 @@ An item's `grants` takes action abilities (they join the wearer's skill list); `
 | `regen_aura` | Regen Aura | support | classes/worldsinger.js |  |
 | `rune_edge` | Rune Edge | support | classes/spellblade.js | World Piercer |
 | `seismic_power` | Seismic Power | support | classes/earthshaker.js |  |
+| `enemy_slippery` | Slippery | support | enemies/realm.js |  |
 | `soul_harvest` | Soul Harvest | support | classes/gravecaller.js |  |
 | `spell_pierce` | Spell Pierce | support | classes/riftcaller.js |  |
 | `spirit_pact` | Spirit Pact | support | classes/spiritbinder.js |  |
+| `enemy_spore_aura` | Spore Aura | support | enemies/realm.js |  |
 | `steady_hands` | Steady Hands | support | classes/field_surgeon.js |  |
 | `swiftcast` | Swiftcast | support | classes/seer.js |  |
 | `unbreakable` | Unbreakable | support | classes/bastion.js |  |
+| `affix_undying` | Undying | support | affixes.js |  |
+| `enemy_unhushed` | Unhushed | support | enemies/realm.js |  |
+| `affix_lifesteal` | Vampiric | support | affixes.js |  |
 | `virulence` | Virulence | support | classes/plaguewright.js |  |
+| `affix_warded` | Warded | support | affixes.js |  |
 | `wyrd_drain` | Wyrd Drain | support | classes/fatebinder.js |  |
 
 ## Fields
@@ -435,6 +458,10 @@ Every field each kind of content may have. `validate.js` rejects anything else.
 | `saveFromDown` | bool | Fires when the ally is knocked out, saving them. |
 | `reviveFrac` | number | The owner gets back up with this fraction of max HP (onDown). |
 | `downBurst` | ability key | Ability that bursts from the owner onto nearby enemies (onDown). |
+| `splitInto` | { count, hpFrac, statFrac } | The owner breaks into weaker copies of itself, which fight on as full units of its side (onDown). Copies do not split again. |
+| `splitInto.count` * | number | How many copies. |
+| `splitInto.hpFrac` * | number | Each copy's max HP, as a fraction of the owner's. |
+| `splitInto.statFrac` * | number | Each copy's ATK, DEF, MAT and MDF, as a fraction of the owner's. |
 | `attackerStatus` | { status, duration, chance } | A status with a duration. |
 | `attackerStatus.status` * | status key | The status. |
 | `attackerStatus.duration` | number | Turns it lasts. |
@@ -458,6 +485,7 @@ Every field each kind of content may have. `validate.js` rejects anything else.
 | `aoeDmgMult` | number | Damage multiplier for area abilities. |
 | `healMult` | number | Healing multiplier. |
 | `drainMult` | number | Multiplier for drainFrac healing. |
+| `lifestealFrac` | number | Your damaging hits heal you this fraction of the damage they deal (on top of any drainFrac). |
 | `attackProc` | { status, duration, chance } | A status with a duration. |
 | `attackProc.status` * | status key | The status. |
 | `attackProc.duration` | number | Turns it lasts. |
@@ -539,6 +567,11 @@ Every field each kind of content may have. `validate.js` rejects anything else.
 | `ai.melee` | bool | A front-liner: braces when nearly dead, and never backs off. |
 | `ai.healer` | bool | Heals early (allies below 60% HP rather than 40%). |
 | `abilities` | list of ability key | Enemies: the fixed ability list it fights with. |
+| `passives` | list of ability key | Enemies: reaction, support or movement abilities it always has. |
+| `battleStart` | list of { status, duration, chance } | Enemies: statuses it starts every battle with (only ones without side effects, e.g. reflect, protect, shell, regen). |
+| `battleStart[].status` * | status key | The status. |
+| `battleStart[].duration` | number | Turns it lasts. |
+| `battleStart[].chance` | number | 0-1 chance. |
 | `inert` | bool | Summons: never acts (Mirror Image's copies). |
 | `lure` | number | Summons: how strongly enemies prefer to attack it. |
 
@@ -580,10 +613,42 @@ Every field each kind of content may have. `validate.js` rejects anything else.
 | `battleStart.chance` | number | 0-1 chance. |
 | `xpMult` | number | Multiplies XP from battles. |
 | `goldMult` | number | Multiplies gold from battles. |
-| `shopDiscount` | number | Fraction off shop prices. |
+| `shopDiscount` | number | Fraction off shop prices (negative: dearer). |
 | `extraItemChoice` | bool | Battle rewards offer one more item to choose from. |
+| `passives` | list of ability key | Reaction, support or movement abilities every member has on top of their own. |
+| `triggers` | list of { on, pct, once, status, healPct, mp, buffs, text } | Battle triggers every member has (each fires for that member). |
+| `triggers[].on` * | `allyDown` / `enemyDown` / `kill` / `hpBelow` | What sets it off (TRIGGER_EVENTS). |
+| `triggers[].pct` | number | For hpBelow: the HP threshold, 0-1. |
+| `triggers[].once` | bool | At most once per battle (hpBelow always is). |
+| `triggers[].status` | { status, duration, chance } | A status with a duration. |
+| `triggers[].status.status` * | status key | The status. |
+| `triggers[].status.duration` | number | Turns it lasts. |
+| `triggers[].status.chance` | number | 0-1 chance. |
+| `triggers[].healPct` | number | Heals the holder this fraction of its max HP. |
+| `triggers[].mp` | number | MP restored to the holder. |
+| `triggers[].buffs` | list of { stat, value, duration } | Buffs for the holder, refreshed rather than stacked. |
+| `triggers[].buffs[].stat` * | `atk` / `def` / `mat` / `mdf` / `eva` / `crit` | The stat changed. |
+| `triggers[].buffs[].value` * | number | Amount (negative: a debuff). |
+| `triggers[].buffs[].duration` | number | Turns it lasts. |
+| `triggers[].text` | string | Floating text when it fires (default: the relic's name). |
 | `acts` | list of `1` / `2` / `3` / `4` | Acts it can be found in. Default: all. |
 | `realms` | list of realm key | Realms it can be found in. Default: all. |
+
+### Affix (affixes.js)
+
+| Field | Type | Meaning |
+|---|---|---|
+| `name` * | string | The word put before the leader's name, e.g. Thorned. |
+| `desc` * | string | What it does, shown before the fight. |
+| `statMods` | { maxHp, maxMp, atk, def, mat, mdf, spd, move, eva, crit } → number | Stat changes for the leader. |
+| `maxHpPct` | number | Raises the leader's max HP by this fraction (after statMods). |
+| `battleStart` | list of { status, duration, chance } | Statuses the leader starts the battle with. |
+| `battleStart[].status` * | status key | The status. |
+| `battleStart[].duration` | number | Turns it lasts. |
+| `battleStart[].chance` | number | 0-1 chance. |
+| `passives` | list of ability key | Reaction, support or movement abilities the leader has on top of its own. |
+| `extraAbilities` | list of ability key | Actions the leader can use on top of its own. |
+| `acts` | list of `1` / `2` / `3` / `4` | Acts it can appear in. Default: all. |
 
 ### Event (events.js, realms/<realm>.js (`events`))
 
@@ -642,6 +707,39 @@ Every field each kind of content may have. `validate.js` rejects anything else.
 | `map` | map key | A fixed battle map; otherwise one of the realm's maps. |
 | `easy` | bool | Gentle enough for a run's opening fights. |
 | `scouting` | string | Bosses: what the Scout's Report says about the fight. |
+| `phases` | list of { at, name, say, status, buffs, healPct, cleanse, allies, summon } | Bosses: what the boss (the first roster entry) does as its HP falls. |
+| `phases[].at` * | number | HP fraction (0-1) that sets it off. |
+| `phases[].name` | string | Its name, for the battle breakdown (default: the boss's name). |
+| `phases[].say` * | string | Announced when it happens. |
+| `phases[].status` | { status, duration, chance } | A status with a duration. |
+| `phases[].status.status` * | status key | The status. |
+| `phases[].status.duration` | number | Turns it lasts. |
+| `phases[].status.chance` | number | 0-1 chance. |
+| `phases[].buffs` | list of { stat, value, duration } | Buffs for the boss. |
+| `phases[].buffs[].stat` * | `atk` / `def` / `mat` / `mdf` / `eva` / `crit` | The stat changed. |
+| `phases[].buffs[].value` * | number | Amount (negative: a debuff). |
+| `phases[].buffs[].duration` | number | Turns it lasts. |
+| `phases[].healPct` | number | The boss heals this fraction of its max HP. |
+| `phases[].cleanse` | bool | The boss sheds its harmful statuses. |
+| `phases[].allies` | { status, buffs, healPct } | Effects for the boss's conscious allies. |
+| `phases[].allies.status` | { status, duration, chance } | A status with a duration. |
+| `phases[].allies.status.status` * | status key | The status. |
+| `phases[].allies.status.duration` | number | Turns it lasts. |
+| `phases[].allies.status.chance` | number | 0-1 chance. |
+| `phases[].allies.buffs` | list of { stat, value, duration } |  |
+| `phases[].allies.buffs[].stat` * | `atk` / `def` / `mat` / `mdf` / `eva` / `crit` | The stat changed. |
+| `phases[].allies.buffs[].value` * | number | Amount (negative: a debuff). |
+| `phases[].allies.buffs[].duration` | number | Turns it lasts. |
+| `phases[].allies.healPct` | number |  |
+| `phases[].summon` | list of { job, name, sprite, tint, ct, level, statMods, extraAbilities } | Reinforcements that appear near the boss, scaled like the roster. |
+| `phases[].summon[].job` * | job key | How the unit fights. |
+| `phases[].summon[].name` * | string | Display name. |
+| `phases[].summon[].sprite` | sprite key | Sprite in place of the job's (dresses the job as a realm creature). |
+| `phases[].summon[].tint` | color | CSS color multiplied over the sprite. |
+| `phases[].summon[].ct` | number | Opening turn gauge. |
+| `phases[].summon[].level` | number | Level, for player-class enemies. |
+| `phases[].summon[].statMods` | { maxHp, maxMp, atk, def, mat, mdf, spd, move, eva, crit } → number | Stat changes on top of the job. |
+| `phases[].summon[].extraAbilities` | list of ability key | Abilities on top of the job's. |
 
 ### Realm (realms/<realm>.js (`realm`))
 
@@ -706,27 +804,27 @@ Every field each kind of content may have. `validate.js` rejects anything else.
 
 | Realm | Chain (tier) | Acts | Draws | Fights (normal/elite/boss) | Bosses | Events |
 |---|---|---|---|---|---|---|
-| The Wild Frontiers (`wild_frontiers`) | The Wild Frontiers (1) | 1 |  | 5 / 2 / 2 | The Bandit King, The Dire Wolf | 5 |
-| Verdant Depths (`verdant_depths`) | Verdant Wilds (1) | 1 | Fungal Hollows, Primeval Canopy | 3 / 2 / 1 | The Thorn Warden, The Ancient Treant | 3 |
+| The Wild Frontiers (`wild_frontiers`) | The Wild Frontiers (1) | 1 |  | 6 / 2 / 2 | The Bandit King, The Dire Wolf | 5 |
+| Verdant Depths (`verdant_depths`) | Verdant Wilds (1) | 1 | Fungal Hollows, Primeval Canopy | 4 / 2 / 1 | The Thorn Warden, The Ancient Treant | 3 |
 | Fungal Hollows (`fungal_hollows`) | Verdant Wilds (2) | drawn by Verdant Depths |  | 3 / 2 / 1 |  | 3 |
 | Primeval Canopy (`primeval_canopy`) | Verdant Wilds (3) | drawn by Verdant Depths |  | 3 / 2 / 1 |  | 2 |
-| Crystal Caves (`crystal_caves`) | Crystal Caverns (1) | 1 | Crystal Mines, Crystal Depths | 3 / 2 / 1 | The Crystal Warden, The Crystal Colossus | 2 |
+| Crystal Caves (`crystal_caves`) | Crystal Caverns (1) | 1 | Crystal Mines, Crystal Depths | 4 / 2 / 1 | The Crystal Warden, The Crystal Colossus | 2 |
 | Crystal Mines (`crystal_mines`) | Crystal Caverns (2) | drawn by Crystal Caves |  | 3 / 2 / 1 |  | 3 |
 | Crystal Depths (`crystal_depths`) | Crystal Caverns (3) | drawn by Crystal Caves |  | 3 / 2 / 1 |  | 2 |
-| Arcane Library (`arcane_library`) | University Ruins (1) | 2 | Ancient University, Abandoned Laboratory | 3 / 2 / 1 | The Arcane Sentinel, The Arcane Construct | 2 |
+| Arcane Library (`arcane_library`) | University Ruins (1) | 2 | Ancient University, Abandoned Laboratory | 4 / 2 / 1 | The Arcane Sentinel, The Arcane Construct | 2 |
 | Ancient University (`ancient_university`) | University Ruins (2) | drawn by Arcane Library |  | 3 / 2 / 1 |  | 3 |
 | Abandoned Laboratory (`abandoned_laboratory`) | University Ruins (3) | drawn by Arcane Library |  | 3 / 2 / 1 |  | 2 |
 | Abyss Gate (`shadow_realm`) | The Abyss (1) | drawn by Sunken Abyss |  | 3 / 2 / 1 |  | 2 |
-| Sunken Abyss (`void_abyss`) | The Abyss (2) | 2 | Abyss Gate, Oblivion Rift | 3 / 2 / 1 | The Gloom Sentinel, The Oblivion Sovereign | 3 |
+| Sunken Abyss (`void_abyss`) | The Abyss (2) | 2 | Abyss Gate, Oblivion Rift | 4 / 2 / 1 | The Gloom Sentinel, The Oblivion Sovereign | 3 |
 | Oblivion Rift (`oblivion_rift`) | The Abyss (3) | drawn by Sunken Abyss |  | 3 / 2 / 1 |  | 2 |
 | Void Hollow (`void_hollow`) | The Void Pact (1) | drawn by Void Sanctum |  | 3 / 2 / 1 |  | 2 |
-| Void Sanctum (`void_sanctum`) | The Void Pact (2) | 3 | Void Hollow, Void Heart | 3 / 2 / 1 | The Hollow Abbot, The Void Arbiter | 3 |
+| Void Sanctum (`void_sanctum`) | The Void Pact (2) | 3 | Void Hollow, Void Heart | 4 / 2 / 1 | The Hollow Abbot, The Void Arbiter | 3 |
 | Void Heart (`void_heart`) | The Void Pact (3) | drawn by Void Sanctum |  | 3 / 2 / 1 |  | 2 |
 | Kingdom Outskirts (`kingdom_outskirts`) | The Kingdom (1) | drawn by Palace Fortress |  | 3 / 2 / 1 |  | 2 |
 | Crusader Barracks (`crusader_barracks`) | The Kingdom (2) | drawn by Palace Fortress |  | 3 / 2 / 1 |  | 3 |
-| Palace Fortress (`palace_fortress`) | The Kingdom (3) | 3 | Kingdom Outskirts, Crusader Barracks | 3 / 2 / 2 | The High King, The High Priest | 2 |
+| Palace Fortress (`palace_fortress`) | The Kingdom (3) | 3 | Kingdom Outskirts, Crusader Barracks | 4 / 2 / 2 | The High King, The High Priest | 2 |
 | Fracture Gate (`fracture_gate`) | The Unraveling (1) | drawn by Shifting Labyrinth |  | 3 / 2 / 1 |  | 2 |
-| Shifting Labyrinth (`shifting_labyrinth`) | The Unraveling (2) | 4 | Fracture Gate, Unraveling Core | 3 / 2 / 1 | The Shifting Horror, The Unraveler | 3 |
+| Shifting Labyrinth (`shifting_labyrinth`) | The Unraveling (2) | 4 | Fracture Gate, Unraveling Core | 4 / 2 / 1 | The Shifting Horror, The Unraveler | 3 |
 | Unraveling Core (`unraveling_core`) | The Unraveling (3) | drawn by Shifting Labyrinth |  | 3 / 2 / 1 |  | 2 |
 
 ### Enemies
@@ -734,28 +832,36 @@ Every field each kind of content may have. `validate.js` rejects anything else.
 | Job | HP | ATK | MAT | SPD | Abilities | In fights |
 |---|---|---|---|---|---|---|
 | `novice` | 46 | 9 | 8 | 8 | attack, rush, throw_stone, first_aid | 2 |
-| `goblin` | 28 | 9 | 2 | 11 | goblin_slash | 18 |
+| `goblin` | 28 | 9 | 2 | 11 | goblin_slash | 20 |
 | `orc_captain` | 70 | 16 | 2 | 7 | attack, shield_bash | 45 |
-| `shadow_mage` | 36 | 5 | 14 | 8 | attack, shadow_bolt, mute | 32 |
-| `wolf` | 30 | 10 | 1 | 13 | wolf_bite | 29 |
+| `shadow_mage` | 36 | 5 | 14 | 8 | attack, shadow_bolt, mute | 33 |
+| `wolf` | 30 | 10 | 1 | 13 | wolf_bite | 30 |
 | `boar` | 48 | 13 | 1 | 9 | attack, boar_charge | 8 |
 | `thorn_beast` | 42 | 7 | 10 | 7 | attack, thorn_volley | 11 |
-| `spore_walker` | 38 | 6 | 9 | 6 | attack, spore_burst, toxic_spores | 15 |
-| `shard_spider` | 26 | 8 | 1 | 12 | spider_bite, venom_strike | 19 |
+| `spore_walker` | 38 | 6 | 9 | 6 | attack, spore_burst, toxic_spores | 16 |
+| `shard_spider` | 26 | 8 | 1 | 12 | spider_bite, venom_strike | 21 |
 | `canopy_stalker` | 44 | 15 | 1 | 10 | attack, pounce | 22 |
-| `spectral_wisp` | 22 | 3 | 12 | 9 | soul_drain, dream_veil | 29 |
-| `void_stalker` | 52 | 14 | 2 | 8 | attack, void_strike | 32 |
-| `raider` | 40 | 11 | 2 | 9 | attack | 17 |
-| `raider_archer` | 34 | 10 | 2 | 10 | attack, long_shot | 27 |
+| `spectral_wisp` | 22 | 3 | 12 | 9 | soul_drain, dream_veil | 30 |
+| `void_stalker` | 52 | 14 | 2 | 8 | attack, void_strike | 33 |
+| `raider` | 40 | 11 | 2 | 9 | attack | 19 |
+| `raider_archer` | 34 | 10 | 2 | 10 | attack, long_shot | 30 |
 | `raider_hexer` | 30 | 5 | 11 | 8 | attack, hex | 18 |
-| `void_walker` | 44 | 9 | 11 | 8 | attack, shadow_bolt | 11 |
-| `kingdom_guard` | 58 | 13 | 2 | 7 | attack, shield_bash | 51 |
+| `void_walker` | 44 | 9 | 11 | 8 | attack, shadow_bolt | 12 |
+| `kingdom_guard` | 58 | 13 | 2 | 7 | attack, shield_bash | 54 |
 | `decoy` | 40 | 0 | 0 | 1 | attack | 0 |
 | `skeleton` | 34 | 11 | 2 | 8 | attack | 0 |
 | `summoned_wolf` | 30 | 10 | 1 | 13 | wolf_bite | 0 |
 | `summoned_wisp` | 22 | 3 | 12 | 9 | soul_drain, dream_veil | 0 |
 | `summoned_thorn_beast` | 42 | 7 | 10 | 7 | attack, thorn_volley | 0 |
 | `summoned_boar` | 48 | 13 | 1 | 9 | attack, boar_charge | 0 |
+| `bandit_cutthroat` | 32 | 12 | 2 | 12 | attack, cutthroat_stab | 1 |
+| `spore_mother` | 50 | 5 | 10 | 6 | attack, mending_spores, spore_burst | 1 |
+| `prism_golem` | 62 | 12 | 2 | 5 | attack, shield_bash | 1 |
+| `living_tome` | 30 | 3 | 12 | 9 | shadow_bolt, mute | 1 |
+| `abyssal_leech` | 46 | 13 | 2 | 9 | attack | 1 |
+| `void_martyr` | 38 | 10 | 10 | 8 | attack, shadow_bolt | 1 |
+| `palace_shieldbearer` | 70 | 11 | 2 | 6 | attack, shield_bash | 1 |
+| `echo_mimic` | 50 | 14 | 8 | 10 | attack, void_strike | 1 |
 
 ### Relics
 
@@ -779,5 +885,30 @@ Every field each kind of content may have. `validate.js` rejects anything else.
 | Phoenix Feather | rare | Every member starts each battle with Reraise: the first knockout leaves them at 1 HP. |
 | Crown of Insight | rare | Every member has +3 MAT, +3 MDF and +8 max MP. |
 | Titan's Belt | rare | Every member has +3 ATK, +3 DEF and +12 max HP. |
+| Soul Lantern | common | Whenever an enemy is knocked out, every member regains 5 MP. |
+| Martyr's Locket | uncommon | When a member is knocked out, the others gain Haste for 2 turns. |
+| Bloodied Banner | uncommon | The first time each member drops below half HP in a battle, they gain Protect for 3 turns. |
+| Executioner's Mark | uncommon | A member who knocks out an enemy heals 15% of their max HP. |
+| Beast Whistle | uncommon | Your summoned creatures and copies have 50% more HP, ATK and MAT. |
+| Hunter's Perch | uncommon | Members deal 50% more damage from higher ground (instead of 25%), and enemies get no high-ground bonus against them. |
+| Leech Fang | rare | Every member heals for 10% of the damage they deal. |
+| Last Stand Idol | rare | The first time each member drops below 25% HP in a battle, they gain Haste and +4 ATK and MAT for 3 turns. |
+| Glass Sigil | rare | Every member has +4 ATK and +4 MAT, but -15 max HP. |
+| Gambler's Crown | rare | Battle rewards offer one more item and pay 25% more gold, but shop prices are 30% higher. |
 
-Items: 157. Abilities: 224. Events: 62 (44 realm events).
+### Elite affixes
+
+| Affix | Acts | Effect |
+|---|---|---|
+| Thorned | 1, 2, 3, 4 | Whoever hits it in melee takes back 30% of the damage they dealt. |
+| Shielded | 1, 2, 3, 4 | Has Protect and Shell all battle (takes 25% less damage) until they are removed. |
+| Hasted | 1, 2, 3, 4 | +2 SPD, and starts the battle with Haste for 3 turns. |
+| Vampiric | 1, 2, 3, 4 | Heals for 35% of the damage it deals. |
+| Regenerating | 1, 2, 3, 4 | Regenerates about 8% of its max HP every turn, until cured. |
+| Commanding | 1, 2, 3, 4 | At the start of each of its turns, it and adjacent allies gain ATK and DEF +3 for 2 turns. |
+| Undying | 2, 3, 4 | Once per battle, a killing blow leaves it at 1 HP. |
+| Warded | 1, 2, 3, 4 | Immune to Stun, Sleep, Charm, Slow, Silence and Poison. |
+| Hulking | 1, 2, 3, 4 | +40% max HP and +2 DEF, but -1 SPD. |
+| Splitting | 2, 3, 4 | When knocked out, it breaks into two weaker copies of itself (35% of its max HP, 70% of its power) that fight on. |
+
+Items: 157. Abilities: 247. Events: 62 (44 realm events).

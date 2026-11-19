@@ -10,6 +10,7 @@ import { ABILITIES, PROMOTES_FROM } from '../js/tactical/data-registry.js';
 import { JOB_DATA } from '../js/content/jobs.js';
 import { EQUIPMENT } from '../js/tactical/data/equipment.js';
 import { RELICS } from '../js/run/data/relics.js';
+import { AFFIXES } from '../js/content/affixes.js';
 import { REALMS, CHAINS, ACT_REALMS } from '../js/run/data/realms.js';
 import { ENCOUNTERS } from '../js/run/data/encounters.js';
 import { EVENTS } from '../js/run/data/events.js';
@@ -85,7 +86,7 @@ const fieldRows = (fields, prefix = '') => Object.entries(fields).flatMap(([k, s
     ...(spec.type === 'object' ? fieldRows(spec.fields, `${prefix}${k}.`) : []),
     ...(spec.type === 'list' && spec.of.type === 'object' ? fieldRows(spec.of.fields, `${prefix}${k}[].`) : []),
 ]);
-const WHERE = { ability: 'classes/, enemies/, items/abilities.js, abilities/', job: 'classes/ (`job`), enemies/ (`jobs`)', item: 'items/<slot>.js', relic: 'relics.js', event: 'events.js, realms/<realm>.js (`events`)', encounter: 'realms/<realm>.js (`encounters`)', realm: 'realms/<realm>.js (`realm`)' };
+const WHERE = { ability: 'classes/, enemies/, items/abilities.js, abilities/', job: 'classes/ (`job`), enemies/ (`jobs`)', item: 'items/<slot>.js', relic: 'relics.js', affix: 'affixes.js', event: 'events.js, realms/<realm>.js (`events`)', encounter: 'realms/<realm>.js (`encounters`)', realm: 'realms/<realm>.js (`realm`)' };
 for (const [kind, fields] of Object.entries(V.SCHEMAS)) {
     h(3, `${title(kind)} (${WHERE[kind]})`);
     table(['Field', 'Type', 'Meaning'], fieldRows(fields));
@@ -112,6 +113,8 @@ table(['Job', 'HP', 'ATK', 'MAT', 'SPD', 'Abilities', 'In fights'], Object.entri
     code(k), j.maxHp, j.atk, j.mat, j.spd, (j.abilities ?? []).join(', '), usedBy(k)]));
 h(3, 'Relics');
 table(['Relic', 'Rarity', 'Effect'], Object.values(RELICS).map(r => [r.name, r.rarity, r.desc]));
+h(3, 'Elite affixes');
+table(['Affix', 'Acts', 'Effect'], Object.values(AFFIXES).map(a => [a.name, (a.acts ?? [1, 2, 3, 4]).join(', '), a.desc]));
 out.push('', `Items: ${Object.keys(EQUIPMENT).length}. Abilities: ${base.length + 1}. Events: ${EVENTS.length} (${EVENTS.filter(e => e.realms).length} realm events).`, '');
 
 writeFileSync(new URL('../js/content/CONTENT.md', import.meta.url), out.join('\n'));

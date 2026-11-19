@@ -41,6 +41,13 @@ export const encounters = {
             e('kingdom_guard', 'Palace Husk', 'palace_husk'),
             e('raider_archer', 'Royal Crossbow', 'crusader_archer'),
         ]),
+        fight('shield_line', 'Shield Line', 5, [
+            e('palace_shieldbearer', 'Shieldbearer', 'kingdom_guard', { tint: '#e0e0ff' }),
+            e('raider_archer', 'Palace Archer', 'crusader_archer'),
+            e('palace_shieldbearer', 'Shieldbearer', 'kingdom_guard', { tint: '#e0e0ff' }),
+            e('runebow', 'Palace Runebow', 'crusader_archer'),
+            e('kingdom_guard', 'Palace Guard', 'kingdom_guard'),
+        ]),
     ],
     elite: [
         fight('royal_inquisitors', 'Royal Inquisitors', 6, [
@@ -68,7 +75,12 @@ export const encounters = {
             e('paladin', 'Palace Champion', 'palace_champion'),
             e('kingdom_guard', 'King\'s Guard', 'boss_high_king_guard'),
             e('runebow', 'Royal Marksman', 'crusader_archer'),
-        ], { scouting: 'The High King keeps his best around him: a priest to heal, a champion to hold, a marksman on the walls. Take the priest first.' }),
+        ], { scouting: 'The High King keeps his best around him: a priest to heal, a champion to hold, a marksman on the walls. Take the priest first.',
+          phases: [
+            { at: 0.5, name: 'To the King!', say: 'Guards! To your king! The palace guard rushes in, and the court rallies.',
+              allies: { buffs: [{ stat: 'atk', value: 3, duration: 3 }, { stat: 'def', value: 3, duration: 3 }] },
+              summon: [e('kingdom_guard', 'King\'s Guard', 'boss_high_king_guard'), e('kingdom_guard', 'King\'s Guard', 'boss_high_king_guard')] },
+          ] }),
         fight('boss_high_priest', 'The High Priest', 6, [
             e('sanctifier', 'The High Priest', 'high_priest', { level: 8, statMods: { maxHp: 80, mat: 5, mdf: 5, def: 3 } }),
             e('paladin', 'Palace Champion', 'palace_champion'),
@@ -76,7 +88,13 @@ export const encounters = {
             e('lifeseer', 'Miracle Worker', 'royal_mage'),
             e('kingdom_guard', 'Temple Guard', 'crusader'),
             e('evoker', 'Ward Mage', 'royal_mage'),
-        ], { scouting: 'The High Priest works miracles for the Crusade. Its healers undo your damage unless you strike them down fast.' }),
+        ], { scouting: 'The High Priest works miracles for the Crusade. Its healers undo your damage unless you strike them down fast.',
+          phases: [
+            { at: 0.5, name: 'Blessing', say: 'The High Priest calls down a blessing. Light washes over its faithful.',
+              cleanse: true, allies: { healPct: 0.25, status: { status: 'regen', duration: 3 } } },
+            { at: 0.25, name: 'Last Defense', say: 'Temple guards run to shield the High Priest!',
+              summon: [e('kingdom_guard', 'Temple Guard', 'crusader')], status: { status: 'protect', duration: 3 } },
+          ] }),
     ],
 };
 

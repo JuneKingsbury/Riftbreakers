@@ -1,0 +1,42 @@
+<!doctype html>
+<!-- Manual/visual harness: runs one headless fight (real classes, real rules) and shows the
+     battle breakdown from the result screen. Serve the repo root and open
+     /tests/harness/breakdown.html (add ?seed=<n> for a different fight). -->
+<html>
+<head>
+<meta charset="utf-8">
+<base href="/">
+<title>Battle breakdown harness</title>
+<link rel="stylesheet" href="css/style.css">
+<style>html,body{margin:0;min-height:100%;background:#05050a;font-family:'Pixelify Sans',monospace}
+#wrap{display:flex;flex-direction:column;align-items:center;gap:12px;padding:24px 0}</style>
+</head>
+<body>
+<div id="wrap"><div id="title" style="color:#ffcc44;font-size:28px;font-weight:bold;letter-spacing:3px;"></div><div id="bd"></div></div>
+<script type="module">
+import { gridMap } from '/tests/map-fixtures.mjs';
+import { createUnit } from '/js/tactical/units.js';
+import { TacticalBattle } from '/js/tactical/battle.js';
+import { runRealtimeBattle } from '/js/tactical/realtime.js';
+import { mountBreakdown } from '/js/tactical/battle-breakdown.js';
+
+const seed = Number(new URLSearchParams(location.search).get('seed') ?? 3) >>> 0;
+let s = seed;
+Math.random = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 2 ** 32; };
+
+const map = gridMap(Array.from({ length: 7 }, () => '.'.repeat(12)));
+const units = [
+    createUnit('Aldric', 'warden', 'player', 0, 1), createUnit('Mira', 'evoker', 'player', 0, 3),
+    createUnit('Thorn', 'beastcaller', 'player', 1, 5), createUnit('Vex', 'alchemist', 'player', 0, 5),
+    createUnit('Bandit King', 'orc_captain', 'enemy', 11, 3), createUnit('Court Hexer', 'raider_hexer', 'enemy', 11, 1),
+    createUnit('Royal Archer', 'raider_archer', 'enemy', 11, 5), createUnit('Bodyguard', 'raider', 'enemy', 10, 2),
+];
+units.find(u => u.name === 'Thorn').abilities.push('call_wolf');
+const battle = new TacticalBattle(map, units);
+runRealtimeBattle(battle);
+document.getElementById('title').textContent = battle.winner === 'player' ? 'VICTORY!' : 'DEFEAT';
+mountBreakdown(document.getElementById('bd'), battle.stats);
+window.harness = { battle, done: true };
+</script>
+</body>
+</html>

@@ -28,7 +28,7 @@ export function partySizeMultiplier(startPartySize = 3) {
 // The score multiplier for a run at each Rift Tier (index = tier). Matches 1 + the tier's
 // renown bonus in RIFT_TIERS (profile.js). Kept here so the leaderboard rules can import
 // nothing: MAX_POINTS_PER_BATTLE there must allow the last entry.
-export const RIFT_TIER_SCORE = [1, 1.25, 1.5, 1.75, 2, 2.5];
+export const RIFT_TIER_SCORE = [1, 1.25, 1.5, 1.75, 2, 2.5, 3];
 
 /** The score multiplier for a run at Rift Tier `tier` (0 = no tier). */
 export function riftTierMultiplier(tier = 0) {

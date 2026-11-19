@@ -41,6 +41,13 @@ export const encounters = {
             e('shard_spider', 'Abyssal Crawler', 'void_horror'),
             e('shadow_mage', 'Shade', 'shade'),
         ]),
+        fight('leech_shallows', 'Leech Shallows', 2, [
+            e('abyssal_leech', 'Abyssal Leech', 'void_horror', { tint: '#a0e0c0' }),
+            e('shard_spider', 'Abyssal Crawler', 'void_horror', { statMods: { maxHp: 8 } }),
+            e('abyssal_leech', 'Abyssal Leech', 'void_horror', { tint: '#a0e0c0' }),
+            e('raider_archer', 'Isle Hunter', 'void_stalker'),
+            e('goblin', 'Shadow Imp', null, { statMods: { maxHp: 8 } }),
+        ]),
     ],
     elite: [
         fight('void_horrors', 'Void Horrors', 3, [
@@ -68,7 +75,12 @@ export const encounters = {
             e('void_stalker', 'Void Stalker'),
             e('shadow_mage', 'Shade', 'shade'),
             e('shard_spider', 'Abyssal Crawler', 'void_horror'),
-        ], { scouting: 'The Gloom Sentinel waits in the dark with shades and void stalkers. Its curses pile on slowly, then all at once.' }),
+        ], { scouting: 'The Gloom Sentinel waits in the dark with shades and void stalkers. Its curses pile on slowly, then all at once.',
+          phases: [
+            { at: 0.5, name: 'Deepening Gloom', say: 'The gloom thickens. Shapes move inside it.',
+              allies: { buffs: [{ stat: 'eva', value: 15, duration: 3 }] },
+              summon: [e('shadow_mage', 'Shade', 'shade'), e('shadow_mage', 'Shade', 'shade')] },
+          ] }),
     ],
 };
 

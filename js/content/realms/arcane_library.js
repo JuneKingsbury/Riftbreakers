@@ -42,6 +42,13 @@ export const encounters = {
             e('spectral_wisp', 'Arcane Wisp', 'arcane_wisp'),
             e('shadow_mage', 'Spell Wraith', 'spell_wraith'),
         ]),
+        fight('restless_tomes', 'Restless Tomes', 2, [
+            e('living_tome', 'Living Tome', 'tome_guardian', { tint: '#f0e0b0' }),
+            e('kingdom_guard', 'Tome Guardian', 'tome_guardian'),
+            e('living_tome', 'Living Tome', 'tome_guardian', { tint: '#f0e0b0' }),
+            e('spectral_wisp', 'Arcane Wisp', 'arcane_wisp'),
+            e('kingdom_guard', 'Tome Guardian', 'tome_guardian'),
+        ]),
     ],
     elite: [
         fight('forbidden_stacks', 'Forbidden Stacks', 3, [
@@ -69,7 +76,12 @@ export const encounters = {
             e('spectral_wisp', 'Arcane Wisp', 'arcane_wisp'),
             e('kingdom_guard', 'Tome Guardian', 'tome_guardian'),
             e('spectral_wisp', 'Arcane Wisp', 'arcane_wisp'),
-        ], { scouting: 'The Arcane Sentinel reads your fate and writes a short one. Tome Guardians shield it, and wisps hover just out of reach.' }),
+        ], { scouting: 'The Arcane Sentinel reads your fate and writes a short one. Tome Guardians shield it, and wisps hover just out of reach.',
+          phases: [
+            { at: 0.5, name: 'Warding Glyphs', say: 'The Arcane Sentinel\'s glyphs flare: spells will turn back on their casters!',
+              status: { status: 'reflect', duration: 3 }, allies: { status: { status: 'shell', duration: 3 } },
+              summon: [e('spectral_wisp', 'Arcane Wisp', 'arcane_wisp')] },
+          ] }),
     ],
 };
 

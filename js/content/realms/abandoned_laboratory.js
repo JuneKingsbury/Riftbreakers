@@ -66,7 +66,13 @@ export const encounters = {
             e('shadow_mage', 'Spell Wraith', 'spell_wraith'),
             e('kingdom_guard', 'Arcane Construct', 'construct'),
             e('spectral_wisp', 'Arcane Wisp', 'arcane_wisp'),
-        ], { scouting: 'The Arcane Construct was built to win duels. It strikes hard up close, and a lab abomination lumbers along beside it.' }),
+        ], { scouting: 'The Arcane Construct was built to win duels. It strikes hard up close, and a lab abomination lumbers along beside it.',
+          phases: [
+            { at: 0.5, name: 'Overload', say: 'Overload! The Construct\'s core burns white-hot.',
+              status: { status: 'haste', duration: 3 }, buffs: [{ stat: 'atk', value: 5, duration: 4 }, { stat: 'mat', value: 5, duration: 4 }] },
+            { at: 0.25, name: 'Failsafe', say: 'A failsafe trips. Dormant constructs lurch back to life!',
+              summon: [e('kingdom_guard', 'Arcane Construct', 'construct'), e('kingdom_guard', 'Arcane Construct', 'construct')] },
+          ] }),
     ],
 };
 

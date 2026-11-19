@@ -89,6 +89,10 @@ export function buildEncounter(def, kind, act, partySize, easy = false, realm = 
         enemyLevel: def.enemyLevel,
         map: def.map ?? null,
         roster: roster.map(r => ({ ...r, statMods: addMods(scale, r.statMods) })),
+        // Boss phases: reinforcements are scaled like the roster.
+        ...(def.phases ? { phases: def.phases.map(p => ({
+            ...p, summon: p.summon?.map(r => ({ ...r, statMods: addMods(scale, r.statMods) })),
+        })) } : {}),
     };
 }
 

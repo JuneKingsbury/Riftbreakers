@@ -65,7 +65,7 @@ export function defaultStorage() {
 export function newProfile() {
     // stats.riftTier: the highest Rift Tier the profile may choose (see RIFT_TIERS).
     return {
-        renown: 0, unlocked: [], stats: { runs: 0, wins: 0, bestAct: 0, bestFloor: 0, riftTier: 0 },
+        renown: 0, unlocked: [], stats: { runs: 0, wins: 0, bestAct: 0, bestFloor: 0, riftTier: 0, bestDepth: 0 },
         items: [],        // every item ever obtained, by base key (an enchanted find counts as its item)
         bestRuns: [],     // summaries of the best finished runs, won or lost, highest score first (see runSummary)
         bossKills: {},    // boss fight id → times defeated, across all runs
@@ -186,7 +186,8 @@ export function runSummary(run, renown, now = new Date()) {
         party: run.party.map(m => ({ name: m.name, job: m.job, origin: m.origin, level: m.level, appearance: m.appearance })),
         // Only the acts it reached: a lost run doesn't name the realms it never saw.
         realms: run.realms.slice(0, run.act),
-        won: run.status === 'won',
+        // An endless run sealed the final rift before going deeper, so it is a win however it ends.
+        won: runWon(run),
         act: run.act,
         ...run.stats,
         relics: run.relics.length,
@@ -279,6 +280,7 @@ export const RIFT_TIERS = [
     { name: 'Tier III: Slim Pickings', desc: 'Battles pay 30% less gold, and their rewards offer one fewer item to choose from.', renown: 0.75 },
     { name: 'Tier IV: Gathering Storm', desc: 'Every enemy gains +8 HP and +1 to ATK, DEF, MAT and MDF, and bosses bring one more ally.', renown: 1 },
     { name: 'Tier V: Riftstorm', desc: 'Every enemy gains another +8 HP and +1 to ATK and MAT, and elites bring one more ally.', renown: 1.5 },
+    { name: 'Tier VI: Unstable Rift', desc: 'Elite leaders gain one more affix.', renown: 2 },
 ];
 export const MAX_RIFT_TIER = RIFT_TIERS.length - 1;
 
@@ -364,9 +366,23 @@ export function renownFor(stats, won) {
     return (stats.floors || 0) + 3 * (stats.elites || 0) + 10 * (stats.bosses || 0) + (won ? 25 : 0);
 }
 
+/** Whether a run counts as won: it sealed the final rift (an endless run did, then went on). */
+export function runWon(run) {
+    return run.status === 'won' || run.sealedRift === true;
+}
+
+/**
+ * An endless run has ended. It was recorded (recordRun) when it sealed the final rift, so its
+ * score, renown and high score stay what they were then: endless play is just for fun. Only
+ * the depth it reached is kept, as profile.stats.bestDepth.
+ */
+export function noteEndlessDepth(profile, run) {
+    if (run.endless) profile.stats.bestDepth = Math.max(profile.stats.bestDepth, run.endless.depth);
+}
+
 // Records a finished run in the profile. Returns the renown earned.
 export function recordRun(profile, run, now = new Date()) {
-    const won = run.status === 'won';
+    const won = runWon(run);
     const tier = run.options?.tier ?? 0;
     const earned = Math.round(renownFor(run.stats, won) * renownMultiplier(tier, run.startPartySize ?? 3));
     profile.renown += earned;

@@ -24,7 +24,7 @@ import { generateActMap, reachableIds } from './map-gen.js';
 import { rollEncounter, realmEncounters, battleRewards, ACT_COUNT, EASY_FIGHTS } from './data/encounters.js';
 import { RELICS, relicStatMods, relicMult, relicsWith } from './data/relics.js';
 import { eventsFor, EVENTS } from './data/events.js';
-import { rollRealms, REALMS, appearsIn } from './data/realms.js';
+import { rollRealms, REALMS, ACT_REALMS, appearsIn } from './data/realms.js';
 import { createMember, recruitCandidates } from './data/recruits.js';
 import { autoAllocate, plannedPromotion } from './skill-plans.js';
 import { battleScore } from './score.js';
@@ -33,6 +33,7 @@ import { runOptions, BASE_JOBS } from './profile.js';
 import { EQUIPMENT, EQUIP_FIELDS, equipmentStatBonuses, itemPrice, itemRarity, itemName, canEnchant, enchantedKey, enchantLevel } from '../tactical/data/equipment.js';
 import { JOB_STATS, ABILITIES, allowedEquipTypes, jobsOfTier } from '../tactical/data-registry.js';
 import { sanitizeLoadout, learnAbility, upgradeAbility, canPromote, promote, promotionOptions, addXp, levelStatMods } from '../tactical/loadout.js';
+import { rollAffixes } from './data/affixes.js';
 
 export const SAVE_KEY = 'riftbreak.run.v1';
 export const SAVE_VERSION = 4;
@@ -65,6 +66,11 @@ export const SLIM_GOLD = 0.7;   // Tier III: battle gold
 const TIER1_TOUGH = { maxHp: 10, atk: 2, mat: 2 };                  // Tier I: elites and bosses
 const TIER4_STORM = { maxHp: 8, atk: 1, def: 1, mat: 1, mdf: 1 };   // Tier IV: every enemy
 const TIER5_RIFTSTORM = { maxHp: 8, atk: 1, mat: 1 };               // Tier V: every enemy, on top of IV
+// Endless mode (after sealing the final rift): each depth adds this to every enemy, on top of
+// the last act's own scaling. Depth 3 is roughly two more Rift Tiers' worth.
+const ENDLESS_STEP = { maxHp: 10, atk: 2, def: 1, mat: 2, mdf: 1 };
+// The realms endless acts are set in: the last acts', whose fights suit those levels.
+const ENDLESS_REALMS = () => [...new Set([...(ACT_REALMS[ACT_COUNT - 1] ?? []), ...ACT_REALMS[ACT_COUNT]])];
 
 function addStatMods(...mods) {
     const out = {};
@@ -187,10 +193,57 @@ export class RunState {
         const bosses = realmEncounters(this.realmId, 'boss').map(e => e.def.id);
         this.actBoss = bosses.length ? new Rng((this.seed ^ (0xB055 * this.act)) >>> 0).pick(bosses) : null;
         // The last act has no recruit floor: the party should be at full size by then.
-        this.map = generateActMap(this.rng, this.act, { recruit: this.act < ACT_COUNT, shops: !this.noGold });
+        this.map = generateActMap(this.rng, this.tableAct, { recruit: this.act < ACT_COUNT, shops: !this.noGold });
         this.currentNodeId = null;
         this.visited = [];
         this.pending = null;
+    }
+
+    // The act whose tables (rewards, item rarities, map shape, events) apply: the act itself,
+    // or the last act for the acts of an endless run.
+    get tableAct() {
+        return Math.min(this.act, ACT_COUNT);
+    }
+
+    // ---- Endless mode ----
+
+    /** Whether the run can go on into endless acts: it has just sealed the final rift (not a daily run). */
+    get canGoEndless() {
+        return this.status === 'won' && !this.endless && !this.endlessDeclined && !this.options?.daily && this.act >= this.actCount;
+    }
+
+    /**
+     * Goes on past the final rift: the run is active again, already counts as won
+     * (`sealedRift`), and moves to the first endless act. It ends only when the party falls
+     * (or the run is abandoned). Record the run (profile.recordRun) before calling this: the
+     * sealed run is what counts, and endless play is just for fun. Returns false if it can't.
+     */
+    goEndless() {
+        if (!this.canGoEndless) return false;
+        this.status = 'active';
+        this.sealedRift = true;
+        // What the run scored when it sealed the rift: what it is recorded with.
+        this.sealedScore = this.score || 0;
+        this.endless = { depth: 0 };
+        this.pending = null;
+        this._nextEndlessAct();
+        return true;
+    }
+
+    // The next endless act: one level deeper, in a late realm other than the last one, picked
+    // on its own stream of the seed.
+    _nextEndlessAct() {
+        this.endless.depth += 1;
+        const pool = ENDLESS_REALMS().filter(id => id !== this.realmId);
+        const realm = new Rng((this.seed ^ Math.imul(this.endless.depth, 0x2545F491)) >>> 0).pick(pool);
+        this.realms.push(realm);
+        this.act += 1;
+        this._startAct();
+    }
+
+    /** "Act 2", or "Depth 3" in an endless run. */
+    get actLabel() {
+        return this.endless ? `Depth ${this.endless.depth}` : `Act ${this.act}`;
     }
 
     // How many acts this run has: one per realm. Runs saved before Act 4 existed keep their
@@ -267,7 +320,10 @@ export class RunState {
         const wasBoss = this.currentNode?.type === 'boss';
         this.pending = null;
         if (wasBoss) {
-            if (this.act >= this.actCount) {
+            if (this.endless) {
+                if (this.options.secondWind) for (const m of this.party) this._grantXp(m, 50);
+                this._nextEndlessAct();
+            } else if (this.act >= this.actCount) {
                 this.status = 'won';
             } else {
                 this.act += 1;
@@ -418,7 +474,7 @@ export class RunState {
         for (let i = 0; i < count * 6 && out.length < count; i++) {
             const rarity = this.rng.weighted(weights);
             const keys = Object.keys(EQUIPMENT).filter(k => itemRarity(k) === rarity && !out.includes(k)
-                && (!EQUIPMENT[k].featOnly || this.options.featItems?.includes(k)) && appearsIn(EQUIPMENT[k], this.act, this.realmId));
+                && (!EQUIPMENT[k].featOnly || this.options.featItems?.includes(k)) && appearsIn(EQUIPMENT[k], this.tableAct, this.realmId));
             const usable = keys.filter(k => this.usableByParty(k));
             const pool = usable.length ? usable : keys;
             if (pool.length) out.push(this.rng.pick(pool));
@@ -438,7 +494,7 @@ export class RunState {
         // Empty Purse runs never find gold or shop relics: they would do nothing.
         const useless = (r) => this.noGold && (r.goldMult || r.shopDiscount);
         const pool = Object.keys(RELICS).filter(k => rarities.includes(RELICS[k].rarity) && !this.relics.includes(k) && !useless(RELICS[k])
-            && appearsIn(RELICS[k], this.act, this.realmId));
+            && appearsIn(RELICS[k], this.tableAct, this.realmId));
         return this.rng.sample(pool, count);
     }
 
@@ -447,7 +503,8 @@ export class RunState {
         const before = this.party.map(m => this.maxHp(m));
         this.relics.push(key);
         // A max HP relic raises current HP too.
-        this.party.forEach((m, i) => { if (m.hp != null) m.hp += this.maxHp(m) - before[i]; });
+        // (A max HP drawback lowers it, but never below 1.)
+        this.party.forEach((m, i) => { if (m.hp != null) m.hp = Math.max(1, m.hp + this.maxHp(m) - before[i]); });
         return true;
     }
 
@@ -470,10 +527,20 @@ export class RunState {
         // were one larger).
         const extraAlly = (kind === 'boss' && tier >= 4) || (kind === 'elite' && tier >= 5);
         const size = this.party.length + (extraAlly ? 1 : 0);
-        const enc = rollEncounter(this.rng, this.realmId, this.act, kind, size, seen, easy);
+        const enc = rollEncounter(this.rng, this.realmId, this.tableAct, kind, size, seen, easy);
         this.seenEncounters.push(enc.id);
         const mods = riftTierMods(tier, enc.kind);
-        if (mods) for (const r of enc.roster) r.statMods = addStatMods(r.statMods, mods);
+        const units = [...enc.roster, ...(enc.phases ?? []).flatMap(p => p.summon ?? [])];
+        if (mods) for (const r of units) r.statMods = addStatMods(r.statMods, mods);
+        // Endless acts: every enemy gets stronger with depth.
+        const depth = this.endless?.depth ?? 0;
+        if (depth > 0) {
+            const step = Object.fromEntries(Object.entries(ENDLESS_STEP).map(([k, v]) => [k, v * depth]));
+            for (const r of units) r.statMods = addStatMods(r.statMods, step);
+        }
+        // Elite affixes go on the leader (data/affixes.js), from their own stream of the seed.
+        const affixes = rollAffixes(this.seed, this.seenEncounters.length, enc.kind, this.tableAct, tier);
+        if (affixes.length && enc.roster[0]) enc.roster[0].affixes = affixes;
         return enc;
     }
 
@@ -497,7 +564,7 @@ export class RunState {
         }
         for (const m of this.party) m.hp = null;
 
-        const base = battleRewards(enc.kind, this.act);
+        const base = battleRewards(enc.kind, this.tableAct);
         const xpMult = relicMult(this.relics, 'xpMult');
         const xpGained = {}, levelUps = {};
         for (const m of this.party) {
@@ -525,7 +592,7 @@ export class RunState {
 
         // The last act's boss ends the run: there is nothing left to spend loot on, so no item or
         // relic choice. The battle's result screen still shows the XP, gold and score it gave.
-        if (enc.kind === 'boss' && this.act >= this.actCount) {
+        if (enc.kind === 'boss' && this.act >= this.actCount && !this.endless) {
             this.pending = null;
             this.status = 'won';
             return { kind: 'reward', encounter: enc, boss: true, final: true, gold, score, xp: xpGained, levelUps, items: [], relics: [] };
@@ -548,7 +615,7 @@ export class RunState {
             score,
             xp: xpGained,
             levelUps,
-            items: this._rollItems(ITEM_RARITY[this.act][enc.kind], choices, enc.kind),
+            items: this._rollItems(ITEM_RARITY[this.tableAct][enc.kind], choices, enc.kind),
             itemClaimed: false,
             relics,
             // Bosses offer a choice of relics; elites give their one relic.
@@ -587,7 +654,7 @@ export class RunState {
     }
 
     _rollShop() {
-        const weights = { ...ITEM_RARITY[this.act].normal };
+        const weights = { ...ITEM_RARITY[this.tableAct].normal };
         if (this.options.fineWares) weights.uncommon = (weights.uncommon || 0) + 25;
         const stock = this._rollItems(weights, this.options.fineWares ? 6 : 5)
             .map(key => ({ key, price: this._discount(itemPrice(key)), sold: false }));
@@ -605,7 +672,7 @@ export class RunState {
     restockShop() {
         if (!this.canRestock()) return false;
         const p = this.pending;
-        const weights = { ...ITEM_RARITY[this.act].normal };
+        const weights = { ...ITEM_RARITY[this.tableAct].normal };
         if (this.options.fineWares) weights.uncommon = (weights.uncommon || 0) + 25;
         const unsold = p.stock.filter(e => !e.sold).length;
         const fresh = this._rollItems(weights, unsold).map(key => ({ key, price: this._discount(itemPrice(key)), sold: false }));
@@ -727,7 +794,7 @@ export class RunState {
 
     _rollEvent() {
         // Realm events come up about half the time while fresh ones remain.
-        const { realm, general } = eventsFor(this.act, this.realmId);
+        const { realm, general } = eventsFor(this.tableAct, this.realmId);
         const fresh = list => list.filter(e => !this.seenEvents.includes(e.id));
         const freshRealm = fresh(realm), freshGeneral = fresh(general);
         let pool;

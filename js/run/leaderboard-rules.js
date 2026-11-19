@@ -10,8 +10,9 @@
 export const NAME_MAX = 20;
 export const MAX_PARTY_SIZE = 6;
 // The most a single battle can score: a boss (500) at ×2 speed with a solo start (×2) at
-// Rift Tier V (×2.5, RIFT_TIER_SCORE in score.js).
-export const MAX_POINTS_PER_BATTLE = 5000;
+// Rift Tier VI (×3, RIFT_TIER_SCORE in score.js). The Worker checks it against a run's average
+// over its battles, so it only needs to change when the top tier's multiplier does.
+export const MAX_POINTS_PER_BATTLE = 6000;
 
 // How many days after its own a daily run can still be submitted, so a run finished just
 // after the midnight reset still counts for the day it was started.
