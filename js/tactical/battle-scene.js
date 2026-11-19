@@ -4,7 +4,7 @@ import { battleMusic, abilitySound, battleEventSound, battleOpensWithAlert, down
 import { pickRealmMap, realmLook } from '../run/data/realms.js';
 import { TacticalBattle, STATES } from './battle.js';
 import { BattleView3D, showViewError } from './battle-view3d.js';
-import { BattleUI, unitSkillsets, SKILLSET_KEYS } from './battle-ui.js';
+import { BattleUI, unitSkillsets, SKILLSET_KEYS, SIDEBAR_W } from './battle-ui.js';
 import { runAutoTurn } from './ai/executor.js';
 import { isEntityMoving } from '../systems/movement-lerp.js';
 import { ABILITIES } from './abilities.js';
@@ -185,11 +185,11 @@ export class BattleScene {
         return this._renderer?.isBusy(this._battle.units) ?? false;
     }
 
-    // The HUD covers the right side in landscape and the bottom in portrait.
+    // The HUD covers the left side in landscape and the bottom in portrait.
     _updateInsets() {
         if (!this._renderer || !this._ui) return;
         if (isPortrait()) this._renderer.setInsets(0, 0, 0, this._ui.bottomInset());
-        else this._renderer.setInsets(0, 190);
+        else this._renderer.setInsets(SIDEBAR_W, 0);
     }
 
     // With the tracking camera on, glide toward whoever just started a turn, at most once a second.

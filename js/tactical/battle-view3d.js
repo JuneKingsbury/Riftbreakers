@@ -226,7 +226,7 @@ export class BattleView3D {
         this._ray   = new THREE.Raycaster();
 
         this._tileSize = DEFAULT_TILE_SIZE;
-        this._insets   = { left: 0, right: 190, top: 0, bottom: 0 };
+        this._insets   = { left: 190, right: 0, top: 0, bottom: 0 };   // battle-scene.js sets the real ones
         this._width = 0;
         this._height = 0;
 

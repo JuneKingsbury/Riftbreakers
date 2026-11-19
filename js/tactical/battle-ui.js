@@ -25,6 +25,11 @@ const SPEEDS = [1, 2, 4];
 // A touch held this long (ms) on a battle button is a look at its tooltip, not a press.
 const TOUCH_HOLD_MS = 450;
 
+// Width of the unit list. In landscape it runs down the left edge, so the command menu, its
+// skill info, the key hints and the log start to the right of it (portrait CSS moves it to the
+// bottom instead). battle-scene.js keeps the camera clear of it.
+export const SIDEBAR_W = 190;
+
 export class BattleUI {
     // opts.fullAuto: every player unit is script-controlled, so show pause/speed
     // controls and the fired-rule readout instead of manual command hints.
@@ -129,8 +134,8 @@ export class BattleUI {
         const el = document.createElement('div');
         el.className = 'tac-sidebar';
         el.style.cssText = `
-            position: absolute; top: 0; right: 0; width: 190px; height: 100%;
-            background: rgba(8,8,20,0.92); border-left: 1px solid #335;
+            position: absolute; top: 0; left: 0; width: ${SIDEBAR_W}px; height: 100%;
+            background: rgba(8,8,20,0.92); border-right: 1px solid #335;
             padding: 10px 8px; box-sizing: border-box;
             overflow-x: hidden; overflow-y: auto; pointer-events: auto;
         `;
@@ -140,8 +145,9 @@ export class BattleUI {
 
     _makeActionMenu() {
         const el = document.createElement('div');
+        el.className = 'tac-actions';
         el.style.cssText = `
-            position: absolute; bottom: 70px; left: 14px;
+            position: absolute; bottom: 70px; left: ${SIDEBAR_W + 14}px;
             background: rgba(8,8,24,0.95); border: 1px solid #447;
             border-radius: 5px; padding: 6px 8px;
             display: none; min-width: 150px;
@@ -155,7 +161,7 @@ export class BattleUI {
         const el = document.createElement('div');
         el.className = 'tac-log';
         el.style.cssText = `
-            position: absolute; bottom: 0; left: 0; right: 190px; height: 65px;
+            position: absolute; bottom: 0; left: ${SIDEBAR_W}px; right: 0; height: 65px;
             background: rgba(8,8,20,0.88); border-top: 1px solid #335;
             padding: 5px 10px; overflow: hidden;
             display: flex; flex-direction: column-reverse;
@@ -183,7 +189,7 @@ export class BattleUI {
         const el = document.createElement('div');
         el.className = 'tac-hint';
         el.style.cssText = `
-            position: absolute; top: 6px; left: 8px;
+            position: absolute; top: 6px; left: ${SIDEBAR_W + 8}px;
             font-size: 10px; color: #556; pointer-events: none;
         `;
         el.textContent = this._fullAuto
@@ -209,8 +215,9 @@ export class BattleUI {
 
     _makeSkillInfo() {
         const el = document.createElement('div');
+        el.className = 'tac-skillinfo';
         el.style.cssText = `
-            position: absolute; bottom: 70px; left: 175px;
+            position: absolute; bottom: 70px; left: ${SIDEBAR_W + 175}px;
             background: rgba(8,8,24,0.97); border: 1px solid #559;
             border-radius: 5px; padding: 8px 10px;
             font-size: 11px; color: #ccc; line-height: 1.6;
