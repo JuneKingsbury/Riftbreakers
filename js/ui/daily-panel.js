@@ -122,7 +122,7 @@ export function mountDailyPanel({ button, panel, onPlay }) {
                 <button data-daily-refresh class="daily-btn"${loading ? ' disabled' : ''}>Refresh</button></div>
             <div class="daily-sub">${esc(dailyLabel(date))} (ET) · new daily in <span data-daily-countdown>${countdownText(msUntilNextDaily())}</span></div>
             <div class="daily-sub">Today's party: <span style="color:#cde;">${esc(jobs)}</span></div>
-            <div class="daily-sub" title="${esc(SCORE_TIP)}" style="text-decoration:underline dotted;cursor:help;width:fit-content;">How scoring works</div>
+            <div class="daily-sub" data-tip="${esc(SCORE_TIP)}" style="text-decoration:underline dotted;cursor:help;width:fit-content;">How scoring works</div>
             ${mineHtml()}
             <div class="daily-list">${listHtml()}</div>`;
         panel.querySelector('[data-daily-refresh]')?.addEventListener('click', loadBoard);
