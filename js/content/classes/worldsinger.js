@@ -25,7 +25,7 @@ export const job = {
             steps: ['toxic_spores', 'toxic_spores+', 'regen_aura', 'verdant_lash+', 'toxic_spores+', 'call_thorn_beast', 'thorn_hide'],
         },
         {
-            key: 'summoner', name: 'Summoner',
+            key: 'summoner', name: 'Summoning',
             desc: 'Let a Thorn Beast do the fighting: it pelts enemies from range while Verdant Lash slows anything that comes for you. Thorn Hide hurts anyone who hits you in melee.',
             steps: ['toxic_spores', 'call_thorn_beast', 'regen_aura', 'call_thorn_beast+', 'verdant_lash+', 'thorn_hide', 'call_thorn_beast+'],
         },

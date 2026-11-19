@@ -20,12 +20,12 @@ export const job = {
     },
     builds: [
         {
-            key: 'wolf', name: 'Wolf Companion',
+            key: 'wolf', name: 'Summoning',
             desc: 'Fight beside a wolf: Call Wolf summons one that\'s hard to hit and slows what it bites, and Savage Howl stuns every enemy near you. Upgrade Call Wolf early, since each rank cuts its high MP cost.',
             steps: ['call_wolf', 'call_wolf+', 'wild_surge+', 'savage_howl', 'savage_howl+', 'call_wolf+', 'savage_howl+'],
         },
         {
-            key: 'brawler', name: 'Melee Brawler',
+            key: 'brawler', name: 'Melee Damage',
             desc: 'Brawl in melee with no MP needed: Wild Surge hits hard and slows, Feral Counter answers melee hits with a Wild Surge of its own, and Bloodlust hits 30% harder once you\'re below half HP.',
             steps: ['feral_counter', 'wild_surge+', 'bloodlust', 'wild_surge+', 'feral_counter+', 'feral_counter+', 'call_wolf'],
         },

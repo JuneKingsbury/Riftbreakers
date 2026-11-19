@@ -24,7 +24,7 @@ export const job = {
             steps: ['delay', 'initiative', 'seize_the_moment+', 'rally', 'seize_the_moment+', 'rally+'],
         },
         {
-            key: 'disrupt', name: 'Disrupt Enemies',
+            key: 'disrupt', name: 'Disruption',
             desc: 'Slow down the enemy\'s turns: Delay pushes an enemy\'s next turn back, and Read the Battle breaks up spells while they charge. Exploit Opening is a quick strike that brings your own turn sooner.',
             steps: ['read_the_battle', 'delay', 'delay+', 'exploit_opening', 'read_the_battle+', 'delay+', 'exploit_opening+'],
         },

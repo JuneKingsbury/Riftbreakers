@@ -25,7 +25,7 @@ export const job = {
             steps: ['seismic_power', 'tremor+', 'stone_spike', 'tremor+', 'landslide', 'stone_spike+', 'landslide+'],
         },
         {
-            key: 'tank', name: 'Tank',
+            key: 'tank', name: 'Tanking',
             desc: 'Hold the front line: Aftershock slows anyone who hits you in melee, and Earth Skin (from the Stoneshaper) raises your DEF. Stone Spike is your heavy hit.',
             steps: ['aftershock', 'earth_skin+', 'stone_spike', 'aftershock+', 'stone_spike+', 'earth_skin+', 'aftershock+'],
         },

@@ -23,7 +23,7 @@ export const job = {
     },
     builds: [
         {
-            key: 'tank', name: 'Tank',
+            key: 'tank', name: 'Tanking',
             desc: 'Pull the enemy onto you: Taunt forces nearby enemies to attack you, Hold the Line strikes back when an ally next to you is hit, and Cleave hits everyone around you.',
             steps: ['taunt', 'hold_the_line', 'cleave+', 'vanguard_step', 'taunt+', 'hold_the_line+', 'cleave+', 'hold_the_line+', 'taunt+'],
         },

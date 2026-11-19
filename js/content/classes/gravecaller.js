@@ -27,7 +27,7 @@ export const job = {
             steps: ['grave_chill', 'life_drain+', 'soul_harvest', 'life_drain+', 'lingering_spite', 'grave_chill+', 'wraithwalk'],
         },
         {
-            key: 'corpses', name: 'Corpse Master',
+            key: 'corpses', name: 'Corpse Magic',
             desc: 'Turn every fallen enemy into an advantage: Raise Dead brings one back as a skeleton that fights for you, or Corpse Burst blows it up to hurt the enemies around it.',
             steps: ['raise_dead', 'corpse_burst', 'grave_chill', 'soul_harvest', 'corpse_burst+', 'raise_dead+', 'corpse_burst+'],
         },

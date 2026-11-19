@@ -27,7 +27,7 @@ export const job = {
             steps: ['mirror_image', 'glamour', 'displacement', 'phantasm+', 'mirror_image+', 'phantasm+', 'displacement+'],
         },
         {
-            key: 'evasion', name: 'Evasion Support',
+            key: 'evasion', name: 'Evasion',
             desc: 'Keep allies from being hit at all: Blur makes one hard to hit and Vanish hides one from enemies for 2 turns. Mirage Step and Displacement keep you out of reach too.',
             steps: ['blur', 'mirage_step', 'vanish', 'blur+', 'displacement', 'vanish+', 'blur+', 'vanish+'],
         },

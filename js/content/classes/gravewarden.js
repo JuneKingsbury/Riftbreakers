@@ -20,7 +20,7 @@ export const job = {
     },
     builds: [
         {
-            key: 'army', name: 'Undead Army',
+            key: 'army', name: 'Summoning',
             desc: 'Build an army of the dead: Mass Raise brings back two fallen enemies as skeletons, and Grave Legion makes everything you summon 80% stronger. It needs fallen enemies, so it gets going mid-fight.',
             steps: ['mass_raise', 'grave_legion', 'mass_raise+', 'raise_dead+', 'mass_raise+', 'death_ward'],
         },

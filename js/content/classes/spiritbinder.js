@@ -20,7 +20,7 @@ export const job = {
     },
     builds: [
         {
-            key: 'summoner', name: 'Summoner',
+            key: 'summoner', name: 'Summoning',
             desc: 'Fight alongside a spirit: Call Wisp summons a wisp that chills enemies and can put them to sleep, and Spirit Pact makes it 30% stronger. Spirit Lash slows targets in the meantime.',
             steps: ['call_wisp', 'spirit_pact', 'spirit_lash+', 'call_wisp+', 'spirit_lash+', 'haunting', 'spirit_hush'],
         },

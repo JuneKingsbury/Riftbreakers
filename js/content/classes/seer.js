@@ -27,7 +27,7 @@ export const job = {
             steps: ['time_lapse', 'dream_veil', 'premonition', 'dream_veil+', 'time_lapse+', 'featherstep', 'dream_veil+', 'time_lapse+', 'swiftcast'],
         },
         {
-            key: 'support', name: 'Ally Support',
+            key: 'support', name: 'Ally Buffs',
             desc: 'Make your allies better: Swift Grace hastes one so they act 50% more often, and Temporal Slip makes the next physical attack on an ally miss. Premonition keeps you safe.',
             steps: ['time_lapse', 'swift_grace', 'premonition', 'temporal_slip+', 'swift_grace+', 'premonition+', 'swift_grace+', 'temporal_slip+'],
         },

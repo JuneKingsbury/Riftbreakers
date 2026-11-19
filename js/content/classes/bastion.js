@@ -20,12 +20,12 @@ export const job = {
     },
     builds: [
         {
-            key: 'tank', name: 'Tank',
+            key: 'tank', name: 'Tanking',
             desc: 'Be nearly impossible to kill: Unbreakable cuts all damage you take by 15%, Mana Shell gives you Shell after a spell hits you, and Bulwark gives an ally Protect.',
             steps: ['unbreakable', 'mana_shell', 'bulwark+', 'ward_circle', 'mana_shell+', 'bulwark+', 'mana_shell+'],
         },
         {
-            key: 'party', name: 'Party Protection',
+            key: 'party', name: 'Party Shielding',
             desc: 'Protect the whole line: Ward Circle gives you and every ally next to you Shell against magic, Bulwark gives one ally Protect, and Grasping Stone slows a group of enemies.',
             steps: ['ward_circle', 'grasping_stone', 'bulwark+', 'ward_circle+', 'grasping_stone+', 'ward_circle+', 'unbreakable'],
         },

@@ -19,7 +19,7 @@ export const job = {
     },
     builds: [
         {
-            key: 'healer', name: 'Healer',
+            key: 'healer', name: 'Healing',
             desc: 'Keep single allies alive: Elixir heals and cures one ally, and Triage patches up allies next to you when a hit leaves them low. Steady Hands stops your splashes from helping enemies.',
             steps: ['triage', 'elixir+', 'panacea_mist', 'steady_hands', 'elixir+', 'triage+', 'triage+'],
         },

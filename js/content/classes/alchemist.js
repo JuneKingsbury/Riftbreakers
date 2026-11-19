@@ -24,7 +24,7 @@ export const job = {
     },
     builds: [
         {
-            key: 'healer', name: 'Healer',
+            key: 'healer', name: 'Healing',
             desc: 'Heal with splash potions: Healing Draught heals everyone it lands on, and Potent Brews makes it 25% stronger. It heals enemies in the splash too, so aim it at your side.',
             steps: ['healing_draught+', 'reflex_tonic', 'acid_flask', 'potent_brews', 'healing_draught+', 'smoke_bomb', 'quicksilver', 'light_pack'],
         },

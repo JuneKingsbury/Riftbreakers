@@ -20,7 +20,7 @@ export const job = {
     },
     builds: [
         {
-            key: 'guard', name: 'Bodyguard',
+            key: 'guard', name: 'Guarding',
             desc: 'Protect the allies beside you: Shield Wall gives you and them Protect, Iron Discipline raises their DEF and MDF every turn, and Interpose lets you take a blow meant for them.',
             steps: ['interpose', 'shield_wall+', 'challenge', 'iron_discipline', 'interpose+', 'shield_wall+', 'interpose+'],
         },

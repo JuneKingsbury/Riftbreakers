@@ -22,7 +22,7 @@ export const job = {
     },
     builds: [
         {
-            key: 'tank', name: 'Tank',
+            key: 'tank', name: 'Tanking',
             desc: 'Stand in front and soak hits: Earth Skin and Stone Reflex pile on DEF, so enemies wear themselves out on you. Stone Fist gives you a heavy hit back.',
             steps: ['earth_skin', 'stone_reflex', 'stone_fist', 'earth_skin+', 'stone_stride', 'stone_reflex+', 'earth_skin+', 'stone_reflex+', 'stone_fist+'],
         },

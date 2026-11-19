@@ -22,12 +22,12 @@ export const job = {
     },
     builds: [
         {
-            key: 'breaker', name: 'Armor Breaker',
+            key: 'breaker', name: 'Armor Breaking',
             desc: 'Fight up close and strip armor: Sunder lowers a target\'s DEF so the whole party hits it harder, and Counter strikes back whenever you\'re hit in melee.',
             steps: ['sunder', 'counter', 'sunder+', 'momentum', 'rune_edge', 'sunder+', 'counter+', 'counter+'],
         },
         {
-            key: 'debuffer', name: 'Debuffer',
+            key: 'debuffer', name: 'Debuffing',
             desc: 'Weaken the enemy\'s biggest threats from 3 tiles away: Mute stops a caster from casting and Enfeeble cuts a fighter\'s ATK. Counter covers you when they get close.',
             steps: ['enfeeble', 'mute', 'enfeeble+', 'sunder', 'counter', 'mute+', 'enfeeble+', 'mute+'],
         },

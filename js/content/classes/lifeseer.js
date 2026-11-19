@@ -19,7 +19,7 @@ export const job = {
     },
     builds: [
         {
-            key: 'healer', name: 'Healer',
+            key: 'healer', name: 'Healing',
             desc: 'The strongest heals in the game: Foresight Heal for one ally and Mass Foresight for a group. Swiftcast (from the Seer) makes Mass Foresight land in half the time.',
             steps: ['foresight_heal+', 'renewing_light', 'mass_foresight', 'swiftcast', 'foresight_heal+', 'mass_foresight+', 'mass_foresight+'],
         },
