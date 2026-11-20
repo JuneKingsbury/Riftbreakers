@@ -10,7 +10,7 @@ import { AFFIXES, knownAffixes, affixedName } from './data/affixes.js';
 import { REALMS } from './data/realms.js';
 import { Sound } from '../audio/sound.js';
 import { SCORE_TIP, scoreLine } from './score.js';
-import { canSpendPoints } from '../tactical/loadout.js';
+import { pointsToSpend } from './builds.js';
 import { JOB_DATA } from '../content/jobs.js';
 import { MAX_PARTY } from './run-state.js';
 import { EQUIPMENT, EQUIP_FIELDS, EQUIP_STAT_KEYS, canEnchant, enchantedKey, enchantLevel, MAX_ENCHANT } from '../tactical/data/equipment.js';
@@ -145,7 +145,7 @@ export class NodeScreens {
     }
 
     _partyButton() {
-        const spend = this.run.party.some(canSpendPoints);
+        const spend = this.run.party.some(pointsToSpend);
         return `<div style="display:flex;gap:6px;">
             <button data-party style="${BTN}flex:1;color:#adf;border-color:#448;${spend ? GLOW : ''}">☰ Party · skills${spend ? ' <span style="color:#afa;">● points to spend</span>' : ''}</button>
             <button data-gear style="${BTN}flex:1;color:#fda;border-color:#664;">⚔ Equipment</button>

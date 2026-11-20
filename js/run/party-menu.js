@@ -20,7 +20,7 @@ import {
 
 import { loadPlans, plannedNext, memberPlan, planJobFor, stepLabel } from './skill-plans.js';
 import { renderSkillPlanEditor } from '../ui/skill-plan-panel.js';
-import { buildNext, buildSummary, buildFromValue, buildsFor, buildPreview } from './builds.js';
+import { buildNext, buildSummary, pointsToSpend, spendsAutomatically, buildFromValue, buildsFor, buildPreview } from './builds.js';
 import { buildChoiceHtml, defaultChoice } from '../ui/build-picker.js';
 
 const NUMERAL = ['', 'I', 'II', 'III'];
@@ -47,16 +47,19 @@ export class PartyMenu {
     showList() {
         const run = this.run;
         let html = `<div style="color:#ffcc44;font-weight:bold;font-size:15px;margin-bottom:10px;">Party <span style="color:#888;font-size:11px;">(${run.party.length}/${MAX_PARTY})</span></div>`;
+        const plans = loadPlans();
         for (const m of run.party) {
             const hp = run.hp(m), max = run.maxHp(m);
             const promo = run.canPromote(m) ? `<span style="color:#fc6;font-size:10px;"> ★ can promote</span>` : '';
-            const spend = canSpendPoints(m);
+            // Points a build or skill plan spends aren't the player's business, so show none.
+            const spend = pointsToSpend(m, plans);
+            const sp = spendsAutomatically(m, plans) ? '' : spBadge(m, spend);
             html += `<div class="rk-member" data-member="${esc(m.name)}" style="display:flex;gap:10px;align-items:center;margin-bottom:6px;padding:7px 8px;cursor:pointer;background:#0d0d20;border:1px solid #335;border-radius:5px;${spend ? GLOW : ''}">
                 ${portraitHtml(m, 32)}
                 <div style="flex:1;min-width:0;">
                     <div style="font-weight:bold;color:${m.appearance?.nameColor || '#ccc'};">${esc(m.name)}${promo}</div>
                     <div style="font-size:10px;color:#888;text-transform:uppercase;">${esc(this._jobLine(m))}</div>
-                    <div style="font-size:10px;color:#aaa;">Lv ${m.level} · ${hpBar(hp, max, 70)} ${hp}/${max} HP ${spBadge(m, spend)}</div>
+                    <div style="font-size:10px;color:#aaa;">Lv ${m.level} · ${hpBar(hp, max, 70)} ${hp}/${max} HP ${sp}</div>
                 </div>
                 <span style="color:#558;">›</span>
             </div>`;
@@ -83,7 +86,7 @@ export class PartyMenu {
                 <div style="font-size:11px;color:#888;text-transform:uppercase;">${esc(this._jobLine(m))}</div>
                 <div style="font-size:11px;color:#aaa;margin-top:2px;">${hpBar(hp, max, 110)} ${hp}/${max} HP</div>
                 <div style="font-size:11px;margin-top:2px;">Level ${m.level} ${xpBar(m.xp, XP_PER_LEVEL, 80)} <span style="color:#666;">${m.xp}/${XP_PER_LEVEL} XP</span></div>
-                <div style="font-size:11px;margin-top:2px;">${spBadge(m, canSpendPoints(m), true)}</div>
+                ${spendsAutomatically(m, loadPlans()) ? '' : `<div style="font-size:11px;margin-top:2px;">${spBadge(m, canSpendPoints(m), true)}</div>`}
             </div>
         </div>`;
 

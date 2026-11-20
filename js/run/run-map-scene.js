@@ -17,19 +17,24 @@ import { CHAINS } from './data/realms.js';
 import { SCOUTING } from './data/encounters.js';
 import { recordDailyResult } from './daily.js';
 import { loadProfile, saveProfile, recordRun, noteItems, noteBosses, claimCollectionRewards, noteEndlessDepth, CHALLENGES } from './profile.js';
-import { loadPlans, describePurchases } from './skill-plans.js';
+import { loadPlans } from './skill-plans.js';
+import { ABILITIES } from '../tactical/data-registry.js';
 import { Modal, Toast, BTN, BTN_GOOD, BTN_DANGER, GLOW, RARITY_COLOR, NODE_INFO, FONT, esc, jobLabel, hpBar, portraitHtml, drawSprites } from './ui-kit.js';
 import { DeployScene } from '../tactical/deploy-scene.js';
 import { BattleScene } from '../tactical/battle-scene.js';
 import { openScriptEditor } from '../tactical/ai/script-editor.js';
 import { setScriptBacking } from '../tactical/ai/script-store.js';
-import { canSpendPoints } from '../tactical/loadout.js';
+import { pointsToSpend } from './builds.js';
 import { isPortrait } from '../ui/layout.js';
 import { riftTransition } from '../ui/rift-transition.js';
 import { showBuildSetup, showPromotionChoice } from '../ui/build-picker.js';
 
 const SIDEBAR_W = 230;
 const DRAG_THRESHOLD = 6;
+// How long a "+ Skill" pop stays over a portrait (matches .skill-pop in style.css), and the
+// gap before the same member's next one.
+const SKILL_POP_MS = 2200;
+const SKILL_POP_GAP_MS = 1500;
 // How long to wait for the click a touch tap produces before giving up on swallowing it.
 const GHOST_CLICK_MS = 500;
 
@@ -55,6 +60,8 @@ export class RunMapScene {
         this._container = containerEl;
         this._skin = skinManager;
         this._sm = sceneManager;
+        this._pops = [];
+        this._pendingPops = [];
         setScriptBacking(this.run.scripts);
 
         containerEl.innerHTML = '';
@@ -136,7 +143,44 @@ export class RunMapScene {
 
     render(now) {
         this._renderer.render(this.run, now);
+        this._startSkillPops();
         this._updateSidebar();
+    }
+
+    // ---- Skill pops ----
+
+    // New skills and promotions bought automatically float up over the member's portrait as
+    // "+ Skill". Upgrades of known skills go unannounced. Pops wait while a modal covers the map.
+    _queueSkillPops(bought) {
+        for (const b of bought) {
+            if (!b.promoted && b.rank > 1) continue;
+            const text = b.promoted ? `★ ${jobLabel(b.promoted)}` : `+ ${ABILITIES[b.key]?.name ?? b.key}`;
+            this._pendingPops.push({ name: b.name, text, promo: !!b.promoted });
+        }
+    }
+
+    _startSkillPops() {
+        const now = performance.now();
+        this._pops = this._pops.filter(p => now - p.at < SKILL_POP_MS);
+        if (!this._pendingPops.length || this._modal.isOpen) return;
+        // Each member's pops queue behind the ones they're still showing.
+        for (const p of this._pendingPops) {
+            const last = Math.max(now - SKILL_POP_GAP_MS, ...this._pops.filter(q => q.name === p.name).map(q => q.at));
+            this._pops.push({ ...p, at: last + SKILL_POP_GAP_MS });
+        }
+        this._pendingPops = [];
+        this._sidebarKey = null;
+    }
+
+    _skillPopHtml(member) {
+        const now = performance.now();
+        return this._pops.filter(p => p.name === member.name)
+            .map(p => `<span class="skill-pop${p.promo ? ' promo' : ''}" style="animation-delay:${Math.round(p.at - now)}ms;">${esc(p.text)}</span>`)
+            .join('');
+    }
+
+    _portraitWithPops(member, size) {
+        return `<div style="position:relative;flex-shrink:0;line-height:0;">${portraitHtml(member, size)}${this._skillPopHtml(member)}</div>`;
     }
 
     // ---- State ----
@@ -146,7 +190,7 @@ export class RunMapScene {
     _changed() {
         if (this.run.status === 'active') {
             const bought = this.run.autoAllocate(loadPlans());
-            if (bought.length) this._toast?.show(`Skill points: ${describePurchases(bought)}`, 3600);
+            this._queueSkillPops(bought);
             if (bought.some(b => b.promoted)) Sound.playSfx('promote');
             // Feats: remember every item the party has ever held and every boss it beats.
             // (Bosses first: noting them marks the run, which is saved just after.)
@@ -412,7 +456,7 @@ export class RunMapScene {
     _updateBars() {
         const run = this.run;
         const floor = run.currentNode?.floor ?? 0;
-        const spend = run.party.some(canSpendPoints);
+        const spend = run.party.some(pointsToSpend);
         let top = `<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:5px;">
             <span style="color:#ffcc44;font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${run.actLabel}: ${esc(run.realm.name)} · ${floor}/15</span>
             <span style="white-space:nowrap;"><span style="color:#fc8;">★ ${run.gold}</span>
@@ -421,10 +465,10 @@ export class RunMapScene {
         <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;">`;
         for (const m of run.party) {
             const hp = run.hp(m), max = run.maxHp(m);
-            const can = canSpendPoints(m);
+            const can = pointsToSpend(m);
             top += `<div data-action="member" data-member="${esc(m.name)}" style="display:flex;gap:4px;align-items:center;padding:3px;min-width:0;
                     border:1px solid ${can ? '#6f6' : '#262640'};border-radius:4px;background:#0d0d20;cursor:pointer;${can ? GLOW : ''}">
-                ${portraitHtml(m, 24)}
+                ${this._portraitWithPops(m, 24)}
                 <div style="flex:1;min-width:0;font-size:10px;">
                     <div style="color:${m.appearance?.nameColor || '#ccc'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(m.name)}</div>
                     <div style="color:#888;white-space:nowrap;">Lv${m.level}${run.canPromote(m) ? ' <span style="color:#fc6;">★</span>' : ''}${can ? ` <span style="color:#afa;font-weight:bold;">●${m.sp}</span>` : ''}</div>
@@ -460,9 +504,9 @@ export class RunMapScene {
         html += `<div style="color:#fc8;font-size:10px;text-transform:uppercase;margin-bottom:5px;">Party (${run.party.length}/${MAX_PARTY})</div>`;
         for (const m of run.party) {
             const hp = run.hp(m), max = run.maxHp(m);
-            const spend = canSpendPoints(m);
+            const spend = pointsToSpend(m);
             html += `<div data-action="member" data-member="${esc(m.name)}" title="Open ${esc(m.name)}" style="display:flex;gap:7px;align-items:center;margin-bottom:5px;padding:3px;border:1px solid ${spend ? '#6f6' : 'transparent'};border-radius:4px;cursor:pointer;${spend ? GLOW : ''}">
-                ${portraitHtml(m, 26)}
+                ${this._portraitWithPops(m, 26)}
                 <div style="flex:1;min-width:0;">
                     <div style="color:${m.appearance?.nameColor || '#ccc'};font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(m.name)}${run.canPromote(m) ? ' <span style="color:#fc6;">★</span>' : ''}</div>
                     <div style="font-size:9px;color:#777;text-transform:uppercase;">Lv ${m.level} ${jobLabel(m.job)} ${spend ? `<span style="color:#afa;font-weight:bold;">● ${m.sp} SP</span>` : ''}</div>
@@ -472,7 +516,7 @@ export class RunMapScene {
         }
 
         html += `<div style="height:6px;"></div>
-            <button data-action="party" style="${BTN}color:#adf;border-color:#448;${run.party.some(canSpendPoints) ? GLOW : ''}">☰ Party <span style="color:#666;font-size:10px;">(P)</span>${run.party.some(canSpendPoints) ? ' <span style="color:#afa;font-size:10px;">● skill points!</span>' : ''}</button>
+            <button data-action="party" style="${BTN}color:#adf;border-color:#448;${run.party.some(pointsToSpend) ? GLOW : ''}">☰ Party <span style="color:#666;font-size:10px;">(P)</span>${run.party.some(pointsToSpend) ? ' <span style="color:#afa;font-size:10px;">● skill points!</span>' : ''}</button>
             <button data-action="gear" style="${BTN}color:#fda;border-color:#664;">⚔ Equipment <span style="color:#666;font-size:10px;">(G)</span></button>
             <button data-action="tactics" style="${BTN}color:#cf9;border-color:#575;">⚙ Tactics <span style="color:#666;font-size:10px;">(T, optional)</span></button>`;
         if (run.pending && run.status === 'active') {

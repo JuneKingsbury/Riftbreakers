@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 
 import {
     buildsFor, focusAllocate, focusNext, buildChoices, buildFromValue, buildSummary, sanitizeBuild, suggestedPlanSteps,
+    pointsToSpend,
 } from '../../js/run/builds.js';
 import { sanitizeSteps } from '../../js/run/skill-plans.js';
 import { RunState } from '../../js/run/run-state.js';
@@ -217,4 +218,14 @@ test('points earned while the promotion choice is open wait for it, so they can 
     assert.deepEqual(run2.autoAllocate({}), []);
     run2.declinePromotion(m2.name);
     assert.ok(run2.autoAllocate({}).length > 0);
+});
+
+test('only members who spend by hand show points to spend, even while a build is saving up', () => {
+    const plans = { runebow: { auto: true, steps: [L('return_fire')] } };
+    assert.equal(pointsToSpend({ ...runebow({ mode: 'manual' }), sp: 5 }, plans), true);
+    assert.equal(pointsToSpend({ ...runebow(), sp: 5 }, plans), false);
+    assert.equal(pointsToSpend({ ...runebow({ mode: 'plan' }), sp: 5 }, plans), false);
+    // Runs from before build focus: auto-allocate on the class's skill plan decides.
+    assert.equal(pointsToSpend({ ...runebow(null), sp: 5 }, plans), false);
+    assert.equal(pointsToSpend({ ...runebow(null), sp: 5 }, { runebow: { ...plans.runebow, auto: false } }), true);
 });

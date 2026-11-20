@@ -28,8 +28,9 @@ import { JOB_DATA } from '../content/jobs.js';
 import { MAX_RANK, isUpgradeable, ABILITIES } from '../tactical/data-registry.js';
 import {
     isLearned, skillRank, learnableFor, abilitySlot, LOADOUT_SLOTS, learnAbility, upgradeAbility, upgradeCost,
+    canSpendPoints,
 } from '../tactical/loadout.js';
-import { autoAllocate as planAllocate, plannedNext, plannedPromotion, planJobFor } from './skill-plans.js';
+import { autoAllocate as planAllocate, plannedNext, plannedPromotion, planJobFor, memberPlan, loadPlans } from './skill-plans.js';
 
 export const BUILD_MODES = ['focus', 'plan', 'manual'];
 
@@ -186,6 +187,21 @@ export function buildAllocate(member, plans) {
     if (mode === 'focus') return focusAllocate(member);
     if (mode === 'plan') return planAllocate(member, forcedPlans(member, plans));
     return [];
+}
+
+/** Whether a member's points are spent for them (a suggested build or a skill plan). */
+export function spendsAutomatically(member, plans) {
+    const mode = member.build?.mode;
+    if (mode) return mode !== 'manual';
+    return !!memberPlan(member, plans);
+}
+
+/**
+ * Whether a member has skill points for the player to spend by hand. Members who spend
+ * automatically never do, even while saving up, so the UI doesn't nag about their points.
+ */
+export function pointsToSpend(member, plans = loadPlans()) {
+    return canSpendPoints(member) && !spendsAutomatically(member, plans);
 }
 
 /** Whether the player has a non-empty skill plan for this member's starting class. */
