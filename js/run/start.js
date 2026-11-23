@@ -54,8 +54,10 @@ export function newRun(containerEl, skinManager, { onStart, onExit, onCancel, ch
 
     const render = () => {
         const c = CHALLENGES[challenge];
-        let html = `<div style="color:#ffcc44;font-weight:bold;font-size:16px;margin-bottom:4px;">${c ? 'New Challenge Run' : 'New Run'}</div>
+        // Title pinned on top and Set out / Close pinned below; everything between scrolls.
+        const header = `<div style="color:#ffcc44;font-weight:bold;font-size:16px;margin-bottom:4px;">${c ? 'New Challenge Run' : 'New Run'}</div>
             <div style="color:#999;font-size:11px;margin-bottom:10px;">Choose up to ${START_PARTY} starting classes. You'll meet recruits on the road, and the party can grow to six.</div>`;
+        let html = '';
         if (c) {
             html += `<div style="margin-bottom:10px;padding:8px;border:1px solid #a7c;border-radius:4px;background:#1a1028;">
                 <div style="color:#daf;font-weight:bold;font-size:12px;">⚑ Challenge: ${esc(c.name)}</div>
@@ -96,9 +98,8 @@ export function newRun(containerEl, skinManager, { onStart, onExit, onCancel, ch
         }
         const mult = renownMultiplier(tier, ready ? picked.length : START_PARTY);
         if (mult > 1) html += `<div style="color:#fc6;font-size:11px;margin-top:6px;">Renown this run: ×${mult.toFixed(2).replace(/\.?0+$/, '')}</div>`;
-        html += `<div style="height:6px;"></div>
-            <button data-begin ${ready ? '' : 'disabled'} style="${BTN}${ready ? BTN_GOOD : BTN_DISABLED}text-align:center;font-weight:bold;">${ready ? `Set out (${picked.length}/${START_PARTY})` : `Choose a class to begin (0/${START_PARTY})`}</button>`;
-        const body = modal.show(html, { width: 480, onClose: () => { modal.destroy(); onCancel?.(); }, view: 'new-run' });
+        const footer = `<button data-begin ${ready ? '' : 'disabled'} style="${BTN}${ready ? BTN_GOOD : BTN_DISABLED}margin:0;text-align:center;font-weight:bold;">${ready ? `Set out (${picked.length}/${START_PARTY})` : `Choose a class to begin (0/${START_PARTY})`}</button>`;
+        const body = modal.show(html, { width: 480, header, footer, onClose: () => { modal.destroy(); onCancel?.(); }, view: 'new-run' });
         body.querySelectorAll('[data-job]').forEach(b => b.addEventListener('click', () => {
             const job = b.dataset.job;
             const i = picked.indexOf(job);

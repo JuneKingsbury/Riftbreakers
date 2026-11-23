@@ -5082,6 +5082,14 @@ body.portrait .se-footer button { flex: 1; }
 /* Run screens: modals use nearly the whole width of a phone. */
 body.portrait .rk-modal-body { width: 96% !important; padding: 14px 12px !important; max-height: 88dvh !important; }
 body.touch .rk-modal-body button { min-height: 34px; }
+/* A modal's scrolling middle (between a pinned header and footer): a finger drag scrolls it
+   (the page itself has touch-action:none), and reaching the end doesn't drag the page along. */
+.rk-modal-scroll { touch-action: pan-y; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+/* A phone on its side: little height, so trim the padding to leave room for the scrolling list. */
+@media (max-height: 500px) {
+    .rk-modal-body { max-height: 94dvh !important; padding: 10px 14px !important; }
+    .rk-modal-body .rk-close { margin-top: 6px !important; }
+}
 body.portrait .se-panel select, body.portrait .se-panel input { max-width: 100%; box-sizing: border-box; }
 
 /* Narrow or short landscape screens (e.g. a phone on its side). */

@@ -209,9 +209,14 @@ export class Modal {
         return this.el.querySelector('.rk-modal-body');
     }
 
+    // The part that scrolls: the whole body, or just its middle when show() pins a header or footer.
+    get _scroller() {
+        return this.el.querySelector('.rk-modal-scroll') ?? this.body;
+    }
+
     show(html, opts = {}) {
         const prev = this._opts;
-        const prevScroll = this.isOpen ? (this.body?.scrollTop ?? 0) : 0;
+        const prevScroll = this.isOpen ? (this._scroller?.scrollTop ?? 0) : 0;
         if (prev.view) this._scrolls[prev.view] = prevScroll;
         const restore = opts.view && this.isOpen && (opts.view === prev.view || opts.view === prev.returnTo)
             ? this._scrolls[opts.view] ?? 0
@@ -220,16 +225,27 @@ export class Modal {
         hideTip();   // the content it pointed at is about to be replaced
         const dismissible = opts.dismissible !== false;
         if (!this.isOpen) Sound.playSfx('panel');
+        const close = dismissible ? `<button class="rk-close" style="${BTN}margin-top:12px;color:#888;text-align:center;">${opts.onBack ? '‹ Back' : 'Close'}</button>` : '';
+        // opts.header / opts.footer: html pinned above / below the content, which scrolls between
+        // them. With a footer, the Close button sits in it so it's always in view.
+        const pinned = opts.header != null || opts.footer != null;
+        const inner = pinned
+            ? `${opts.header != null ? `<div style="flex:none;">${opts.header}</div>` : ''}
+                <div class="rk-modal-scroll" style="flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;">
+                    ${html}${opts.footer != null ? '' : close}
+                </div>
+                ${opts.footer != null ? `<div style="flex:none;padding-top:8px;border-top:1px solid #224;">${opts.footer}${close}</div>` : ''}`
+            : `${html}${close}`;
         this.el.innerHTML = `
             <div class="rk-modal-body" style="background:#0d0d1e;border:1px solid #447;border-radius:8px;
                         padding:18px 22px;max-width:${opts.width || 460}px;width:92%;max-height:84vh;
-                        overflow-y:auto;overflow-x:hidden;box-sizing:border-box;position:relative;">
-                ${html}
-                ${dismissible ? `<button class="rk-close" style="${BTN}margin-top:12px;color:#888;text-align:center;">${opts.onBack ? '‹ Back' : 'Close'}</button>` : ''}
+                        ${pinned ? 'display:flex;flex-direction:column;overflow:hidden;' : 'overflow-y:auto;overflow-x:hidden;'}
+                        box-sizing:border-box;position:relative;">
+                ${inner}
             </div>`;
         this.el.style.display = 'flex';
         this.el.querySelector('.rk-close')?.addEventListener('click', () => this.back());
-        this.body.scrollTop = restore;
+        this._scroller.scrollTop = restore;
         return this.body;
     }
 
