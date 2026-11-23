@@ -5036,13 +5036,9 @@ body.portrait .tac-sidebar {
     padding-bottom: max(8px, env(safe-area-inset-bottom)) !important;
 }
 body.portrait .tac-sidebar > * { break-inside: avoid; }
-body.portrait .tac-log {
-    left: 0 !important; right: 0 !important; bottom: min(28vh, 230px) !important; height: 32px !important; padding: 3px 8px !important;
-}
-body.portrait .tac-log > div { font-size: 10px !important; line-height: 13px !important; }
 /* The unit list isn't on the left in portrait, so the command menu and its skill info hug the edge. */
-body.portrait .tac-actions { left: 14px !important; }
-body.portrait .tac-skillinfo { left: 175px !important; }
+body.portrait .tac-actions { left: 14px !important; bottom: calc(min(28vh, 230px) + 8px) !important; }
+body.portrait .tac-skillinfo { left: 175px !important; bottom: calc(min(28vh, 230px) + 8px) !important; }
 body.portrait .tac-controls { top: max(8px, env(safe-area-inset-top)) !important; max-width: 96vw; }
 body.portrait .tac-controls [data-decision] { max-width: 92vw !important; }
 body.portrait .tac3d-compass { top: max(70px, calc(env(safe-area-inset-top) + 62px)) !important; }
@@ -5090,14 +5086,8 @@ body.portrait .se-panel select, body.portrait .se-panel input { max-width: 100%;
 @media (max-width: 1100px), (max-height: 500px) {
     .tac3d-compass { top: 70px !important; }
 }
-@media (max-height: 500px) {
-    .tac-log { height: 48px !important; }
-    .tac-log > div { font-size: 10px !important; line-height: 13px !important; }
-}
 /* The deploy panel's Begin/Cancel buttons stay in view however tall the party list gets. */
 .deploy-panel .deploy-footer { position: sticky; bottom: -10px; background: rgba(8,8,20,0.98); padding-bottom: 6px; }
-/* Log rows keep their height; the oldest just scroll out of the top. */
-.tac-log > div { flex-shrink: 0; }
 @media (max-height: 500px) {
     .tac3d-compass { top: 86px !important; }
 }

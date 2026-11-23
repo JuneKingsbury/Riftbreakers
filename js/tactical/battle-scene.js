@@ -106,7 +106,7 @@ export class BattleScene {
             return;
         }
         this._renderer.onCenterRequest = () => this._centerOnActiveUnit();
-        this._ui       = new BattleUI(containerEl, this._battle, this._renderer, { fullAuto: !this._manualControl });
+        this._ui       = new BattleUI(containerEl, this._battle, this._renderer, { fullAuto: !this._manualControl, showDecisions: this._battle.logTactics });
 
         this._ui.setActionHandler((action, key) => this._handleAction(action, key));
         this._ui.setPlaybackHandler((ctl, value) => this._handlePlayback(ctl, value));

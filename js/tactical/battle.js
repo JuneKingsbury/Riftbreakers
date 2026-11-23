@@ -250,7 +250,8 @@ export class TacticalBattle {
 
     logMsg(msg) {
         this.log.unshift(msg);
-        if (this.log.length > 40) this.log.pop();
+        // Kept whole (within reason) for the result screen's battle log.
+        if (this.log.length > 2000) this.log.pop();
         if (this.onLogMessage) this.onLogMessage(msg);
     }
 

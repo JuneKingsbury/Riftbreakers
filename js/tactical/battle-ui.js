@@ -43,17 +43,19 @@ const SPEEDS = [1, 2, 4];
 const TOUCH_HOLD_MS = 450;
 
 // Width of the unit list. In landscape it runs down the left edge, so the command menu, its
-// skill info, the key hints and the log start to the right of it (portrait CSS moves it to the
+// skill info and the key hints start to the right of it (portrait CSS moves it to the
 // bottom instead). battle-scene.js keeps the camera clear of it.
 export const SIDEBAR_W = 190;
 
 export class BattleUI {
     // opts.fullAuto: every player unit is script-controlled, so show pause/speed
-    // controls and the fired-rule readout instead of manual command hints.
+    // controls instead of manual command hints.
+    // opts.showDecisions: also show the rule the last scripted unit fired (the tactics log setting).
     constructor(container, battle, renderer, opts = {}) {
         this.battle   = battle;
         this.renderer = renderer;
         this._fullAuto = !!opts.fullAuto;
+        this._showDecisions = !!opts.showDecisions;
         this._onPlayback = null;
         this._onAction    = null;
         this._openSkillset = null;   // index into unitSkillsets(unit), or null
@@ -72,7 +74,6 @@ export class BattleUI {
 
         this._sidebar    = this._makeSidebar();
         this._actionMenu = this._makeActionMenu();
-        this._log        = this._makeLog();
         this._result     = this._makeResult();
         this._hint       = this._makeHint();
         this._tooltip    = this._makeTooltip();
@@ -92,8 +93,7 @@ export class BattleUI {
 
     // Pixels the HUD covers at the bottom of the screen (the unit list and log in portrait).
     bottomInset() {
-        const top = Math.min(this._sidebar.getBoundingClientRect().top, this._log.getBoundingClientRect().top);
-        return Math.max(0, window.innerHeight - top);
+        return Math.max(0, window.innerHeight - this._sidebar.getBoundingClientRect().top);
     }
 
     // fn('pause') toggles pause, fn('speed', n) sets the speed multiplier.
@@ -113,7 +113,7 @@ export class BattleUI {
                 <button data-ctl="pause" style="${this._ctlStyle(false)}">Pause</button>
                 ${SPEEDS.map(s => `<button data-ctl="speed" data-speed="${s}" style="${this._ctlStyle(false)}">${s}x</button>`).join('')}
             </div>
-            <div data-decision style="font-size:11px;color:#9ab;background:rgba(8,8,20,0.8);padding:2px 8px;border-radius:3px;max-width:520px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
+            <div data-decision style="${this._showDecisions ? '' : 'display:none;'}"font-size:11px;color:#9ab;background:rgba(8,8,20,0.8);padding:2px 8px;border-radius:3px;max-width:520px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
         `;
         el.addEventListener('click', (e) => {
             const btn = e.target.closest('button[data-ctl]');
@@ -138,6 +138,7 @@ export class BattleUI {
             btn.style.cssText = this._ctlStyle(active);
             if (btn.dataset.ctl === 'pause') btn.textContent = pb.paused ? 'Resume' : 'Pause';
         }
+        if (!this._showDecisions) return;
         const d = battle.lastDecision;
         const line = d && d.trace.length ? `${esc(d.name)}: ${d.trace.map(t => esc(t.label)).join(' > ')}` : '';
         this._controls.querySelector('[data-decision]').innerHTML = line;
@@ -164,7 +165,7 @@ export class BattleUI {
         const el = document.createElement('div');
         el.className = 'tac-actions';
         el.style.cssText = `
-            position: absolute; bottom: 70px; left: ${SIDEBAR_W + 14}px;
+            position: absolute; bottom: 14px; left: ${SIDEBAR_W + 14}px;
             background: rgba(8,8,24,0.95); border: 1px solid #447;
             border-radius: 5px; padding: 6px 8px;
             display: none; min-width: 150px;
@@ -174,19 +175,6 @@ export class BattleUI {
         return el;
     }
 
-    _makeLog() {
-        const el = document.createElement('div');
-        el.className = 'tac-log';
-        el.style.cssText = `
-            position: absolute; bottom: 0; left: ${SIDEBAR_W}px; right: 0; height: 65px;
-            background: rgba(8,8,20,0.88); border-top: 1px solid #335;
-            padding: 5px 10px; overflow: hidden;
-            display: flex; flex-direction: column-reverse;
-            pointer-events: none;
-        `;
-        this._overlay.appendChild(el);
-        return el;
-    }
 
     _makeResult() {
         const el = document.createElement('div');
@@ -234,7 +222,7 @@ export class BattleUI {
         const el = document.createElement('div');
         el.className = 'tac-skillinfo';
         el.style.cssText = `
-            position: absolute; bottom: 70px; left: ${SIDEBAR_W + 175}px;
+            position: absolute; bottom: 14px; left: ${SIDEBAR_W + 175}px;
             background: rgba(8,8,24,0.97); border: 1px solid #559;
             border-radius: 5px; padding: 8px 10px;
             font-size: 11px; color: #ccc; line-height: 1.6;
@@ -296,7 +284,6 @@ export class BattleUI {
         this._updateControls(battle, playback);
         this._updateSidebar(battle);
         this._updateActionMenu(battle);
-        this._updateLog(battle);
         this._updateSkillInfo(battle);
         if (battle.state === STATES.BATTLE_OVER) this._showResult(battle, onExit, turnFlags);
     }
@@ -316,78 +303,70 @@ export class BattleUI {
         const sb = this._sidebar;
         const u  = battle.activeUnit;
 
-        // Stable order within each team: sort by id (creation/roster order).
-        const players = battle.livingUnits.filter(u => u.team === 'player').sort((a, b) => a.id - b.id);
-        const enemies = battle.livingUnits.filter(u => u.team === 'enemy').sort((a, b) => a.id - b.id);
-        const living  = [...players, ...enemies];
+        // Only the party is listed; enemies are read off the map (or inspected).
+        // Stable order: sort by id (creation/roster order).
+        const party = battle.livingUnits.filter(u => u.team === 'player').sort((a, b) => a.id - b.id);
 
-        // Roster key uses stable IDs — only changes when units die.
-        const rosterKey = living.map(u => u.id).sort((a, b) => a - b).join(',');
+        // Roster key uses stable IDs — only changes when units join or die.
+        const rosterKey = party.map(u => u.id).join(',');
         if (this._sidebarRosterKey !== rosterKey) {
             this._sidebarRosterKey = rosterKey;
-            this._rebuildSidebarRoster(sb, players, enemies, living);
+            this._rebuildSidebarRoster(sb, party);
         }
 
         // Fast path: update only the dynamic values in-place every frame.
-        this._patchSidebarRoster(sb, living, u, battle);
-        this._patchSidebarDetails(sb, u, battle);
+        this._patchSidebarRoster(sb, party, u, battle);
+        this._patchSidebarDetails(sb, u?.team === 'player' ? u : null, battle);
     }
 
-    _rebuildSidebarRoster(sb, players, enemies, living) {
+    _rebuildSidebarRoster(sb, party) {
         // Remove existing roster content, keep the detail panel placeholder.
-        sb.querySelectorAll('.tac-roster-row, .tac-roster-header, .tac-team-header').forEach(el => el.remove());
+        sb.querySelectorAll('.tac-roster-row').forEach(el => el.remove());
 
         const detailPanel = sb.querySelector('.tac-detail-panel');
 
         const insertBefore = (el) => detailPanel ? sb.insertBefore(el, detailPanel) : sb.appendChild(el);
 
-        // Main header.
-        const hdr = document.createElement('div');
-        hdr.className = 'tac-roster-header';
-        hdr.style.cssText = 'color:#ffcc44;font-weight:bold;margin-bottom:8px;font-size:11px;border-bottom:1px solid #335;padding-bottom:4px;';
-        hdr.textContent = 'UNITS';
-        insertBefore(hdr);
-
-        const makeTeamSection = (units, label, col) => {
-            const teamHdr = document.createElement('div');
-            teamHdr.className = 'tac-team-header';
-            teamHdr.style.cssText = `color:${col};font-size:9px;text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;margin-top:4px;`;
-            teamHdr.textContent = label;
-            insertBefore(teamHdr);
-
-            for (const unit of units) {
-                const row = document.createElement('div');
-                row.className = 'tac-roster-row';
-                row.dataset.uid = unit.id;
-                row.style.cssText = 'display:flex;align-items:center;gap:5px;padding:3px 2px;margin-bottom:2px;border:1px solid transparent;border-radius:3px;';
-                row.innerHTML = `
-                    <div class="tac-portrait" style="width:28px;height:28px;flex-shrink:0;border-radius:2px;overflow:hidden;background:#111;border:1px solid ${col}44;"></div>
+        const BAR = 'background:#1a1a2a;border-radius:2px;position:relative;overflow:hidden;';
+        for (const unit of party) {
+            const row = document.createElement('div');
+            row.className = 'tac-roster-row';
+            row.dataset.uid = unit.id;
+            row.style.cssText = 'padding:4px 4px 3px;margin-bottom:4px;background:#0e0e20;border:1px solid #223;border-left:3px solid #223;border-radius:3px;';
+            row.innerHTML = `
+                <div style="display:flex;align-items:center;gap:5px;">
+                    <div class="tac-portrait" style="width:30px;height:30px;flex-shrink:0;border-radius:2px;overflow:hidden;background:#111;border:1px solid #7bf44;"></div>
                     <div style="flex:1;min-width:0;">
-                        <div style="display:flex;justify-content:space-between;align-items:baseline;">
-                            <span class="tac-name" style="color:${col};font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:70px;">${unit.name}</span>
-                            <span class="tac-hp" style="font-size:9px;">${unit.hp}</span>
-                            <span class="tac-spd" style="font-size:9px;color:#888;"></span>
+                        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:4px;">
+                            <span class="tac-name" style="color:#7bf;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(unit.name)}</span>
+                            <span class="tac-turn" style="font-size:9px;color:#888;white-space:nowrap;"></span>
                         </div>
-                        <div style="background:#1a1a2a;height:4px;border-radius:2px;margin-top:3px;position:relative;overflow:hidden;">
-                            <div class="tac-ct-ghost" style="position:absolute;top:0;left:0;height:100%;border-radius:2px;width:0%;background:#fff;"></div>
-                            <div class="tac-ct-bar" style="position:relative;height:100%;border-radius:2px;width:0%;transition:width 0.12s linear;"></div>
+                        <div class="tac-hp-track" style="${BAR}height:8px;margin-top:3px;">
+                            <div class="tac-hp-ghost" style="position:absolute;top:0;left:0;height:100%;width:0%;background:#f44;"></div>
+                            <div class="tac-hp-bar" style="position:relative;height:100%;width:0%;transition:width 0.25s ease-out,background-color 0.25s;"></div>
                         </div>
-                        <div class="tac-charge-wrap" style="display:none;background:#1a1a2a;height:4px;border-radius:2px;margin-top:2px;position:relative;overflow:hidden;">
-                            <div class="tac-charge-bar" style="background:#ffcc44;height:100%;border-radius:2px;width:0%;transition:width 0.12s linear;"></div>
-                            <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:flex-end;padding-right:2px;pointer-events:none;">
-                                <span style="font-size:7px;color:#00000088;line-height:1;">✦</span>
-                            </div>
+                        <div style="display:flex;justify-content:space-between;font-size:9px;margin-top:1px;line-height:11px;">
+                            <span class="tac-hp" style="font-weight:bold;"></span>
+                            <span class="tac-mp" style="color:#88f;"></span>
                         </div>
-                    </div>`;
-                insertBefore(row);
-            }
-        };
-
-        makeTeamSection(players, 'Allies', '#7bf');
-        makeTeamSection(enemies,  'Enemies', '#f76');
+                    </div>
+                </div>
+                <div class="tac-mp-track" style="${BAR}height:3px;margin-top:2px;">
+                    <div class="tac-mp-bar" style="background:#36f;height:100%;width:0%;transition:width 0.25s ease-out;"></div>
+                </div>
+                <div style="${BAR}height:3px;margin-top:2px;">
+                    <div class="tac-ct-ghost" style="position:absolute;top:0;left:0;height:100%;width:0%;background:#fff;"></div>
+                    <div class="tac-ct-bar" style="position:relative;height:100%;width:0%;transition:width 0.12s linear;"></div>
+                </div>
+                <div class="tac-charge-wrap" style="display:none;${BAR}height:3px;margin-top:2px;">
+                    <div class="tac-charge-bar" style="background:#ffcc44;height:100%;width:0%;transition:width 0.12s linear;"></div>
+                </div>
+                <div class="tac-status" style="font-size:9px;line-height:13px;"></div>`;
+            insertBefore(row);
+        }
 
         // Draw portraits after browser layout.
-        requestAnimationFrame(() => this._drawPortraits(sb, living));
+        requestAnimationFrame(() => this._drawPortraits(sb, party));
     }
 
     _drawPortraits(sb, living) {
@@ -420,55 +399,57 @@ export class BattleUI {
         });
     }
 
-    _patchSidebarRoster(sb, living, activeUnit, battle) {
-        const activeBorderCol = activeUnit?.team === 'player' ? '#44ff8866' : '#ffcc4466';
-        // Scale CT bars within each team so the leader shows full.
+    _patchSidebarRoster(sb, party, activeUnit, battle) {
         sb.querySelectorAll('.tac-roster-row').forEach(row => {
             const uid  = row.dataset.uid;
-            const unit = living.find(u => String(u.id) === uid);
+            const unit = party.find(u => String(u.id) === uid);
             if (!unit) return;
 
             const isActive = unit === activeUnit;
-            const hpF   = unit.hp / unit.maxHp;
+            const ko    = unit.status.includes('unconscious');
+            const hpF   = Math.max(0, unit.hp / unit.maxHp);
+            const hpPct = Math.round(hpF * 100);
             const hpC   = hpF > 0.5 ? '#3c3' : hpF > 0.25 ? '#cc3' : '#c33';
             // A full gauge (100 CT) means the unit is ready to act; a channeling unit shows its spell's progress.
             const ctPct = unit._charging
                 ? Math.round(Math.min(1, unit._charging.ct / Math.max(1, unit._charging.needed)) * 100)
                 : Math.round(Math.min(1, unit.ct / 100) * 100);
-            const ctC   = isActive ? (unit.team === 'player' ? '#44ff88' : '#ffcc44')
-                                   : (unit.team === 'player' ? '#4af' : '#f64');
 
-            row.style.borderColor = isActive ? activeBorderCol : 'transparent';
+            row.style.borderColor     = isActive ? '#44ff8866' : '#223';
+            row.style.borderLeftColor = ko ? '#555' : isActive ? '#44ff88' : hpC;
+            row.style.background      = isActive ? '#12261c' : '#0e0e20';
+            row.style.opacity         = ko ? 0.55 : 1;
 
             const nameEl = row.querySelector('.tac-name');
             if (nameEl) nameEl.style.fontWeight = isActive ? 'bold' : 'normal';
 
-            const hpEl  = row.querySelector('.tac-hp');
-            if (hpEl) { hpEl.textContent = `${unit.hp}/${unit.maxHp} HP`; hpEl.style.color = hpC; }
-            const spdEl = row.querySelector('.tac-spd');
-            if (spdEl) spdEl.textContent = `SPD ${unit.spd}`;
-
-            const ctBar   = row.querySelector('.tac-ct-bar');
-            const ctGhost = row.querySelector('.tac-ct-ghost');
-            if (ctBar) {
-                const prev = parseFloat(ctBar.dataset.ctPct ?? ctPct);
-                if (ctPct < prev && ctGhost) {
-                    // CT dropped — snap ghost to old value, then let it drain.
-                    ctGhost.style.transition = 'none';
-                    ctGhost.style.width = prev + '%';
-                    // Force reflow so the snap is applied before we re-enable transition.
-                    void ctGhost.offsetWidth;
-                    ctGhost.style.transition = 'width 0.6s ease-out';
-                    ctGhost.style.width = ctPct + '%';
-                } else if (ctPct >= prev && ctGhost) {
-                    // CT rising — keep ghost in sync with no delay.
-                    ctGhost.style.transition = 'none';
-                    ctGhost.style.width = ctPct + '%';
-                }
-                ctBar.dataset.ctPct = ctPct;
-                ctBar.style.width = ctPct + '%';
-                ctBar.style.background = ctC;
+            const turnEl = row.querySelector('.tac-turn');
+            if (turnEl) {
+                const [text, col] = ko ? ['KO', '#f66']
+                    : isActive ? ['▶ ACTING', '#4f8']
+                    : unit._charging ? [`✦ casting ${ctPct}%`, '#fc4']
+                    : [`SPD ${unit.spd}`, '#778'];
+                turnEl.textContent = text;
+                turnEl.style.color = col;
             }
+
+            const hpEl = row.querySelector('.tac-hp');
+            if (hpEl) { hpEl.textContent = `HP ${unit.hp}/${unit.maxHp}`; hpEl.style.color = hpC; }
+            const hpTrack = row.querySelector('.tac-hp-track');
+            if (hpTrack) hpTrack.style.boxShadow = wardRing(unit).replace(/^box-shadow:|;$/g, '');
+            this._drainBar(row.querySelector('.tac-hp-bar'), row.querySelector('.tac-hp-ghost'), hpPct, hpC);
+
+            const mpEl    = row.querySelector('.tac-mp');
+            const mpTrack = row.querySelector('.tac-mp-track');
+            const hasMp   = unit.maxMp > 0;
+            if (mpEl) mpEl.textContent = hasMp ? `MP ${unit.mp}/${unit.maxMp}` : '';
+            if (mpTrack) {
+                mpTrack.style.display = hasMp ? 'block' : 'none';
+                if (hasMp) mpTrack.firstElementChild.style.width = Math.round(unit.mp / unit.maxMp * 100) + '%';
+            }
+
+            this._drainBar(row.querySelector('.tac-ct-bar'), row.querySelector('.tac-ct-ghost'), ctPct,
+                isActive ? '#44ff88' : '#4af');
 
             const chargeWrap = row.querySelector('.tac-charge-wrap');
             const chargeBar  = row.querySelector('.tac-charge-bar');
@@ -481,7 +462,37 @@ export class BattleUI {
                     chargeWrap.style.display = 'none';
                 }
             }
+
+            // Statuses only re-render when they change, so the chips don't flicker every frame.
+            const statusEl = row.querySelector('.tac-status');
+            if (statusEl) {
+                const html = statusChips(unit, 3);
+                if (statusEl._html !== html) { statusEl._html = html; statusEl.innerHTML = html; }
+            }
         });
+    }
+
+    // Sets a bar's fill; when it drops, a ghost bar behind it snaps to the old value and drains,
+    // so the size of a hit (or a spent CT gauge) stays readable for a moment.
+    _drainBar(bar, ghost, pct, color) {
+        if (!bar) return;
+        const prev = parseFloat(bar.dataset.pct ?? pct);
+        if (ghost) {
+            if (pct < prev) {
+                ghost.style.transition = 'none';
+                ghost.style.width = prev + '%';
+                // Force reflow so the snap is applied before we re-enable transition.
+                void ghost.offsetWidth;
+                ghost.style.transition = 'width 0.6s ease-out 0.15s';
+                ghost.style.width = pct + '%';
+            } else if (pct > prev) {
+                ghost.style.transition = 'none';
+                ghost.style.width = pct + '%';
+            }
+        }
+        bar.dataset.pct = pct;
+        bar.style.width = pct + '%';
+        bar.style.background = color;
     }
 
     _patchSidebarDetails(sb, u, battle) {
@@ -716,12 +727,6 @@ export class BattleUI {
         this._tooltip.style.display = 'none';
     }
 
-    _updateLog(battle) {
-        const lines = battle.log.slice(0, 5);
-        this._log.innerHTML = lines.map(l =>
-            `<div style="font-size:11px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(l)}</div>`
-        ).join('');
-    }
 
     _showResult(battle, onExit, flags) {
         const r = this._result;
@@ -755,6 +760,7 @@ export class BattleUI {
             <div style="color:#aaa;font-size:13px;">${!won ? 'Your party has fallen. The run is over.' : rewards?.final ? 'The final rift is sealed.' : 'All enemies defeated.'}</div>
             ${rewardHtml}
             <div id="tac-breakdown"></div>
+            ${this._battleLogHtml(battle)}
             <button id="tac-return-btn" style="margin-top:12px;padding:10px 28px;background:#1a1a30;border:1px solid #557;color:#ccc;font-family:inherit;font-size:14px;cursor:pointer;border-radius:4px;pointer-events:auto;">
                 ${won ? 'Continue' : 'Return'}
             </button>
@@ -762,6 +768,18 @@ export class BattleUI {
         const breakdown = r.querySelector('#tac-breakdown');
         if (breakdown && battle.stats) mountBreakdown(breakdown, battle.stats);
         document.getElementById('tac-return-btn')?.addEventListener('click', () => { if (onExit) onExit(); });
+    }
+
+    // The whole fight's log, oldest first, folded away behind a toggle on the result screen.
+    _battleLogHtml(battle) {
+        if (!battle.log.length) return '';
+        const lines = [...battle.log].reverse().map(l =>
+            `<div style="font-size:11px;line-height:1.4;color:#bbc;">${esc(l)}</div>`).join('');
+        return `
+            <details style="width:min(520px,92vw);background:rgba(8,8,20,0.9);border:1px solid #335;border-radius:4px;">
+                <summary style="cursor:pointer;padding:6px 10px;color:#99a;font-size:12px;">Battle log</summary>
+                <div style="max-height:240px;overflow-y:auto;padding:4px 10px 8px;border-top:1px solid #335;text-align:left;">${lines}</div>
+            </details>`;
     }
 
     destroy() {
