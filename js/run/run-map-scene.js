@@ -196,10 +196,12 @@ export class RunMapScene {
             // (Bosses first: noting them marks the run, which is saved just after.)
             const profile = loadProfile();
             const newBosses = noteBosses(profile, this.run);
-            if (noteItems(profile, this.run) || newBosses) {
-                for (const r of claimCollectionRewards(profile)) this._toast?.show(`Collection reward: ${r.label}! See Feats.`, 4200);
-                saveProfile(profile);
-            }
+            const newItems = noteItems(profile, this.run);
+            // Checked every time, not just on a new find: the share also moves when the game's
+            // item count changes.
+            const rewards = claimCollectionRewards(profile);
+            for (const r of rewards) this._toast?.show(`Collection reward: ${r.label}! See Feats.`, 4200);
+            if (newItems || newBosses || rewards.length) saveProfile(profile);
             this.run.save();
         }
         this._sidebarKey = null;

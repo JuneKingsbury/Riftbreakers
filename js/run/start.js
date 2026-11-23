@@ -13,6 +13,9 @@ import { riftTransition } from '../ui/rift-transition.js';
 import { dailyDate, dailyJobs, dailyLabel, dailyPlayed, createDailyRun, markDailyStarted } from './daily.js';
 
 
+// Button labels for each Rift Tier (RIFT_TIERS), from 'None' up.
+const TIER_NUMERALS = ['None', 'I', 'II', 'III', 'IV', 'V', 'VI'];
+
 export function hasSavedRun() {
     return !!RunState.load();
 }
@@ -83,13 +86,13 @@ export function newRun(containerEl, skinManager, { onStart, onExit, onCancel, ch
             for (let t = 0; t < RIFT_TIERS.length; t++) {
                 const open = t <= maxTier, on = t === tier;
                 html += `<button data-tier="${t}" ${open ? '' : 'disabled'} style="${BTN}width:auto;margin:0;padding:4px 10px;text-align:center;
-                    ${on ? 'border:2px solid #f96;background:#2a1408;color:#fc9;' : ''}${open ? '' : BTN_DISABLED}">${t === 0 ? 'None' : ['I', 'II', 'III', 'IV', 'V'][t - 1]}${open ? '' : ' 🔒'}</button>`;
+                    ${on ? 'border:2px solid #f96;background:#2a1408;color:#fc9;' : ''}${open ? '' : BTN_DISABLED}">${TIER_NUMERALS[t]}${open ? '' : ' 🔒'}</button>`;
             }
             html += `</div><div style="color:#aab;font-size:11px;margin-top:5px;line-height:1.5;">`;
             if (tier === 0) html += 'No extra twists.';
             else html += RIFT_TIERS.slice(1, tier + 1).map(t => `<div><span style="color:#f96;">${esc(t.name)}</span>: ${esc(t.desc)}</div>`).join('');
             html += `</div>`;
-            if (maxTier < RIFT_TIERS.length - 1) html += `<div style="color:#667;font-size:10px;margin-top:3px;">Win a run at Tier ${maxTier === 0 ? 'None' : ['I', 'II', 'III', 'IV', 'V'][maxTier - 1]} to open the next one.</div>`;
+            if (maxTier < RIFT_TIERS.length - 1) html += `<div style="color:#667;font-size:10px;margin-top:3px;">Win a run at Tier ${TIER_NUMERALS[maxTier]} to open the next one.</div>`;
         }
         const mult = renownMultiplier(tier, ready ? picked.length : START_PARTY);
         if (mult > 1) html += `<div style="color:#fc6;font-size:11px;margin-top:6px;">Renown this run: ×${mult.toFixed(2).replace(/\.?0+$/, '')}</div>`;

@@ -7,7 +7,7 @@ import { EQUIPMENT, EQUIP_FIELDS } from '../tactical/data/equipment.js';
 import { ITEM_RARITIES } from '../content/vocab.js';
 import { REALMS, ACT_REALMS } from './data/realms.js';
 import { ENCOUNTERS } from './data/encounters.js';
-import { loadProfile, BEST_RUNS, BOSS_IDS, COLLECTION_REWARDS, RIFT_TIERS, CHALLENGES } from './profile.js';
+import { loadProfile, saveProfile, claimCollectionRewards, BEST_RUNS, BOSS_IDS, COLLECTION_REWARDS, RIFT_TIERS, CHALLENGES } from './profile.js';
 import { SCORE_TIP } from './score.js';
 import { canSubmit, submitRun, fetchLeaderboard, savedName, runResult } from './leaderboard.js';
 import { NAME_MAX, nameProblem } from './leaderboard-rules.js';
@@ -84,6 +84,8 @@ function partyHtml(w) {
  */
 export function showFeats(skinManager = globalThis._sharedSkinManager, onClose, { onStartChallenge } = {}) {
     const profile = loadProfile();
+    // A reward the profile has reached without a new find (the game's item count changed).
+    if (claimCollectionRewards(profile).length) saveProfile(profile);
     const found = new Set(profile.items);
     const catalog = itemCatalog();
     const total = Object.values(catalog).reduce((n, l) => n + l.length, 0);
