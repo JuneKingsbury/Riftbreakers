@@ -84,7 +84,6 @@ Relics show `items/relic_<key>.png` when it exists, otherwise a ◆ in the relic
   - Wild Frontiers and Verdant Depths, two of the three Act 1 options, sound the same.
   - Void Abyss (Act 2) and Void Sanctum (Act 3) sound the same.
 - **New realm:** `audio/music/expedition_rift_throne.ogg` is a copy of the Void Heart track.
-- **Unused tracks:** `audio/music/UnusedTracks/` holds 16. They come from two packs (see its `credits.txt`): NOT JAM, which is already credited, and flowerheadmusic's lofi pack, which the Credits screen doesn't list yet. Check each pack's license before using it.
 - **Hooks ready, no files yet:**
   - Boss battle track: add `battle_boss: 'audio/music/battle_boss.ogg'` to `music` in `js/audio/sound-manifest.js`. Boss fights then play it, and other fights keep the act's track.
   - Victory and defeat stings: add `battle_won` and `battle_lost` to `sfx` in the same file. They play the moment a battle ends.
