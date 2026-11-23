@@ -30,10 +30,10 @@ export const RARITY_STYLE = { legendary: 'text-shadow:0 0 5px rgba(255,80,20,0.7
 // desc: what the place offers, for the map's hover label and How to Play.
 export const NODE_INFO = {
     combat:   { label: 'Battle',   icon: '⚔', color: '#d66', desc: 'A fight that pays gold, XP and a pick of items.' },
-    elite:    { label: 'Elite',    icon: '☠', color: '#f80', desc: 'A tougher fight with a stronger leader, and better loot, including a relic.' },
-    boss:     { label: 'Boss',     icon: '♛', color: '#f44', desc: 'The heart of the realm. Beat it to end the act.' },
-    event:    { label: 'Event',    icon: '?',      color: '#9cf', desc: 'Something\'s happening on the road. It\'s up to you how to handle it.' },
-    shop:     { label: 'Shop',     icon: '$',      color: '#fc6', desc: 'Buy gear or a relic, or sell what you don\'t need.' },
+    elite:    { label: 'Elite',    icon: '☠', color: '#f80', desc: 'A tougher fight with a strong leader and better loot, including a relic.' },
+    boss:     { label: 'Boss',     icon: '♛', color: '#f44', desc: 'The master of the realm. Beat it to end the act.' },
+    event:    { label: 'Event',    icon: '?', color: '#9cf', desc: 'Something\'s happening on the road ahead. It\'s up to you how to handle it.' },
+    shop:     { label: 'Shop',     icon: '$', color: '#fc6', desc: 'Buy gear or a relic, or sell what you don\'t need.' },
     rest:     { label: 'Rest',     icon: '♨', color: '#8d8', desc: 'Train for XP, or enchant one item.' },
     treasure: { label: 'Treasure', icon: '✦', color: '#ec4', desc: 'Free gold, and often a relic too.' },
     recruit:  { label: 'Recruit',  icon: '+',      color: '#c9f', desc: 'Someone wants to join the party.' },
