@@ -9,7 +9,7 @@ export const COACH_TIPS = {
     briefing: ['Hands off', 'Your party fights on its own, with each member following their tactics. What you control is everything before the fight: skills, gear and where everyone stands. Win, and everyone heals back to full.'],
     deploy: ['Deploy your party', 'Pick a member, then a highlighted tile to move them there. Fragile members are safer at the back. Start the battle whenever you\'re ready.'],
     battle: ['Watching the battle', 'Press Space to pause, or 1, 2 and 3 to change the speed. Click any unit to check its stats, and hover over a status to see what it does.'],
-    reward: ['Spoils', 'Pick one item to keep. Hover over each one to see how it compares with what your party has on.'],
+    reward: ['Spoils', 'Pick one item to keep. A green up-arrow indicates that an item is a strict upgrade for one of your party members. Choose wisely!'],
 };
 
 // Added to the reward tip only when someone spends skill points by hand: with build focus or
