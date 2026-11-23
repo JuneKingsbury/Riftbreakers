@@ -12,7 +12,8 @@ import { BattleFx } from './battle-fx.js';
 import { perfSettings, pixelRatio } from '../core/perf-settings.js';
 import {
     abilityColors, projectileSprite, impactSprite, meleeSprite, isHeavyHit, hitShake, statusSprite, areaStyle,
-    HEAL_COLORS, BUFF_COLORS, DEATH_COLORS, POISON_COLORS, PHYSICAL_SPARKS,
+    statusAura, statusBadges, wardColors, HP_BAR_COLORS,
+    HEAL_COLORS, BUFF_COLORS, DEATH_COLORS, PHYSICAL_SPARKS,
 } from './fx-presets.js';
 
 /**
@@ -131,7 +132,15 @@ const CSS = `
 .tac3d-name.player{color:#9df}.tac3d-name.enemy{color:#f88}
 .tac3d-bar{width:34px;background:#111;box-shadow:0 0 0 1px #000;}
 .tac3d-bar i{display:block;height:100%;}
-.tac3d-hp{height:5px}.tac3d-hp i{background:#3c3}
+.tac3d-hp{height:5px;position:relative}.tac3d-hp i{background:${HP_BAR_COLORS.player}}.tac3d-hp.enemy i{background:${HP_BAR_COLORS.enemy}}
+.tac3d-hp.warded::after{content:'';position:absolute;inset:0;background:linear-gradient(100deg,transparent 35%,rgba(255,255,255,.6) 50%,transparent 65%);
+    background-size:300% 100%;animation:tac3d-sheen 1.6s linear infinite;}
+@keyframes tac3d-sheen{0%{background-position:150% 0}100%{background-position:-150% 0}}
+.tac3d-badges{display:flex;flex-wrap:wrap;justify-content:center;gap:1px;max-width:64px;}
+.tac3d-badge{font-size:9px;font-weight:bold;line-height:10px;min-width:8px;padding:0 2px;border:1px solid currentColor;border-radius:3px;
+    background:rgba(8,8,20,.8);text-align:center;white-space:nowrap;text-shadow:0 0 2px #000;}
+.tac3d-badge.harmful{background:rgba(60,8,8,.85);}
+.tac3d-badge sub{font-size:7px;vertical-align:baseline;margin-left:1px;color:#fff;}
 .tac3d-mp{height:3px}.tac3d-mp i{background:#36f}
 .tac3d-charge{width:34px;height:6px;background:#111;box-shadow:0 0 6px currentColor;}
 .tac3d-charge i{display:block;height:100%;background:currentColor}
@@ -1103,7 +1112,8 @@ export class BattleView3D {
         tag.innerHTML = `<div class="tac3d-doom" style="display:none"></div>`
             + `<div class="tac3d-name ${unit.team === 'player' ? 'player' : 'enemy'}"></div>`
             + `<div class="tac3d-cname" style="display:none"></div><div class="tac3d-charge" style="display:none"><i></i></div>`
-            + `<div class="tac3d-status"></div><div class="tac3d-bar tac3d-hp"><i></i></div><div class="tac3d-bar tac3d-mp"><i></i></div>`;
+            + `<div class="tac3d-badges"></div><div class="tac3d-status"></div>`
+            + `<div class="tac3d-bar tac3d-hp ${unit.team === 'player' ? 'player' : 'enemy'}"><i></i></div><div class="tac3d-bar tac3d-mp"><i></i></div>`;
         this.overlay.appendChild(tag);
 
         return {
@@ -1114,6 +1124,8 @@ export class BattleView3D {
                 charge: tag.querySelector('.tac3d-charge'),
                 chargeFill: tag.querySelector('.tac3d-charge i'),
                 status: tag.querySelector('.tac3d-status'),
+                badges: tag.querySelector('.tac3d-badges'),
+                hpBar: tag.querySelector('.tac3d-hp'),
                 hp: tag.querySelector('.tac3d-hp i'),
                 mpBar: tag.querySelector('.tac3d-mp'),
                 mp: tag.querySelector('.tac3d-mp i'),
@@ -1436,21 +1448,19 @@ export class BattleView3D {
         return c;
     }
 
-    // Lingering statuses give off a few particles: poison bubbles, and sparks around haste.
+    // Lingering statuses give off a trickle of particles (fx-presets.statusAura): poison
+    // bubbles, frost flakes while slowed, sparks round a stunned head, glints off Protect...
     _statusParticles(unit, vs, pose, now) {
         if (unit.status.includes('dead') || unit.status.includes('unconscious')) return;
         // Minimal effects drops these ambient particles; the status still shows on the unit's tag.
         if (perfSettings().effects === 'minimal') return;
-        const at = { x: pose.x, y: pose.y + 0.5, z: pose.z };
-        if (unit.status.includes('poison') && now >= (vs.nextBubble ?? 0)) {
-            vs.nextBubble = now + 420 / this._timeScale;
-            this.fx.burst(at, { layer: 'mote', count: 1, colors: POISON_COLORS, speed: [0, 0.1], up: [0.25, 0.45],
-                gravity: -0.1, life: [0.7, 1], radius: 0.18, wobble: 0.04, alpha: 0.8 });
-        }
-        if (unit.status.includes('haste') && now >= (vs.nextSpark ?? 0)) {
-            vs.nextSpark = now + 300 / this._timeScale;
-            this.fx.burst({ ...at, y: pose.y + 0.15 }, { layer: 'spark', count: 2, colors: BUFF_COLORS, speed: [0.1, 0.3],
-                up: [0.1, 0.3], life: [0.3, 0.45], radius: 0.2 });
+        const next = vs.auraNext ?? (vs.auraNext = {});
+        for (const status of unit.status) {
+            const aura = statusAura(status);
+            if (!aura || now < (next[status] ?? 0)) continue;
+            next[status] = now + aura.every / this._timeScale;
+            const { every, y, ...burst } = aura;
+            this.fx.burst({ x: pose.x, y: pose.y + y, z: pose.z }, burst);
         }
     }
 
@@ -1482,15 +1492,21 @@ export class BattleView3D {
             els.doom.title = v === 1 ? `Doom: ${what} on its next turn` : `Doom: ${what} in ${v} turns`;
         });
 
-        const marks = [];
-        if (unit.status.includes('stun'))     marks.push('*');
-        if (unit.status.includes('slow'))     marks.push('S');
-        if (unit.status.includes('defend'))   marks.push('D');
-        if (unit.status.includes('charging')) marks.push('!');
-        if (unit.status.includes('hidden'))   marks.push('H');
-        if (unit.status.includes('taunted'))  marks.push('T');
-        if (ko) marks.push('KO');
-        set('marks', marks.join(' '), v => { els.status.textContent = v; });
+        // A badge per status and per raised or lowered stat, with the turns left.
+        const badges = ko ? [] : statusBadges(unit);
+        set('badges', badges.map(b => b.key + (b.turns ?? '')).join(), () => {
+            els.badges.innerHTML = badges.map(b => `<span class="tac3d-badge${b.harmful ? ' harmful' : ''}" style="color:${b.color}">`
+                + `${b.glyph}${b.turns ? `<sub>${b.turns}</sub>` : ''}</span>`).join('');
+        });
+        set('marks', ko ? 'KO' : '', v => { els.status.textContent = v; els.status.style.display = v ? '' : 'none'; });
+
+        // Protect, Shell and Defend ring the HP bar in their colors, with a sheen running across.
+        const wards = ko ? [] : wardColors(unit);
+        set('wards', wards.join(), () => {
+            els.hpBar.classList.toggle('warded', wards.length > 0);
+            els.hpBar.style.boxShadow = ['0 0 0 1px #000', ...wards.map((c, i) => `0 0 0 ${i + 2}px ${c}`),
+                ...(wards.length ? [`0 0 6px ${wards[0]}`] : [])].join(',');
+        });
 
         worldPos.project(this.camera);
         const sx = (worldPos.x * 0.5 + 0.5) * this._width;

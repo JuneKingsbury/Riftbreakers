@@ -8,6 +8,7 @@ import * as THREE from '../../lib/three/three.module.js';
 import { BattleFx } from '../../js/tactical/battle-fx.js';
 import {
     abilityColors, projectileSprite, impactSprite, meleeSprite, isHeavyHit, hitShake, statusSprite,
+    statusAura, statusBadges, wardColors, HP_BAR_COLORS,
     PHYSICAL_SPARKS, HEAL_COLORS,
 } from '../../js/tactical/fx-presets.js';
 
@@ -56,6 +57,28 @@ test('a heavy hit is a quarter of the target\'s HP; the camera shakes hardest wh
     assert.ok(hitShake(30, hero) > hitShake(30, foe));
     assert.equal(statusSprite('protect'), 'spell_shield');
     assert.equal(statusSprite('poison'), null, 'poison bubbles instead of an icon');
+});
+
+test('lingering statuses wear a badge with the turns left; stat changes get one each', () => {
+    const unit = { team: 'enemy', status: ['protect', 'poison', 'doom'], statusTimers: { poison: 3, protect: 99, doom: 2 },
+        buffs: [{ key: 'war_cry', stat: 'atk', value: 4 }, { key: 'enfeebled', stat: 'atk', value: -5 }, { key: 'x', stat: 'def', value: -2 }] };
+    const badges = statusBadges(unit);
+    assert.deepEqual(badges.map(b => b.key), ['poison', 'protect', 'buff_atk', 'buff_def'], 'harmful first; doom has its own countdown');
+    assert.equal(badges[0].turns, 3);
+    assert.equal(badges[1].turns, null, 'a battle-long status shows no countdown');
+    assert.ok(badges[0].harmful && !badges[1].harmful && badges[3].harmful);
+    assert.equal(badges[2].name, 'ATK +4', 'Enfeeble\'s own -5 is on its status badge, not here');
+    assert.ok(statusBadges(unit, { withDoom: true }).some(b => b.key === 'doom'));
+    assert.deepEqual(statusBadges({ status: [] }), []);
+});
+
+test('Protect, Shell and Defend ring the HP bar; the teams\' bars differ; most statuses trickle particles', () => {
+    assert.equal(wardColors({ status: ['protect', 'shell', 'poison'] }).length, 2);
+    assert.equal(wardColors({ status: ['defend'] }).length, 1);
+    assert.deepEqual(wardColors({ status: ['haste'] }), []);
+    assert.notEqual(HP_BAR_COLORS.player, HP_BAR_COLORS.enemy);
+    for (const s of ['poison', 'slow', 'stun', 'regen', 'protect', 'shell', 'doom']) assert.ok(statusAura(s)?.every > 0, s);
+    assert.equal(statusAura('no_such_status'), null);
 });
 
 // ---- Mechanics --------------------------------------------------------------------------

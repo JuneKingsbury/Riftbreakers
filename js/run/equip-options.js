@@ -124,6 +124,15 @@ export function isStrictUpgrade(w) {
 }
 
 /**
+ * The party members an item would be a strict upgrade for (isStrictUpgrade) over what they
+ * wear now, best first. It needn't be owned yet: reward and shop screens flag these picks.
+ */
+export function strictUpgradeFor(run, key) {
+    if (!EQUIPMENT[key]) return [];
+    return equipOptions(run, key).wearers.filter(isStrictUpgrade).sort((a, b) => b.score - a.score).map(w => w.member);
+}
+
+/**
  * Equips a newly gained item on the member it's the biggest strict upgrade for, then does the
  * same with whatever that member took off, and so on. Every move strictly improves the member
  * receiving it, so the chain ends; the guard is only a backstop.

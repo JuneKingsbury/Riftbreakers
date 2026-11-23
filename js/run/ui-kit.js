@@ -167,6 +167,14 @@ export function itemIconHtml(key, size = 20) {
         style="image-rendering:pixelated;flex-shrink:0;vertical-align:middle;"></canvas>` : '';
 }
 
+// A green up arrow for an item that's a strict upgrade for someone (equip-options.strictUpgradeFor),
+// naming who in its tip. Empty when it's no one's.
+export function upgradeArrowHtml(members) {
+    if (!members?.length) return '';
+    const tip = `Upgrade for ${members.map(m => m.name).join(', ')}: better than what they wear now, with nothing they use going down.`;
+    return `<span data-tip="${esc(tip)}" style="color:#4e4;font-size:16px;font-weight:bold;line-height:1;flex-shrink:0;text-shadow:0 0 4px #2a2;">▲</span>`;
+}
+
 // A centred modal panel. show() replaces its content; Esc, the backdrop and the
 // Close button call back(), which runs the current onBack (or closes).
 //   opts.dismissible  false: Esc/backdrop do nothing and there is no Close button

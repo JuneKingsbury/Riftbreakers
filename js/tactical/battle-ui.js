@@ -2,10 +2,27 @@ import { STATES } from './battle.js';
 import { placeTipAt } from '../ui/tip-place.js';
 import { ABILITIES, passivesOf } from './abilities.js';
 import { mountBreakdown } from './battle-breakdown.js';
+import { statusBadges, wardColors, HP_BAR_COLORS } from './fx-presets.js';
 
 // Rule labels and unit names can come from player-authored scripts.
 function esc(text) {
     return String(text).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+}
+
+// A unit's statuses and stat changes as colored chips (the same badges as its map tag).
+function statusChips(unit, marginTop) {
+    const chips = statusBadges(unit, { withDoom: true }).map(b =>
+        `<span style="display:inline-block;margin:0 3px 2px 0;padding:0 3px;border:1px solid ${b.color};border-radius:3px;color:${b.color};`
+        + `background:${b.harmful ? '#3a0808' : '#0c0c1c'};">${b.key.startsWith('buff_') ? esc(b.name) : `${b.glyph} ${esc(b.name)}`}`
+        + `${b.turns ? ` <span style="color:#fff;">${b.turns}</span>` : ''}</span>`);
+    for (const s of ['unconscious', 'dead']) if (unit.status.includes(s)) chips.push(`<span style="color:#888;">${s}</span>`);
+    return chips.length ? `<div style="margin-top:${marginTop}px;font-size:10px;line-height:14px;">${chips.join('')}</div>` : '';
+}
+
+// Protect, Shell and Defend ring a unit's HP bar in their colors (inline style for the bar's track).
+function wardRing(unit) {
+    const wards = wardColors(unit);
+    return wards.length ? `box-shadow:${wards.map((c, i) => `0 0 0 ${i + 1}px ${c}`).join(',')},0 0 5px ${wards[0]};` : '';
 }
 
 // Hotkey label for each skillset command, in menu order.
@@ -481,7 +498,7 @@ export class BattleUI {
                 <div style="font-size:10px;color:#888;text-transform:uppercase;">${u.job}</div>
                 <div style="margin-top:5px;">
                     <div style="display:flex;justify-content:space-between;font-size:10px;"><span style="color:#888;">HP</span><span>${u.hp}/${u.maxHp}</span></div>
-                    <div style="background:#111;height:5px;border-radius:2px;margin:2px 0 4px;"><div style="background:#3c3;width:${hpP}%;height:100%;border-radius:2px;"></div></div>
+                    <div style="background:#111;height:5px;border-radius:2px;margin:2px 0 4px;${wardRing(u)}"><div style="background:${HP_BAR_COLORS[u.team] ?? HP_BAR_COLORS.player};width:${hpP}%;height:100%;border-radius:2px;"></div></div>
                 </div>
                 ${u.maxMp > 0 ? `<div>
                     <div style="display:flex;justify-content:space-between;font-size:10px;"><span style="color:#888;">MP</span><span>${u.mp}/${u.maxMp}</span></div>
@@ -498,7 +515,7 @@ export class BattleUI {
                     <span style="color:#888;">CRIT</span><span>${u.crit ?? 5}%</span>
                     <span style="color:#888;">Facing</span><span>${u.facing || 'south'}</span>
                 </div>
-                ${u.status.length ? `<div style="margin-top:5px;color:#fc6;font-size:10px;">Status: ${u.status.join(', ')}</div>` : ''}
+                ${statusChips(u, 5)}
             </div>`;
         }
 
@@ -519,7 +536,7 @@ export class BattleUI {
                 <div style="font-size:10px;color:#888;text-transform:uppercase;margin-bottom:5px;">${insp.job}${insp.team === 'enemy' ? ' <span style="color:#f76;">(enemy)</span>' : ''}</div>
                 <div>
                     <div style="display:flex;justify-content:space-between;font-size:10px;"><span style="color:#888;">HP</span><span style="color:${hpC};">${insp.hp}/${insp.maxHp}</span></div>
-                    <div style="background:#111;height:5px;border-radius:2px;margin:2px 0 4px;"><div style="background:${hpC};width:${hpP}%;height:100%;border-radius:2px;"></div></div>
+                    <div style="background:#111;height:5px;border-radius:2px;margin:2px 0 4px;${wardRing(insp)}"><div style="background:${HP_BAR_COLORS[insp.team] ?? hpC};width:${hpP}%;height:100%;border-radius:2px;"></div></div>
                 </div>
                 ${insp.maxMp > 0 ? `<div>
                     <div style="display:flex;justify-content:space-between;font-size:10px;"><span style="color:#888;">MP</span><span>${insp.mp}/${insp.maxMp}</span></div>
@@ -533,7 +550,7 @@ export class BattleUI {
                     <span style="color:#888;">SPD</span><span>${insp.spd}</span>
                     <span style="color:#888;">Move</span><span>${insp.move}</span>
                 </div>
-                ${insp.status.length ? `<div style="margin-top:4px;color:#fc6;font-size:10px;">Status: ${insp.status.join(', ')}</div>` : ''}
+                ${statusChips(insp, 4)}
             </div>`;
         }
 

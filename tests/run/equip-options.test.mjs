@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { equipOptions, canOfferEquip, rateSwap, statWeights } from '../../js/run/equip-options.js';
+import { equipOptions, canOfferEquip, rateSwap, statWeights, strictUpgradeFor } from '../../js/run/equip-options.js';
 import { RunState } from '../../js/run/run-state.js';
 
 // An Evoker and a Warden (both start with a Wooden Wand: MAT +3, MP +4) and a Runebow (bows only).
@@ -182,4 +182,15 @@ test('auto-equip never makes a trade: losing a skill or a used stat keeps the it
     const w = equipOptions(run, 'void_staff').wearers.find(x => x.member === ev);
     assert.equal(w.verdict, 'upgrade');
     assert.equal(isStrictUpgrade(w), false);
+});
+
+test('reward and shop screens flag an item that is a strict upgrade for someone, even before it is owned', () => {
+    // GIVEN: two casters in Wooden Wands and an archer; nothing in the bag
+    const run = party();
+
+    // THEN: a Void Staff beats both wands outright; the wands they already wear beat no one;
+    // and an item no one can wear, or a made-up key, flags no one
+    assert.deepEqual(strictUpgradeFor(run, 'void_staff').map(m => m.job).sort(), ['evoker', 'warden']);
+    assert.deepEqual(strictUpgradeFor(run, 'wooden_wand'), []);
+    assert.deepEqual(strictUpgradeFor(run, 'no_such_item'), []);
 });

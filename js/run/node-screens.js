@@ -1,7 +1,7 @@
 // The screen for whatever the run has pending at the current node: the battle
 // briefing, rewards, shop, event, rest site, treasure, recruits, and the end of
 // the run. Every action goes through RunState; `hooks` tell the scene what to do next.
-import { canOfferEquip, autoEquip } from './equip-options.js';
+import { canOfferEquip, autoEquip, strictUpgradeFor } from './equip-options.js';
 import { autoEquipEnabled, setGameSetting } from './game-settings.js';
 import { showEquipPicker } from '../ui/equip-picker.js';
 import { RELICS } from './data/relics.js';
@@ -16,7 +16,7 @@ import { MAX_PARTY } from './run-state.js';
 import { EQUIPMENT, EQUIP_FIELDS, EQUIP_STAT_KEYS, canEnchant, enchantedKey, enchantLevel, MAX_ENCHANT } from '../tactical/data/equipment.js';
 import {
     BTN, BTN_DISABLED, BTN_GOOD, BTN_GOLD, BTN_DANGER, GLOW, RARITY_COLOR, esc, jobLabel, jobDesc,
-    abilityName, itemTitle, itemSummary, itemIconHtml, portraitHtml, drawSprites,
+    abilityName, itemTitle, itemSummary, itemIconHtml, upgradeArrowHtml, portraitHtml, drawSprites,
 } from './ui-kit.js';
 
 const H1 = (t, color = '#ffcc44') => `<div style="color:${color};font-weight:bold;font-size:16px;margin-bottom:6px;">${t}</div>`;
@@ -220,7 +220,7 @@ export class NodeScreens {
                     ${itemIconHtml(k, 24)}
                     <span style="flex:1;">${itemTitle(k)}<br><span style="color:#889;font-size:10px;">${esc(itemSummary(k))}</span>
                     <br><span style="color:#667;font-size:10px;">${users.length ? `Usable by ${esc(users.join(', '))}` : 'No one in the party can use this'}</span></span>
-                    ${takenTag(taken, k)}
+                    ${p.itemClaimed ? '' : upgradeArrowHtml(strictUpgradeFor(run, k))}${takenTag(taken, k)}
                 </button>`;
             }
             if (typeof taken === 'string') html += this._equipButton(taken, p);
@@ -278,6 +278,7 @@ export class NodeScreens {
                 ${itemIconHtml(e.key, 24)}
                 <span style="flex:1;">${itemTitle(e.key)}<br><span style="color:#889;font-size:10px;">${esc(itemSummary(e.key))}</span>
                 <br><span style="color:#667;font-size:10px;">${users.length ? esc(users.join(', ')) : 'No one can use this'}</span></span>
+                ${e.sold ? '' : upgradeArrowHtml(strictUpgradeFor(run, e.key))}
                 <span style="color:#fd8;">${e.sold ? 'SOLD' : `${e.price}g`}</span>
             </button>`;
             if (e.sold) html += this._equipButton(e.key, e);
