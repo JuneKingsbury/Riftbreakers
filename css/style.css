@@ -5032,10 +5032,12 @@ body.portrait .tac-sidebar {
     top: auto !important; bottom: 0 !important; left: 0 !important; right: 0 !important;
     width: 100% !important; height: 28vh !important; max-height: 230px;
     border-right: none !important; border-top: 1px solid #335;
-    column-count: 2; column-gap: 10px;
+    /* Two columns that grow downward, so a big party (plus summons) scrolls instead of being clipped. */
+    display: grid; grid-template-columns: 1fr 1fr; column-gap: 10px; align-content: start;
     padding-bottom: max(8px, env(safe-area-inset-bottom)) !important;
 }
-body.portrait .tac-sidebar > * { break-inside: avoid; }
+body.portrait .tac-sidebar > * { min-width: 0; }
+body.portrait .tac-sidebar > .tac-detail-panel { grid-column: 1 / -1; }
 /* The unit list isn't on the left in portrait, so the command menu and its skill info hug the edge. */
 body.portrait .tac-actions { left: 14px !important; bottom: calc(min(28vh, 230px) + 8px) !important; }
 body.portrait .tac-skillinfo { left: 175px !important; bottom: calc(min(28vh, 230px) + 8px) !important; }
