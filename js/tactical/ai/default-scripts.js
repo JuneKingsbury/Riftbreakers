@@ -144,9 +144,10 @@ export function autoScriptFor(job, abilities = []) {
     for (const k of of(a => a.targetType === 'ally' && !a.isHeal && !a.isCure && a.applyStatus && a.ctGain == null)) {
         const ab = ABILITIES[k];
         // Shield Wall and the like only reach the caster and those beside it.
+        // Not again while the caster still has its status.
         if (ab.range === 0) {
             rules.push(rule(id(), `${ab.name} when enemies are close`, test('enemy_within', { range: 2 }),
-                { do: 'ability', ability: k, target: { side: 'self', pick: 'nearest' } }));
+                { do: 'ability', ability: k, target: { side: 'self', pick: 'nearest', filters: statusFilter(ab.applyStatus) } }));
             continue;
         }
         const target = (pick, extra = []) => ally(pick, [...statusFilter(ab.applyStatus), ...extra]);
@@ -167,8 +168,8 @@ export function autoScriptFor(job, abilities = []) {
         const ab = ABILITIES[k];
         const defensive = ab.buffs.every(b => DEFENSIVE.has(b.stat));
         rules.push(defensive
-            ? rule(id(), `${ab.name} on an ally taking hits`, test('ally_hp_below', { value: 80 }),
-                { do: 'ability', ability: k, target: ab.aoe ? ally('most_clustered') : ally('lowest_hp_pct', [{ kind: 'hp_below', value: 80 }]), approach: true })
+            ? rule(id(), `${ab.name} on an ally taking hits`, test('ally_hp_below', { value: 60 }),
+                { do: 'ability', ability: k, target: ab.aoe ? ally('most_clustered') : ally('lowest_hp_pct', [{ kind: 'hp_below', value: 60 }]), approach: true })
             : rule(id(), `${ab.name} on the main group when enemies are near`, test('enemy_within', { range: 5 }),
                 { do: 'ability', ability: k, target: ally('most_clustered'), approach: true }));
     }
@@ -176,13 +177,24 @@ export function autoScriptFor(job, abilities = []) {
         rules.push(rule(id(), `${ABILITIES[k].name} when enemies are close`, test('enemy_within', { range: 2 }),
             { do: 'ability', ability: k }));
     }
+    // Skills that hit a status harder (Nightmare on sleepers) go after an enemy that has it.
+    for (const k of of(a => a.basePower > 0 && a.bonusVsStatus)) {
+        for (const status of Object.keys(ABILITIES[k].bonusVsStatus)) {
+            rules.push(rule(id(), `${ABILITIES[k].name} an enemy with ${status}`, always(),
+                { do: 'ability', ability: k, target: enemy('lowest_hp', [{ kind: 'status', status, has: true }]), approach: true }));
+        }
+    }
     // Control spells are saved for healthy enemies; weakened ones just get finished off. The most
     // telling go first. Sleep comes last: in a running fight, the next blow wakes the sleeper.
     const controlValue = (k) => CONTROL_VALUE[ABILITIES[k].applyStatus] ?? 1;
     const control = of(a => a.targetType === 'enemy' && a.applyStatus && !a.basePower && !POSITIVE_STATUSES.includes(a.applyStatus));
     for (const k of control.sort((a, b) => controlValue(b) - controlValue(a))) {
         const ab = ABILITIES[k];
-        rules.push(rule(id(), `${ab.name} on a healthy enemy without ${ab.applyStatus}`, test('target_hp_pct', { cmp: '>=', value: 60 }),
+        // A taunter only draws blows while it can take them; once badly hurt it fights instead.
+        const when = ab.applyStatus === 'taunted'
+            ? { op: 'and', args: [test('target_hp_pct', { cmp: '>=', value: 60 }), test('self_hp_pct', { cmp: '>=', value: 50 })] }
+            : test('target_hp_pct', { cmp: '>=', value: 60 });
+        rules.push(rule(id(), `${ab.name} on a healthy enemy without ${ab.applyStatus}`, when,
             { do: 'ability', ability: k, target: enemy('nearest', statusFilter(ab.applyStatus)), approach: true }));
     }
     // Orders that move speed gauges come after control (so a Warlord taunts before it rallies):
@@ -190,8 +202,8 @@ export function autoScriptFor(job, abilities = []) {
     for (const k of orders.sort((a, b) => ABILITIES[b].ctGain - ABILITIES[a].ctGain)) {
         const ab = ABILITIES[k];
         rules.push(ab.ctGain > 0
-            ? rule(id(), `${ab.name} an ally when enemies are near`, test('enemy_within', { range: 6 }),
-                { do: 'ability', ability: k, target: ally('nearest'), approach: true })
+            ? rule(id(), `${ab.name} the strongest ally when enemies are near`, test('enemy_within', { range: 6 }),
+                { do: 'ability', ability: k, target: ally('strongest'), approach: true })
             : rule(id(), `${ab.name} the nearest enemy`, test('enemy_within', { range: 6 }),
                 { do: 'ability', ability: k, target: enemy('nearest'), approach: true }));
     }

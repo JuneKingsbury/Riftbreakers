@@ -477,10 +477,10 @@ test('passive and tile-terrain abilities are not offered to scripts', () => {
 
 test('default behavior uses every kind of skill the character has, and is always valid', () => {
     const labels = (job, abilities) => autoScriptFor(job, abilities).rules.map(r => r.label).join(' | ');
-    const seer = labels('seer', ['attack', 'temporal_slip', 'time_lapse@2', 'swift_grace']);
+    const seer = labels('seer', ['attack', 'temporal_slip', 'dream_veil@2', 'swift_grace']);
     assert.match(seer, /Swift Grace on an ally without haste/);
     assert.match(seer, /Temporal Slip on an ally at the start/, 'Temporal Slip is protective, cast on allies');
-    assert.match(seer, /Time Lapse on a healthy enemy without slow/, 'a ranked skill is named by its base');
+    assert.match(seer, /Dream Veil on a healthy enemy without sleep/, 'a ranked skill is named by its base');
     assert.match(seer, /Back off/);
     const warden = labels('warden', ['attack', 'ward', 'stone_aegis']);
     assert.match(warden, /Revive.*Heal.*Stone Aegis on a hurt ally/);

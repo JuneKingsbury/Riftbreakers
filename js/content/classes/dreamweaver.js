@@ -5,8 +5,8 @@
 export const key = 'dreamweaver';
 
 export const job = {
-    maxHp: 36, maxMp: 54,
-    spd: 8, atk: 5, def: 4, mat: 14, mdf: 11,
+    maxHp: 42, maxMp: 54,
+    spd: 9, atk: 5, def: 4, mat: 15, mdf: 11,
     move: 4, eva: 16,
     skillsetName: 'Dreamcraft',
     tier: 2,
@@ -25,8 +25,8 @@ export const job = {
         },
         {
             key: 'charm', name: 'Charm Control',
-            desc: 'Turn enemies against each other: Bewilder charms a target into fighting for you, and Deep Dreams makes it last a turn longer. Lull puts attackers to sleep.',
-            steps: ['bewilder', 'deep_dreams', 'lull', 'bewilder+', 'mass_sleep+', 'bewilder+', 'lull+'],
+            desc: 'Turn enemies against each other: Bewilder charms a target into fighting for you, and Deep Dreams makes it last a turn longer. Nightmare is your damage, and Lull puts attackers to sleep.',
+            steps: ['bewilder', 'nightmare', 'deep_dreams', 'bewilder+', 'nightmare+', 'lull', 'bewilder+'],
         },
     ],
     spriteKey: 'mirror_shade',
@@ -38,21 +38,21 @@ export const job = {
 
 export const abilities = {
     mass_sleep: {
-        extends: 'dream_veil', name: 'Mass Sleep', aoe: 1, mpCost: 20, actionCost: 50, chargeTime: 25,
+        extends: 'dream_veil', name: 'Mass Sleep', aoe: 1, mpCost: 20, actionCost: 50, chargeTime: 15,
         statusDuration: 2, requiresLos: false, element: 'illusion',
         desc: 'A lullaby that settles over an area. Every enemy caught falls asleep for up to {turns}, or until struck.',
     },
 
     bewilder: {
-        name: 'Bewilder', type: 'magic', range: 3, aoe: 0, mpCost: 16, actionCost: 45,
+        name: 'Bewilder', type: 'magic', range: 3, aoe: 0, mpCost: 14, actionCost: 45,
         targetType: 'enemy', basePower: 0, element: 'illusion', animType: 'cast',
-        projectileColor: '#ff99dd', chargeTime: 0, applyStatus: 'charm', statusDuration: 2,
+        projectileColor: '#ff99dd', chargeTime: 0, applyStatus: 'charm', statusDuration: 3,
         desc: 'Convinces an enemy that their friends are the foe. Charms them for {duration} turns.',
     },
 
     nightmare: {
-        name: 'Nightmare', type: 'magic', range: 4, aoe: 0, mpCost: 14, actionCost: 46,
-        targetType: 'enemy', basePower: 1.2, element: 'illusion', animType: 'cast',
+        name: 'Nightmare', type: 'magic', range: 4, aoe: 0, mpCost: 12, actionCost: 46,
+        targetType: 'enemy', basePower: 1.7, element: 'illusion', animType: 'cast',
         projectileColor: '#8844aa', chargeTime: 0, bonusVsStatus: { sleep: 2 },
         desc: 'Turns a dream against the dreamer: deals double damage to a sleeping target.',
     },

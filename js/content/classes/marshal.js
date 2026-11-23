@@ -6,8 +6,8 @@ export const key = 'marshal';
 
 export const job = {
     equipmentExpansions: { armor: ['heavy'], helmet: ['heavy'] },
-    maxHp: 64, maxMp: 24,
-    spd: 7, atk: 13, def: 13, mat: 4, mdf: 10,
+    maxHp: 70, maxMp: 24,
+    spd: 8, atk: 14, def: 13, mat: 4, mdf: 10,
     move: 3, eva: 10,
     skillsetName: 'Defense Orders',
     tier: 2,
@@ -41,20 +41,20 @@ export const abilities = {
     shield_wall: {
         name: 'Shield Wall', type: 'physical', range: 0, aoe: 1, mpCost: 8, actionCost: 45,
         targetType: 'ally', basePower: 0, element: 'command', animType: 'cast',
-        projectileColor: '#ccccff', chargeTime: 0, noEvade: true, applyStatus: 'protect', statusDuration: 2,
+        projectileColor: '#ccccff', chargeTime: 0, noEvade: true, applyStatus: 'protect', statusDuration: 3,
         desc: 'Lock shields. You and every adjacent ally gain Protect for {duration} turns.',
     },
 
     challenge: {
-        name: 'Challenge', type: 'physical', range: 3, aoe: 0, mpCost: 8, actionCost: 40,
-        targetType: 'enemy', basePower: 0, element: 'command', animType: 'cast',
+        name: 'Challenge', type: 'physical', range: 2, aoe: 0, mpCost: 8, actionCost: 45,
+        targetType: 'enemy', basePower: 0.8, element: 'command', animType: 'slash',
         projectileColor: '#ff6644', chargeTime: 0, noEvade: true, applyStatus: 'taunted', statusDuration: 3,
         buffs: [{ stat: 'def', value: -4, duration: 3 }],
-        desc: 'Calls out one enemy. They must attack you for {turns}, and their DEF falls by {buff:def} for 3 turns.',
+        desc: 'A shield-first charge that calls one enemy out. It deals damage, they have to attack you for {turns}, and their DEF falls by {buff:def} for 3 turns.',
     },
 
     bulwark_bash: {
-        extends: 'attack', name: 'Bulwark Bash', basePower: 0.9, mpCost: 8, actionCost: 45,
+        extends: 'attack', name: 'Bulwark Bash', basePower: 1.1, mpCost: 8, actionCost: 45,
         applyStatus: 'stun', statusDuration: 1,
         desc: 'A blow with the shield\'s rim. Deals damage and stuns the target for {turns}.',
     },
@@ -66,7 +66,7 @@ export const abilities = {
 
     iron_discipline: {
         extends: 'support', name: 'Iron Discipline', passiveMpCost: 0, dmgDealt: null,
-        turnAlliesBuff: [{ stat: 'def', value: 3, duration: 1 }, { stat: 'mdf', value: 3, duration: 1 }],
-        desc: 'At the start of each of your turns, you and adjacent allies gain DEF and MDF +3 for 1 turn.',
+        turnAlliesBuff: [{ stat: 'def', value: 4, duration: 1 }, { stat: 'mdf', value: 4, duration: 1 }],
+        desc: 'At the start of each of your turns, you and adjacent allies gain DEF and MDF +4 for 1 turn.',
     },
 };

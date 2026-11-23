@@ -8,6 +8,7 @@
     "serve": "python3 -m http.server 8000",
     "dev": "node tools/dev-server.mjs",
     "skin-manifest": "node tools/skin-files.mjs",
-    "content-docs": "node tools/content-docs.mjs"
+    "content-docs": "node tools/content-docs.mjs",
+    "balance": "node --no-warnings tools/class-balance.mjs"
   }
 }

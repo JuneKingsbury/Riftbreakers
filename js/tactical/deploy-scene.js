@@ -8,7 +8,9 @@ import { BattleView3D, showViewError } from './battle-view3d.js';
 import { STATES } from './battle.js';
 import { CHARACTER_DATA } from './data/characters.js';
 import { buildUnits, encounterEnemies } from './build-units.js';
-import { Modal } from '../run/ui-kit.js';
+import { Modal, esc } from '../run/ui-kit.js';
+import { coachTip } from '../ui/coach.js';
+import { AFFIXES, knownAffixes, affixedName } from '../run/data/affixes.js';
 import { PartyMenu } from '../run/party-menu.js';
 import { attachTouchGestures } from './touch-gestures.js';
 import { isPortrait, isTouch } from '../ui/layout.js';
@@ -114,6 +116,7 @@ export class DeployScene {
         this._buildOverlay(containerEl);
         this._highlightSpawnTiles();
 
+        coachTip('deploy');
         this._renderer.canvas.addEventListener('mousedown',   this._onMouseDown   = e => this._handleMouseDown(e));
         this._renderer.canvas.addEventListener('mousemove',   this._onMouseMove   = e => this._handleMouseMove(e));
         this._renderer.canvas.addEventListener('mouseup',     this._onMouseUp     = e => this._handleMouseUp(e));
@@ -193,10 +196,15 @@ export class DeployScene {
             const counts = {};
             for (const r of roster) {
                 const label = (r.name || r.job || '?').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-                counts[label] = (counts[label] || 0) + 1;
+                const name = affixedName(label, r.affixes);
+                counts[name] = (counts[name] || 0) + 1;
             }
             for (const [name, n] of Object.entries(counts)) {
-                html += `<div class="deploy-enemy" style="color:#f88;font-size:11px;margin-bottom:2px;">&#x2694; ${name}${n > 1 ? ` ×${n}` : ''}</div>`;
+                html += `<div class="deploy-enemy" style="color:#f88;font-size:11px;margin-bottom:2px;">&#x2694; ${esc(name)}${n > 1 ? ` ×${n}` : ''}</div>`;
+            }
+            // Elite affixes, as on the briefing: the name, with what it does on hover or hold.
+            for (const k of roster.flatMap(r => knownAffixes(r.affixes))) {
+                html += `<div class="deploy-enemy" data-tip="${esc(`${AFFIXES[k].name}\n${AFFIXES[k].desc}`)}" style="font-size:10px;margin:0 0 2px 12px;color:#fb6;cursor:help;">✦ ${esc(AFFIXES[k].name)}</div>`;
             }
             html += `<div class="deploy-gap" style="height:8px;"></div>`;
         }

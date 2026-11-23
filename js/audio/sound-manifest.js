@@ -15,6 +15,7 @@ export const SOUND_MANIFEST = {
         // Combat
         hit_party:      { file: 'audio/sfx/combat/colonist_damaged.ogg' },
         hit_enemy:      { file: 'audio/sfx/work/chop_hit.ogg', gain: 0.55 },
+        hit_crit:       { file: 'audio/sfx/combat/critical_hit.ogg', gain: 0.8 },
         miss:           { file: 'audio/sfx/combat/shield_block.ogg' },
         party_down:     { file: 'audio/sfx/combat/colonist_death.ogg' },
         enemy_down:     { file: 'audio/sfx/combat/enemy_death.ogg', gain: 0.8 },
@@ -40,6 +41,9 @@ export const SOUND_MANIFEST = {
         loot:           { file: 'audio/sfx/combat/loot_drop.ogg' },
         equip:          { file: 'audio/sfx/work/craft_complete.ogg', gain: 0.8, pitch: 150 },
         rest:           { file: 'audio/sfx/spells/spell_heal.ogg', gain: 0.8, pitch: 150 },
+        enchant:        { file: 'audio/sfx/work/enchant_complete.ogg', gain: 0.8, pitch: 100 },
+        // Wired up, waiting for files (see audio/README.md): a short sting when a battle is won
+        // or lost. Add battle_won / battle_lost entries here once the .ogg files exist.
         travel:         { file: 'audio/sfx/environment/footstep.ogg', gain: 0.5 },
         event:          { file: 'audio/sfx/ui/notification.ogg', gain: 0.7, pitch: 100 },
 
@@ -77,5 +81,6 @@ export const SOUND_MANIFEST = {
         expedition_fracture_gate:        'audio/music/expedition_fracture_gate.ogg',
         expedition_shifting_labyrinth:   'audio/music/expedition_shifting_labyrinth.ogg',
         expedition_unraveling_core:      'audio/music/expedition_unraveling_core.ogg',
+        expedition_rift_throne:          'audio/music/expedition_rift_throne.ogg',
     },
 };

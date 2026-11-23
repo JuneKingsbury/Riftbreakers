@@ -63,7 +63,12 @@ export const encounters = {
             e('goblin', 'Fracture Imp', 'fracture_imp'),
             e('goblin', 'Fracture Imp', 'fracture_imp'),
             e('goblin', 'Fracture Imp', 'fracture_imp'),
-        ]),
+        ], {
+            scouting: 'The Echo Beast leads a pack of rift-hounds and imps through the broken gate. Imps die fast, so clear them before the beast closes in.',
+            phases: [
+                { at: 0.5, name: 'Echoing Roar', say: 'The Echo Beast roars, and the rift echoes it back as another hound!', summon: [e('wolf', 'Chaos Hound', 'chaos_hound')] },
+            ],
+        }),
     ],
 };
 

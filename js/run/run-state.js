@@ -54,7 +54,7 @@ const BATTLE_TYPES = { combat: 'normal', elite: 'elite', boss: 'boss' };
 // Item rarity weights for rewards and shop stock, by act and fight kind. Each reward choice
 // rolls separately. Legendary appears only in elite and boss rewards from act 2 on; shops use
 // the `normal` weights, so they never stock it.
-const ITEM_RARITY = {
+export const ITEM_RARITY = {
     1: { normal: { common: 70, uncommon: 28, rare: 2 },  elite: { common: 30, uncommon: 55, rare: 15 },           boss: { uncommon: 50, rare: 50 } },
     2: { normal: { common: 35, uncommon: 55, rare: 10 }, elite: { common: 5, uncommon: 55, rare: 40 },            boss: { uncommon: 30, rare: 68, legendary: 2 } },
     3: { normal: { common: 10, uncommon: 55, rare: 35 }, elite: { uncommon: 35, rare: 64, legendary: 1 },        boss: { rare: 95, legendary: 5 } },
@@ -882,7 +882,13 @@ export class RunState {
         const r = choice.requires || {};
         if (r.gold != null && this.gold < r.gold) return false;
         if (r.items != null && Object.keys(this.inventory).length < r.items) return false;
+        if (r.classes && !this.classMember(r.classes)) return false;
         return true;
+    }
+
+    // The first member of one of `classes` (their class, or the class they promoted from), or null.
+    classMember(classes) {
+        return this.party.find(m => classes.includes(m.job) || classes.includes(m.origin)) ?? null;
     }
 
     // Resolves an event choice. Returns { text, next } where next is 'battle' or null;
@@ -896,7 +902,10 @@ export class RunState {
             const weights = Object.fromEntries(choice.outcomes.map((o, i) => [i, o.weight ?? 1]));
             ({ effect, resultText } = choice.outcomes[Number(this.rng.weighted(weights))]);
         }
-        const fx = this.applyEffect(effect || {});
+        // A class choice is that member's doing: they're {name}, and any stat bonus is theirs.
+        const doer = choice.requires?.classes ? this.classMember(choice.requires.classes) : null;
+        const fx = this.applyEffect(effect || {}, { member: doer });
+        if (!fx.member && doer) fx.member = doer.name;
         let text = resultText || '';
         text = text.replace('{name}', fx.member ?? '').replace('{item}', fx.item ? itemName(fx.item) : 'nothing')
             .replace('{relic}', fx.relic ? RELICS[fx.relic].name : 'nothing');
@@ -910,7 +919,8 @@ export class RunState {
     }
 
     // Applies an event effect (see data/events.js). Returns what was gained: { item, relic, member }.
-    applyEffect(effect) {
+    // opts.member: who gets memberStatMods (default: a random member).
+    applyEffect(effect, { member = null } = {}) {
         const out = {};
         if (effect.gold > 0) {
             if (!this._earnGold(effect.gold)) out.goldLost = true;
@@ -930,7 +940,7 @@ export class RunState {
             if (keys.length) this.removeItem(out.lostItem = this.rng.pick(keys));
         }
         if (effect.memberStatMods) {
-            const m = this.rng.pick(this.party);
+            const m = member ?? this.rng.pick(this.party);
             const before = this.maxHp(m);
             m.statMods = { ...(m.statMods || {}) };
             for (const [k, v] of Object.entries(effect.memberStatMods)) m.statMods[k] = (m.statMods[k] || 0) + v;

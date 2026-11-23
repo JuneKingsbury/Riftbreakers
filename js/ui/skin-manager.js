@@ -1,4 +1,5 @@
-import { EQUIPMENT_OVERLAY_OFFSETS, RENDER_CONFIG } from '../core/config.js';
+import { EQUIPMENT_OVERLAY_OFFSETS } from '../core/config/equipment.js';
+import { RENDER_CONFIG } from '../core/config/rendering.js';
 
 // Enchanted items ('iron_sword+1', see equipment.js) draw with their base item's sprites.
 const spriteKey = (itemKey) => String(itemKey).replace(/\+\d$/, '');

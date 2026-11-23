@@ -1,6 +1,7 @@
 import { loadMapData, posKey } from './battle-map.js';
 import { Sound } from '../audio/sound.js';
-import { battleMusic, abilitySound, battleEventSound, battleOpensWithAlert, downSound, downChanges } from '../audio/game-sounds.js';
+import { battleMusic, battleEndSting, abilitySound, battleEventSound, battleOpensWithAlert, downSound, downChanges } from '../audio/game-sounds.js';
+import { coachTip } from '../ui/coach.js';
 import { pickRealmMap, realmLook } from '../run/data/realms.js';
 import { TacticalBattle, STATES } from './battle.js';
 import { BattleView3D, showViewError } from './battle-view3d.js';
@@ -111,6 +112,7 @@ export class BattleScene {
         this._ui.setActionHandler((action, key) => this._handleAction(action, key));
         this._ui.setPlaybackHandler((ctl, value) => this._handlePlayback(ctl, value));
 
+        if (!this._manualControl) coachTip('battle');
         // Without manual control every player unit is auto-controlled from the start.
         if (!this._manualControl) {
             for (const u of units) if (u.team === 'player') this._autoUnits.add(u.id);
@@ -218,6 +220,7 @@ export class BattleScene {
             this._settled = true;
             this._won = this._battle.winner === 'player';
             this._renderer?.fxCheer(this._battle.winner, this._battle.units);
+            Sound.playSfx(battleEndSting(this._won));
             if (this._won) Sound.playSfx('loot');
             else Sound.stopMusic(1500);
             this._pendingRewards = this._run
@@ -256,6 +259,12 @@ export class BattleScene {
 
     _handlePlayback(ctl, value) {
         if (ctl === 'pause') this._paused = !this._paused;
+        else if (ctl === 'help') {
+            // The battle waits while the player reads, and picks up as it was.
+            const was = this._paused;
+            this._paused = true;
+            import('../ui/help-panel.js').then(({ showHelp }) => showHelp('glossary', { onClose: () => { this._paused = was; } }));
+        }
         else if (ctl === 'speed' && value > 0) {
             this._speed = value;
             saveBattleSpeed(value);

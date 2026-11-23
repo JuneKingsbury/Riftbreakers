@@ -14,4 +14,11 @@ export const items = {
     striders_greaves:     { name: "Strider's Greaves",     slot: 'boots',  type: 'boots',  spd:  1, def:  3, eva:  5, rarity: 'uncommon' },
     void_treads:          { name: 'Void Treads',           slot: 'boots',  type: 'boots',  move: 1, spd:  1, def:  3, rarity: 'rare' },
     boots_of_haste:       { name: 'Boots of Haste',        slot: 'boots',  type: 'boots',  move: 1, spd:  3, eva:  3, rarity: 'legendary' },
+    travelers_boots:      { name: "Traveler's Boots",      slot: 'boots',  type: 'boots',  spd:  1, maxHp: 5 },
+    soft_slippers:        { name: 'Soft Slippers',         slot: 'boots',  type: 'boots',  eva:  4, maxMp: 2 },
+    stoneshod_boots:      { name: 'Stoneshod Boots',       slot: 'boots',  type: 'boots',  def:  2, mdf:  3, maxHp: 8, rarity: 'uncommon' },
+    windrunner_boots:     { name: 'Windrunner Boots',      slot: 'boots',  type: 'boots',  spd:  2, eva:  2, maxHp: 4, rarity: 'uncommon' },
+    thornstep_boots:      { name: 'Thornstep Boots',       slot: 'boots',  type: 'boots',  def:  2, maxHp: 8, rarity: 'uncommon', grantsPassive: ['take_root'] },
+    frostbound_greaves:   { name: 'Frostbound Greaves',    slot: 'boots',  type: 'boots',  def:  4, mdf:  4, maxHp: 10, rarity: 'rare' },
+    riftwalker_boots:     { name: 'Riftwalker Boots',      slot: 'boots',  type: 'boots',  move: 1, eva:  6, rarity: 'rare' },
 };

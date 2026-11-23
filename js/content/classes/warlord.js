@@ -53,7 +53,7 @@ export const abilities = {
     rally: {
         name: 'Rally', type: 'physical', range: 3, aoe: 0, mpCost: 6, actionCost: 35,
         targetType: 'ally', basePower: 0, element: 'command', animType: 'cast',
-        projectileColor: '#ffcc66', chargeTime: 0, ctGain: 30, floatText: 'Rallied!',
+        projectileColor: '#ffcc66', chargeTime: 0, ctGain: 45, floatText: 'Rallied!',
         desc: 'Calls an ally to action. Their speed gauge jumps forward, so they act sooner.',
     },
 

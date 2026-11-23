@@ -19,10 +19,12 @@ import { recordDailyResult } from './daily.js';
 import { loadProfile, saveProfile, recordRun, noteItems, noteBosses, claimCollectionRewards, noteEndlessDepth, CHALLENGES } from './profile.js';
 import { loadPlans } from './skill-plans.js';
 import { ABILITIES } from '../tactical/data-registry.js';
-import { Modal, Toast, BTN, BTN_GOOD, BTN_DANGER, GLOW, RARITY_COLOR, NODE_INFO, FONT, esc, jobLabel, hpBar, portraitHtml, drawSprites } from './ui-kit.js';
+import { Modal, Toast, confirmDialog, anyModalOpen, relicIconHtml, BTN, BTN_GOOD, BTN_DANGER, GLOW, RARITY_COLOR, NODE_INFO, FONT, esc, jobLabel, hpBar, portraitHtml, drawSprites } from './ui-kit.js';
 import { DeployScene } from '../tactical/deploy-scene.js';
 import { BattleScene } from '../tactical/battle-scene.js';
 import { openScriptEditor } from '../tactical/ai/script-editor.js';
+import { showHelp } from '../ui/help-panel.js';
+import { coachTip } from '../ui/coach.js';
 import { setScriptBacking } from '../tactical/ai/script-store.js';
 import { pointsToSpend } from './builds.js';
 import { isPortrait } from '../ui/layout.js';
@@ -50,6 +52,25 @@ function swallowNextClick() {
 
 const BAR = `position:absolute; left:0; right:0; box-sizing:border-box; z-index:10;
     background:rgba(8,8,20,0.95); font-family:${FONT}; font-size:12px; color:#ccc;`;
+
+// The realm's picture (the skin's portraits/realm_<id>.png) on its act card. A missing or
+// still-blank placeholder (one flat color) leaves the card without one.
+function drawRealmArt(canvas, skin, realmId) {
+    const img = canvas && skin?.getSprite('portraits', `realm_${realmId}`);
+    if (!img) return;
+    const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    try {
+        const px = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+        let flat = true;
+        for (let i = 4; i < px.length && flat; i += 4) {
+            if (px[i] !== px[0] || px[i + 1] !== px[1] || px[i + 2] !== px[2] || px[i + 3] !== px[3]) flat = false;
+        }
+        if (flat) return;
+    } catch { /* can't read it back: show it anyway */ }
+    canvas.style.display = '';
+}
 
 export class RunMapScene {
     constructor(run) {
@@ -116,12 +137,14 @@ export class RunMapScene {
             if (e.key === 'p' || e.key === 'P') this._openParty();
             if (e.key === 't' || e.key === 'T') this._openTactics();
             if (e.key === 'g' || e.key === 'G') this._openGear(this.run.pending ? () => this._screens.show() : null);
+            if (e.key === 'h' || e.key === 'H') showHelp('basics');
         });
 
         this._sidebarKey = null;
         this._updateSidebar();
         this._renderer.focusFloor((this.run.currentNode?.floor ?? 0) + 1);
         this._afterChange();
+        this._mapTipChecked = false;
     }
 
     resume(containerEl, skinManager, sceneManager) {
@@ -142,6 +165,11 @@ export class RunMapScene {
     }
 
     render(now) {
+        // The map's first-time tip waits until nothing covers the map (build picks, node screens).
+        if (!this._mapTipChecked && !anyModalOpen() && !this.run.pending && this.run.status === 'active') {
+            this._mapTipChecked = true;
+            coachTip('map');
+        }
         this._renderer.render(this.run, now);
         this._startSkillPops();
         this._updateSidebar();
@@ -261,6 +289,7 @@ export class RunMapScene {
     _showActIntro() {
         const run = this.run, realm = run.realm;
         const body = this._modal.show(`
+            <canvas data-realm-art width="64" height="64" style="display:none;float:right;width:80px;height:80px;margin:0 0 6px 10px;image-rendering:pixelated;border:1px solid #446;border-radius:4px;background:#080818;"></canvas>
             <div style="color:#888;font-size:11px;text-transform:uppercase;letter-spacing:2px;">${run.endless ? `Endless rift · depth ${run.endless.depth}` : `Act ${run.act} of ${run.actCount}`} · ${esc(CHAINS[realm.chain].name)}</div>
             ${run.endless ? `<div style="color:#c9a;font-size:11px;margin-top:4px;">Every enemy here is stronger than the last realm's. The run ends when your party falls.</div>` : ''}
             <div style="color:#ffcc44;font-weight:bold;font-size:20px;margin:4px 0 10px;">${esc(realm.name)}</div>
@@ -270,6 +299,7 @@ export class RunMapScene {
                 <div style="color:#dcb;line-height:1.5;font-size:11px;">${esc(SCOUTING[run.actBoss])}</div></div>` : ''}
             <button data-begin style="${BTN}${BTN_GOOD}text-align:center;padding:10px;">Set out</button>`,
             { dismissible: false, width: 420 });
+        drawRealmArt(body.querySelector('[data-realm-art]'), this._skin, realm.id);
         body.querySelector('[data-begin]').addEventListener('click', () => {
             run.actIntro = run.act;
             this._modal.close();
@@ -376,14 +406,18 @@ export class RunMapScene {
             case 'tactics': this._openTactics(); break;
             case 'gear': this._openGear(this.run.pending ? () => this._screens.show() : null); break;
             case 'menu': this._openMenu(); break;
+            case 'help': showHelp('basics'); break;
             case 'resume': this._screens.show(); break;
-            case 'abandon':
-                if (window.confirm(this.run.endless ? 'End this endless run here? It still counts as a win.' : 'Abandon this run? It counts as a defeat.')) {
+            case 'abandon': {
+                const msg = this.run.endless ? 'End this endless run here?\nIt still counts as a win.' : 'Abandon this run?\nIt counts as a defeat.';
+                confirmDialog(msg, { ok: this.run.endless ? 'End run' : 'Abandon', cancel: 'Keep playing', danger: true }).then((yes) => {
+                    if (!yes || this.run.status !== 'active') return;
                     this.run.status = 'lost';
                     this._modal.close();
                     this._endRun();
-                }
+                });
                 break;
+            }
             case 'quit':
                 this._modal.close();
                 this._sm.pop();
@@ -398,9 +432,11 @@ export class RunMapScene {
         const body = this._modal.show(`<div style="color:#ffcc44;font-weight:bold;font-size:15px;margin-bottom:8px;">Menu</div>
             ${this._challengeHtml()}${this._realmLoreHtml()}${this._relicsHtml()}${this._legendHtml()}
             <div style="margin-top:14px;border-top:1px solid #223;padding-top:8px;">
+                <button data-action="help" style="${BTN}color:#aab;">? How to Play</button>
                 <button data-action="quit" style="${BTN}color:#888;">Save &amp; quit to title</button>
                 <button data-action="abandon" style="${BTN}${BTN_DANGER}">Abandon run</button>
             </div>`, { view: 'menu', onClose: back });
+        drawSprites(body, run.party, this._skin);
         body.addEventListener('click', (e) => this._onSidebarClick(e));
     }
 
@@ -411,7 +447,7 @@ export class RunMapScene {
             const r = RELICS[k];
             // The effect is spelled out, not left to a hover tooltip: hovering doesn't exist on
             // touch screens, and node screens cover the sidebar.
-            html += `<div style="font-size:11px;color:${RARITY_COLOR[r.rarity]};margin-bottom:5px;">◆ ${esc(r.name)}
+            html += `<div style="font-size:11px;color:${RARITY_COLOR[r.rarity]};margin-bottom:5px;">${relicIconHtml(k)} ${esc(r.name)}
                 <div style="color:#889;font-size:10px;line-height:1.35;">${esc(r.desc)}</div></div>`;
         }
         return html;
@@ -520,7 +556,8 @@ export class RunMapScene {
         html += `<div style="height:6px;"></div>
             <button data-action="party" style="${BTN}color:#adf;border-color:#448;${run.party.some(pointsToSpend) ? GLOW : ''}">☰ Party <span style="color:#666;font-size:10px;">(P)</span>${run.party.some(pointsToSpend) ? ' <span style="color:#afa;font-size:10px;">● skill points!</span>' : ''}</button>
             <button data-action="gear" style="${BTN}color:#fda;border-color:#664;">⚔ Equipment <span style="color:#666;font-size:10px;">(G)</span></button>
-            <button data-action="tactics" style="${BTN}color:#cf9;border-color:#575;">⚙ Tactics <span style="color:#666;font-size:10px;">(T, optional)</span></button>`;
+            <button data-action="tactics" style="${BTN}color:#cf9;border-color:#575;">⚙ Tactics <span style="color:#666;font-size:10px;">(T, optional)</span></button>
+            <button data-action="help" style="${BTN}color:#aab;">? How to Play <span style="color:#666;font-size:10px;">(H)</span></button>`;
         if (run.pending && run.status === 'active') {
             html += `<button data-action="resume" style="${BTN}color:#fc8;border-color:#664;">› Return to ${esc(NODE_INFO[run.currentNode?.type]?.label ?? 'node')}</button>`;
         }
@@ -577,6 +614,7 @@ export class RunMapScene {
         const p = this._point(e);
         const id = this._renderer.nodeAt(this.run, p.x, p.y);
         this._renderer.hoveredId = id;
+        this._renderer.hoverHint = null;
         this._canvas.style.cursor = id && this.run.reachable().includes(id) ? 'pointer' : 'default';
     }
 
@@ -597,6 +635,14 @@ export class RunMapScene {
             if (this.run.pending) this._screens.show();
             return;
         }
+        // Touch has no hover: the first tap shows what the place is, a second tap on it goes.
+        if (e.pointerType !== 'mouse' && this._renderer.hoveredId !== id) {
+            this._renderer.hoveredId = id;
+            this._renderer.hoverHint = 'Tap again to travel';
+            return;
+        }
+        this._renderer.hoveredId = null;
+        this._renderer.hoverHint = null;
         this.run.enterNode(id);
         Sound.playSfx('travel');
         this._afterChange();

@@ -205,9 +205,14 @@ test('the act realm\'s track plays on the map and carries on through deploying a
     const run = { realmId: 'crystal_caves' };
     assert.deepEqual(mapMusic(run), ['expedition_crystal_caves', 'expedition']);
     // Even a fight from a realm folded into the act keeps the act's track going.
-    const fight = { realm: 'crystal_caves', zone: 'crystal_depths', kind: 'boss' };
+    const fight = { realm: 'crystal_caves', zone: 'crystal_depths', kind: 'elite' };
     assert.equal(battleMusic(fight, run)[0], mapMusic(run)[0]);
     assert.deepEqual(battleMusic(null, null), ['combat'], 'a battle outside a run');
+    // A boss asks for its own track first; until one is in the manifest, the act's plays on.
+    const boss = { ...fight, kind: 'boss' };
+    assert.deepEqual(battleMusic(boss, run).slice(0, 2), ['battle_boss', mapMusic(run)[0]]);
+    const playable = battleMusic(boss, run).find(name => SOUND_MANIFEST.music[name]);
+    assert.equal(playable, SOUND_MANIFEST.music.battle_boss ? 'battle_boss' : mapMusic(run)[0]);
 });
 
 test('moving from the map into a battle and back never restarts the realm track', async () => {
@@ -240,6 +245,7 @@ test('battle events map to sounds by what happened and to whom', () => {
     const party = { team: 'player' }, foe = { team: 'enemy' };
     assert.equal(battleEventSound('hit', { target: party }), 'hit_party');
     assert.equal(battleEventSound('hit', { target: foe }), 'hit_enemy');
+    assert.equal(battleEventSound('hit', { target: foe, crit: true }), 'hit_crit', 'a critical hit has its own sound');
     assert.equal(battleEventSound('miss'), 'miss');
     assert.equal(battleEventSound('heal'), 'spell_heal');
     assert.equal(battleEventSound('revive'), 'spell_revive');

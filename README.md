@@ -36,14 +36,17 @@ the last act's scaling, and its rewards, item rarities, map shape and events are
 - **Realms:** each act is set in a realm from Rifthold (`js/content/realms/`), picked at random from that
   act's list (`ACT_REALMS` in `content/realms/index.js`), never two from the same chain. Act 1: The Wild Frontiers, Verdant Depths
   or Crystal Caves. Act 2: Arcane Library or Sunken Abyss. Act 3: Palace Fortress or Void Sanctum.
-  Act 4: Shifting Labyrinth. A realm that moved to a later act (its `writtenFor`) fights its own battles at that act's levels. Each listed realm names the other realms it also draws on
+  Act 4: Shifting Labyrinth or The Rift Throne (where every rift leads: its fights mix creatures
+  from every chain, with `RIFT_BOOST` in its file bringing them up to the last act). A realm that moved to a later act (its `writtenFor`) fights its own battles at that act's levels. Each listed realm names the other realms it also draws on
   (`draws` in its file): Crystal Caves also fields Crystal Mines and Crystal Depths fights and events.
   Folded-in fights keep their rosters and their own look and maps, but are retuned for the act
   (`retuneEncounter` in `run/data/encounters.js`): levels move to the act's, and stats scale so the
   roster's power matches the home realm's own fights, with small per-realm corrections
   (each realm's `retuneBias`) measured in simulated battles. A realm listed for an act can't also be drawn by another.
   An act ends at the heart of its realm: each listed realm names its two bosses (`bosses`), so a
-  boss from a realm's outer reaches isn't fielded as its finale.
+  boss from a realm's outer reaches isn't fielded as its finale. Those bosses are met as
+  **champions** instead: elite fights in the act realm that draws on them, retuned to elite
+  strength but keeping their phases (`realmEncounters` in `run/data/encounters.js`).
   The realm decides the act's
   enemies (its file's `encounters`; a roster entry's `sprite` dresses a job as a realm
   creature), about half of its events (its file's `events`), which battle maps its fights use, and
@@ -113,6 +116,17 @@ the last act's scaling, and its rewards, item rarities, map shape and events are
   Each ability or move rule has a positioning style (`positionStyle` in `ai/script-runtime.js`):
   ranged roles default to Careful (stay out of enemy reach, attack from near max range, don't run
   ahead of the group, melee only as a last resort); everyone else defaults to Bold.
+  Orders (Rally, Delay, Taunt, swaps) are quick: they cost their own `actionCost` (at least 40)
+  of the gauge rather than a full action's 80 (`isQuickOrder` in `ai/executor.js`), and rallies
+  go to the strongest ally (the `strongest` target pick). The "best damage" choice counts poison's
+  damage over time, a skill that hits a status harder (Nightmare) goes after enemies that have
+  it, and a taunter stops taunting once below half HP.
+- **Class balance:** `npm run balance` plays every class through real fights (`tools/class-balance.mjs`):
+  parties sized and geared as a run would have them by Act 1's elite and boss, Act 2's elite and
+  boss and Act 3's boss, with each class's suggested builds, and prints win rates per class with
+  the median. Classes more than 10 points from it are flagged. `--mode mono` plays parties of one
+  class, `--jobs` and `--build` narrow it down, and `--usage` shows what a class did each battle,
+  ability by ability. `tests/tools/class-balance.test.mjs` runs a small sample to catch a big slip.
 - **Battle breakdown:** the result screen, won or lost, shows what each unit did: damage dealt,
   damage taken, healing and knockouts, for allies or (with the toggle) enemies. Clicking a row
   opens that unit's split by ability, with each ability's share and number of uses. Only HP that
@@ -185,6 +199,23 @@ the last act's scaling, and its rewards, item rarities, map shape and events are
   local storage, mobile Safari after about a week of not visiting, so a backup is the only
   way to keep progress safe.
 - **Content:** encounters, events, relics and recruits live in `js/run/data/`.
+- **Class choices in events:** a choice can need a class in the party (`requires.classes`: a
+  member of that class or promoted from it). The button names the class, the result text's
+  `{name}` is that member, and any `memberStatMods` go to them (`RunState.classMember`).
+- **Help and first-time tips:** How to Play (title screen, the map sidebar or Menu, H on the
+  map, and the ? beside the battle speed buttons, which pauses) has tabs for the basics,
+  battles, growth, the map, controls and a Glossary built from `content/vocab.js` and the
+  affixes (`js/ui/help-panel.js`). The first time a player reaches the map, a briefing, the
+  deploy screen, a battle and a reward screen, a one-time tip explains it (`js/ui/coach.js`;
+  Settings > Accessibility > First-time tips shows them again). Status chips and stat labels
+  have hover tips, battles show each skill's name as it's used, map places describe what they offer
+  on hover (on touch, the first tap shows it and the second travels), and a lost battle
+  suggests what to change. Confirmations use the in-game `confirmDialog` (`run/ui-kit.js`).
+- **Accessibility:** Colorblind mode applies a correction filter (daltonization) to the whole
+  page (`index.html`, `html[data-colorblind]` in `css/style.css`). Menu text size zooms the
+  run's panels (`html[data-ui-scale]`). Reduced effects (Graphics) turns off screen shake.
+- **Dev tools:** the Settings tab with the skin and map editors only shows with `?dev` in the
+  address (remembered on the device; `?dev=0` hides it again).
 
 ## Audio
 
@@ -192,6 +223,9 @@ Music and sound effects follow Rifthold's sound system (`js/audio/`): looping mu
 crossfades between scenes, with each realm's own track on its act map, and short sound effects
 with a slight random pitch shift so repeated sounds don't grate. The Music and SFX sliders in
 Settings control them. `audio/README.md` lists every track and sound and when it plays.
+A few names are wired up before their files exist (`battle_boss` music for boss fights, and
+`battle_won` / `battle_lost` stings): add the file and its manifest line and they play.
+`ASSETS_TODO.md` lists the art and audio still to make.
 
 ## Tactical battle view
 

@@ -38,19 +38,19 @@ export const job = {
 
 export const abilities = {
     seize_the_moment: {
-        extends: 'rally', name: 'Seize the Moment', range: 4, mpCost: 12, ctGain: 55,
+        extends: 'rally', name: 'Seize the Moment', range: 4, mpCost: 12, ctGain: 75,
         desc: 'You spot the perfect moment for an ally. Their speed gauge jumps far forward.',
     },
 
     delay: {
         name: 'Delay', type: 'physical', range: 4, aoe: 0, mpCost: 10, actionCost: 40,
         targetType: 'enemy', basePower: 0, element: 'command', animType: 'cast',
-        projectileColor: '#aa88ff', chargeTime: 0, ctGain: -40, floatText: 'Delayed!',
+        projectileColor: '#aa88ff', chargeTime: 0, ctGain: -55, floatText: 'Delayed!',
         desc: 'A feint that makes the enemy hesitate. Their speed gauge falls back, so they act later.',
     },
 
     exploit_opening: {
-        extends: 'attack', name: 'Exploit Opening', basePower: 0.9, mpCost: 6, actionCost: 38, selfCtGain: 25,
+        extends: 'attack', name: 'Exploit Opening', basePower: 1.05, mpCost: 6, actionCost: 38, selfCtGain: 35,
         desc: 'A strike into a gap in the enemy\'s guard. Your own next turn comes sooner.',
     },
 

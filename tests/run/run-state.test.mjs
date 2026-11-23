@@ -97,18 +97,19 @@ function beatBoss(run) {
     run.leaveNode();
 }
 
-test('a run has four acts, ending in the Shifting Labyrinth, and winning the act 4 boss wins it', () => {
+test('a run has four acts, ending in an act 4 realm, and winning the act 4 boss wins it', () => {
     // GIVEN: a new run at the act 3 boss
     const run = newRun(3);
     assert.equal(run.actCount, 4);
-    assert.equal(run.realms[3], 'shifting_labyrinth');
+    const finale = run.realms[3];
+    assert.ok(['shifting_labyrinth', 'rift_throne'].includes(finale));
     run.act = 3;
 
     // WHEN / THEN: beating it moves on to act 4 instead of ending the run
     beatBoss(run);
     assert.equal(run.status, 'active');
     assert.equal(run.act, 4);
-    assert.equal(run.realmId, 'shifting_labyrinth');
+    assert.equal(run.realmId, finale);
 
     // WHEN / THEN: beating the act 4 boss wins
     beatBoss(run);
@@ -469,4 +470,34 @@ test('the reward screen knows which item and relic were taken', () => {
     assert.ok(run.claimRewardRelic('gamblers_crown'));
     assert.equal(run.pending.itemTaken, 'leather_cap');
     assert.equal(run.pending.relicTaken, 'gamblers_crown');
+});
+
+test('a class choice in an event needs that class in the party, and is that member\'s doing', () => {
+    // GIVEN: the hermit's hut, whose third choice needs an Alchemist
+    const hermit = EVENTS.find(e => e.id === 'hermit');
+    const recipe = hermit.choices.findIndex(c => c.requires?.classes?.includes('alchemist'));
+    assert.ok(recipe >= 0);
+    const run = newRun(6);
+    enter(run, 'event');
+    run.pending.eventId = 'hermit';
+
+    // THEN: without an Alchemist it can't be chosen
+    assert.equal(run.choiceAvailable(hermit.choices[recipe]), false);
+    assert.equal(run.chooseEvent(recipe), null);
+
+    // WHEN: an Alchemist joins (or someone promoted from one)
+    run.party[2].origin = 'alchemist';
+    run.party[2].job = 'field_surgeon';
+    assert.equal(run.choiceAvailable(hermit.choices[recipe]), true);
+    const res = run.chooseEvent(recipe);
+    assert.match(res.text, new RegExp(run.party[2].name), 'the result names the member who did it');
+});
+
+test('a stat bonus from a class choice goes to that member', () => {
+    const run = newRun(6);
+    const seer = run.party[1];
+    seer.job = 'seer';
+    const before = seer.statMods?.maxHp ?? 0;
+    run.applyEffect({ memberStatMods: { maxHp: 5 } }, { member: seer });
+    assert.equal(seer.statMods.maxHp, before + 5);
 });

@@ -71,6 +71,20 @@ export const RELICS = {
                         desc: 'Every member has +4 ATK and +4 MAT, but -15 max HP.' },
     gamblers_crown:   { rarity: 'rare', name: "Gambler's Crown", extraItemChoice: true, goldMult: 1.25, shopDiscount: -0.3,
                         desc: 'Battle rewards offer one more item and pay 25% more gold, but shop prices are 30% higher.' },
+
+    // More boss relics: each a strong pull in one direction, most with a price.
+    riftheart_shard:  { rarity: 'rare', name: 'Riftheart Shard', statMods: { spd: 1, maxHp: -8 },
+                        desc: 'Every member has +1 SPD, but -8 max HP.' },
+    oath_of_the_fallen: { rarity: 'rare', name: 'Oath of the Fallen', triggers: [{ on: 'allyDown', healPct: 0.2, buffs: [{ stat: 'atk', value: 3, duration: 3 }, { stat: 'mat', value: 3, duration: 3 }] }],
+                        desc: 'When a member is knocked out, the others heal 20% of their max HP and gain +3 ATK and MAT for 3 turns.' },
+    hunting_horn:     { rarity: 'rare', name: 'Hunting Horn', triggers: [{ on: 'kill', status: { status: 'haste', duration: 2 } }],
+                        desc: 'A member who knocks out an enemy gains Haste for 2 turns.' },
+    tome_of_ages:     { rarity: 'rare', name: 'Tome of Ages', xpMult: 1.5, goldMult: 0.75,
+                        desc: 'The party earns 50% more XP from battles, but 25% less gold.' },
+    heavy_crown:      { rarity: 'rare', name: 'Heavy Crown', statMods: { atk: 5, mat: 5 }, battleStart: { status: 'slow', duration: 2 },
+                        desc: 'Every member has +5 ATK and +5 MAT, but starts each battle Slowed for 2 turns.' },
+    bramble_crown:    { rarity: 'rare', name: 'Bramble Crown', passives: ['relic_thorns'], statMods: { def: 2 },
+                        desc: 'Every member has +2 DEF, and anyone who strikes them in melee takes 25% of the damage back.' },
 };
 
 // The passives relics give (`passives` above): copies of support skills, so tuning a relic
@@ -90,5 +104,9 @@ export const abilities = {
         extends: 'support', name: 'Leech Fang', passiveMpCost: 0, dmgDealt: null,
         lifestealFrac: 0.1,
         desc: 'You heal for 10% of the damage you deal.',
+    },
+    relic_thorns: {
+        extends: 'thorn_hide', name: 'Bramble Crown', thornsFrac: 0.25,
+        desc: 'Anyone who strikes you in melee takes 25% of the damage back.',
     },
 };

@@ -64,7 +64,12 @@ export const encounters = {
             e('canopy_stalker', 'Crystal Beast', 'crystal_beast'),
             e('kingdom_guard', 'Miner Golem', 'miner_golem'),
             e('shard_spider', 'Shard Spider'),
-        ]),
+        ], {
+            scouting: 'The Runite Sentinel guards the deepest seam, shielded and slow. Magic does better than blades against its crystal skin.',
+            phases: [
+                { at: 0.5, name: 'Runite Shell', say: 'Runes flare across the Sentinel\'s body as its crystal skin thickens!', status: { status: 'protect', duration: 3 }, summon: [e('kingdom_guard', 'Miner Golem', 'miner_golem')] },
+            ],
+        }),
     ],
 };
 
@@ -75,6 +80,7 @@ export const events = [
         text: 'A voice calls from behind a collapsed tunnel. A miner, alive, pinned under a cart.',
         choices: [
             { label: 'Dig them out', effect: { healPct: -0.1, gold: 60 }, resultText: 'It takes hours. The grateful miner hands over a pouch of 60 gold.' },
+            { label: 'Shape the stone aside', requires: { classes: ['stoneshaper'] }, effect: { gold: 60, xp: 20 }, resultText: '{name} lifts the rubble like a curtain. The miner pays 60 gold, and everyone gains 20 XP.' },
             { label: 'Leave them', resultText: 'Their calls fade behind you.' },
         ],
     },
@@ -88,6 +94,7 @@ export const events = [
                 { weight: 2, effect: { relic: 'uncommon' }, resultText: 'It comes free with a spark. You now carry {relic}.' },
                 { weight: 1, effect: { battle: 'elite' }, resultText: 'The golem\'s eyes light up.' },
             ] },
+            { label: 'Disconnect it carefully', requires: { classes: ['stoneshaper', 'alchemist'] }, effect: { relic: 'uncommon' }, resultText: '{name} unhooks it wire by wire. The golem never stirs, and you carry {relic}.' },
             { label: 'Leave it sleeping', resultText: 'Some things are best left switched off.' },
         ],
     },

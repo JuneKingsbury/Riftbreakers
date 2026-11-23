@@ -96,8 +96,8 @@ Set by the engine, not by content (except `defend`, which a reaction can grant w
 | `helmet` | `helmetKey` | 44 |
 | `weapon` | `weaponKey` | 56 |
 | `tool` | `toolKey` | 44 |
-| `boots` | `bootsKey` | 8 |
-| `trinket` | `trinketKey` | 16 |
+| `boots` | `bootsKey` | 15 |
+| `trinket` | `trinketKey` | 28 |
 
 | Type | Slots | Worn by (starting classes) | Meaning |
 |---|---|---|---|
@@ -293,14 +293,15 @@ An item's `grants` takes action abilities (they join the wearer's skill list); `
 | `restorative_step` | Restorative Step | movement | items/abilities.js | Aether Mantle |
 | `sentinel_step` | Sentinel Step | movement | classes/warden.js | Commander's Crown |
 | `stone_stride` | Stone Stride | movement | classes/stoneshaper.js |  |
-| `take_root` | Take Root | movement | items/abilities.js | Living Bark Armor |
+| `take_root` | Take Root | movement | items/abilities.js | Living Bark Armor, Thornstep Boots |
 | `vanguard_step` | Vanguard Step | movement | classes/warlord.js |  |
 | `wraithwalk` | Wraithwalk | movement | classes/gravecaller.js | Mourning Shroud |
 | `aftershock` | Aftershock | reaction | classes/earthshaker.js |  |
 | `arcane_rebuke` | Arcane Rebuke | reaction | classes/battlemage.js |  |
-| `brace` | Brace | reaction | abilities/common.js | Parrying Dagger |
+| `brace` | Brace | reaction | abilities/common.js | Parrying Dagger, Ironclad Effigy |
+| `relic_thorns` | Bramble Crown | reaction | relics.js |  |
 | `call_of_the_pack` | Call of the Pack | reaction | items/abilities.js | Huntsman's Leathers |
-| `counter` | Counter | reaction | classes/spellblade.js | Abyssal Fang |
+| `counter` | Counter | reaction | classes/spellblade.js | Abyssal Fang, Sanguine Fang |
 | `death_ward` | Death Ward | reaction | classes/gravewarden.js |  |
 | `displacement` | Displacement | reaction | classes/illusionist.js |  |
 | `feral_counter` | Feral Counter | reaction | classes/beastcaller.js |  |
@@ -308,7 +309,7 @@ An item's `grants` takes action abilities (they join the wearer's skill list); `
 | `guardian_ward` | Guardian Ward | reaction | classes/warden.js | Warden's Mail |
 | `hold_the_line` | Hold the Line | reaction | classes/warlord.js | Warlord's Helm |
 | `interpose` | Interpose | reaction | classes/marshal.js | Void Bulwark |
-| `karmic_rebound` | Karmic Rebound | reaction | classes/fatebinder.js |  |
+| `karmic_rebound` | Karmic Rebound | reaction | classes/fatebinder.js | Shard of Oblivion |
 | `lingering_spite` | Lingering Spite | reaction | classes/gravecaller.js |  |
 | `lull` | Lull | reaction | classes/dreamweaver.js |  |
 | `mana_shell` | Mana Shell | reaction | classes/bastion.js |  |
@@ -321,7 +322,7 @@ An item's `grants` takes action abilities (they join the wearer's skill list); `
 | `premonition` | Premonition | reaction | classes/seer.js |  |
 | `purifying_light` | Purifying Light | reaction | classes/sanctifier.js |  |
 | `read_the_battle` | Read the Battle | reaction | classes/tactician.js |  |
-| `reflex_tonic` | Reflex Tonic | reaction | classes/alchemist.js |  |
+| `reflex_tonic` | Reflex Tonic | reaction | classes/alchemist.js | Stitched Poppet |
 | `retribution` | Retribution | reaction | classes/paladin.js |  |
 | `return_fire` | Return Fire | reaction | classes/runebow.js |  |
 | `second_sight` | Second Sight | reaction | classes/lifeseer.js | Unraveler's Eye |
@@ -665,9 +666,10 @@ Every field each kind of content may have. `validate.js` rejects anything else.
 | `text` * | string | What the party finds. |
 | `choices` * | list of { label, requires, effect, resultText, outcomes } | 1 to 3 choices. |
 | `choices[].label` * | string | Button text. |
-| `choices[].requires` | { gold, items } | The choice is disabled unless met. |
+| `choices[].requires` | { gold, items, classes } | The choice is disabled unless met. |
 | `choices[].requires.gold` | number | At least this much gold. |
 | `choices[].requires.items` | number | At least this many unequipped items. |
+| `choices[].requires.classes` | list of job key | Someone in the party is one of these classes, or promoted from one. They are {name}, and get any memberStatMods. |
 | `choices[].effect` | { gold, healPct, xp, item, relic, loseItem, memberStatMods, battle } | What a choice does. |
 | `choices[].effect.gold` | number | Gold gained (negative: spent). |
 | `choices[].effect.healPct` | number | Every member heals this fraction of max HP (negative: damage, never below 1 HP). |
@@ -810,7 +812,7 @@ Every field each kind of content may have. `validate.js` rejects anything else.
 
 | Realm | Chain (tier) | Acts | Draws | Fights (normal/elite/boss) | Bosses | Events |
 |---|---|---|---|---|---|---|
-| The Wild Frontiers (`wild_frontiers`) | The Wild Frontiers (1) | 1 |  | 6 / 2 / 2 | The Bandit King, The Dire Wolf | 5 |
+| The Wild Frontiers (`wild_frontiers`) | The Wild Frontiers (1) | 1 |  | 10 / 6 / 2 | The Bandit King, The Dire Wolf | 5 |
 | Verdant Depths (`verdant_depths`) | Verdant Wilds (1) | 1 | Fungal Hollows, Primeval Canopy | 4 / 2 / 1 | The Thorn Warden, The Ancient Treant | 3 |
 | Fungal Hollows (`fungal_hollows`) | Verdant Wilds (2) | drawn by Verdant Depths |  | 3 / 2 / 1 |  | 3 |
 | Primeval Canopy (`primeval_canopy`) | Verdant Wilds (3) | drawn by Verdant Depths |  | 3 / 2 / 1 |  | 2 |
@@ -832,41 +834,42 @@ Every field each kind of content may have. `validate.js` rejects anything else.
 | Fracture Gate (`fracture_gate`) | The Unraveling (1) | drawn by Shifting Labyrinth |  | 3 / 2 / 1 |  | 2 |
 | Shifting Labyrinth (`shifting_labyrinth`) | The Unraveling (2) | 4 | Fracture Gate, Unraveling Core | 4 / 2 / 1 | The Shifting Horror, The Unraveler | 3 |
 | Unraveling Core (`unraveling_core`) | The Unraveling (3) | drawn by Shifting Labyrinth |  | 3 / 2 / 1 |  | 2 |
+| The Rift Throne (`rift_throne`) | The Rift Throne (1) | 4 |  | 8 / 5 / 2 | The Rift Regent, The Crowned Echo | 5 |
 
 ### Enemies
 
 | Job | HP | ATK | MAT | SPD | Abilities | In fights |
 |---|---|---|---|---|---|---|
-| `novice` | 46 | 9 | 8 | 8 | attack, rush, throw_stone, first_aid | 2 |
-| `goblin` | 28 | 9 | 2 | 11 | goblin_slash | 20 |
-| `orc_captain` | 70 | 16 | 2 | 7 | attack, shield_bash | 45 |
-| `shadow_mage` | 36 | 5 | 14 | 8 | attack, shadow_bolt, mute | 33 |
-| `wolf` | 30 | 10 | 1 | 13 | wolf_bite | 30 |
-| `boar` | 48 | 13 | 1 | 9 | attack, boar_charge | 8 |
-| `thorn_beast` | 42 | 7 | 10 | 7 | attack, thorn_volley | 11 |
-| `spore_walker` | 38 | 6 | 9 | 6 | attack, spore_burst, toxic_spores | 16 |
-| `shard_spider` | 26 | 8 | 1 | 12 | spider_bite, venom_strike | 21 |
-| `canopy_stalker` | 44 | 15 | 1 | 10 | attack, pounce | 22 |
-| `spectral_wisp` | 22 | 3 | 12 | 9 | soul_drain, dream_veil | 30 |
-| `void_stalker` | 52 | 14 | 2 | 8 | attack, void_strike | 33 |
-| `raider` | 40 | 11 | 2 | 9 | attack | 19 |
-| `raider_archer` | 34 | 10 | 2 | 10 | attack, long_shot | 30 |
-| `raider_hexer` | 30 | 5 | 11 | 8 | attack, hex | 18 |
-| `void_walker` | 44 | 9 | 11 | 8 | attack, shadow_bolt | 12 |
-| `kingdom_guard` | 58 | 13 | 2 | 7 | attack, shield_bash | 54 |
-| `decoy` | 40 | 0 | 0 | 1 | attack | 0 |
+| `novice` | 46 | 9 | 8 | 8 | attack, rush, throw_stone, first_aid | 3 |
+| `goblin` | 28 | 9 | 2 | 11 | goblin_slash | 22 |
+| `orc_captain` | 70 | 16 | 2 | 7 | attack, shield_bash | 54 |
+| `shadow_mage` | 36 | 5 | 14 | 8 | attack, shadow_bolt, mute | 40 |
+| `wolf` | 30 | 10 | 1 | 13 | wolf_bite | 37 |
+| `boar` | 48 | 13 | 1 | 9 | attack, boar_charge | 10 |
+| `thorn_beast` | 42 | 7 | 10 | 7 | attack, thorn_volley | 12 |
+| `spore_walker` | 38 | 6 | 9 | 6 | attack, spore_burst, toxic_spores | 18 |
+| `shard_spider` | 26 | 8 | 1 | 12 | spider_bite, venom_strike | 22 |
+| `canopy_stalker` | 44 | 15 | 1 | 10 | attack, pounce | 27 |
+| `spectral_wisp` | 22 | 3 | 12 | 9 | soul_drain, dream_veil | 34 |
+| `void_stalker` | 52 | 14 | 2 | 8 | attack, void_strike | 42 |
+| `raider` | 40 | 11 | 2 | 9 | attack | 23 |
+| `raider_archer` | 34 | 10 | 2 | 10 | attack, long_shot | 37 |
+| `raider_hexer` | 30 | 5 | 11 | 8 | attack, hex | 22 |
+| `void_walker` | 44 | 9 | 11 | 8 | attack, shadow_bolt | 13 |
+| `kingdom_guard` | 58 | 13 | 2 | 7 | attack, shield_bash | 64 |
+| `decoy` | 30 | 0 | 0 | 1 | attack | 0 |
 | `skeleton` | 34 | 11 | 2 | 8 | attack | 0 |
 | `summoned_wolf` | 30 | 10 | 1 | 13 | wolf_bite | 0 |
 | `summoned_wisp` | 22 | 3 | 12 | 9 | soul_drain, dream_veil | 0 |
-| `summoned_thorn_beast` | 42 | 7 | 10 | 7 | attack, thorn_volley | 0 |
+| `summoned_thorn_beast` | 46 | 7 | 12 | 7 | attack, thorn_volley | 0 |
 | `summoned_boar` | 48 | 13 | 1 | 9 | attack, boar_charge | 0 |
-| `bandit_cutthroat` | 32 | 12 | 2 | 12 | attack, cutthroat_stab | 1 |
+| `bandit_cutthroat` | 32 | 12 | 2 | 12 | attack, cutthroat_stab | 2 |
 | `spore_mother` | 50 | 5 | 10 | 6 | attack, mending_spores, spore_burst | 1 |
 | `prism_golem` | 62 | 12 | 2 | 5 | attack, shield_bash | 1 |
 | `living_tome` | 30 | 3 | 12 | 9 | shadow_bolt, mute | 1 |
 | `abyssal_leech` | 46 | 13 | 2 | 9 | attack | 1 |
 | `void_martyr` | 38 | 10 | 10 | 8 | attack, shadow_bolt | 1 |
-| `palace_shieldbearer` | 70 | 11 | 2 | 6 | attack, shield_bash | 1 |
+| `palace_shieldbearer` | 70 | 11 | 2 | 6 | attack, shield_bash | 2 |
 | `echo_mimic` | 50 | 14 | 8 | 10 | attack, void_strike | 1 |
 
 ### Relics
@@ -901,6 +904,12 @@ Every field each kind of content may have. `validate.js` rejects anything else.
 | Last Stand Idol | rare | The first time each member drops below 25% HP in a battle, they gain Haste and +4 ATK and MAT for 3 turns. |
 | Glass Sigil | rare | Every member has +4 ATK and +4 MAT, but -15 max HP. |
 | Gambler's Crown | rare | Battle rewards offer one more item and pay 25% more gold, but shop prices are 30% higher. |
+| Riftheart Shard | rare | Every member has +1 SPD, but -8 max HP. |
+| Oath of the Fallen | rare | When a member is knocked out, the others heal 20% of their max HP and gain +3 ATK and MAT for 3 turns. |
+| Hunting Horn | rare | A member who knocks out an enemy gains Haste for 2 turns. |
+| Tome of Ages | rare | The party earns 50% more XP from battles, but 25% less gold. |
+| Heavy Crown | rare | Every member has +5 ATK and +5 MAT, but starts each battle Slowed for 2 turns. |
+| Bramble Crown | rare | Every member has +2 DEF, and anyone who strikes them in melee takes 25% of the damage back. |
 
 ### Elite affixes
 
@@ -917,4 +926,4 @@ Every field each kind of content may have. `validate.js` rejects anything else.
 | Hulking | 1, 2, 3, 4 | +40% max HP and +2 DEF, but -1 SPD. |
 | Splitting | 2, 3, 4 | When knocked out, it breaks into two weaker copies of itself (35% of its max HP, 70% of its power) that fight on. |
 
-Items: 222. Abilities: 247. Events: 62 (44 realm events).
+Items: 241. Abilities: 248. Events: 67 (49 realm events).

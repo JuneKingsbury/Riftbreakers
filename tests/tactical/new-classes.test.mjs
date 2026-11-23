@@ -16,7 +16,7 @@ import { resolveAbility, getEffectiveStat } from '../../js/tactical/abilities.js
 import { ABILITIES, JOB_STATS, jobsOfTier } from '../../js/tactical/data-registry.js';
 import { JOB_DATA } from '../../js/content/jobs.js';
 import { planEnemyTurn } from '../../js/tactical/enemy-ai.js';
-import { planTurn } from '../../js/tactical/ai/executor.js';
+import { planTurn, intentCost, COST_ACTION_MIN } from '../../js/tactical/ai/executor.js';
 import { runScript } from '../../js/tactical/ai/script-runtime.js';
 import { autoScriptFor } from '../../js/tactical/ai/default-scripts.js';
 import { buildUnits } from '../../js/tactical/build-units.js';
@@ -224,11 +224,20 @@ test('Rally speeds an ally\'s gauge, Delay sets an enemy\'s back, and Reposition
     const foe = mk('Foe', 'goblin', 'enemy', 6, 3, { ct: 50 });
     const battle = new TacticalBattle(map, [lord, tac, ally, foe]);
     battle.applyEnemyAbility(lord, 'rally', 3, 3);
-    assert.equal(ally.ct, 40);
+    assert.equal(ally.ct, 55);
     battle.applyEnemyAbility(tac, 'delay', 6, 3);
-    assert.equal(foe.ct, 10);
+    assert.equal(foe.ct, 0, 'a gauge never goes below empty');
     battle.applyEnemyAbility(lord, 'reposition', 3, 3);
     assert.deepEqual([lord.x, ally.x], [3, 1]);
+});
+
+test('orders cost the commander less of their gauge than a strike does', () => {
+    const lord = mk('Lord', 'warlord', 'player', 1, 3, { abilities: ['attack', 'rally', 'cleave'] });
+    const cost = (ability) => intentCost(lord, { act: { kind: 'ability', ability } });
+    assert.equal(cost('rally'), 40, 'an order costs its own actionCost, at least 40');
+    assert.equal(cost('cleave'), COST_ACTION_MIN, 'a strike still costs the full action');
+    assert.ok(cost('rally') + ABILITIES.rally.ctGain > 0 && ABILITIES.rally.ctGain > cost('rally'),
+        'rallying gives the ally more gauge than it costs the commander');
 });
 
 test('the automatic Warlord rallies an ally once the fight is near', () => {

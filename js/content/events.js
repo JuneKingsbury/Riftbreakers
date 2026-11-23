@@ -38,6 +38,7 @@ export const GENERAL_EVENTS = [
                 { weight: 2, effect: { item: 'uncommon' }, resultText: 'Inside, wrapped in oilcloth: {item}.' },
                 { weight: 1, effect: { healPct: -0.15 }, resultText: 'A needle trap. Everyone takes a nasty cut.' },
             ] },
+            { label: 'Sense the trap and slip it', requires: { classes: ['seer', 'illusionist'] }, effect: { item: 'uncommon' }, resultText: '{name} sees the needle before anyone touches the lock. Inside: {item}.' },
             { label: 'Leave it', resultText: 'Some things are hidden for a reason.' },
         ],
     },
@@ -58,6 +59,7 @@ export const GENERAL_EVENTS = [
         choices: [
             { label: 'Pay 60 gold', requires: { gold: 60 }, effect: { gold: -60, xp: 60 },
               resultText: 'He lectures through the night, and some of it even sticks. Everyone gains 60 XP.' },
+            { label: 'Trade spells with him', requires: { classes: ['evoker', 'spellblade'] }, effect: { xp: 45 }, resultText: '{name} and the old mage swap tricks until dawn. He calls it even, and everyone gains 45 XP.' },
             { label: 'Decline', resultText: 'He shrugs and shuffles off into the trees.' },
         ],
     },
@@ -145,6 +147,7 @@ export const GENERAL_EVENTS = [
                 { weight: 1, effect: { gold: 50 }, resultText: 'Lady luck smiles. You win 50 gold.' },
                 { weight: 1, effect: { gold: -50 }, resultText: 'He wins, and is gone before you can ask for a rematch.' },
             ] },
+            { label: 'Read the cards before he deals', requires: { classes: ['seer'], gold: 50 }, effect: { gold: 50 }, resultText: '{name} calls every card before it turns. The gambler pays 50 gold to make you leave.' },
             { label: 'Walk away', resultText: 'Wise.' },
         ],
     },
@@ -165,6 +168,7 @@ export const GENERAL_EVENTS = [
         choices: [
             { label: 'One of you drinks', effect: { memberStatMods: { maxHp: 8 } },
               resultText: '{name} shudders, then stands taller. +8 max HP.' },
+            { label: 'Ask for the recipe', requires: { classes: ['alchemist'] }, effect: { healPct: 1, xp: 25 }, resultText: '{name} brews a gentler batch for everyone. The whole party heals fully and gains 25 XP.' },
             { label: 'Politely decline', resultText: 'The hermit looks wounded, then pours it out for the cat.' },
         ],
     },
@@ -201,6 +205,7 @@ export const GENERAL_EVENTS = [
         choices: [
             { label: 'Escort them', effect: { healPct: -0.1, gold: 70 },
               resultText: 'The road is rough, but they pay 70 gold at the shrine gates.' },
+            { label: 'Lead the escort', requires: { classes: ['warden', 'warlord'] }, effect: { gold: 70, xp: 15 }, resultText: 'With {name} at the front, nothing on the road tries its luck. 70 gold at the shrine, and 15 XP each.' },
             { label: 'Point the way', resultText: 'They thank you and trudge on.' },
         ],
     },

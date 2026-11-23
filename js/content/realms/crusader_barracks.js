@@ -64,7 +64,12 @@ export const encounters = {
             e('kingdom_guard', 'Knight', 'knight'),
             e('warden', 'Field Medic', 'high_priest'),
             e('runebow', 'Arbalest', 'crusader_archer'),
-        ]),
+        ], {
+            scouting: 'The Drillmaster trains the barracks\' best: knights in front, arbalests behind, and a medic to patch them up. Take out the medic first.',
+            phases: [
+                { at: 0.5, name: 'Close Ranks', say: 'The Drillmaster barks an order, and the line locks shields!', allies: { status: { status: 'protect', duration: 2 } }, summon: [e('kingdom_guard', 'Crusader', 'crusader')] },
+            ],
+        }),
     ],
 };
 

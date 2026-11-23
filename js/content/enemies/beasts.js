@@ -162,6 +162,7 @@ export const abilities = {
         name: 'Pounce',
         actionCost: 40,
         basePower: 1.3,
+        desc: 'A leaping strike with claws and teeth. Hits harder than a plain attack.',
     },
 
     // Spectral wisp: soul drain — magic, drains from distance
@@ -187,5 +188,6 @@ export const abilities = {
         name: 'Void Strike',
         actionCost: 38,
         basePower: 1.2,
+        desc: 'A blow wrapped in rift-stuff. Hits harder than a plain attack.',
     },
 };

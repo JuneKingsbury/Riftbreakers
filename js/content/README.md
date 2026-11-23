@@ -120,8 +120,9 @@ that clearly beat the best rare of their type. Optional `acts` and
 - **Relic:** add it to `relics.js`, with `rarity`, a `desc`, and its effect (`statMods`,
   `battleStart`, `xpMult`…). Optional `acts` / `realms`, as for items.
 - **Event:** a general one goes in `events.js`, a realm one in the realm file's `events` (it
-  appears in that realm; list `realms` to share it with others). Choices can require gold or
-  items, roll weighted `outcomes`, and have `effect`s (see `SCHEMAS.event`).
+  appears in that realm; list `realms` to share it with others). Choices can require gold,
+  items or a class in the party (`requires.classes`; that member is `{name}`), roll weighted
+  `outcomes`, and have `effect`s (see `SCHEMAS.event`).
 
 ## Battle maps
 

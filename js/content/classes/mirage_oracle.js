@@ -20,7 +20,7 @@ export const job = {
     builds: [
         {
             key: 'decoys', name: 'Decoys',
-            desc: 'Fill the field with copies of yourself that enemies would rather attack: Hall of Mirrors makes two at once and Lasting Images doubles their HP. Shattered Image slows whoever breaks one.',
+            desc: 'Fill the field with copies of yourself that enemies would rather attack: Hall of Mirrors makes two at once and Lasting Images makes them much tougher. Shattered Image slows whoever breaks one.',
             steps: ['mass_blur', 'lasting_images', 'shattered_image', 'hall_of_mirrors+', 'mirror_image+', 'hall_of_mirrors+', 'mass_blur+'],
         },
         {
@@ -62,7 +62,7 @@ export const abilities = {
     },
 
     lasting_images: {
-        extends: 'support', name: 'Lasting Images', passiveMpCost: 0, dmgDealt: null, summonBoost: 1,
-        desc: 'Your copies and creatures have twice their usual HP, ATK and MAT.',
+        extends: 'support', name: 'Lasting Images', passiveMpCost: 0, dmgDealt: null, summonBoost: 0.6,
+        desc: 'Your copies and creatures get +60% HP, ATK and MAT.',
     },
 };

@@ -1,17 +1,10 @@
-// Config hub: every subsystem imports from '../core/config.js', which surfaces
-// this module. Symbols are grouped into feature-cohesive source files and
-// re-exported here so consumer import paths stay stable regardless of which file
-// a symbol physically lives in. Feature files: social.js (thoughts,
-// relationships, interactions), quality.js (quality tiers, salvage),
-// trade.js (merchants, caravan, trade values). Move a symbol between files
-// freely. Only this hub needs to know where it lives.
+// Leftover tables from the colony builder Riftbreakers grew out of. The game itself only
+// reads two of them, straight from their files (equipment.js's EQUIPMENT_OVERLAY_OFFSETS in
+// ui/skin-manager.js, game.js's CONFIG in systems/movement-lerp.js). This hub, through
+// core/config.js, serves the skin editor (a dev tool, loaded on demand), whose sprite lists
+// are still built from these tables.
 export { GAME_VERSION, CONFIG, DAY_NIGHT, EVENTS, FIRE_CONFIG, BLIGHT_CONFIG, PATHFINDING_CONFIG } from './game.js';
-export { SKILLS, TRAITS, TRAIT_EXCLUSIONS, RACES, COLONIST_CONFIG, HUMAN_NAMES, NYMPH_NAMES, FERIN_NAMES, KOBALOS_NAMES, BUFOS_NAMES, COLONIST_APPEARANCE, NEED_DECAY, MOOD_THRESHOLDS, MOOD_SPEED_MULT, WORK_CONFIG, MAGIC_STUDY_CONFIG, TASK_CONFIG, TASK_SPEED_STATS, EASTER_EGG_COLONISTS } from './colonists.js';
-export { THOUGHTS, RELATIONSHIP_TIERS, SOCIAL_INTERACTIONS, SOCIAL_CONFIG, ARRIVAL_BONDS, GROUP_ACTIVITIES } from './social.js';
-export { ENCHANTMENT_TIERS, QUALITY_TIERS, SALVAGE_RATE, ROOM_QUALITY_TIERS, TOWN_HALL_QUALITY_TIERS, WORKSHOP_QUALITY_TIERS, STATION_GROUPS, FLOOR_QUALITY_VALUES, ENCHANT_COST_BY_TIER } from './quality.js';
-export { CARAVAN_TRADES, MERCHANTS, TRADE_VALUES, TRADER_MARKUP, TRADER_DISCOUNT, TRADE_RIFT_CONFIG } from './trade.js';
 export { BUILD_CATEGORIES, BUILDINGS, TILE_CHARS, TILE_COLORS, IMPASSABLE_STRUCTURES, ENEMY_BLOCKED_STRUCTURES, BREAKABLE_STRUCTURES, WALL_STRUCTURES, FURNITURE_STRUCTURES, DOOR_STRUCTURES, DRAG_BUILD_TYPES, COMPLEX_STRUCTURES } from './buildings.js';
-export { STAT_META, formatStatValue, getItemStatLines, getNestedEffectLines } from './effects.js';
 import { ALL_ITEMS as _BASE_ALL_ITEMS, RECIPE_CATEGORIES, MATERIALS, WEAPONS, ARMORS, HELMETS, CLOTHES, BOOTS, TOOLS, TRINKETS, POTIONS, CONSUMABLES, ITEM_CHARS, EQUIPMENT_OVERLAY_OFFSETS, RECIPES, WEAPON_ENCHANTMENT_EFFECTS, ARMOR_ENCHANTMENT_EFFECTS, CLOTHES_ENCHANTMENT_EFFECTS, TOOL_ENCHANTMENT_EFFECTS, BOOTS_ENCHANTMENT_EFFECTS } from './equipment.js';
 import { MAGIC_SKILLS, MANA_CONFIG, SPELLS, SPELL_TOMES, RESEARCH_TABS, RESEARCH, DEMO_LOCKED_RESEARCH, RITUALS } from './magic.js';
 
@@ -33,4 +26,3 @@ export { REALMS, DEMO_ALLOWED_REALM_CHAINS, EXPLORATION_CONFIG, EXPEDITION_DIFFI
 } from './exploration.js';
 export { SEASONS, SEASON_EFFECTS, TERRAIN, RESOURCES, WEATHER_TYPES, SEASON_WEATHER, MAP_GENERATORS, FOODSTUFFS, NON_FOOD_CROPS, FOOD_DECAY_CONFIG, CROPS, WINTER_FEAST_CONFIG } from './world.js';
 export { RENDER_CONFIG, COMBAT_VISUALS, LOG_COLORS } from './rendering.js';
-export { DEFAULT_KEYMAP, KEYBIND_ACTIONS } from './input.js';

@@ -151,6 +151,7 @@ const CSS = `
 .tac3d-doom.last{color:#fff;background:rgba(110,0,50,.9);animation-duration:.6s;}
 @keyframes tac3d-doom-pulse{0%,100%{transform:scale(1);box-shadow:0 0 4px rgba(204,0,102,.5)}50%{transform:scale(1.12);box-shadow:0 0 10px rgba(255,60,160,.9)}}
 .tac3d-float{position:absolute;left:0;top:0;font-size:15px;font-weight:bold;text-shadow:-1px -1px 0 #000,1px -1px 0 #000,-1px 1px 0 #000,1px 1px 0 #000;white-space:nowrap;will-change:transform,opacity;}
+.tac3d-float.cast{font-size:11px;font-weight:normal;padding:1px 6px;border-radius:3px;background:rgba(8,8,24,0.78);border:1px solid currentColor;text-shadow:none;}
 .tac3d-compass{position:absolute;top:14px;display:flex;gap:6px;pointer-events:auto;}
 .tac3d-compass button{width:34px;height:34px;border-radius:50%;border:1px solid #335;background:rgba(8,8,24,.8);color:#cde;font:bold 16px 'Courier New',monospace;cursor:pointer;padding:0;}
 .tac3d-compass button:hover{background:rgba(40,40,90,.9)}
@@ -1565,14 +1566,14 @@ export class BattleView3D {
                 if (f.age >= f.maxAge) { f.el?.remove(); floats.splice(i, 1); continue; }
                 if (!f.el) {
                     f.el = document.createElement('div');
-                    f.el.className = 'tac3d-float';
+                    f.el.className = f.cast ? 'tac3d-float cast' : 'tac3d-float';
                     f.el.textContent = f.text;
                     f.el.style.color = f.color;
                     // A hit for a quarter of the unit's HP or more gets a bigger number.
                     const dmg = /^-(\d+)$/.exec(f.text);
                     if (dmg && isHeavyHit(Number(dmg[1]), unit)) f.el.style.fontSize = '21px';
                     // Drift a little to one side, so numbers landing together don't stack.
-                    f.drift = (Math.random() - 0.5) * 22;
+                    f.drift = f.cast ? 0 : (Math.random() - 0.5) * 22;
                     this.overlay.appendChild(f.el);
                 }
                 const progress = f.age / f.maxAge;

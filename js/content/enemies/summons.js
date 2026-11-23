@@ -8,9 +8,9 @@
 export const jobs = {
     // Mirror Image: a copy that enemies would rather strike (lure). It doesn't act (inert).
     decoy: {
-        maxHp: 40, maxMp: 0,
+        maxHp: 30, maxMp: 0,
         spd: 1, atk: 0, def: 2, mat: 0, mdf: 2,
-        move: 0, eva: 25,
+        move: 0, eva: 10,
         abilities: ['attack'],
         inert: true, lure: 2,
         spriteKey: 'decoy',
@@ -50,8 +50,8 @@ export const jobs = {
 
     // Called by the Worldsinger (Call Thorn Beast). Starts out with a wild thorn beast's stats.
     summoned_thorn_beast: {
-        maxHp: 42, maxMp: 28,
-        spd: 7, atk: 7, def: 5, mat: 10, mdf: 7,
+        maxHp: 46, maxMp: 40,
+        spd: 7, atk: 7, def: 6, mat: 12, mdf: 7,
         move: 3, eva: 12,
         abilities: ['attack', 'thorn_volley'],
         spriteKey: 'thorn_beast',

@@ -1,6 +1,6 @@
 // Party menu: each member's level, HP, stats, skills to learn and upgrade with skill points, passive slots,
 // equipment and promotion. Works on a RunState and saves it after every change.
-import { previewUnit, STATS } from './member-stats.js';
+import { previewUnit, STATS, statTip } from './member-stats.js';
 import { EQUIP_SLOTS } from '../content/vocab.js';
 import { GearScreen } from './gear-screen.js';
 import { Sound } from '../audio/sound.js';
@@ -91,7 +91,7 @@ export class PartyMenu {
         </div>`;
 
         html += `<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:2px 6px;font-size:10px;margin-bottom:10px;padding:6px;background:#0a0a18;border:1px solid #223;border-radius:4px;">`;
-        for (const [k, label] of STATS) html += `<div><span style="color:#778;">${label}</span> <span style="color:#ddd;">${unit[k]}</span></div>`;
+        for (const [k, label] of STATS) html += `<div><span data-tip="${esc(statTip(k))}" style="color:#778;cursor:help;">${label}</span> <span style="color:#ddd;">${unit[k]}</span></div>`;
         html += `</div>`;
 
         html += this._promotionHtml(m);

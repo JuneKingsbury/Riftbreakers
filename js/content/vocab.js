@@ -465,7 +465,11 @@ const EFFECT = obj({
 
 const CHOICE = obj({
     label: str('Button text.', { required: true }),
-    requires: obj({ gold: num('At least this much gold.'), items: num('At least this many unequipped items.') }, 'The choice is disabled unless met.'),
+    requires: obj({
+        gold: num('At least this much gold.'),
+        items: num('At least this many unequipped items.'),
+        classes: list(ref('job', ''), 'Someone in the party is one of these classes, or promoted from one. They are {name}, and get any memberStatMods.'),
+    }, 'The choice is disabled unless met.'),
     effect: EFFECT,
     resultText: str('Text after choosing. May use {name}, {item} and {relic}.'),
     outcomes: list(obj({ weight: num('Relative chance.', { required: true }), effect: EFFECT, resultText: str('Text for this outcome.') }, ''), 'One is rolled instead of effect/resultText.'),

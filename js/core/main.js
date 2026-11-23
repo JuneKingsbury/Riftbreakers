@@ -62,6 +62,7 @@ document.addEventListener('DOMContentLoaded', () => {
             musicVolume: sliderValue('start-music-vol', 50),
             sfxVolume:   sliderValue('start-sfx-vol', 80),
             colorblindMode: document.getElementById('start-colorblind')?.value || 'none',
+            uiScale: parseFloat(document.getElementById('start-ui-scale')?.value) || 1,
             tacticsLog: !!document.getElementById('start-tactics-log')?.checked,
             autoEquip: !!document.getElementById('start-auto-equip')?.checked,
             backdrop: document.getElementById('start-backdrop')?.value || DEFAULT_BACKDROP,
@@ -71,6 +72,18 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.setItem(SETTINGS_KEY, JSON.stringify({ ...loadSettings(), ...s }));
         refreshPerfSettings();
         syncBatterySaverLock();
+        applyColorblind(s.colorblindMode);
+        applyUiScale(s.uiScale);
+    }
+    function applyUiScale(scale) {
+        const root = document.documentElement;
+        if (scale > 1) { root.dataset.uiScale = String(scale); root.style.setProperty('--ui-zoom', String(scale)); }
+        else { delete root.dataset.uiScale; root.style.removeProperty('--ui-zoom'); }
+    }
+    // The correction filter sits on the root element (css/style.css), so it covers every screen.
+    function applyColorblind(mode) {
+        if (mode && mode !== 'none') document.documentElement.dataset.colorblind = mode;
+        else delete document.documentElement.dataset.colorblind;
     }
 
     // --- Performance & Battery (Graphics tab; Show FPS sits in Dev Tools) ---
@@ -126,6 +139,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (s.colorblindMode && s.colorblindMode !== 'none') {
             document.getElementById('start-colorblind').value = s.colorblindMode;
         }
+        const uiScale = document.getElementById('start-ui-scale');
+        if (uiScale && [...uiScale.options].some(o => o.value === String(s.uiScale))) uiScale.value = String(s.uiScale);
         const tacticsLog = document.getElementById('start-tactics-log');
         if (tacticsLog) tacticsLog.checked = s.tacticsLog === true;
         const autoEquip = document.getElementById('start-auto-equip');
@@ -138,6 +153,8 @@ document.addEventListener('DOMContentLoaded', () => {
         Sound.setSfxVolume(sliderValue('start-sfx-vol', 80));
     }
     applySettings(loadSettings());
+    applyColorblind(loadSettings().colorblindMode);
+    applyUiScale(loadSettings().uiScale);
     applyVolumes();
 
     settingsPanel?.addEventListener('change', () => { saveSettings(); applyVolumes(); });
@@ -162,12 +179,22 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('start-sfx-vol').value = 80;
         document.getElementById('start-sfx-vol-val').textContent = '80';
         document.getElementById('start-colorblind').value = 'none';
+        document.getElementById('start-ui-scale').value = '1';
         document.getElementById('start-tactics-log').checked = false;
+        document.getElementById('start-auto-equip').checked = false;
         document.getElementById('start-backdrop').value = DEFAULT_BACKDROP;
         writePerfControls(PERF_DEFAULTS);
         saveSettings();
         redrawBackdrop();
         applyVolumes();
+    });
+
+    document.getElementById('start-reset-tips')?.addEventListener('click', (e) => {
+        import('../ui/coach.js').then(({ resetTips }) => {
+            resetTips();
+            e.target.textContent = 'Done';
+            setTimeout(() => { e.target.textContent = 'Show again'; }, 1500);
+        });
     });
 
     // --- Settings tab switching ---
@@ -211,6 +238,17 @@ document.addEventListener('DOMContentLoaded', () => {
     modalBackdrop?.addEventListener('click', closeModals);
 
     // --- Dev tools ---
+    // The Dev Tools tab (skin and map editors, FPS counter) is for making the game, so it only
+    // shows with ?dev in the address, or on a device where that has been used once.
+    // ?dev=0 hides it again.
+    const devParam = new URLSearchParams(location.search).get('dev');
+    try {
+        if (devParam === '0') localStorage.removeItem('riftbreakers_dev');
+        else if (devParam != null) localStorage.setItem('riftbreakers_dev', '1');
+    } catch { /* storage off: the address alone decides */ }
+    let devMode = devParam != null && devParam !== '0';
+    try { devMode ||= localStorage.getItem('riftbreakers_dev') === '1'; } catch { /* as above */ }
+    if (!devMode) document.querySelector('[data-start-tab-btn="devtools"]')?.style.setProperty('display', 'none');
     document.getElementById('start-skin-editor')?.addEventListener('click', () => {
         import('../editor/skin-editor.js').then(({ launchSkinEditor }) => {
             launchSkinEditor();
@@ -293,6 +331,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 newRun(gameEl, skinManager, { onStart: showGame, onExit: backToTitle, challenge });
             }),
         }));
+    });
+    // How to Play. Until the player has finished a run, the button glows to point new players at it.
+    const helpBtn = document.getElementById('start-help');
+    if (helpBtn && !(loadProfile().bestRuns?.length)) helpBtn.classList.add('start-btn-new');
+    helpBtn?.addEventListener('click', () => {
+        helpBtn.classList.remove('start-btn-new');
+        import('../ui/help-panel.js').then(({ showHelp }) => showHelp('basics'));
     });
     document.getElementById('start-unlocks')?.addEventListener('click', () => {
         import('../run/start.js').then(({ showUnlocks }) => showUnlocks());

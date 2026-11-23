@@ -1,4 +1,4 @@
-import { CONFIG } from '../core/config.js';
+import { CONFIG } from '../core/config/game.js';
 import { viewState } from '../tactical/view-state.js';
 import { setFacing, facingForStep } from '../tactical/units.js';
 

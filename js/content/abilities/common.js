@@ -15,6 +15,7 @@ export const abilities = {
         basePower: 1.0,
         animType: 'slash',
         chargeTime: 0,
+        desc: 'A plain strike with whatever\'s in hand, against an enemy right beside you.',
     },
 
     brace: {

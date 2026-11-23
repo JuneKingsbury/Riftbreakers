@@ -64,7 +64,12 @@ export const encounters = {
             e('spectral_wisp', 'Arcane Wisp', 'arcane_wisp'),
             e('kingdom_guard', 'Arcane Construct', 'construct'),
             e('spectral_wisp', 'Arcane Wisp', 'arcane_wisp'),
-        ]),
+        ], {
+            scouting: 'The Rune Automaton was built to guard the lecture halls, and still does. Its spell wraiths and wisps keep it going, so thin them out first.',
+            phases: [
+                { at: 0.5, name: 'Overclock', say: 'The Rune Automaton\'s gears whine as its runes burn hot!', status: { status: 'haste', duration: 2 }, buffs: [{ stat: 'mat', value: 3, duration: 3 }] },
+            ],
+        }),
     ],
 };
 
@@ -91,6 +96,7 @@ export const events = [
                 { weight: 1, effect: { gold: 50, item: 'common' }, resultText: 'You slip away with 50 gold and {item}.' },
                 { weight: 1, effect: { battle: 'normal' }, resultText: 'A sentry spots you.' },
             ] },
+            { label: 'Walk in wearing their colors', requires: { classes: ['illusionist'] }, effect: { gold: 50, item: 'uncommon' }, resultText: '{name} makes the party look like a relief squad. You leave with 50 gold and {item}.' },
             { label: 'Go around', resultText: 'You take the long way through the ruined gardens.' },
         ],
     },

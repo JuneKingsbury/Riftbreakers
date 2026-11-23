@@ -66,6 +66,7 @@ function freeCells(battle, around, radius, score) {
 function castOn(battle, reactor, key, target) {
     reactor.mp = Math.max(0, reactor.mp - (ABILITIES[key].mpCost || 0));
     battle.stats?.use(reactor, key);
+    battle.announceCast?.(reactor, key);
     const res = resolveAbility(reactor, target, key, battle.map);
     battle._applyResult(reactor, target, key, res, { isReaction: true });
 }

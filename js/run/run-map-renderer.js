@@ -160,20 +160,29 @@ export class RunMapRenderer {
             ctx.globalAlpha = 1;
         }
 
-        // Hover label
+        // Hover label: what the place is and offers, and on touch screens how to go there.
         const hov = this.hoveredId && map.nodes[this.hoveredId];
         if (hov) {
             const p = this.nodePos(hov);
-            const label = (NODE_INFO[hov.type] || NODE_INFO.combat).label;
-            ctx.font = `12px ${FONT}`;
-            const w = ctx.measureText(label).width + 14;
+            const info = NODE_INFO[hov.type] || NODE_INFO.combat;
+            const lines = [`${info.label} · Floor ${hov.floor}`, info.desc, ...(this.hoverHint ? [this.hoverHint] : [])].filter(Boolean);
+            ctx.font = `11px ${FONT}`;
+            const w = Math.min(this.mapWidth, Math.max(...lines.map(l => ctx.measureText(l).width)) + 16);
+            const h = lines.length * 14 + 6;
+            const x = Math.max(4, Math.min((this.mapWidth) - w - 4, p.x - w / 2));
+            const y = Math.max(this.insets.top + 4, p.y - p.r - h - 8);
             ctx.fillStyle = 'rgba(8,8,24,0.95)';
-            ctx.fillRect(p.x - w / 2, p.y - p.r - 26, w, 18);
-            ctx.strokeStyle = '#557';
+            ctx.fillRect(x, y, w, h);
+            ctx.strokeStyle = info.color;
             ctx.lineWidth = 1;
-            ctx.strokeRect(p.x - w / 2, p.y - p.r - 26, w, 18);
-            ctx.fillStyle = '#ddd';
-            ctx.fillText(label, p.x, p.y - p.r - 17);
+            ctx.strokeRect(x, y, w, h);
+            ctx.textAlign = 'left';
+            lines.forEach((l, i) => {
+                ctx.fillStyle = i === 0 ? '#fff' : i === 2 ? '#fc8' : '#aab';
+                ctx.font = `${i === 0 ? 'bold ' : ''}11px ${FONT}`;
+                ctx.fillText(l, x + 8, y + 10 + i * 14);
+            });
+            ctx.textAlign = 'center';
         }
     }
 }

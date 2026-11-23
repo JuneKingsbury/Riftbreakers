@@ -8,7 +8,7 @@ import {
 import { rankChanges } from '../tactical/data-registry.js';
 import { buildsFor, suggestedPlanSteps } from '../run/builds.js';
 import { PROMOTION_LEVEL } from '../tactical/loadout.js';
-import { esc, jobLabel, abilityTooltip, wireTips, hideTip } from '../run/ui-kit.js';
+import { esc, jobLabel, abilityTooltip, wireTips, hideTip, confirmDialog } from '../run/ui-kit.js';
 
 // width:auto overrides the title screen's large-button rule (#start-screen button).
 const SMALL = `width:auto;flex-shrink:0;padding:2px 7px;font-family:inherit;font-size:11px;border-radius:3px;cursor:pointer;
@@ -132,20 +132,20 @@ export function renderSkillPlanEditor(container, { job, storage, onChange } = {}
         const on = (sel, fn) => container.querySelectorAll(sel).forEach(el => el.addEventListener('click', () => fn(el)));
         container.querySelector('[data-plan-job]').addEventListener('change', (e) => { current = e.target.value; status = ''; render(); });
         container.querySelector('[data-plan-auto]').addEventListener('change', (e) => save(steps, e.target.checked, promotion));
-        container.querySelector('[data-plan-promotion]').addEventListener('change', (e) => {
+        container.querySelector('[data-plan-promotion]').addEventListener('change', async (e) => {
             const next = e.target.value || null;
             // Switching away drops the old promotion's steps (sanitizeSteps), so ask first.
             const lost = rows.filter(r => r.job !== current).length;
-            if (lost && !window.confirm(`Switching promotion removes ${lost} ${jobLabel(promotion)} step${lost === 1 ? '' : 's'} from this plan. Continue?`)) {
+            if (lost && !await confirmDialog(`Switch promotion?\nThis will drop ${lost} ${jobLabel(promotion)} step${lost === 1 ? '' : 's'} from the plan.`, { ok: 'Switch' })) {
                 e.target.value = promotion ?? '';
                 return;
             }
             save(steps, auto, next);
         });
-        container.querySelector('[data-plan-suggest]')?.addEventListener('change', (e) => {
+        container.querySelector('[data-plan-suggest]')?.addEventListener('change', async (e) => {
             const pair = pairs[+e.target.value];
             if (!pair) return;
-            if (rows.length && !window.confirm('Replace this plan\'s steps with the suggested build?')) { e.target.value = ''; return; }
+            if (rows.length && !await confirmDialog('Use the suggested build?\nIt will replace the steps you have now.', { ok: 'Replace' })) { e.target.value = ''; return; }
             save(suggestedPlanSteps(current, pair[0].key, promotion, pair[1]?.key ?? null), auto, promotion);
         });
         const move = (i, d) => { const s = [...steps]; [s[i], s[i + d]] = [s[i + d], s[i]]; save(s, auto, promotion); };

@@ -15,8 +15,12 @@ import * as Q from './queries.js';
 // CT cost of a turn, matching the manual game and the enemy AI:
 // moving costs 20, an action costs at least 80 (more if the ability's own
 // actionCost is higher), defending costs 80, and doing nothing costs 60.
+// Orders (Rally, Delay, Taunt, swaps: no damage, they move gauges or draw attacks) are
+// shouted, not swung: they cost their own actionCost, at least COST_ORDER_MIN. At the full 80,
+// giving an ally +45 CT cost the commander more turn than it gave.
 export const COST_MOVE = 20;
 export const COST_ACTION_MIN = 80;
+export const COST_ORDER_MIN = 40;
 export const COST_DEFEND = 80;
 export const COST_IDLE = 60;
 export const COST_ACTION_DEFAULT = 60;
@@ -40,12 +44,19 @@ function doMove(unit, dest, battle) {
 }
 
 // CT cost of an intent: moving costs 20, an action at least 80 (more if the ability's
-// own actionCost is higher), defending 80, and doing nothing 60.
+// own actionCost is higher; orders, see isQuickOrder, at least 40), defending 80, and
+// doing nothing 60.
+export function isQuickOrder(ab) {
+    return !!ab && !ab.basePower && !ab.isHeal && !ab.isSummon && ab.targetType !== 'all'
+        && (ab.ctGain != null || !!ab.swapPlaces || ab.applyStatus === 'taunted');
+}
+
 export function intentCost(unit, intent) {
     let cost = COST_IDLE;
     const act = intent.act;
     if (act?.kind === 'ability' && ABILITIES[act.ability]) {
-        cost = Math.max(COST_ACTION_MIN, ABILITIES[act.ability].actionCost ?? COST_ACTION_DEFAULT);
+        const ab = ABILITIES[act.ability];
+        cost = Math.max(isQuickOrder(ab) ? COST_ORDER_MIN : COST_ACTION_MIN, ab.actionCost ?? COST_ACTION_DEFAULT);
     } else if (act?.kind === 'defend') {
         cost = COST_DEFEND;
     }

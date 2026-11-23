@@ -65,7 +65,12 @@ export const encounters = {
             e('wolf', 'Darkling', 'shade_wraith'),
             e('raider_hexer', 'Pact Hexer', 'void_acolyte'),
             e('wolf', 'Darkling', 'shade_wraith'),
-        ]),
+        ], {
+            scouting: 'The Hollow Sentinel stands where the Pact first broke through. It is tough and slow, flanked by darklings and a hexer.',
+            phases: [
+                { at: 0.5, name: 'Hollow Resolve', say: 'Void light pours from the cracks in the Hollow Sentinel\'s armor!', cleanse: true, healPct: 0.1, status: { status: 'shell', duration: 3 } },
+            ],
+        }),
     ],
 };
 

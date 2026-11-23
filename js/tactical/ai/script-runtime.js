@@ -33,6 +33,9 @@ const KILL_BONUS = 1000;
 // A damaging skill that also lowers the target's stats (Hunter's Mark, Sunder, Acid Flask) is
 // worth this much more on a target that doesn't carry its debuff yet and won't die from the hit.
 const DEBUFF_BONUS = 1.5;
+// Poison's damage over time, as a share of max HP per turn it lasts (battle.js ticks ~6%).
+// Counted when picking the best damage, so a weak hit that poisons a group isn't passed over.
+const POISON_TICK = 0.06;
 
 function passesFilter(f, cand, ctx) {
     switch (f.kind) {
@@ -54,6 +57,9 @@ function pickFrom(pick, cands, ctx) {
         case 'highest_hp':     return Q.pickMin(cands, c => -c.hp);
         case 'lowest_def':     return Q.pickMin(cands, c => c.def);
         case 'lowest_mdf':     return Q.pickMin(cands, c => c.mdf);
+        // The best of ATK and MAT. Someone else first: speeding up or buffing oneself is
+        // rarely what a rule picking "the strongest" means.
+        case 'strongest':      return Q.pickMin(cands, c => (c === me ? 1000 : 0) - Math.max(c.atk ?? 0, c.mat ?? 0));
         case 'most_clustered': {
             const near = c => cands.filter(o => Q.distance(c, o) <= 2).length;
             return Q.pickMin(cands, c => -near(c) * 1000 + Q.distance(me, c));
@@ -284,6 +290,9 @@ function scoreAbility(key, choice, target, ctx) {
     const amount = choice === 'best_heal' ? healing : damage;
     const hits = Math.max(1, Q.unitsAffected(ctx.self, key, target, ctx.units, ctx.map).length);
     let score = amount * hits;
+    if (choice === 'best_damage' && ab.applyStatus === 'poison' && !Q.hasStatus(target, 'poison')) {
+        score += hits * Math.round(target.maxHp * POISON_TICK) * (ab.statusDuration ?? 3);
+    }
     if (choice === 'best_damage' && damage >= target.hp) score += KILL_BONUS;
     else if (choice === 'best_damage' && ab.buffs?.some(b => b.value < 0) && !Q.hasBuff(target, key)) score *= DEBUFF_BONUS;
     if (ab.chargeTime > 0) score *= CHARGE_PENALTY;

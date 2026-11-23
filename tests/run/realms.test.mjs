@@ -43,7 +43,7 @@ test('each act draws from its own list of realms', () => {
         1: ['wild_frontiers', 'verdant_depths', 'crystal_caves'],
         2: ['arcane_library', 'void_abyss'],
         3: ['palace_fortress', 'void_sanctum'],
-        4: ['shifting_labyrinth'],
+        4: ['shifting_labyrinth', 'rift_throne'],
     });
     assert.equal(ACT_COUNT, 4);
     for (let act = 1; act <= ACT_COUNT; act++) {
@@ -263,14 +263,32 @@ test('a realm draws on whatever its draws list names, not on its chain', () => {
     }
 });
 
+test('a folded-in realm\'s boss that is not an act finale is fought as an elite champion, phases and all', () => {
+    const elites = realmEncounters('verdant_depths', 'elite');
+    const witch = elites.find(e => e.def.id === 'boss_bog_witch');
+    assert.ok(witch?.champion, 'the Bog Witch is a Verdant Depths champion');
+    assert.equal(witch.zone, 'fungal_hollows');
+    for (const realm of Object.values(ACT_REALMS).flat()) {
+        const finales = REALMS[realm].bosses;
+        for (const e of realmEncounters(realm, 'elite').filter(x => x.champion)) {
+            assert.ok(!finales.includes(e.def.id), `${realm}: a finale is never also a champion`);
+            assert.notEqual(e.zone, realm, 'only folded-in realms\' bosses become champions');
+        }
+    }
+    const allBosses = Object.values(ENCOUNTERS).flatMap(r => r.boss.map(d => d.id));
+    const fielded = new Set(Object.values(ACT_REALMS).flat().flatMap(r => [...realmEncounters(r, 'boss'), ...realmEncounters(r, 'elite')].map(e => e.def.id)));
+    assert.deepEqual(allBosses.filter(id => !fielded.has(id)), [], 'every boss in the game can be met');
+});
+
 test('a folded-in fight keeps its roster but is refitted to the act it is fought in', () => {
     for (const ids of Object.values(ACT_REALMS)) {
         for (const realm of ids) {
             const act = actOf(realm);
             for (const kind of ['normal', 'elite', 'boss']) {
                 const own = ENCOUNTERS[realm][kind].map(d => rosterPower(d, kind, act)).sort((x, y) => x - y);
-                for (const { def, zone } of realmEncounters(realm, kind)) {
-                    const original = ENCOUNTERS[zone][kind].find(d => d.id === def.id);
+                for (const { def, zone, champion } of realmEncounters(realm, kind)) {
+                    // Champions are folded-in realms' bosses, fought as elites.
+                    const original = ENCOUNTERS[zone][champion ? 'boss' : kind].find(d => d.id === def.id);
                     assert.ok(original, `${realm}: ${def.id} comes from ${zone}`);
                     if (zone === realm) {
                         // Own fights are as written, apart from levels when the realm moved to a later act.
@@ -346,6 +364,7 @@ test('each act ends with one of two bosses that belong at the heart of its realm
         void_sanctum:       ['The Hollow Abbot', 'The Void Arbiter'],
         palace_fortress:    ['The High King', 'The High Priest'],
         shifting_labyrinth: ['The Shifting Horror', 'The Unraveler'],
+        rift_throne:        ['The Rift Regent', 'The Crowned Echo'],
     });
     for (const id of Object.values(ACT_REALMS).flat()) {
         // Every listed boss exists in the realm or a realm folded into it.

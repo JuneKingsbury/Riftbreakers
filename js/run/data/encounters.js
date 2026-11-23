@@ -195,15 +195,24 @@ export function shiftLevels(def, kind, fromAct, toAct) {
 // Every encounter of `kind` the realm can field: [{ def, zone }], its own first (at its act's
 // levels, see WRITTEN_FOR), then those of the realms folded into it, retuned for its act.
 // Bosses are limited to the realm's `bosses` list when it has one.
+// Champions: a folded-in realm's boss that isn't one of the act's finales is fielded as an
+// elite fight instead (after the act's own elites), retuned to elite strength. It keeps its
+// phases, so it still fights like a boss.
 export function realmEncounters(realm, kind) {
     const bosses = kind === 'boss' ? REALMS[realm]?.bosses : null;
     const act = actOf(realm);
-    return realmSources(realm).flatMap(zone => (ENCOUNTERS[zone]?.[kind] ?? [])
+    const fights = realmSources(realm).flatMap(zone => (ENCOUNTERS[zone]?.[kind] ?? [])
         .filter(def => !bosses || bosses.includes(def.id))
         .map(def => ({
             zone,
             def: zone === realm ? shiftLevels(def, kind, WRITTEN_FOR[realm] ?? act, act) : retuneEncounter(def, kind, actOf(zone), realm, zone),
         })));
+    if (kind !== 'elite') return fights;
+    const finales = REALMS[realm]?.bosses ?? [];
+    const champions = realmSources(realm).filter(zone => zone !== realm).flatMap(zone => (ENCOUNTERS[zone]?.boss ?? [])
+        .filter(def => !finales.includes(def.id))
+        .map(def => ({ zone, champion: true, def: retuneEncounter(def, 'elite', actOf(zone), realm, zone) })));
+    return [...fights, ...champions];
 }
 
 // Picks an encounter of `kind` from the realm's fights (its own and those folded into it),

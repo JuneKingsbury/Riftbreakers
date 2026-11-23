@@ -65,7 +65,7 @@ test('every skill that inflicts a status says how long it lasts, at every rank',
 
 test('the upgrade tooltip lists what the next rank changes', () => {
     assert.deepEqual(rankChanges('fire', 1), ['Power 100% → 120%', 'MP cost 12 → 10']);
-    assert.deepEqual(rankChanges('heal', 1), ['Healing 100% → 120%', 'MP cost 15 → 13']);
+    assert.deepEqual(rankChanges('heal', 1), ['Healing 100% → 120%', 'MP cost 18 → 15']);
     assert.ok(rankChanges('earth_skin', 1).includes('DEF +8 → +10'));
     assert.ok(rankChanges('sunder', 1).includes('DEF −5 → −6'));
     assert.ok(rankChanges('pinning_shot', 2).includes('Slow lasts 2 → 3 turns'));

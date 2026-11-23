@@ -10,14 +10,17 @@ import { AFFIXES, knownAffixes, affixedName } from './data/affixes.js';
 import { REALMS } from './data/realms.js';
 import { Sound } from '../audio/sound.js';
 import { SCORE_TIP, scoreLine } from './score.js';
-import { pointsToSpend } from './builds.js';
+import { pointsToSpend, spendsAutomatically } from './builds.js';
+import { loadPlans } from './skill-plans.js';
 import { JOB_DATA } from '../content/jobs.js';
 import { MAX_PARTY } from './run-state.js';
 import { EQUIPMENT, EQUIP_FIELDS, EQUIP_STAT_KEYS, canEnchant, enchantedKey, enchantLevel, MAX_ENCHANT } from '../tactical/data/equipment.js';
 import {
     BTN, BTN_DISABLED, BTN_GOOD, BTN_GOLD, BTN_DANGER, GLOW, RARITY_COLOR, esc, jobLabel, jobDesc,
     abilityName, itemTitle, itemSummary, itemIconHtml, upgradeArrowHtml, portraitHtml, drawSprites,
+    confirmDialog, relicIconHtml,
 } from './ui-kit.js';
+import { coachTip, MANUAL_SP_TIP } from '../ui/coach.js';
 
 const H1 = (t, color = '#ffcc44') => `<div style="color:${color};font-weight:bold;font-size:16px;margin-bottom:6px;">${t}</div>`;
 const SUB = (t) => `<div style="color:#999;font-size:11px;line-height:1.6;margin-bottom:12px;">${t}</div>`;
@@ -33,7 +36,7 @@ function enchantPreview(key) {
 
 function relicHtml(key) {
     const r = RELICS[key];
-    return `<span style="color:${RARITY_COLOR[r.rarity]};font-weight:bold;">${esc(r.name)}</span>
+    return `${relicIconHtml(key, 16)} <span style="color:${RARITY_COLOR[r.rarity]};font-weight:bold;">${esc(r.name)}</span>
         <div style="color:#889;font-size:10px;">${esc(r.desc)}</div>`;
 }
 
@@ -62,6 +65,13 @@ export class NodeScreens {
             rest: this.rest, treasure: this.treasure, recruit: this.recruit, relicChoice: this.relicChoice,
         }[p.kind];
         fn.call(this, p);
+        // Over a panel, so at the top of the screen, clear of its buttons.
+        if (p.kind === 'battle') coachTip('briefing', { top: true });
+        if (p.kind === 'reward') {
+            const plans = loadPlans();
+            const byHand = this.run.party.some(m => !spendsAutomatically(m, plans));
+            coachTip('reward', { top: true, more: byHand ? MANUAL_SP_TIP : '' });
+        }
         return true;
     }
 
@@ -256,9 +266,9 @@ export class NodeScreens {
                 this._act(ok, 'loot');
             });
             on('[data-relic]', (el) => this._act(run.claimRewardRelic(el.dataset.relic), 'loot'));
-            on('[data-continue]', () => {
+            on('[data-continue]', async () => {
                 const unclaimed = (!p.itemClaimed && p.items.length) || (p.relicPick && !p.relicClaimed && p.relics.length);
-                if (unclaimed && !window.confirm('Leave without taking your reward?')) return;
+                if (unclaimed && !await confirmDialog('Leave your reward behind?\nYou won\'t be able to come back for it.', { ok: 'Leave it', cancel: 'Go back' })) return;
                 this.hooks.leave();
             });
         });
@@ -335,7 +345,10 @@ export class NodeScreens {
         } else {
             ev.choices.forEach((c, i) => {
                 const ok = run.choiceAvailable(c);
-                html += `<button data-choice="${i}" style="${BTN}${ok ? '' : BTN_DISABLED}" ${ok ? '' : 'disabled'}>› ${esc(c.label)}</button>`;
+                // A class choice names the class, so players learn what each class opens up.
+                const classes = c.requires?.classes;
+                const tag = classes ? `<span style="color:${ok ? '#fc8' : '#776'};">[${esc(classes.map(jobLabel).join(' / '))}]</span> ` : '';
+                html += `<button data-choice="${i}" style="${BTN}${ok ? '' : BTN_DISABLED}" ${ok ? '' : 'disabled'}>› ${tag}${esc(c.label)}</button>`;
             });
         }
         this._show(html, (on) => {
@@ -410,7 +423,7 @@ export class NodeScreens {
         this._show(html, (on) => {
             this._wireParty(on);
             on('[data-rest]', () => this._act(run.train(), 'rest'));
-            on('[data-enchant]', (el) => this._act(run.enchant(choices[+el.dataset.enchant]), 'rest'));
+            on('[data-enchant]', (el) => this._act(run.enchant(choices[+el.dataset.enchant]), 'enchant'));
         });
     }
 

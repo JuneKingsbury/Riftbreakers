@@ -3,6 +3,7 @@
 // when it starts, asking first if this device and the cloud both have new progress.
 import { gdrive } from '../core/gdrive.js';
 import { createCloudSync } from '../run/cloud-sync.js';
+import { confirmDialog } from '../run/ui-kit.js';
 
 const timeText = (d) => d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
 
@@ -19,10 +20,10 @@ export function wireCloudPanel(onReplaced) {
     const say = (msg, color = '#999') => { status.textContent = msg; status.style.color = color; };
 
     const resolveConflict = async ({ local, cloud }) => {
-        const useCloud = window.confirm('Your Google Drive save and this device both have new progress.\n\n'
-            + `Google Drive: ${cloud}\n\nThis device: ${local}\n\n`
-            + 'Press OK to load the Google Drive save here (this device\'s progress is replaced).\n'
-            + 'Press Cancel to keep this device\'s progress (it replaces the Google Drive save).');
+        const useCloud = await confirmDialog('Your Google Drive save and this device both have new progress.\n'
+            + `Google Drive: ${cloud}\nThis device: ${local}\n\n`
+            + 'Which do you want to keep? Loading the Google Drive save replaces the progress on this device. Keeping this device\'s progress replaces the save in Google Drive.',
+            { ok: 'Load Google Drive save', cancel: 'Keep this device\'s' });
         return useCloud ? 'cloud' : 'local';
     };
     const sync = createCloudSync({
@@ -81,7 +82,7 @@ export function wireCloudPanel(onReplaced) {
     });
     syncBtn.addEventListener('click', () => runSync(true));
     offBtn.addEventListener('click', async () => {
-        if (!window.confirm('Disconnect Google Drive?\n\nYour progress stays on this device, and your cloud save stays in Google Drive. Progress made from now on won\'t be uploaded.')) return;
+        if (!await confirmDialog('Disconnect Google Drive?\nYour progress stays on this device, and your cloud save stays in Google Drive. Progress made from now on won\'t be uploaded.', { ok: 'Disconnect' })) return;
         busy = true;
         render();
         await sync.flush();   // upload anything not yet sent first

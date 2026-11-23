@@ -211,6 +211,19 @@ body {
     background: #3a3a6a;
     border-color: #888;
 }
+/* How to Play, until a first run is finished (core/main.js). */
+#start-screen button.start-btn-new {
+    border-color: #fc8;
+    color: #fc8;
+    animation: start-btn-pulse 2s ease-in-out infinite;
+}
+@keyframes start-btn-pulse {
+    0%, 100% { box-shadow: 0 0 0 rgba(255, 204, 136, 0); }
+    50%      { box-shadow: 0 0 10px rgba(255, 204, 136, 0.55); }
+}
+@media (prefers-reduced-motion: reduce) {
+    #start-screen button.start-btn-new { animation: none; box-shadow: 0 0 8px rgba(255, 204, 136, 0.45); }
+}
 
 /* ---- Daily run: the button and the leaderboard panel (js/ui/daily-panel.js) ---- */
 #start-screen .start-btn-grid { align-items: stretch; }
@@ -2693,13 +2706,23 @@ details.settings-debug > summary::marker {
     font-size: 13px;
 }
 
-#game-container[data-colorblind="protanopia"] {
+/* Menu text size (Settings > Accessibility, core/main.js): run-kit panels (ui-kit.js Modal)
+   are zoomed. Their width and height limits are divided by the zoom so they still fit. */
+html[data-ui-scale] .rk-modal-body {
+    zoom: var(--ui-zoom, 1);
+    width: calc(92% / var(--ui-zoom, 1)) !important;
+    max-height: calc(84vh / var(--ui-zoom, 1)) !important;
+}
+
+/* On the root element, so it covers every screen without trapping fixed panels
+   (a filter lower down makes a new stacking context). Set in core/main.js. */
+html[data-colorblind="protanopia"] {
     filter: url(#cb-protanopia);
 }
-#game-container[data-colorblind="deuteranopia"] {
+html[data-colorblind="deuteranopia"] {
     filter: url(#cb-deuteranopia);
 }
-#game-container[data-colorblind="tritanopia"] {
+html[data-colorblind="tritanopia"] {
     filter: url(#cb-tritanopia);
 }
 

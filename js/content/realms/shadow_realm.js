@@ -63,7 +63,12 @@ export const encounters = {
             e('goblin', 'Shadow Imp'),
             e('spectral_wisp', 'Watching Eye', 'blight_bloom'),
             e('goblin', 'Shadow Imp'),
-        ]),
+        ], {
+            scouting: 'The Shade Warden watches from the dark with imps and a floating eye. It casts from range and hides behind its stalker.',
+            phases: [
+                { at: 0.5, name: 'Deepening Dark', say: 'The Shade Warden pulls the shadows close around its servants!', allies: { buffs: [{ stat: 'eva', value: 15, duration: 3 }] }, summon: [e('goblin', 'Shadow Imp')] },
+            ],
+        }),
     ],
 };
 
@@ -87,6 +92,7 @@ export const events = [
                 { weight: 2, effect: { relic: 'uncommon' }, resultText: 'It never goes dark. You now carry {relic}.' },
                 { weight: 1, effect: { battle: 'normal' }, resultText: 'The eyes close. Things climb out of the dark.' },
             ] },
+            { label: 'Calm the eyes', requires: { classes: ['gravecaller', 'seer'] }, effect: { relic: 'uncommon' }, resultText: '{name} murmurs to them until they close. The lantern comes away freely: {relic}.' },
             { label: 'Keep your distance', resultText: 'You keep to the far edge of the ledge, and the eyes lose interest.' },
         ],
     },

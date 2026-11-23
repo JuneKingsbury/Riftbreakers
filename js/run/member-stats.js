@@ -8,6 +8,9 @@ import { STATS as STAT_INFO } from '../content/vocab.js';
 // The stats the menus list, in order, with their labels.
 export const STATS = Object.entries(STAT_INFO).map(([key, s]) => [key, s.short]);
 
+/** A stat's hover tip (a data-tip value): its name, then what it does. */
+export const statTip = (key) => STAT_INFO[key] ? `${STAT_INFO[key].short}\n${STAT_INFO[key].desc}` : '';
+
 function addMods(...mods) {
     const out = {};
     for (const m of mods) for (const [k, v] of Object.entries(m || {})) out[k] = (out[k] || 0) + v;

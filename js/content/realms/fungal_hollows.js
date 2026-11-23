@@ -64,7 +64,12 @@ export const encounters = {
             e('spectral_wisp', 'Bound Spirit', 'ghost'),
             e('thorn_beast', 'Thorn Beast'),
             e('spore_walker', 'Spore Walker'),
-        ]),
+        ], {
+            scouting: 'The Bog Witch tends a garden of spores and bound spirits. Her brood heals itself while she curses from the back, so get to her fast.',
+            phases: [
+                { at: 0.5, name: 'Rot Bloom', say: 'The Bog Witch sinks her hands into the mud, and the spores answer!', healPct: 0.15, summon: [e('spore_walker', 'Spore Walker')] },
+            ],
+        }),
     ],
 };
 
@@ -78,6 +83,7 @@ export const events = [
                 { weight: 1, effect: { gold: 60 }, resultText: 'Giant truffles. A fortune to the right cook: 60 gold.' },
                 { weight: 1, effect: { gold: 30, healPct: -0.15 }, resultText: 'A puffball bursts in your faces and everyone chokes on spores. You still salvage 30 gold of fungi.' },
             ] },
+            { label: 'Harvest it properly', requires: { classes: ['alchemist'] }, effect: { gold: 60 }, resultText: '{name} knows which caps to cut and which to leave. 60 gold of truffles, and nobody coughs.' },
             { label: 'Hold your breath and hurry past', resultText: 'You make it through without a cough.' },
         ],
     },

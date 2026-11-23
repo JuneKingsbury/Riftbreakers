@@ -65,7 +65,12 @@ export const encounters = {
             e('raider_hexer', 'Royal Mage', 'royal_mage'),
             e('kingdom_guard', 'Kingdom Guard'),
             e('raider_archer', 'Patrol Archer', 'crusader_archer'),
-        ]),
+        ], {
+            scouting: 'The Road Captain runs the toll roads with patrol archers and a royal mage. He\'s fast and hits hard, so slow him down if you can.',
+            phases: [
+                { at: 0.5, name: 'Rally the Patrol', say: 'The Road Captain blows his horn, and a patrol comes running!', summon: [e('kingdom_guard', 'Kingdom Guard')] },
+            ],
+        }),
     ],
 };
 
@@ -79,6 +84,7 @@ export const events = [
                 { weight: 2, effect: { gold: 70, item: 'uncommon' }, resultText: 'You slip away with 70 gold and {item}.' },
                 { weight: 1, effect: { battle: 'normal' }, resultText: 'An alarm bell clangs. Soldiers come running.' },
             ] },
+            { label: 'Requisition it in the Crown\'s name', requires: { classes: ['warlord'] }, effect: { gold: 70, item: 'common' }, resultText: '{name} wakes the driver and gives orders. He hands over 70 gold and {item} without a word.' },
             { label: 'Let them sleep', resultText: 'You walk on past the snoring driver.' },
         ],
     },

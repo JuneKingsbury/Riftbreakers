@@ -78,8 +78,8 @@ export const abilities = {
     },
 
     glamour: {
-        extends: 'support', name: 'Glamour', passiveMpCost: 0, dmgDealt: null, summonBoost: 0.6,
-        desc: 'More convincing illusions. Copies and creatures you summon get +60% HP, ATK and MAT.',
+        extends: 'support', name: 'Glamour', passiveMpCost: 0, dmgDealt: null, summonBoost: 0.4,
+        desc: 'More convincing illusions. Copies and creatures you summon get +40% HP, ATK and MAT.',
     },
 
     mirage_step: {

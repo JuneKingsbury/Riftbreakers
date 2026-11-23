@@ -27,6 +27,7 @@ import * as palace_fortress from './palace_fortress.js';
 import * as fracture_gate from './fracture_gate.js';
 import * as shifting_labyrinth from './shifting_labyrinth.js';
 import * as unraveling_core from './unraveling_core.js';
+import * as rift_throne from './rift_throne.js';
 
 // Realm chains, one realm per tier from shallowest to deepest. A run never sets two acts in
 // the same chain.
@@ -39,6 +40,7 @@ export const CHAINS = {
     the_void_pact:    { name: 'The Void Pact', realms: [void_hollow, void_sanctum, void_heart] },
     the_kingdom:      { name: 'The Kingdom', realms: [kingdom_outskirts, crusader_barracks, palace_fortress] },
     the_unraveling:   { name: 'The Unraveling', realms: [fracture_gate, shifting_labyrinth, unraveling_core] },
+    the_rift_throne:  { name: 'The Rift Throne', realms: [rift_throne] },
 };
 
 // The realms each act can be set in. Each run picks one per act at random (never two from
@@ -47,5 +49,5 @@ export const ACT_REALMS = {
     1: ['wild_frontiers', 'verdant_depths', 'crystal_caves'],
     2: ['arcane_library', 'void_abyss'],
     3: ['palace_fortress', 'void_sanctum'],
-    4: ['shifting_labyrinth'],
+    4: ['shifting_labyrinth', 'rift_throne'],
 };

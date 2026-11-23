@@ -1,5 +1,5 @@
 import { activeSupports, computeMoveRange, computeMovePath, computeAttackRange, computeAoeArea, computePatternArea, resolveAbility, ABILITIES, supportOf, passivesOf, inflictStatus, cleanseStatuses, abilityAffects, abilityStrikes, isHelpful, summonCapped } from './abilities.js';
-import { JOB_STATS } from './data-registry.js';
+import { JOB_STATS, baseKey } from './data-registry.js';
 import { viewState } from './view-state.js';
 import { isDead, isAlive, isConscious, isUnconscious, isStunned, faceToward, setFacing, createUnit } from './units.js';
 import { getCell, applyTerrainEffect, settleZ, posKey, parseKey, cellKey, columnCells } from './battle-map.js';
@@ -655,6 +655,7 @@ export class TacticalBattle {
         }
 
         this.stats.use(source, this.selectedAbility);
+        this.announceCast(source, this.selectedAbility);
         for (const target of targets) {
             const result = resolveAbility(source, target, this.selectedAbility, this.map);
             this._applyResult(source, target, this.selectedAbility, result);
@@ -726,6 +727,7 @@ export class TacticalBattle {
                 this._emitArea(unit, ability, affectedTiles, { x: targetX, y: targetY, z: targetZ });
 
                 this.stats.use(unit, ability);
+                this.announceCast(unit, ability);
                 for (const target of targets) {
                     const result = resolveAbility(unit, target, ability, this.map);
                     this._applyResult(unit, target, ability, result);
@@ -779,6 +781,7 @@ export class TacticalBattle {
         this._emitArea(unit, abilityKey, affectedTiles, { x: tx, y: ty, z: tz });
 
         this.stats.use(unit, abilityKey);
+        this.announceCast(unit, abilityKey);
         for (const target of targets) {
             const result = resolveAbility(unit, target, abilityKey, this.map);
             this._applyResult(unit, target, abilityKey, result);
@@ -990,6 +993,7 @@ export class TacticalBattle {
     _resolveCorpse(source, key, tx, ty, tz) {
         const ab = ABILITIES[key];
         this.stats.use(source, key);
+        this.announceCast(source, key);
         const center = { x: tx, y: ty, z: tz ?? 0 };
         const area = ab.aoe > 0 ? computeAoeArea(this.map, center, ab.aoe) : new Set([cellKey(tx, ty, center.z)]);
         // The body on the target cell goes first.
@@ -1091,6 +1095,14 @@ export class TacticalBattle {
 
     _spawnFloat(unit, text, color) {
         viewState(unit).floats.push({ text, color, age: 0, maxAge: 1200 });
+    }
+
+    // The skill's name over its user as it goes off, so a watched battle reads as more than
+    // numbers. Plain attacks aren't named.
+    announceCast(unit, key) {
+        const ab = ABILITIES[key];
+        if (!ab || baseKey(key) === 'attack') return;
+        viewState(unit).floats.push({ text: ab.name, color: unit.team === 'player' ? '#9df' : '#fb9', age: 0, maxAge: 1500, cast: true });
     }
 
     getRangeHighlights() {

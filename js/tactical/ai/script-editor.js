@@ -17,6 +17,7 @@ const classLabel = (job) => String(job || '').replace(/_/g, ' ').replace(/\b\w/g
 import { validateScript, hasErrors } from './script-validate.js';
 import { getScriptFor, saveScript, resetScript, hasCustomScript, defaultBehaviorFor, saveTemplate, loadTemplate } from './script-store.js';
 import { abilitiesForMember } from './party.js';
+import { confirmDialog } from '../../run/ui-kit.js';
 
 const FONT = "'Courier New',monospace";
 const BTN = `padding:4px 10px;background:#151528;border:1px solid #447;color:#ccc;font-family:${FONT};font-size:11px;cursor:pointer;border-radius:3px;`;
@@ -99,9 +100,9 @@ export class ScriptEditor {
         this._render();
     }
 
-    close() {
+    async close() {
         const dirty = this._chars.filter(c => this._isDirty(c.name));
-        if (dirty.length && !window.confirm(`Discard unsaved changes for ${dirty.map(c => c.name).join(', ')}?`)) return;
+        if (dirty.length && !await confirmDialog(`Discard your changes?\n${dirty.map(c => c.name).join(', ')} ${dirty.length === 1 ? 'has' : 'have'} tactics that haven\'t been saved.`, { ok: 'Discard', danger: true })) return;
         this._root.remove();
     }
 

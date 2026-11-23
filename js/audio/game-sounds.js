@@ -5,6 +5,7 @@
 //   title screen       menu_theme
 //   a whole act        the act realm's track (else the generic expedition track): on the map,
 //                      while deploying and through every battle, so it never restarts mid-act
+//   a boss fight       battle_boss, if the manifest has it; otherwise the act's track as usual
 //   a battle outside a run (test harnesses)  combat
 //   a won run          credits
 import { ABILITIES } from '../tactical/data-registry.js';
@@ -24,7 +25,13 @@ export function mapMusic(run) {
  */
 export function battleMusic(encounter, run) {
     const realm = run?.realmId ?? encounter?.realm;
-    return realm ? [realmTrack(realm), 'expedition', 'combat'] : ['combat'];
+    const boss = encounter?.kind === 'boss' ? ['battle_boss'] : [];
+    return realm ? [...boss, realmTrack(realm), 'expedition', 'combat'] : [...boss, 'combat'];
+}
+
+/** The sting for a battle's end: battle_won or battle_lost (silent until the manifest has them). */
+export function battleEndSting(won) {
+    return won ? 'battle_won' : 'battle_lost';
 }
 export const TITLE_MUSIC = ['menu_theme'];
 export const VICTORY_MUSIC = ['credits'];
@@ -52,7 +59,7 @@ export function abilitySound(abilityKey) {
  */
 export function battleEventSound(type, data = {}) {
     switch (type) {
-        case 'hit':    return data.target?.team === 'player' ? 'hit_party' : 'hit_enemy';
+        case 'hit':    return data.crit ? 'hit_crit' : data.target?.team === 'player' ? 'hit_party' : 'hit_enemy';
         case 'miss':   return 'miss';
         case 'heal':   return 'spell_heal';
         case 'revive': return 'spell_revive';

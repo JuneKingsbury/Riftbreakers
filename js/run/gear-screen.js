@@ -8,7 +8,7 @@
 // shows the bag for that slot. Clicking an empty slot just shows the bag for that slot.
 import { Sound } from '../audio/sound.js';
 import { EQUIPMENT, EQUIP_FIELDS } from '../tactical/data/equipment.js';
-import { STATS, equipDelta, previewUnit } from './member-stats.js';
+import { STATS, statTip, equipDelta, previewUnit } from './member-stats.js';
 import { autoEquipEnabled, setGameSetting } from './game-settings.js';
 import { EQUIP_SLOTS } from '../content/vocab.js';
 import { BTN, esc, jobLabel, titleCase, abilityName, itemTitle, itemSummary, itemIconHtml, portraitHtml, drawSprites, drawPortrait, FONT } from './ui-kit.js';
@@ -133,7 +133,7 @@ export class GearScreen {
             </div>
             <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:3px 8px;font-size:11px;margin-top:10px;padding-top:8px;border-top:1px solid #223;">`;
         for (const [s, label] of STATS) {
-            html += `<div><span style="color:#778;">${label}</span> <span style="color:#ddd;">${unit[s]}</span><span data-gear-delta="${s}"></span></div>`;
+            html += `<div><span data-tip="${esc(statTip(s))}" style="color:#778;cursor:help;">${label}</span> <span style="color:#ddd;">${unit[s]}</span><span data-gear-delta="${s}"></span></div>`;
         }
         html += `</div><div data-gear-hint style="color:#667;font-size:10px;margin-top:6px;min-height:14px;">Hover gear to compare.</div></div>`;
         return html;

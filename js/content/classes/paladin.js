@@ -5,7 +5,7 @@
 export const key = 'paladin';
 
 export const job = {
-    maxHp: 62, maxMp: 28,
+    maxHp: 58, maxMp: 28,
     spd: 7, atk: 13, def: 12, mat: 10, mdf: 12,
     move: 3, eva: 12,
     skillsetName: 'Holy Arts',
@@ -43,7 +43,7 @@ export const abilities = {
         type: 'magic',
         range: 3,
         aoe: 0,
-        mpCost: 15,
+        mpCost: 18,
         actionCost: 45,
         targetType: 'ally',
         basePower: 1.0,
@@ -75,8 +75,8 @@ export const abilities = {
         name: 'Divine Ward',
         passiveMpCost: 1,
         dmgDealt: null,
-        dmgTaken: { physical: 0.8 },
-        desc: 'A constant barrier of holy force. Physical damage taken -20%. Costs 1 MP per turn.',
+        dmgTaken: { physical: 0.85 },
+        desc: 'A constant barrier of holy force. Physical damage taken -15%. Costs 1 MP per turn.',
     },
 
     retribution: {

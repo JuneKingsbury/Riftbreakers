@@ -39,7 +39,7 @@ export const job = {
 export const abilities = {
     elixir: {
         name: 'Elixir', type: 'magic', range: 4, aoe: 0, mpCost: 0, actionCost: 55,
-        targetType: 'ally', basePower: 1.0, isHeal: true, alsoCure: true, element: 'alchemy', animType: 'cast',
+        targetType: 'ally', basePower: 0.85, isHeal: true, alsoCure: true, element: 'alchemy', animType: 'cast',
         projectileColor: '#88ffcc', chargeTime: 0,
         desc: 'A carefully measured dose for one ally. A strong heal that also cures their harmful statuses.',
     },

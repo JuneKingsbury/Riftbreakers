@@ -241,6 +241,7 @@ export const PICKS = {
     highest_hp:     'highest HP',
     lowest_def:     'lowest DEF',
     lowest_mdf:     'lowest MDF',
+    strongest:      'strongest attacker',
     most_clustered: 'most clustered',
     last_target:    'my last target',
 };

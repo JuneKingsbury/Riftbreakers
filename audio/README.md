@@ -21,6 +21,7 @@ Every track loops, and changing track crossfades over 2 seconds.
 |------|-------|
 | Title screen | `music/menu_theme.ogg` |
 | A whole act | `music/expedition_<realm>.ogg` for the act's realm, e.g. `expedition_crystal_caves.ogg`. It plays on the map and keeps going through deploying and every battle, so it never restarts mid-act. |
+| A boss fight | `music/battle_boss.ogg` once it's listed as `battle_boss` in the manifest (not made yet). Until then the act's track plays on. |
 | A battle outside a run (test harnesses) | `music/combat.ogg` |
 | A won run | `music/credits.ogg` |
 | A lost run | Fades to silence |
@@ -44,6 +45,7 @@ once, so busy fights stay clear.
 |------|------|------|
 | `hit_party` | `sfx/combat/colonist_damaged.ogg` | A party member takes damage |
 | `hit_enemy` | `sfx/work/chop_hit.ogg` | An enemy takes damage |
+| `hit_crit` | `sfx/combat/critical_hit.ogg` | A critical hit, on either side |
 | `miss` | `sfx/combat/shield_block.ogg` | An attack misses |
 | `party_down` | `sfx/combat/colonist_death.ogg` | A party member is knocked out |
 | `enemy_down` | `sfx/combat/enemy_death.ogg` | An enemy is knocked out |
@@ -63,7 +65,9 @@ once, so busy fights stay clear.
 | `promote` | `sfx/spells/spell_divination.ogg` | A member promotes |
 | `loot` | `sfx/combat/loot_drop.ogg` | Item, relic, treasure, buying and selling, a won battle |
 | `equip` | `sfx/work/craft_complete.ogg` | Equipment changes |
-| `rest` | `sfx/spells/spell_heal.ogg` | Train or enchant at a rest site |
+| `rest` | `sfx/spells/spell_heal.ogg` | Train at a rest site |
+| `enchant` | `sfx/work/enchant_complete.ogg` | Enchant an item at a rest site |
+| `battle_won` / `battle_lost` | not made yet | A sting the moment a battle ends. Add the files and their manifest lines to hear them. |
 | `travel` | `sfx/environment/footstep.ogg` | Moving to a node |
 | `rift_travel` | `sfx/spells/spell_teleport.ogg` | Stepping through the portal into a new run or act (the file is currently a copy of `magic_levelup`; a whoosh would suit it better) |
 | `event` | `sfx/ui/notification.ogg` | An event choice resolves, or a recruit joins |

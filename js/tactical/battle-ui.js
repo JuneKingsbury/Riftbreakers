@@ -3,20 +3,52 @@ import { placeTipAt } from '../ui/tip-place.js';
 import { ABILITIES, passivesOf } from './abilities.js';
 import { mountBreakdown } from './battle-breakdown.js';
 import { statusBadges, wardColors, HP_BAR_COLORS } from './fx-presets.js';
+import { ENGINE_STATES, STATS } from '../content/vocab.js';
 
 // Rule labels and unit names can come from player-authored scripts.
 function esc(text) {
     return String(text).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 }
 
+// Hover tips for the stat labels in the sidebar and inspect panel.
+const STAT_TIPS = Object.fromEntries(Object.entries(STATS).map(([k, st]) => [k, esc(`${st.short}\n${st.desc}`)]));
+const FACING_TIP = esc('Facing\nThe direction this unit is facing. Its EVA works fully against attacks from the front, half as well from the sides, and not at all from behind.');
+
 // A unit's statuses and stat changes as colored chips (the same badges as its map tag).
 function statusChips(unit, marginTop) {
     const chips = statusBadges(unit, { withDoom: true }).map(b =>
-        `<span style="display:inline-block;margin:0 3px 2px 0;padding:0 3px;border:1px solid ${b.color};border-radius:3px;color:${b.color};`
+        `<span data-tip="${esc(`${b.name}${b.turns ? ` (${b.turns} turns left)` : ''}\n${b.desc}`)}" style="display:inline-block;margin:0 3px 2px 0;padding:0 3px;border:1px solid ${b.color};border-radius:3px;color:${b.color};cursor:help;`
         + `background:${b.harmful ? '#3a0808' : '#0c0c1c'};">${b.key.startsWith('buff_') ? esc(b.name) : `${b.glyph} ${esc(b.name)}`}`
         + `${b.turns ? ` <span style="color:#fff;">${b.turns}</span>` : ''}</span>`);
-    for (const s of ['unconscious', 'dead']) if (unit.status.includes(s)) chips.push(`<span style="color:#888;">${s}</span>`);
+    for (const s of ['unconscious', 'dead']) if (unit.status.includes(s)) chips.push(`<span data-tip="${esc(`${ENGINE_STATES[s].name}\n${ENGINE_STATES[s].desc}`)}" style="color:#888;cursor:help;">${s}</span>`);
     return chips.length ? `<div style="margin-top:${marginTop}px;font-size:10px;line-height:14px;">${chips.join('')}</div>` : '';
+}
+
+// After a loss, a line or two on what went wrong, read off the battle's numbers, so the next
+// run goes better. Each check names something the player can change.
+function defeatTipsHtml(battle) {
+    const stats = battle.stats;
+    if (!stats) return '';
+    const mine = battle.units.filter(u => u.team === 'player' && u.summonerId == null);
+    const line = (u) => stats.byUnit.get(u.id) ?? { dealt: 0, taken: 0, healed: 0 };
+    const healed = mine.reduce((s, u) => s + line(u).healed, 0);
+    const dealt = mine.reduce((s, u) => s + line(u).dealt, 0);
+    const taken = mine.reduce((s, u) => s + line(u).taken, 0);
+    const foes = battle.units.filter(u => u.team === 'enemy' && u.summonerId == null);
+    const foeHp = foes.reduce((s, u) => s + u.maxHp, 0);
+    const tips = [];
+    if (healed === 0) tips.push('Nobody in the party could heal. A Warden, an Alchemist or a Lifeseer, or even a tool with First Aid, would keep everyone standing longer.');
+    const tank = [...mine].sort((a, b) => line(b).taken - line(a).taken)[0];
+    if (tank && mine.length > 1 && line(tank).taken > taken * 0.45) {
+        tips.push(`${tank.name} took ${Math.round(line(tank).taken / Math.max(1, taken) * 100)}% of all the damage. Heavier armor or a spot further back at deploy would spread the hits around.`);
+    }
+    if (foeHp > 0 && dealt < foeHp * 0.5) tips.push(`Your party dealt ${dealt} damage, but the enemies had ${foeHp} HP between them. Stronger attacks, skill upgrades or better weapons would end fights faster.`);
+    if (!tips.length) tips.push('That one was close. A few more levels, a rest before the boss or a relic from an elite could tip it your way.');
+    return `<div style="margin-top:10px;max-width:420px;text-align:left;border:1px solid #533;background:rgba(40,10,10,0.5);border-radius:4px;padding:6px 10px;">
+        <div style="color:#fc8;font-size:11px;font-weight:bold;margin-bottom:3px;">Next time</div>
+        ${tips.slice(0, 2).map(t => `<div style="color:#ccb;font-size:11px;line-height:1.45;margin-bottom:3px;">${esc(t)}</div>`).join('')}
+        <div style="color:#888;font-size:10px;margin-top:4px;">The renown you earned this run still goes toward unlocks.</div>
+    </div>`;
 }
 
 // Protect, Shell and Defend ring a unit's HP bar in their colors (inline style for the bar's track).
@@ -112,13 +144,15 @@ export class BattleUI {
             <div style="display:flex;gap:4px;pointer-events:auto;">
                 <button data-ctl="pause" style="${this._ctlStyle(false)}">Pause</button>
                 ${SPEEDS.map(s => `<button data-ctl="speed" data-speed="${s}" style="${this._ctlStyle(false)}">${s}x</button>`).join('')}
+                <button data-ctl="help" data-tip="Glossary\nPause the battle and look up stats, statuses and affixes." style="${this._ctlStyle(false)}">?</button>
             </div>
-            <div data-decision style="${this._showDecisions ? '' : 'display:none;'}"font-size:11px;color:#9ab;background:rgba(8,8,20,0.8);padding:2px 8px;border-radius:3px;max-width:520px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
+            <div data-decision style="${this._showDecisions ? '' : 'display:none;'}font-size:11px;color:#9ab;background:rgba(8,8,20,0.8);padding:2px 8px;border-radius:3px;max-width:520px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
         `;
         el.addEventListener('click', (e) => {
             const btn = e.target.closest('button[data-ctl]');
             if (!btn || !this._onPlayback) return;
             if (btn.dataset.ctl === 'pause') this._onPlayback('pause');
+            else if (btn.dataset.ctl === 'help') this._onPlayback('help');
             else this._onPlayback('speed', Number(btn.dataset.speed));
         });
         this._overlay.appendChild(el);
@@ -516,15 +550,15 @@ export class BattleUI {
                     <div style="background:#111;height:4px;border-radius:2px;margin:2px 0 4px;"><div style="background:#36f;width:${mpP}%;height:100%;border-radius:2px;"></div></div>
                 </div>` : ''}
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:1px 6px;font-size:10px;margin-top:4px;">
-                    <span style="color:#888;">ATK</span><span>${u.atk}</span>
-                    <span style="color:#888;">DEF</span><span>${u.def}</span>
-                    <span style="color:#888;">MAT</span><span>${u.mat}</span>
-                    <span style="color:#888;">MDF</span><span>${u.mdf}</span>
-                    <span style="color:#888;">SPD</span><span>${u.spd}</span>
-                    <span style="color:#888;">Move</span><span>${u.move}</span>
-                    <span style="color:#888;">EVA</span><span>${u.eva || 0}</span>
-                    <span style="color:#888;">CRIT</span><span>${u.crit ?? 5}%</span>
-                    <span style="color:#888;">Facing</span><span>${u.facing || 'south'}</span>
+                    <span data-tip="${STAT_TIPS.atk}" style="color:#888;cursor:help;">ATK</span><span>${u.atk}</span>
+                    <span data-tip="${STAT_TIPS.def}" style="color:#888;cursor:help;">DEF</span><span>${u.def}</span>
+                    <span data-tip="${STAT_TIPS.mat}" style="color:#888;cursor:help;">MAT</span><span>${u.mat}</span>
+                    <span data-tip="${STAT_TIPS.mdf}" style="color:#888;cursor:help;">MDF</span><span>${u.mdf}</span>
+                    <span data-tip="${STAT_TIPS.spd}" style="color:#888;cursor:help;">SPD</span><span>${u.spd}</span>
+                    <span data-tip="${STAT_TIPS.move}" style="color:#888;cursor:help;">Move</span><span>${u.move}</span>
+                    <span data-tip="${STAT_TIPS.eva}" style="color:#888;cursor:help;">EVA</span><span>${u.eva || 0}</span>
+                    <span data-tip="${STAT_TIPS.crit}" style="color:#888;cursor:help;">CRIT</span><span>${u.crit ?? 5}%</span>
+                    <span data-tip="${FACING_TIP}" style="color:#888;cursor:help;">Facing</span><span>${u.facing || 'south'}</span>
                 </div>
                 ${statusChips(u, 5)}
             </div>`;
@@ -554,12 +588,12 @@ export class BattleUI {
                     <div style="background:#111;height:4px;border-radius:2px;margin:2px 0 4px;"><div style="background:#36f;width:${mpP}%;height:100%;border-radius:2px;"></div></div>
                 </div>` : ''}
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:1px 6px;font-size:10px;margin-top:3px;">
-                    <span style="color:#888;">ATK</span><span>${insp.atk}</span>
-                    <span style="color:#888;">DEF</span><span>${insp.def}</span>
-                    <span style="color:#888;">MAT</span><span>${insp.mat}</span>
-                    <span style="color:#888;">MDF</span><span>${insp.mdf}</span>
-                    <span style="color:#888;">SPD</span><span>${insp.spd}</span>
-                    <span style="color:#888;">Move</span><span>${insp.move}</span>
+                    <span data-tip="${STAT_TIPS.atk}" style="color:#888;cursor:help;">ATK</span><span>${insp.atk}</span>
+                    <span data-tip="${STAT_TIPS.def}" style="color:#888;cursor:help;">DEF</span><span>${insp.def}</span>
+                    <span data-tip="${STAT_TIPS.mat}" style="color:#888;cursor:help;">MAT</span><span>${insp.mat}</span>
+                    <span data-tip="${STAT_TIPS.mdf}" style="color:#888;cursor:help;">MDF</span><span>${insp.mdf}</span>
+                    <span data-tip="${STAT_TIPS.spd}" style="color:#888;cursor:help;">SPD</span><span>${insp.spd}</span>
+                    <span data-tip="${STAT_TIPS.move}" style="color:#888;cursor:help;">Move</span><span>${insp.move}</span>
                 </div>
                 ${statusChips(insp, 4)}
             </div>`;
@@ -758,6 +792,7 @@ export class BattleUI {
                 ${won ? 'VICTORY!' : 'DEFEAT'}
             </div>
             <div style="color:#aaa;font-size:13px;">${!won ? 'Your party has fallen. The run is over.' : rewards?.final ? 'The final rift is sealed.' : 'All enemies defeated.'}</div>
+            ${won ? '' : defeatTipsHtml(battle)}
             ${rewardHtml}
             <div id="tac-breakdown"></div>
             ${this._battleLogHtml(battle)}

@@ -3,6 +3,7 @@
 import {
     exportSave, saveFileName, saveToCode, readSaveText, describeSave, applySave,
 } from '../run/save-transfer.js';
+import { confirmDialog } from '../run/ui-kit.js';
 
 /**
  * Wires up the Save Data buttons in index.html.
@@ -24,11 +25,11 @@ export function wireSavePanel(onImported) {
         (forLoading ? text.focus() : text.select());
     };
 
-    const importText = (raw) => {
+    const importText = async (raw) => {
         const { save, error } = readSaveText(raw);
         if (error) return say(error, false);
-        const ok = window.confirm(`Replace your current progress with this save?\n\n${describeSave(save)}\n\n`
-            + 'This overwrites your current renown, unlocks and any run in progress.');
+        const ok = await confirmDialog(`Replace your current progress with this save?\n${describeSave(save)}\n`
+            + 'This overwrites your current renown, unlocks and any run in progress.', { ok: 'Replace', danger: true });
         if (!ok) return say('Import cancelled. Nothing changed.');
         if (!applySave(save)) return say('Couldn\'t save on this device. Storage may be full or turned off.', false);
         box.style.display = 'none';

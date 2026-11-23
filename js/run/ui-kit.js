@@ -4,6 +4,7 @@ import { ABILITIES } from '../tactical/data-registry.js';
 import { JOB_DATA } from '../content/jobs.js';
 import { EQUIPMENT, EQUIP_STAT_KEYS, itemRarity, itemName } from '../tactical/data/equipment.js';
 import { Sound } from '../audio/sound.js';
+import { RELICS } from '../content/relics.js';
 import { placeTipAt } from '../ui/tip-place.js';
 
 export const FONT = `'Courier New',monospace`;
@@ -26,15 +27,16 @@ export const RARITY_COLOR = { common: '#ccc', uncommon: '#7bf', rare: '#fc6', le
 // Extra inline style per rarity, on top of its colour: legendary names smoulder.
 export const RARITY_STYLE = { legendary: 'text-shadow:0 0 5px rgba(255,80,20,0.75);font-weight:bold;' };
 
+// desc: what the place offers, for the map's hover label and How to Play.
 export const NODE_INFO = {
-    combat:   { label: 'Battle',   icon: '⚔', color: '#d66' },
-    elite:    { label: 'Elite',    icon: '☠', color: '#f80' },
-    boss:     { label: 'Boss',     icon: '♛', color: '#f44' },
-    event:    { label: 'Event',    icon: '?',      color: '#9cf' },
-    shop:     { label: 'Shop',     icon: '$',      color: '#fc6' },
-    rest:     { label: 'Rest',     icon: '♨', color: '#8d8' },
-    treasure: { label: 'Treasure', icon: '✦', color: '#ec4' },
-    recruit:  { label: 'Recruit',  icon: '+',      color: '#c9f' },
+    combat:   { label: 'Battle',   icon: '⚔', color: '#d66', desc: 'A fight that pays gold, XP and a pick of items.' },
+    elite:    { label: 'Elite',    icon: '☠', color: '#f80', desc: 'A tougher fight with a stronger leader, and better loot, including a relic.' },
+    boss:     { label: 'Boss',     icon: '♛', color: '#f44', desc: 'The heart of the realm. Beat it to end the act.' },
+    event:    { label: 'Event',    icon: '?',      color: '#9cf', desc: 'Something\'s happening on the road. It\'s up to you how to handle it.' },
+    shop:     { label: 'Shop',     icon: '$',      color: '#fc6', desc: 'Buy gear or a relic, or sell what you don\'t need.' },
+    rest:     { label: 'Rest',     icon: '♨', color: '#8d8', desc: 'Train for XP, or enchant one item.' },
+    treasure: { label: 'Treasure', icon: '✦', color: '#ec4', desc: 'Free gold, and often a relic too.' },
+    recruit:  { label: 'Recruit',  icon: '+',      color: '#c9f', desc: 'Someone wants to join the party.' },
 };
 
 export function esc(s) {
@@ -154,6 +156,8 @@ export function drawSprites(root, party, skinManager) {
         const ctx = c.getContext('2d');
         ctx.imageSmoothingEnabled = false;
         ctx.drawImage(sprite, 0, 0, c.width, c.height);
+        // An icon standing in for a glyph (relicIconHtml): show it, drop the glyph.
+        if (c.dataset.glyphSwap != null) { c.style.display = ''; c.nextElementSibling?.remove(); }
     });
 }
 
@@ -165,6 +169,14 @@ export function portraitHtml(member, size = 32) {
 export function itemIconHtml(key, size = 20) {
     return key ? `<canvas class="rk-item" data-item="${esc(key)}" width="${size}" height="${size}"
         style="image-rendering:pixelated;flex-shrink:0;vertical-align:middle;"></canvas>` : '';
+}
+
+// A relic's icon: the skin's items/relic_<key>.png when there is one, otherwise a ◆ in the
+// relic's rarity color (drawSprites swaps them).
+export function relicIconHtml(key, size = 14) {
+    const color = RARITY_COLOR[RELICS[key]?.rarity] ?? '#ccc';
+    return `<span style="display:inline-flex;width:${size}px;height:${size}px;align-items:center;justify-content:center;vertical-align:middle;flex-shrink:0;color:${color};">`
+        + `<canvas class="rk-item" data-item="relic_${esc(key)}" data-glyph-swap width="${size}" height="${size}" style="display:none;image-rendering:pixelated;"></canvas><span>◆</span></span>`;
 }
 
 // A green up arrow for an item that's a strict upgrade for someone (equip-options.strictUpgradeFor),
@@ -183,6 +195,12 @@ export function upgradeArrowHtml(members) {
 //   opts.view         Name of the view shown. Re-showing the same view (e.g. after buying
 //                     something) keeps the scroll position, as does going back to opts.returnTo.
 //   opts.returnTo     The view this one was opened from
+// Open modals, oldest first: Esc closes only the one on top (a help panel over the run menu
+// goes back to the menu, not out of both).
+const openModals = [];
+/** Whether any run-kit panel is open (e.g. so a first-time tip waits until it's closed). */
+export const anyModalOpen = () => openModals.length > 0;
+
 export class Modal {
     constructor(zIndex = 300) {
         this.el = document.createElement('div');
@@ -194,7 +212,7 @@ export class Modal {
         document.body.appendChild(this.el);
         this.el.addEventListener('click', (e) => { if (e.target === this.el) this.back(); });
         this._onKey = (e) => {
-            if (e.key === 'Escape' && this.isOpen) { e.preventDefault(); this.back(); }
+            if (e.key === 'Escape' && this.isOpen && openModals[openModals.length - 1] === this) { e.preventDefault(); this.back(); }
         };
         document.addEventListener('keydown', this._onKey);
         this._opts = {};
@@ -244,6 +262,7 @@ export class Modal {
                 ${inner}
             </div>`;
         this.el.style.display = 'flex';
+        if (!openModals.includes(this)) openModals.push(this);
         this.el.querySelector('.rk-close')?.addEventListener('click', () => this.back());
         this._scroller.scrollTop = restore;
         return this.body;
@@ -262,6 +281,7 @@ export class Modal {
         Sound.playSfx('panel');
         this.el.style.display = 'none';
         this.el.innerHTML = '';
+        if (openModals.includes(this)) openModals.splice(openModals.indexOf(this), 1);
         const done = this._opts.onClose;
         this._opts = {};
         done?.();
@@ -269,8 +289,50 @@ export class Modal {
 
     destroy() {
         document.removeEventListener('keydown', this._onKey);
+        if (openModals.includes(this)) openModals.splice(openModals.indexOf(this), 1);
         this.el.remove();
     }
+}
+
+// ---- Confirm dialog ----
+// The in-game stand-in for window.confirm: resolves true (OK) or false (Cancel, Esc or a click
+// outside). `message` may have line breaks; the first line is the heading. Sits above every
+// other panel (but under hover tips). Enter confirms and Esc cancels.
+//   opts.ok / opts.cancel   button labels      opts.danger   OK in red, for losing progress
+export function confirmDialog(message, opts = {}) {
+    return new Promise((resolve) => {
+        const modal = new Modal(1900);
+        let answered = false;
+        const answer = (yes) => {
+            if (answered) return;
+            answered = true;
+            document.removeEventListener('keydown', onEnter, true);
+            modal.close();
+            modal.destroy();
+            resolve(yes);
+        };
+        // Caught first (capture) and stopped, so the panel underneath doesn't also take the key.
+        const onEnter = (e) => {
+            if (e.key !== 'Enter' && e.key !== 'Escape') return;
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            answer(e.key === 'Enter');
+        };
+        const [head, ...rest] = String(message).split('\n');
+        const okColor = opts.danger ? BTN_DANGER : BTN_GOLD;
+        const body = modal.show(`
+            <div style="color:#fc8;font-weight:bold;font-size:13px;margin-bottom:8px;">${esc(head)}</div>
+            ${rest.map(l => l ? `<div style="margin-bottom:4px;line-height:1.5;">${esc(l)}</div>` : '<div style="height:6px;"></div>').join('')}
+            <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;">
+                <button data-confirm-no style="${BTN}width:auto;color:#aab;">${esc(opts.cancel ?? 'Cancel')}</button>
+                <button data-confirm-yes style="${BTN}width:auto;${okColor}">${esc(opts.ok ?? 'OK')}</button>
+            </div>`, { dismissible: true, onBack: () => answer(false), width: 400 });
+        body.querySelector('.rk-close')?.remove();
+        body.querySelector('[data-confirm-no]').addEventListener('click', () => answer(false));
+        body.querySelector('[data-confirm-yes]').addEventListener('click', () => answer(true));
+        document.addEventListener('keydown', onEnter, true);
+        body.querySelector('[data-confirm-yes]').focus();
+    });
 }
 
 // ---- Hover tips ----

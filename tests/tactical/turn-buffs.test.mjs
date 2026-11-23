@@ -26,9 +26,9 @@ test("Iron Discipline's owner braces too, not just its neighbours", () => {
     // WHEN: its turn begins
     battle.startTurn(marshal);
 
-    // THEN: both have DEF +3 for the coming turn
-    assert.equal(getEffectiveStat(marshal, 'def'), before.me + 3);
-    assert.equal(getEffectiveStat(ally, 'def'), before.ally + 3);
+    // THEN: both have DEF +4 for the coming turn
+    assert.equal(getEffectiveStat(marshal, 'def'), before.me + 4);
+    assert.equal(getEffectiveStat(ally, 'def'), before.ally + 4);
 });
 
 test('the turn buff is refreshed each turn, never stacked', () => {

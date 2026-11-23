@@ -47,6 +47,7 @@ export const abilities = {
         name: 'Slash',
         actionCost: 30,
         basePower: 0.9,
+        desc: 'A quick, careless slash. A little weaker than a plain attack.',
     },
 
     shadow_bolt: {

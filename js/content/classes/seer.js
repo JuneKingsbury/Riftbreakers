@@ -111,10 +111,10 @@ export const abilities = {
         name: 'Time Lapse',
         type: 'magic',
         range: 4, aoe: 0, mpCost: 10, actionCost: 42,
-        targetType: 'enemy', basePower: 0, element: 'arcane',
+        targetType: 'enemy', basePower: 0.6, element: 'arcane',
         animType: 'cast', projectileColor: '#ccddff', chargeTime: 0,
         applyStatus: 'slow', statusDuration: 3,
-        desc: 'Thickens the flow of time around the target, slowing them for {duration} turns.',
+        desc: 'Thickens the flow of time around the target, dealing light magic damage and slowing them for {duration} turns.',
     },
 
     premonition: {

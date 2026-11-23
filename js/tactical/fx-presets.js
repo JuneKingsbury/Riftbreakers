@@ -2,9 +2,10 @@
 // how hard the camera shakes. Pure lookups, so the choices are testable without WebGL; the
 // battle view (battle-view3d.js) plays them through BattleFx (battle-fx.js).
 import { ABILITIES } from './abilities.js';
-import { STATUSES, ENGINE_STATES } from '../content/vocab.js';
+import { STATUSES, ENGINE_STATES, STATS } from '../content/vocab.js';
 
-// Particle colors per element: bright core first, then the darker edges.
+// Particle colors per element: bright core first, then the darker edges. Alchemy has none:
+// each flask glows its own projectileColor.
 const PALETTES = {
     fire:    ['#ffe27a', '#ff9a2e', '#ff4a1e'],
     ice:     ['#ffffff', '#a8e8ff', '#4aa8ff'],
@@ -16,6 +17,9 @@ const PALETTES = {
     spirit:  ['#ecffff', '#a8eaff', '#70c8ff'],
     nature:  ['#e6ff9a', '#9ae85a', '#4aa83a'],
     earth:   ['#d8b888', '#a07a4a', '#6a5236'],
+    necrotic: ['#d8ffd0', '#7acc6a', '#2a4a2a'],
+    illusion: ['#ffe8ff', '#e0a0ff', '#9a6add'],
+    command:  ['#fff4d0', '#ffcc66', '#e08a2a'],
 };
 export const PHYSICAL_SPARKS = ['#ffffff', '#fff2c0', '#ffd27a'];
 export const HEAL_COLORS = ['#c8ffc8', '#66ff88', '#2ee06a'];
@@ -46,8 +50,8 @@ export function projectileSprite(abilityKey) {
     if (ab.animType === 'shot') return isThrown(key) ? null : 'projectile_arrow';
     switch (ab.element) {
         case 'fire': case 'thunder': case 'nature': return 'projectile_spell';
-        case 'shadow': case 'void': case 'spirit': return 'projectile_void';
-        case 'arcane': case 'holy': case 'ice':    return 'projectile_arcane';
+        case 'shadow': case 'void': case 'spirit': case 'necrotic': return 'projectile_void';
+        case 'arcane': case 'holy': case 'ice': case 'illusion': return 'projectile_arcane';
         default: return null;
     }
 }
@@ -59,7 +63,8 @@ export function impactSprite(abilityKey) {
         case 'fire':  return 'fire';
         case 'ice':   return 'freezing';
         case 'holy':  return 'smite';
-        case 'shadow': case 'void': case 'spirit': case 'arcane': return 'spell_attack';
+        case 'shadow': case 'void': case 'spirit': case 'arcane': case 'necrotic': case 'illusion': return 'spell_attack';
+        case 'command': return 'rally';
         default:      return ab?.animType === 'cast' ? 'spell_attack' : 'hit';
     }
 }
@@ -88,6 +93,7 @@ const STATUS_SPRITES = {
     slow: 'freezing', stun: 'mental_break', sleep: 'mental_break', charm: 'mental_break',
     berserk: 'mental_break', doom: 'death', frog: 'spell_teleport',
     hidden: 'spell_teleport', taunted: 'danger',
+    silence: 'mental_break', enfeebled: 'damage_flash',
 };
 
 /** The sprite shown when a status lands on a unit, or null. */
@@ -115,8 +121,10 @@ const STATUS_LOOKS = {
         speed: [0.1, 0.25], up: [0.4, 0.7], life: [0.3, 0.45], radius: 0.22 } },
     charm:     { glyph: '♥', color: '#f8c', aura: { every: 480, y: 0.8, layer: 'mote', count: 1, colors: ['#ffd8ee', '#ff8cc8', '#ff4aa0'],
         speed: [0, 0.08], up: [0.25, 0.4], gravity: -0.05, life: [0.8, 1.1], radius: 0.2, wobble: 0.05 } },
-    frog:      { glyph: '≈', color: '#7d5' },
-    enfeebled: { glyph: '⇣', color: '#e86' },
+    frog:      { glyph: '≈', color: '#7d5', aura: { every: 700, y: 0.3, layer: 'mote', count: 1, colors: ['#d8ffb0', '#8ad84a', '#4a9a2a'],
+        speed: [0.05, 0.12], up: [0.15, 0.3], gravity: 0.1, life: [0.5, 0.7], radius: 0.15, alpha: 0.7 } },
+    enfeebled: { glyph: '⇣', color: '#e86', aura: { every: 600, y: 0.8, layer: 'mote', count: 1, colors: ['#ffc8a0', '#e8865a'],
+        speed: [0, 0.05], up: [-0.3, -0.15], life: [0.6, 0.8], radius: 0.18, alpha: 0.6 } },
     doom:      { glyph: '☠', color: '#f6c', aura: { every: 380, y: 0.7, layer: 'mote', count: 1, colors: ['#c06', '#802', '#3a0a2a'],
         speed: [0.05, 0.15], up: [-0.25, -0.1], life: [0.7, 1], radius: 0.25, alpha: 0.8 } },
     taunted:   { glyph: '⚑', color: '#f64', aura: { every: 600, y: 1.05, layer: 'spark', count: 1, colors: ['#ff9a6a', '#ff4a2a'],
@@ -133,9 +141,12 @@ const STATUS_LOOKS = {
         speed: [0, 0.05], up: [0, 0.05], life: [0.2, 0.3], radius: 0.35 } },
     reraise:   { glyph: '☥', color: '#fe8', aura: { every: 900, y: 0.3, layer: 'mote', count: 1, colors: ['#fffbe0', '#ffe68a'],
         speed: [0, 0.05], up: [0.3, 0.45], gravity: -0.05, life: [0.8, 1], radius: 0.2, alpha: 0.7 } },
-    slipped:   { glyph: '~', color: '#9ef' },
-    hidden:    { glyph: '◌', color: '#99a' },
-    defend:    { glyph: '▼', color: '#fd8', ward: true },
+    slipped:   { glyph: '~', color: '#9ef', aura: { every: 650, y: 0.1, layer: 'mote', count: 1, colors: ['#e0f8ff', '#9ee0ff'],
+        speed: [0.15, 0.3], up: [0, 0.05], life: [0.4, 0.6], radius: 0.3, alpha: 0.5 } },
+    hidden:    { glyph: '◌', color: '#99a', aura: { every: 500, y: 0.5, layer: 'mote', count: 1, colors: ['#c8c8d8', '#7a7a8a'],
+        speed: [0, 0.05], up: [0.05, 0.15], life: [0.8, 1.1], radius: 0.35, wobble: 0.05, alpha: 0.35 } },
+    defend:    { glyph: '▼', color: '#fd8', ward: true, aura: { every: 700, y: 0.5, layer: 'spark', count: 1, colors: ['#fff6d0', '#ffd88a'],
+        speed: [0, 0.05], up: [0, 0.08], life: [0.3, 0.45], radius: 0.3 } },
 };
 const STAT_SHORT = { atk: 'ATK', def: 'DEF', mat: 'MAT', mdf: 'MDF', eva: 'EVA', crit: 'CRT', spd: 'SPD', move: 'MOV' };
 
@@ -159,6 +170,7 @@ export function statusBadges(unit, { withDoom = false } = {}) {
         const t = unit.statusTimers?.[key];
         out.push({ key, glyph: look.glyph + '︎', color: look.color,
             name: STATUSES[key]?.name ?? ENGINE_STATES[key]?.name ?? key,
+            desc: STATUSES[key]?.desc ?? ENGINE_STATES[key]?.desc ?? '',
             turns: t > 0 && t < 99 ? t : null, harmful: !!STATUSES[key]?.harmful });
     }
     // Buffs from statuses (Frog, Enfeeble) already have their badge.
@@ -171,7 +183,7 @@ export function statusBadges(unit, { withDoom = false } = {}) {
         if (!v) continue;
         const label = STAT_SHORT[stat] ?? stat.toUpperCase();
         out.push({ key: `buff_${stat}`, glyph: `${label}${v > 0 ? '▲' : '▼'}`, color: v > 0 ? '#7e7' : '#f77',
-            name: `${label} ${v > 0 ? '+' : ''}${v}`, turns: null, harmful: v < 0 });
+            name: `${label} ${v > 0 ? '+' : ''}${v}`, desc: STATS[stat]?.desc ?? '', turns: null, harmful: v < 0 });
     }
     return out;
 }
