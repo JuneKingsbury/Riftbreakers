@@ -1250,6 +1250,7 @@
       "progress_bar"
     ],
     "portraits": [
+      "colony_10",
       "first_crusader_raid_survived",
       "first_death",
       "first_love",
@@ -1258,12 +1259,15 @@
       "realm_abandoned_laboratory",
       "realm_ancient_university",
       "realm_arcane_library",
+      "realm_crusader_barracks",
       "realm_crystal_caves",
       "realm_crystal_depths",
       "realm_crystal_mines",
       "realm_fracture_gate",
       "realm_fungal_hollows",
+      "realm_kingdom_outskirts",
       "realm_oblivion_rift",
+      "realm_palace_fortress",
       "realm_primeval_canopy",
       "realm_shadow_realm",
       "realm_verdant_depths",
